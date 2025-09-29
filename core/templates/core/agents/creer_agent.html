@@ -1,0 +1,49 @@
+<!-- templates/agents/creer_agent.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Créer un Nouvel Agent</h1>
+    <a href="{% url 'liste_agents' %}" class="btn btn-secondary">← Retour</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="nom" class="form-label">Nom *</label>
+                    <input type="text" class="form-control" id="nom" name="nom" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="prenom" class="form-label">Prénom *</label>
+                    <input type="text" class="form-control" id="prenom" name="prenom" required>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="telephone" class="form-label">Téléphone *</label>
+                    <input type="tel" class="form-control" id="telephone" name="telephone" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="type_agent" class="form-label">Type d'Agent *</label>
+                    <select class="form-select" id="type_agent" name="type_agent" required>
+                        <option value="terrain">Agent Terrain</option>
+                        <option value="superviseur">Superviseur</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                <small>Le mot de passe temporaire sera "temp123". L'agent pourra le changer après sa première connexion.</small>
+            </div>
+
+            <button type="submit" class="btn btn-success">Créer l'Agent</button>
+            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">Annuler</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

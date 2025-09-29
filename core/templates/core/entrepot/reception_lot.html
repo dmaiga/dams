@@ -1,0 +1,251 @@
+<!-- core/entrepot/reception_lot.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Réception de Lot{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Réception d'un Nouveau Lot</h4>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data" id="reception-form">
+                        {% csrf_token %}
+                        
+                        <!-- Section Produit -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Produit</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            {{ form.nouveau_produit }}
+                                            <label class="form-check-label" for="{{ form.nouveau_produit.id_for_label }}">
+                                                Nouveau produit
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Produit existant -->
+                                <div id="produit-existant-group" class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Produit existant</label>
+                                        {{ form.produit }}
+                                        {% if form.produit.errors %}
+                                        <div class="text-danger small">{{ form.produit.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Nouveau produit -->
+                                <div id="nouveau-produit-group" class="row" style="display: none;">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nom du nouveau produit</label>
+                                        {{ form.nouveau_produit_nom }}
+                                        {% if form.nouveau_produit_nom.errors %}
+                                        <div class="text-danger small">{{ form.nouveau_produit_nom.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Description</label>
+                                        {{ form.nouveau_produit_description }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section Fournisseur -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Fournisseur</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            {{ form.nouveau_fournisseur }}
+                                            <label class="form-check-label" for="{{ form.nouveau_fournisseur.id_for_label }}">
+                                                Nouveau fournisseur
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Fournisseur existant -->
+                                <div id="fournisseur-existant-group" class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Fournisseur existant</label>
+                                        {{ form.fournisseur }}
+                                        {% if form.fournisseur.errors %}
+                                        <div class="text-danger small">{{ form.fournisseur.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <!-- Nouveau fournisseur -->
+                                <div id="nouveau-fournisseur-group" class="row" style="display: none;">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nom du fournisseur</label>
+                                        {{ form.nouveau_fournisseur_nom }}
+                                        {% if form.nouveau_fournisseur_nom.errors %}
+                                        <div class="text-danger small">{{ form.nouveau_fournisseur_nom.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Contact</label>
+                                        {{ form.nouveau_fournisseur_contact }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Informations du lot -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Informations du Lot</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Quantité</label>
+                                        {{ form.quantite_initiale }}
+                                        {% if form.quantite_initiale.errors %}
+                                        <div class="text-danger small">{{ form.quantite_initiale.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Prix d'achat unitaire (FCFA)</label>
+                                        {{ form.prix_achat_unitaire }}
+                                        {% if form.prix_achat_unitaire.errors %}
+                                        <div class="text-danger small">{{ form.prix_achat_unitaire.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'liste_lots' %}" class="btn btn-secondary">Annuler</a>
+                            <button type="submit" class="btn btn-primary">Enregistrer le lot</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Éléments pour les produits
+    const nouveauProduitCheckbox = document.getElementById('{{ form.nouveau_produit.id_for_label }}');
+    const produitExistantGroup = document.getElementById('produit-existant-group');
+    const nouveauProduitGroup = document.getElementById('nouveau-produit-group');
+    const selectProduit = document.getElementById('{{ form.produit.id_for_label }}');
+    const inputNouveauProduit = document.getElementById('{{ form.nouveau_produit_nom.id_for_label }}');
+    const inputDescriptionProduit = document.getElementById('{{ form.nouveau_produit_description.id_for_label }}');
+
+    // Éléments pour les fournisseurs
+    const nouveauFournisseurCheckbox = document.getElementById('{{ form.nouveau_fournisseur.id_for_label }}');
+    const fournisseurExistantGroup = document.getElementById('fournisseur-existant-group');
+    const nouveauFournisseurGroup = document.getElementById('nouveau-fournisseur-group');
+    const selectFournisseur = document.getElementById('{{ form.fournisseur.id_for_label }}');
+    const inputNouveauFournisseur = document.getElementById('{{ form.nouveau_fournisseur_nom.id_for_label }}');
+    const inputContactFournisseur = document.getElementById('{{ form.nouveau_fournisseur_contact.id_for_label }}');
+
+    // Fonction pour basculer les groupes produit
+    function toggleProduitFields() {
+        if (nouveauProduitCheckbox.checked) {
+            produitExistantGroup.style.display = 'none';
+            nouveauProduitGroup.style.display = 'block';
+            if (selectProduit) {
+                selectProduit.disabled = true;
+                selectProduit.required = false;
+            }
+            if (inputNouveauProduit) {
+                inputNouveauProduit.disabled = false;
+                inputNouveauProduit.required = true;
+            }
+            if (inputDescriptionProduit) {
+                inputDescriptionProduit.disabled = false;
+            }
+        } else {
+            produitExistantGroup.style.display = 'block';
+            nouveauProduitGroup.style.display = 'none';
+            if (selectProduit) {
+                selectProduit.disabled = false;
+                selectProduit.required = true;
+            }
+            if (inputNouveauProduit) {
+                inputNouveauProduit.disabled = true;
+                inputNouveauProduit.required = false;
+            }
+            if (inputDescriptionProduit) {
+                inputDescriptionProduit.disabled = true;
+            }
+        }
+    }
+
+    // Fonction pour basculer les groupes fournisseur
+    function toggleFournisseurFields() {
+        if (nouveauFournisseurCheckbox.checked) {
+            fournisseurExistantGroup.style.display = 'none';
+            nouveauFournisseurGroup.style.display = 'block';
+            if (selectFournisseur) {
+                selectFournisseur.disabled = true;
+                selectFournisseur.required = false;
+            }
+            if (inputNouveauFournisseur) {
+                inputNouveauFournisseur.disabled = false;
+                inputNouveauFournisseur.required = true;
+            }
+            if (inputContactFournisseur) {
+                inputContactFournisseur.disabled = false;
+            }
+        } else {
+            fournisseurExistantGroup.style.display = 'block';
+            nouveauFournisseurGroup.style.display = 'none';
+            if (selectFournisseur) {
+                selectFournisseur.disabled = false;
+                selectFournisseur.required = true;
+            }
+            if (inputNouveauFournisseur) {
+                inputNouveauFournisseur.disabled = true;
+                inputNouveauFournisseur.required = false;
+            }
+            if (inputContactFournisseur) {
+                inputContactFournisseur.disabled = true;
+            }
+        }
+    }
+
+    // Événements
+    if (nouveauProduitCheckbox) {
+        nouveauProduitCheckbox.addEventListener('change', toggleProduitFields);
+    }
+    if (nouveauFournisseurCheckbox) {
+        nouveauFournisseurCheckbox.addEventListener('change', toggleFournisseurFields);
+    }
+
+    // Initialisation
+    toggleProduitFields();
+    toggleFournisseurFields();
+});
+</script>
+{% endblock %}

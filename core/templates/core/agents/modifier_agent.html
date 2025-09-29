@@ -1,0 +1,52 @@
+<!-- templates/agents/modifier_agent.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Modifier l'Agent</h1>
+    <a href="{% url 'liste_agents' %}" class="btn btn-secondary">← Retour</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="nom" class="form-label">Nom *</label>
+                    <input type="text" class="form-control" id="nom" name="nom" 
+                           value="{{ agent.user.first_name }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="prenom" class="form-label">Prénom *</label>
+                    <input type="text" class="form-control" id="prenom" name="prenom" 
+                           value="{{ agent.user.last_name }}" required>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="telephone" class="form-label">Téléphone *</label>
+                    <input type="tel" class="form-control" id="telephone" name="telephone" 
+                           value="{{ agent.telephone }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="type_agent" class="form-label">Type d'Agent *</label>
+                    <select class="form-select" id="type_agent" name="type_agent" required>
+                        <option value="terrain" {% if agent.type_agent == 'terrain' %}selected{% endif %}>
+                            Agent Terrain
+                        </option>
+                        <option value="superviseur" {% if agent.type_agent == 'superviseur' %}selected{% endif %}>
+                            Superviseur
+                        </option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">Annuler</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
