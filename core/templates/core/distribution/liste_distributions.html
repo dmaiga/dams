@@ -1,0 +1,81 @@
+<!-- templates/distribution/liste_distributions.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Historique des Distributions</h1>
+    <div>
+        <a href="{% url 'distribuer_produits' %}" class="btn btn-success">➕ Nouvelle distribution</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if distributions %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Superviseur</th>
+                        <th>Agent Terrain</th>
+                        <th>Produit</th>
+                        <th>Quantité</th>
+                        <th>Prix Gros</th>
+                        <th>Prix Détail</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dist in distributions %}
+                    <tr>
+                        <td>{{ dist.date_distribution|date:"d/m/Y H:i" }}</td>
+                        <td>{{ dist.superviseur.user.first_name }}</td>
+                        <td>{{ dist.agent_terrain.user.first_name }}</td>
+                        <td>{{ dist.produit_nom }}</td>
+                        <td>{{ dist.quantite }}</td>
+                        <td>{{ dist.prix_vente_gros }} FCFA</td>
+                        <td>{{ dist.prix_vente_detail }} FCFA</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Statistiques -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h5>{{ distributions|length }}</h5>
+                        <p class="mb-0">Distributions totales</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h5>{{ distributions|length }}</h5>
+                        <p class="mb-0">Agents concernés</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h5>{{ distributions|length }}</h5>
+                        <p class="mb-0">Produits différents</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="text-center py-4">
+            <p class="text-muted">Aucune distribution enregistrée</p>
+            <a href="{% url 'distribuer_produits' %}" class="btn btn-primary">Faire la première distribution</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

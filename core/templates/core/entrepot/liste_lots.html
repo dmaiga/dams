@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Liste des Lots - Entrepôt{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header pb-0">
+                    <div class="d-flex align-items-center">
+                        <h4>Gestion des Lots</h4>
+                        <a href="{% url 'reception_lot' %}" class="btn btn-primary btn-sm ms-auto">
+                            <i class="fas fa-plus me-2"></i>Nouveau Lot
+                        </a>
+                    </div>
+                    <p class="text-sm mb-0">Tous les lots reçus de l'entrepôt</p>
+                </div>
+                <div class="card-body">
+                    <!-- Filtres -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" placeholder="Filtrer par produit..." 
+                                   name="produit" value="{{ request.GET.produit }}" id="produit-filter">
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" placeholder="Filtrer par fournisseur..." 
+                                   name="fournisseur" value="{{ request.GET.fournisseur }}" id="fournisseur-filter">
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" name="statut" id="statut-filter">
+                                <option value="">Tous les statuts</option>
+                                <option value="disponible" {% if request.GET.statut == 'disponible' %}selected{% endif %}>Disponible</option>
+                                <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>Épuisé</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-outline-primary w-100" onclick="appliquerFiltres()">Filtrer</button>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques -->
+                    <div class="row mb-4">
+                        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+                            <div class="card">
+                                <div class="card-body p-3">
+                                    <div class="row">
+                                        <div class="col-8">
+                                            <div class="numbers">
+                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Total Lots</p>
+                                                <h5 class="font-weight-bolder mb-0">{{ total_lots }}</h5>
+                                            </div>
+                                        </div>
+                                        <div class="col-4 text-end">
+                                            <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                                                <i class="fas fa-boxes text-lg opacity-10"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+                            <div class="card">
+                                <div class="card-body p-3">
+                                    <div class="row">
+                                        <div class="col-8">
+                                            <div class="numbers">
+                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Stock Total</p>
+                                                <h5 class="font-weight-bolder mb-0">{{ total_stock }}</h5>
+                                            </div>
+                                        </div>
+                                        <div class="col-4 text-end">
+                                            <div class="icon icon-shape bg-gradient-success shadow text-center border-radius-md">
+                                                <i class="fas fa-cubes text-lg opacity-10"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+                            <div class="card">
+                                <div class="card-body p-3">
+                                    <div class="row">
+                                        <div class="col-8">
+                                            <div class="numbers">
+                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Valeur Stock</p>
+                                                <h5 class="font-weight-bolder mb-0">{{ total_valeur|floatformat:0 }} FCFA</h5>
+                                            </div>
+                                        </div>
+                                        <div class="col-4 text-end">
+                                            <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
+                                                <i class="fas fa-money-bill text-lg opacity-10"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-sm-6">
+                            <div class="card">
+                                <div class="card-body p-3">
+                                    <div class="row">
+                                        <div class="col-8">
+                                            <div class="numbers">
+                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Lots Épuisés</p>
+                                                <h5 class="font-weight-bolder mb-0">
+                                                    {{ lots|length|add:"-1" }}  {# Exemple, à adapter #}
+                                                </h5>
+                                            </div>
+                                        </div>
+                                        <div class="col-4 text-end">
+                                            <div class="icon icon-shape bg-gradient-danger shadow text-center border-radius-md">
+                                                <i class="fas fa-exclamation-triangle text-lg opacity-10"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tableau des lots -->
+                    <div class="table-responsive">
+                        <table class="table table-flush" id="lots-table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Référence</th>
+                                    <th>Produit</th>
+                                    <th>Fournisseur</th>
+                                    <th>Stock</th>
+                                    <th>Prix d'achat</th>
+                                    <th>Valeur stock</th>
+                                    <th>Date réception</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lot in lots %}
+                                <tr>
+                                    <td class="font-weight-bold">
+                                        {% if lot.reference_lot %}
+                                            {{ lot.reference_lot }}
+                                        {% else %}
+                                            Lot #{{ lot.id }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ lot.produit.nom }}
+                                    </td>
+                                    <td>{{ lot.fournisseur.nom }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="me-2">{{ lot.quantite_restante }}/{{ lot.quantite_initiale }}</span>
+                                            <div>
+                                                <div class="progress" style="width: 100px; height: 3px;">
+                                                    {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress_percent %}
+                                                    <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-gradient-success{% else %}bg-gradient-danger{% endif %}" 
+                                                         role="progressbar" 
+                                                         style="width: {{ progress_percent }}%" 
+                                                         aria-valuenow="{{ lot.quantite_restante }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="{{ lot.quantite_initiale }}"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ lot.prix_achat_unitaire }} FCFA</td>
+                                    <td class="font-weight-bold">
+                                        {% widthratio lot.quantite_restante 1 lot.prix_achat_unitaire as valeur %}
+                                        {{ valeur }} FCFA
+                                    </td>
+                                    <td>{{ lot.date_reception|date:"d/m/Y H:i" }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="#" class="btn btn-outline-info btn-sm" data-bs-toggle="tooltip" title="Voir détails">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if lot.quantite_restante > 0 %}
+                                            <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}" class="btn btn-outline-primary btn-sm" data-bs-toggle="tooltip" title="Distribuer">
+                                                <i class="fas fa-share"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-4">
+                                        <i class="fas fa-box-open fa-2x mb-3 text-muted"></i>
+                                        <p class="text-muted">Aucun lot enregistré</p>
+                                        <a href="{% url 'reception_lot' %}" class="btn btn-primary">
+                                            Ajouter le premier lot
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function appliquerFiltres() {
+    const produit = document.getElementById('produit-filter').value;
+    const fournisseur = document.getElementById('fournisseur-filter').value;
+    const statut = document.getElementById('statut-filter').value;
+    
+    const params = new URLSearchParams();
+    if (produit) params.append('produit', produit);
+    if (fournisseur) params.append('fournisseur', fournisseur);
+    if (statut) params.append('statut', statut);
+    
+    window.location.href = '{% url "liste_lots" %}' + (params.toString() ? '?' + params.toString() : '');
+}
+
+// Appliquer les filtres avec Enter
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('#produit-filter, #fournisseur-filter');
+    inputs.forEach(input => {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                appliquerFiltres();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

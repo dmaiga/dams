@@ -1,0 +1,32 @@
+<!-- templates/agents/supprimer_agent.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Supprimer l'Agent</h1>
+    <a href="{% url 'liste_agents' %}" class="btn btn-secondary">← Retour</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="alert alert-danger">
+            <h5>⚠️ Attention !</h5>
+            <p>Vous êtes sur le point de supprimer l'agent :</p>
+            <ul>
+                <li><strong>Nom :</strong> {{ agent.user.first_name }} {{ agent.user.last_name }}</li>
+                <li><strong>Téléphone :</strong> {{ agent.telephone }}</li>
+                <li><strong>Type :</strong> {{ agent.get_type_agent_display }}</li>
+            </ul>
+            <p class="mb-0"><strong>Cette action est irréversible !</strong></p>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="{% url 'liste_agents' %}" class="btn btn-secondary me-md-2">Annuler</a>
+                <button type="submit" class="btn btn-danger">Confirmer la suppression</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
