@@ -1,0 +1,481 @@
+<!-- core/templates/core/dashboard_agent.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Tableau de Bord - Agent Terrain{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- En-tête avec informations agent -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-gradient-dark text-white">
+                <div class="card-body py-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h4 class="mb-1">Bonjour, {{ agent.user.get_full_name|default:agent.user.username }} !</h4>
+                            <p class="mb-0 opacity-8">
+                                <i class="fas fa-map-marker-alt"></i>
+                                Agent Terrain • 
+                                <i class="fas fa-calendar-alt"></i>
+                                {% now "d F Y" %}
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <a href="{% url 'enregistrer_vente' %}" class="btn btn-success btn-lg">
+                                <i class="fas fa-plus-circle"></i> Nouvelle Vente
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Indicateurs de performance -->
+    <div class="row mb-4">
+        <!-- Chiffre d'affaires -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">
+                                Chiffre d'Affaires
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ chiffre_affaires_total|floatformat:0 }} FCFA</div>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up"></i> {{ pourcentage_croissance }}% ce mois
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bonus totaux -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-success border-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-success text-uppercase mb-1">
+                                Bonus Obtenus
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ bonus_agent.total_bonus|floatformat:0 }} FCFA</div>
+                            <small class="text-success">
+                                {{ bonus_agent.nombre_produits_recouverts }} produits recouverts
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-gift fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dettes en cours -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">
+                                À Recouvrer
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ total_a_recouvrer|floatformat:0 }} FCFA</div>
+                            <small class="text-warning">
+                                {{ dettes_en_cours.count }} dette{{ dettes_en_cours.count|pluralize }} en cours
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-invoice-dollar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock disponible -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-info border-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-info text-uppercase mb-1">
+                                Stock Disponible
+                            </div>
+                            <div class="h5 mb-0 fw-bold text-gray-800">{{ total_stock_disponible }}</div>
+                            <small class="text-info">
+                                {{ produits_disponibles.count }} produit{{ produits_disponibles.count|pluralize }} différents
+                            </small>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Colonne gauche : Actions rapides et stock -->
+        <div class="col-lg-5">
+            <!-- Actions rapides -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Actions Rapides</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <a href="{% url 'enregistrer_vente' %}" class="btn btn-success w-100 h-100 py-3">
+                                <i class="fas fa-cash-register fa-2x mb-2"></i>
+                                <br>
+                                <span>Nouvelle Vente</span>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'liste_dettes' %}" class="btn btn-warning w-100 h-100 py-3">
+                                <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                                <br>
+                                <span>Recouvrement</span>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'consulter_bonus' %}" class="btn btn-info w-100 h-100 py-3">
+                                <i class="fas fa-gift fa-2x mb-2"></i>
+                                <br>
+                                <span>Mes Bonus</span>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{% url 'liste_ventes' %}" class="btn btn-primary w-100 h-100 py-3">
+                                <i class="fas fa-chart-line fa-2x mb-2"></i>
+                                <br>
+                                <span>Statistiques</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stock disponible -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Stock Disponible</h5>
+                    <span class="badge bg-primary">{{ total_stock_disponible }} unités</span>
+                </div>
+                <div class="card-body p-0">
+                    {% if produits_disponibles %}
+                    <div class="list-group list-group-flush">
+                        {% for detail in produits_disponibles|slice:":5" %}
+                        <div class="list-group-item">
+                            <div class="row align-items-center">
+                                <div class="col-8">
+                                    <h6 class="mb-1">{{ detail.lot.produit.nom }}</h6>
+                                    <small class="text-muted">
+                                        Lot: {{ detail.lot.reference_lot|default:"N/A" }}
+                                        {% if detail.prix_gros and detail.prix_detail %}
+                                        • Gros: {{ detail.prix_gros }}F • Détail: {{ detail.prix_detail }}F
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <span class="badge bg-{% if detail.quantite > 10 %}success{% elif detail.quantite > 3 %}warning{% else %}danger{% endif %}">
+                                        {{ detail.quantite }} unités
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if produits_disponibles.count > 5 %}
+                    <div class="card-footer text-center">
+                        <a href="#" class="btn btn-sm btn-outline-primary">
+                            Voir les {{ produits_disponibles.count|add:"-5" }} autres produits
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-box-open fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">Aucun stock disponible</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bonus du mois -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Objectif Bonus du Mois</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h3 class="text-success">{{ bonus_mois|floatformat:0 }} FCFA</h3>
+                        <small class="text-muted">Bonus obtenus ce mois</small>
+                    </div>
+                    <div class="progress mb-3" style="height: 20px;">
+                        {% widthratio produits_recouverts_mois 50 100 as pourcentage_objectif %}
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ pourcentage_objectif }}%"
+                             aria-valuenow="{{ produits_recouverts_mois }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="50">
+                            {{ produits_recouverts_mois }}/50 produits
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted">Produits recouverts</small>
+                            <br>
+                            <strong>{{ produits_recouverts_mois }}</strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Bonus/produit</small>
+                            <br>
+                            <strong>100 FCFA</strong>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Objectif: 50 produits = 5 000 FCFA de bonus
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne droite : Dettes et activité récente -->
+        <div class="col-lg-7">
+            <!-- Dettes à recouvrer en priorité -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Dettes à Recouvrer</h5>
+                    <a href="{% url 'liste_dettes' %}" class="btn btn-sm btn-outline-primary">
+                        Voir tout
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if dettes_prioritaires %}
+                    <div class="list-group list-group-flush">
+                        {% for dette in dettes_prioritaires %}
+                        <div class="list-group-item {% if dette.est_en_retard %}list-group-item-warning{% endif %}">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h6 class="mb-1">{{ dette.vente.client.nom }}</h6>
+                                    <small class="text-muted">
+                                        {{ dette.vente.detail_distribution.lot.produit.nom }} • 
+                                        {{ dette.nom_localite }}
+                                    </small>
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <strong class="{% if dette.est_en_retard %}text-danger{% else %}text-warning{% endif %}">
+                                        {{ dette.montant_restant }} FCFA
+                                    </strong>
+                                    <br>
+                                    <small class="text-muted">reste</small>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    {% if dette.est_en_retard %}
+                                    <span class="badge bg-danger">
+                                        {{ dette.jours_retard }}j retard
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-{% if dette.eligible_bonus %}success{% else %}secondary{% endif %}">
+                                        {{ dette.date_echeance|date:"d/m" }}
+                                    </span>
+                                    {% endif %}
+                                    <br>
+                                    <a href="{% url 'enregistrer_paiement_dette' dette.id %}" class="btn btn-sm btn-success mt-1">
+                                        Payer
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <p class="text-muted mb-0">Aucune dette en cours</p>
+                        <small class="text-muted">Toutes les dettes sont réglées !</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Activité récente -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Activité Récente</h5>
+                    <a href="{% url 'liste_ventes' %}" class="btn btn-sm btn-outline-primary">
+                        Voir l'historique
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if ventes_recentes %}
+                    <div class="list-group list-group-flush">
+                        {% for vente in ventes_recentes %}
+                        <div class="list-group-item">
+                            <div class="row align-items-center">
+                                <div class="col-2 text-center">
+                                    <span class="badge bg-{% if vente.mode_paiement == 'comptant' %}success{% else %}warning{% endif %}">
+                                        {{ vente.get_mode_paiement_display|slice:":1" }}
+                                    </span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>{{ vente.client.nom }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ vente.detail_distribution.lot.produit.nom }} • 
+                                        {{ vente.quantite }} unités
+                                    </small>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <strong>{{ vente.total_vente }} FCFA</strong>
+                                    <br>
+                                    <small class="text-muted">{{ vente.date_vente|timesince }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-shopping-cart fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">Aucune vente récente</p>
+                        <a href="{% url 'enregistrer_vente' %}" class="btn btn-sm btn-primary mt-2">
+                            Commencer à vendre
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistiques rapides -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center py-3">
+                            <h4 class="mb-1">{{ ventes_mois.count }}</h4>
+                            <small class="opacity-8">Ventes ce mois</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center py-3">
+                            <h4 class="mb-1">{{ ventes_comptant_mois.count }}</h4>
+                            <small class="opacity-8">Ventes comptant</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mt-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center py-3">
+                            <h4 class="mb-1">{{ ventes_credit_mois.count }}</h4>
+                            <small class="opacity-8">Ventes crédit</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mt-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center py-3">
+                            <h4 class="mb-1">{{ clients_servis_mois }}</h4>
+                            <small class="opacity-8">Clients ce mois</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mise à jour en temps réel de l'heure
+    function updateTime() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('fr-FR', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        const dateString = now.toLocaleDateString('fr-FR', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        
+        // Mettre à jour l'affichage si nécessaire
+        console.log('Dashboard mis à jour:', timeString);
+    }
+
+    // Mettre à jour toutes les minutes
+    setInterval(updateTime, 60000);
+
+    // Animation des compteurs
+    function animateCounter(element, target) {
+        let current = 0;
+        const increment = target / 100;
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                element.textContent = Math.floor(target).toLocaleString();
+                clearInterval(timer);
+            } else {
+                element.textContent = Math.floor(current).toLocaleString();
+            }
+        }, 20);
+    }
+
+    // Animer les indicateurs principaux
+    const counters = document.querySelectorAll('.fw-bold.text-gray-800');
+    counters.forEach(counter => {
+        const target = parseInt(counter.textContent.replace(/\s/g, '')) || 0;
+        if (target > 0) {
+            animateCounter(counter, target);
+        }
+    });
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border-radius: 0.5rem;
+}
+.border-start {
+    border-left-width: 0.25rem !important;
+}
+.list-group-item {
+    border: none;
+    padding: 1rem;
+}
+.btn-success {
+    background: linear-gradient(45deg, #1cc88a, #13855c);
+    border: none;
+}
+.bg-gradient-dark {
+    background: linear-gradient(45deg, #5a5c69, #3a3b45);
+}
+.progress {
+    border-radius: 10px;
+}
+.badge {
+    font-size: 0.75rem;
+}
+</style>
+{% endblock %}

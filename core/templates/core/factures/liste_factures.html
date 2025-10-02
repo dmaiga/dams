@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Factures</h1>
+<a href="{% url 'creer_facture' %}" class="btn btn-success mb-3">➕ Nouvelle Facture</a>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Agent</th>
+            <th>Montant</th>
+            <th>Fichier</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for facture in factures %}
+        <tr>
+            <td>{{ facture.date_depot|date:"d/m/Y H:i" }}</td>
+            <td>{{ facture.get_type_facture_display }}</td>
+            <td>{{ facture.agent.user.first_name }}</td>
+            <td>{{ facture.montant }} FCFA</td>
+            <td>
+                {% if facture.fichier_facture %}
+                    <a href="{{ facture.fichier_facture.url }}" target="_blank">Voir</a>
+                {% endif %}
+            </td>
+            <td>
+                <a href="{% url 'modifier_facture' facture.id %}" class="btn btn-sm btn-primary">Modifier</a>
+                <a href="{% url 'supprimer_facture' facture.id %}" class="btn btn-sm btn-danger">Supprimer</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

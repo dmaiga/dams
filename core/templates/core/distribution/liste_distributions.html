@@ -1,4 +1,3 @@
-<!-- templates/distribution/liste_distributions.html -->
 {% extends 'base.html' %}
 
 {% block content %}
@@ -24,51 +23,68 @@
                         <th>Quantité</th>
                         <th>Prix Gros</th>
                         <th>Prix Détail</th>
+                        <th>Valeur Gros</th>
+                        <th>Valeur Détail</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for dist in distributions %}
-                    <tr>
-                        <td>{{ dist.date_distribution|date:"d/m/Y H:i" }}</td>
-                        <td>{{ dist.superviseur.user.first_name }}</td>
-                        <td>{{ dist.agent_terrain.user.first_name }}</td>
-                        <td>{{ dist.produit_nom }}</td>
-                        <td>{{ dist.quantite }}</td>
-                        <td>{{ dist.prix_vente_gros }} FCFA</td>
-                        <td>{{ dist.prix_vente_detail }} FCFA</td>
-                    </tr>
+                        {% for detail in dist.detaildistribution_set.all %}
+                        <tr>
+                            <td>{{ dist.date_distribution|date:"d/m/Y H:i" }}</td>
+                            <td>{{ dist.superviseur.user.first_name }}</td>
+                            <td>{{ dist.agent_terrain.user.first_name }}</td>
+                            <td>{{ detail.lot.produit.nom }}</td>
+                            <td>{{ detail.quantite }}</td>
+<td>{{ detail.prix_gros }} FCFA</td>
+<td>{{ detail.prix_detail }} FCFA</td>
+<td>{{ dist.valeur_attendue_gros|floatformat:0 }} FCFA</td>
+<td>{{ dist.valeur_attendue_detail|floatformat:0 }} FCFA</td>
+
+                        </tr>
+                        {% endfor %}
                     {% endfor %}
                 </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="4">Totaux</td>
+                        <td>{{ total_quantite }}</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>{{ total_valeur_gros|floatformat:0 }} FCFA</td>
+                        <td>{{ total_valeur_detail|floatformat:0 }} FCFA</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
-
-        <!-- Statistiques -->
-        <div class="row mt-4">
-            <div class="col-md-4">
-                <div class="card bg-light">
-                    <div class="card-body text-center">
-                        <h5>{{ distributions|length }}</h5>
-                        <p class="mb-0">Distributions totales</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card bg-light">
-                    <div class="card-body text-center">
-                        <h5>{{ distributions|length }}</h5>
-                        <p class="mb-0">Agents concernés</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card bg-light">
-                    <div class="card-body text-center">
-                        <h5>{{ distributions|length }}</h5>
-                        <p class="mb-0">Produits différents</p>
-                    </div>
-                </div>
+<!-- Statistiques générales -->
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <h5>{{ total_distributions }}</h5>
+                <p class="mb-0">Distributions totales</p>
             </div>
         </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <h5>{{ total_agents }}</h5>
+                <p class="mb-0">Agents concernés</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <h5>{{ total_produits }}</h5>
+                <p class="mb-0">Produits différents</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 
         {% else %}
         <div class="text-center py-4">

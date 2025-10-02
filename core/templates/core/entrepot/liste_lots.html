@@ -178,9 +178,7 @@
                                     <td>{{ lot.date_reception|date:"d/m/Y H:i" }}</td>
                                     <td>
                                         <div class="btn-group">
-                                            <a href="#" class="btn btn-outline-info btn-sm" data-bs-toggle="tooltip" title="Voir détails">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
+                                           
                                             {% if lot.quantite_restante > 0 %}
                                             <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}" class="btn btn-outline-primary btn-sm" data-bs-toggle="tooltip" title="Distribuer">
                                                 <i class="fas fa-share"></i>

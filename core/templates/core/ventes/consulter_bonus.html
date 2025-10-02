@@ -1,0 +1,462 @@
+<!-- core/templates/core/ventes/consulter_bonus.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mes Bonus{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Mes Bonus</h4>
+                    <div>
+                        <a href="{% url 'liste_ventes' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-shopping-cart"></i> Mes Ventes
+                        </a>
+                        <a href="{% url 'liste_dettes' %}" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-file-invoice-dollar"></i> Mes Dettes
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Indicateurs principaux -->
+                    <div class="row mb-4">
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h3 class="mb-0">{{ bonus_agent.total_bonus|floatformat:0 }} FCFA</h3>
+                                            <p class="mb-0 opacity-8">Bonus Total</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <i class="fas fa-gift fa-2x opacity-7"></i>
+                                        </div>
+                                    </div>
+                                    <hr class="my-2 opacity-2">
+                                    <small class="opacity-8">
+                                        <i class="fas fa-chart-line"></i>
+                                        Cumul de tous vos bonus
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h3 class="mb-0">{{ bonus_agent.nombre_produits_recouverts }}</h3>
+                                            <p class="mb-0 opacity-8">Produits Recouverts</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <i class="fas fa-boxes fa-2x opacity-7"></i>
+                                        </div>
+                                    </div>
+                                    <hr class="my-2 opacity-2">
+                                    <small class="opacity-8">
+                                        <i class="fas fa-check-circle"></i>
+                                        Produits payés dans les délais
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h3 class="mb-0">{{ bonus_mois|floatformat:0 }} FCFA</h3>
+                                            <p class="mb-0 opacity-8">Bonus du Mois</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <i class="fas fa-calendar-alt fa-2x opacity-7"></i>
+                                        </div>
+                                    </div>
+                                    <hr class="my-2 opacity-2">
+                                    <small class="opacity-8">
+                                        <i class="fas fa-bolt"></i>
+                                        {{ produits_recouverts_mois }} produits ce mois
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6 mb-4">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h3 class="mb-0">{{ dettes_bonus.count }}</h3>
+                                            <p class="mb-0 opacity-8">Dettes avec Bonus</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <i class="fas fa-file-invoice-dollar fa-2x opacity-7"></i>
+                                        </div>
+                                    </div>
+                                    <hr class="my-2 opacity-2">
+                                    <small class="opacity-8">
+                                        <i class="fas fa-trophy"></i>
+                                        Dettes réglées à temps
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques détaillées -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Performance Mensuelle</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="fw-bold">Mois de {{ mois_courant }}/{{ annee_courante }}</span>
+                                        <span class="badge bg-primary">{{ bonus_mois|floatformat:0 }} FCFA</span>
+                                    </div>
+                                    <div class="progress mb-2" style="height: 20px;">
+                                        {% with max_produits=50 %}
+                                        {% widthratio produits_recouverts_mois max_produits 100 as pourcentage %}
+                                        <div class="progress-bar bg-success" 
+                                             role="progressbar" 
+                                             style="width: {{ pourcentage }}%"
+                                             aria-valuenow="{{ produits_recouverts_mois }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="{{ max_produits }}">
+                                            {{ produits_recouverts_mois }} produits
+                                        </div>
+                                        {% endwith %}
+                                    </div>
+                                    <div class="d-flex justify-content-between text-muted small">
+                                        <span>0 produit</span>
+                                        <span>Objectif: 50 produits</span>
+                                    </div>
+                                    <div class="mt-3 text-center">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle"></i>
+                                            {{ produits_recouverts_mois }} produits recouverts × 100 FCFA = {{ bonus_mois }} FCFA
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Récapitulatif des Gains</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="list-group list-group-flush">
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <div>
+                                                <i class="fas fa-gift text-primary me-2"></i>
+                                                <span>Bonus par produit</span>
+                                            </div>
+                                            <span class="fw-bold text-success">100 FCFA</span>
+                                        </div>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <div>
+                                                <i class="fas fa-clock text-warning me-2"></i>
+                                                <span>Délai pour bonus</span>
+                                            </div>
+                                            <span class="fw-bold">48 heures</span>
+                                        </div>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <div>
+                                                <i class="fas fa-calculator text-info me-2"></i>
+                                                <span>Moyenne par dette</span>
+                                            </div>
+                                            <span class="fw-bold">
+                                               {{ moyenne_par_dette|floatformat:0 }} FCFA
+                                            </span>
+                                        </div>
+                                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <div>
+                                                <i class="fas fa-trophy text-warning me-2"></i>
+                                                <span>Efficacité recouvrement</span>
+                                            </div>
+                                            <span class="fw-bold text-success">
+                                                {% if dettes_bonus.count > 0 %}
+                                                    {% widthratio dettes_bonus.count bonus_agent.nombre_produits_recouverts 100 %}%
+                                                {% else %}
+                                                    0%
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Liste détaillée des bonus -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Historique des Bonus</h5>
+                            <span class="badge bg-primary">{{ dettes_bonus.count }} bonus obtenu{{ dettes_bonus.count|pluralize }}</span>
+                        </div>
+                        <div class="card-body">
+                            {% if dettes_bonus %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date Bonus</th>
+                                            <th>Client</th>
+                                            <th>Produit</th>
+                                            <th class="text-center">Quantité</th>
+                                            <th class="text-center">Montant Dette</th>
+                                            <th class="text-center">Bonus Obtenu</th>
+                                            <th class="text-center">Localité</th>
+                                            <th class="text-center">Délai Respecté</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for dette in dettes_bonus %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ dette.date_reglement|date:"d/m/Y" }}</strong>
+                                                <br>
+                                              <strong>{{ dette.date_reglement|date:"d/m/Y" }}</strong>
+
+                                            </td>
+                                            <td>
+                                                <strong>{{ dette.vente.client.nom }}</strong>
+                                                {% if dette.vente.client.contact %}
+                                                <br>
+                                                <small class="text-muted">{{ dette.vente.client.contact }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ dette.vente.detail_distribution.lot.produit.nom }}
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ dette.vente.get_type_vente_display }}
+                                                </small>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary rounded-pill">{{ dette.vente.quantite }}</span>
+                                            <br>
+                                                <small class="text-muted">produits</small>
+                                            </td>
+                                            <td class="text-center">
+                                                <strong>{{ dette.montant_total }} FCFA</strong>
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="text-success">
+                                                    <i class="fas fa-gift fa-lg"></i>
+                                                    <br>
+                                                    <strong>{{ dette.montant_bonus }} FCFA</strong>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        ({{ dette.vente.quantite }} × 100 FCFA)
+                                                    </small>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-info">{{ dette.nom_localite }}</span>
+                                            </td>
+                                            <td class="text-center">
+                                                {% with delai_restant=dette.temps_restant_bonus %}
+                                                {% if delai_restant %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check"></i> Oui
+                                                    </span>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        {{ delai_restant }} restant
+                                                    </small>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">
+                                                        <i class="fas fa-check"></i> À temps
+                                                    </span>
+                                                {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'detail_dette' dette.id %}" 
+                                                       class="btn btn-outline-primary" 
+                                                       title="Voir détail dette">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{% url 'detail_vente' dette.vente.id %}" 
+                                                       class="btn btn-outline-info" 
+                                                       title="Voir vente">
+                                                        <i class="fas fa-shopping-cart"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-primary">
+                                        <tr>
+                                            <td colspan="5" class="text-end"><strong>Total des bonus:</strong></td>
+                                            <td class="text-center">
+                                                <strong class="text-success">{{ bonus_agent.total_bonus|floatformat:0 }} FCFA</strong>
+                                            </td>
+                                            <td colspan="3"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5">
+                                <div class="mb-4">
+                                    <i class="fas fa-gift fa-4x text-muted"></i>
+                                </div>
+                                <h4 class="text-muted">Aucun bonus obtenu</h4>
+                                <p class="text-muted mb-4">
+                                    Les bonus sont accordés lorsque les dettes sont réglées dans les 48 heures.
+                                </p>
+                                <div class="d-flex justify-content-center gap-2">
+                                    <a href="{% url 'liste_dettes' %}" class="btn btn-primary">
+                                        <i class="fas fa-file-invoice-dollar"></i> Voir Mes Dettes
+                                    </a>
+                                    <a href="{% url 'enregistrer_vente' %}" class="btn btn-success">
+                                        <i class="fas fa-plus"></i> Nouvelle Vente
+                                    </a>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Conseils pour optimiser les bonus -->
+                    {% if dettes_bonus.count < 5 %}
+                    <div class="card mt-4 border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Comment augmenter vos bonus ?</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="d-flex mb-3">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-bullhorn text-primary fa-lg"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6>Communication proactive</h6>
+                                            <p class="small text-muted mb-0">
+                                                Contactez vos clients avant l'échéance pour leur rappeler le délai de 48 heures.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex mb-3">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-clock text-success fa-lg"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6>Suivi rigoureux</h6>
+                                            <p class="small text-muted mb-0">
+                                                Enregistrez les paiements dès réception pour ne pas manquer le délai.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex mb-3">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-target text-info fa-lg"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6>Objectif réaliste</h6>
+                                            <p class="small text-muted mb-0">
+                                                Visez 10 produits recouverts par mois pour 1 000 FCFA de bonus.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex mb-3">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-chart-line text-warning fa-lg"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6>Suivi des performances</h6>
+                                            <p class="small text-muted mb-0">
+                                                Consultez régulièrement cette page pour mesurer vos progrès.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Animation des compteurs (optionnel)
+    function animateValue(element, start, end, duration) {
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const value = Math.floor(progress * (end - start) + start);
+            element.textContent = value.toLocaleString();
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+        };
+        window.requestAnimationFrame(step);
+    }
+
+    // Animer les valeurs principales
+    const bonusTotal = document.querySelector('.bg-gradient-primary h3');
+    if (bonusTotal && {{ bonus_agent.total_bonus }} > 0) {
+        animateValue(bonusTotal, 0, {{ bonus_agent.total_bonus }}, 2000);
+    }
+
+    // Initialiser les tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.bg-gradient-primary {
+    background: linear-gradient(45deg, #4e73df, #224abe);
+}
+.bg-gradient-success {
+    background: linear-gradient(45deg, #1cc88a, #13855c);
+}
+.bg-gradient-info {
+    background: linear-gradient(45deg, #36b9cc, #258391);
+}
+.bg-gradient-warning {
+    background: linear-gradient(45deg, #f6c23e, #dda20a);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+.badge {
+    font-size: 0.75rem;
+}
+.progress {
+    border-radius: 10px;
+}
+.list-group-item {
+    border: none;
+    padding: 0.75rem 0;
+}
+</style>
+{% endblock %}

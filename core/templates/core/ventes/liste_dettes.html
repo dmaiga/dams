@@ -1,0 +1,437 @@
+<!-- core/templates/core/ventes/liste_dettes.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mes Dettes{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Mes Dettes</h4>
+                    <div>
+                        <a href="{% url 'liste_ventes' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-shopping-cart"></i> Voir Mes Ventes
+                        </a>
+                        
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Filtres et statistiques -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <span class="fw-bold">Filtrer par statut:</span>
+                                <a href="{% url 'liste_dettes' %}" 
+                                   class="btn btn-sm {% if not statut_actuel %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                                    Toutes ({{ dettes.count }})
+                                </a>
+                                <a href="?statut=en_cours" 
+                                   class="btn btn-sm {% if statut_actuel == 'en_cours' %}btn-info{% else %}btn-outline-info{% endif %}">
+                                    En Cours
+                                </a>
+                                <a href="?statut=partiellement_paye" 
+                                   class="btn btn-sm {% if statut_actuel == 'partiellement_paye' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                                    Partiellement Payé
+                                </a>
+                                <a href="?statut=en_retard" 
+                                   class="btn btn-sm {% if statut_actuel == 'en_retard' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                                    En Retard
+                                </a>
+                                <a href="?statut=paye" 
+                                   class="btn btn-sm {% if statut_actuel == 'paye' %}btn-success{% else %}btn-outline-success{% endif %}">
+                                    Payées
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="text-muted">
+                                <small>
+                                    <i class="fas fa-info-circle"></i>
+                                    {% if statut_actuel %}
+                                        Filtre: {{ statut_actuel|title }}
+                                    {% else %}
+                                        Toutes les dettes
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicateurs rapides -->
+                    {% with total_dettes=dettes.count %}
+                    {% with dettes_en_cours=dettes.filter.statut__in|default:"" %}
+                    <div class="row mb-4">
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center p-3">
+                <h4 class="mb-1">{{ total_dettes }}</h4>
+                <small class="opacity-8">Total Dettes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center p-3">
+                <h4 class="mb-1">{{ dettes_en_cours }}</h4>
+                <small class="opacity-8">En Cours</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center p-3">
+                <h4 class="mb-1">{{ dettes_partiel }}</h4>
+                <small class="opacity-8">Partiel</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center p-3">
+                <h4 class="mb-1">{{ dettes_retard }}</h4>
+                <small class="opacity-8">En Retard</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center p-3">
+                <h4 class="mb-1">{{ dettes_payees }}</h4>
+                <small class="opacity-8">Payées</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6 mb-3">
+        <div class="card bg-dark text-white">
+            <div class="card-body text-center p-3">
+                <h4 class="mb-1">{{ total_restant }} F</h4>
+                <small class="opacity-8">Total à Recouvrer</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+                    {% endwith %}
+                    {% endwith %}
+
+                    <!-- Liste des dettes -->
+                    {% if dettes %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Liste des Dettes</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Client</th>
+                                            <th>Produit</th>
+                                            <th class="text-center">Montant</th>
+                                            <th class="text-center">Reste</th>
+                                            <th class="text-center">Échéance</th>
+                                            <th class="text-center">Statut</th>
+                                            <th class="text-center">Bonus</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for dette in dettes %}
+                                        <tr class="{% if dette.est_en_retard %}table-warning{% endif %}">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="flex-shrink-0">
+                                                        <i class="fas fa-user-circle text-muted"></i>
+                                                    </div>
+                                                    <div class="flex-grow-1 ms-2">
+                                                        <strong>{{ dette.vente.client.nom }}</strong>
+                                                        {% if dette.vente.client.contact %}
+                                                        <br>
+                                                        <small class="text-muted">{{ dette.vente.client.contact }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong>{{ dette.vente.detail_distribution.lot.produit.nom }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ dette.vente.quantite }} unités • 
+                                                    {{ dette.vente.get_type_vente_display }}
+                                                </small>
+                                                <br>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-map-marker-alt"></i>
+                                                    {{ dette.nom_localite|default:"Localité non précisée" }}
+                                                </small>
+                                            </td>
+                                            <td class="text-center">
+                                                <strong class="text-primary">{{ dette.montant_total }} FCFA</strong>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if dette.montant_restant > 0 %}
+                                                <strong class="text-danger">{{ dette.montant_restant }} FCFA</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {% widthratio dette.montant_restant dette.montant_total 100 %}% restant
+                                                </small>
+                                                {% else %}
+                                                <span class="badge bg-success">Payée</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="{% if dette.est_en_retard %}text-danger fw-bold{% elif dette.date_echeance < today %}text-warning{% else %}text-muted{% endif %}">
+                                                    {{ dette.date_echeance|date:"d/m/Y" }}
+                                                    {% if dette.est_en_retard %}
+                                                    <br>
+                                                    <small class="text-danger">
+                                                        <i class="fas fa-exclamation-triangle"></i>
+                                                        {{ dette.jours_retard }}j de retard
+                                                    </small>
+                                                    {% elif dette.date_echeance < today %}
+                                                    <br>
+                                                    <small class="text-warning">Aujourd'hui</small>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'en_retard' %}danger{% elif dette.statut == 'partiellement_paye' %}warning{% else %}info{% endif %}">
+                                                    {% if dette.statut == 'paye' %}
+                                                    <i class="fas fa-check"></i>
+                                                    {% elif dette.statut == 'en_retard' %}
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    {% elif dette.statut == 'partiellement_paye' %}
+                                                    <i class="fas fa-clock"></i>
+                                                    {% else %}
+                                                    <i class="fas fa-hourglass"></i>
+                                                    {% endif %}
+                                                    {{ dette.get_statut_display }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if dette.bonus_accorde %}
+                                                <span class="badge bg-success" title="Bonus obtenu">
+                                                    <i class="fas fa-gift"></i> {{ dette.montant_bonus }}F
+                                                </span>
+                                                {% elif dette.eligible_bonus %}
+                                                <span class="badge bg-warning" title="Bonus disponible">
+                                                    <i class="fas fa-clock"></i> Disponible
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary" title="Bonus non disponible">
+                                                    <i class="fas fa-times"></i> Non
+                                                </span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'detail_dette' dette.id %}" 
+                                                       class="btn btn-outline-primary" 
+                                                       title="Voir détails">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if dette.montant_restant > 0 %}
+                                                    <a href="{% url 'enregistrer_paiement_dette' dette.id %}" 
+                                                       class="btn btn-outline-success" 
+                                                       title="Enregistrer paiement">
+                                                        <i class="fas fa-money-bill-wave"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                    <a href="{% url 'detail_vente' dette.vente.id %}" 
+                                                       class="btn btn-outline-info" 
+                                                       title="Voir vente">
+                                                        <i class="fas fa-shopping-cart"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Résumé détaillé -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Dettes par Statut</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="statutChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Prochaines Échéances</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% with prochaines_dettes=dettes.filter.statut__in|slice:":5" %}
+                                    {% if prochaines_dettes %}
+                                    <div class="list-group list-group-flush">
+                                        {% for dette in prochaines_dettes %}
+                                        <div class="list-group-item px-0">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ dette.vente.client.nom }}</strong>
+                                                    <br>
+                                                    <small class="text-muted">{{ dette.montant_restant }} FCFA restant</small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <small class="{% if dette.est_en_retard %}text-danger{% else %}text-warning{% endif %}">
+                                                        {{ dette.date_echeance|date:"d/m/Y" }}
+                                                    </small>
+                                                    <br>
+                                                    <a href="{% url 'enregistrer_paiement_dette' dette.id %}" class="btn btn-sm btn-success">
+                                                        Payer
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <p class="text-muted text-center mb-0">Aucune échéance proche</p>
+                                    {% endif %}
+                                    {% endwith %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-file-invoice-dollar fa-4x text-muted"></i>
+                        </div>
+                        <h4 class="text-muted">Aucune dette trouvée</h4>
+                        <p class="text-muted mb-4">
+                            {% if statut_actuel %}
+                                Aucune dette avec le statut "{{ statut_actuel }}"
+                            {% else %}
+                                Vous n'avez aucune dette enregistrée
+                            {% endif %}
+                        </p>
+                        <a href="{% url 'liste_ventes' %}" class="btn btn-primary">
+                            <i class="fas fa-shopping-cart"></i> Voir Mes Ventes
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Graphique des statuts
+    const statutChart = document.getElementById('statutChart');
+    if (statutChart) {
+        const ctx = statutChart.getContext('2d');
+        
+        // Compter les dettes par statut
+        const stats = {
+    en_cours: {{ dettes_en_cours }},
+    partiellement_paye: {{ dettes_partiel }},
+    en_retard: {{ dettes_retard }},
+    paye: {{ dettes_payees }}
+};
+
+
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['En Cours', 'Partiellement Payé', 'En Retard', 'Payées'],
+                datasets: [{
+                    data: [stats.en_cours, stats.partiellement_paye, stats.en_retard, stats.paye],
+                    backgroundColor: [
+                        '#17a2b8', // info
+                        '#ffc107', // warning
+                        '#dc3545', // danger
+                        '#28a745'  // success
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Initialiser les tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Fonction pour marquer les dettes en retard
+    function highlightLateDebts() {
+        const today = new Date();
+        document.querySelectorAll('tr').forEach(row => {
+            const echeanceCell = row.querySelector('.text-danger');
+            if (echeanceCell) {
+                row.classList.add('table-warning');
+            }
+        });
+    }
+
+    highlightLateDebts();
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.badge {
+    font-size: 0.75rem;
+}
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+.list-group-item {
+    border: none;
+    padding: 0.75rem 0;
+}
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+}
+</style>
+{% endblock %}

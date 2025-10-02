@@ -82,7 +82,7 @@
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <label class="form-label">Produit disponible *</label>
                                         {{ form.detail_distribution }}
                                         {% if form.detail_distribution.errors %}
@@ -92,19 +92,36 @@
                                             Quantité disponible: <span id="quantite-disponible" class="fw-bold">-</span>
                                         </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
+                                        <label class="form-label">Type de vente *</label>
+                                        {{ form.type_vente }}
+                                        {% if form.type_vente.errors %}
+                                        <div class="text-danger small">{{ form.type_vente.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Mode paiement *</label>
+                                        {{ form.mode_paiement }}
+                                        {% if form.mode_paiement.errors %}
+                                        <div class="text-danger small">{{ form.mode_paiement.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-2">
                                         <label class="form-label">Quantité *</label>
                                         {{ form.quantite }}
                                         {% if form.quantite.errors %}
                                         <div class="text-danger small">{{ form.quantite.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-2">
                                         <label class="form-label">Prix unitaire (FCFA) *</label>
                                         {{ form.prix_vente_unitaire }}
                                         {% if form.prix_vente_unitaire.errors %}
                                         <div class="text-danger small">{{ form.prix_vente_unitaire.errors }}</div>
                                         {% endif %}
+                                        <div class="form-text">
+                                            <span id="info-prix-applique">Prix déterminé automatiquement</span>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -112,16 +129,16 @@
                                 <div id="produit-info" class="mt-3 p-3 bg-light rounded" style="display: none;">
                                     <h6>Informations du produit :</h6>
                                     <div class="row">
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <strong>Produit:</strong> <span id="info-produit">-</span>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-md-3">
                                             <strong>Lot:</strong> <span id="info-lot">-</span>
                                         </div>
-                                        <div class="col-md-2">
+                                        <div class="col-md-3">
                                             <strong>Prix gros:</strong> <span id="info-prix-gros">-</span>
                                         </div>
-                                        <div class="col-md-2">
+                                        <div class="col-md-3">
                                             <strong>Prix détail:</strong> <span id="info-prix-detail">-</span>
                                         </div>
                                     </div>
@@ -178,10 +195,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Éléments pour les produits
     const selectDistribution = document.getElementById('{{ form.detail_distribution.id_for_label }}');
+    const selectTypeVente = document.getElementById('{{ form.type_vente.id_for_label }}');
+    const selectModePaiement = document.getElementById('{{ form.mode_paiement.id_for_label }}');
     const quantiteInput = document.getElementById('{{ form.quantite.id_for_label }}');
     const prixInput = document.getElementById('{{ form.prix_vente_unitaire.id_for_label }}');
     const quantiteDisponibleSpan = document.getElementById('quantite-disponible');
     const produitInfoDiv = document.getElementById('produit-info');
+    const infoPrixApplique = document.getElementById('info-prix-applique');
 
     // Éléments du résumé
     const resumeClient = document.getElementById('resume-client');
@@ -221,6 +241,55 @@ document.addEventListener('DOMContentLoaded', function() {
         updateResume();
     }
 
+    // Fonction pour mettre à jour le prix de vente
+    async function updatePrixVente() {
+        const distributionId = selectDistribution.value;
+        const typeVente = selectTypeVente ? selectTypeVente.value : 'detail';
+        
+        if (distributionId) {
+            try {
+                const response = await fetch(`/api/info-distribution/${distributionId}/`);
+                const data = await response.json();
+                
+                // Déterminer le prix en fonction du type de vente choisi
+                let prix = 0;
+                let prixText = '';
+                
+                if (typeVente === 'gros' && data.prix_gros) {
+                    prix = data.prix_gros;
+                    prixText = `Prix gros: ${prix} FCFA`;
+                } else if (data.prix_detail) {
+                    prix = data.prix_detail;
+                    prixText = `Prix détail: ${prix} FCFA`;
+                } else {
+                    prixText = 'Prix non défini';
+                }
+                
+                // Mettre à jour le champ prix et l'information
+                if (prix > 0) {
+                    prixInput.value = prix;
+                    infoPrixApplique.textContent = prixText;
+                    infoPrixApplique.className = 'text-success fw-bold';
+                } else {
+                    prixInput.value = '';
+                    infoPrixApplique.textContent = 'Prix non disponible';
+                    infoPrixApplique.className = 'text-danger';
+                }
+                
+            } catch (error) {
+                console.error('Erreur lors de la récupération des informations:', error);
+                prixInput.value = '';
+                infoPrixApplique.textContent = 'Erreur de chargement';
+                infoPrixApplique.className = 'text-danger';
+            }
+        } else {
+            prixInput.value = '';
+            infoPrixApplique.textContent = 'Sélectionnez un produit';
+            infoPrixApplique.className = 'text-muted';
+        }
+        updateResume();
+    }
+
     // Fonction pour mettre à jour les infos du produit
     async function updateProduitInfo() {
         const distributionId = selectDistribution.value;
@@ -245,13 +314,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('info-prix-detail').textContent = data.prix_detail ? data.prix_detail + ' FCFA' : 'N/D';
                 produitInfoDiv.style.display = 'block';
                 
-                // Suggérer un prix basé sur le type de client
-                if (selectClientType && selectClientType.value === 'grossiste' && data.prix_gros) {
-                    prixInput.value = data.prix_gros;
-                } else if (data.prix_detail) {
-                    prixInput.value = data.prix_detail;
-                }
-                
             } catch (error) {
                 quantiteDisponibleSpan.textContent = 'Erreur';
                 quantiteDisponibleSpan.className = 'fw-bold text-danger';
@@ -262,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
             quantiteDisponibleSpan.className = 'fw-bold';
             produitInfoDiv.style.display = 'none';
         }
-        updateResume();
+        updatePrixVente();
     }
 
     // Fonction pour mettre à jour le résumé
@@ -302,8 +364,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (inputClientNom) {
         inputClientNom.addEventListener('input', updateResume);
     }
-    if (selectClientType) {
-        selectClientType.addEventListener('change', updateProduitInfo);
+    if (selectTypeVente) {
+        selectTypeVente.addEventListener('change', updatePrixVente);
     }
     if (selectDistribution) {
         selectDistribution.addEventListener('change', updateProduitInfo);

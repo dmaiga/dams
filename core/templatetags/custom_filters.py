@@ -10,3 +10,11 @@ def sub(value, arg):
 @register.filter
 def multiply(value, arg):
     return value * arg
+
+@register.filter
+def subtract(value, arg):
+    """Soustrait arg de value"""
+    try:
+        return value - arg
+    except Exception:
+        return 0

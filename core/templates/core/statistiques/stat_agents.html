@@ -1,0 +1,420 @@
+<!-- templates/core/performances/agents.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Performance des Agents{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">🚀 Performance des Agents</h1>
+            <p class="text-muted">Analyse détaillée des performances commerciales par agent</p>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-outline-primary active" data-period="month">Mois</button>
+            <button class="btn btn-outline-primary" data-period="week">Semaine</button>
+            <button class="btn btn-outline-primary" data-period="all">Tout</button>
+        </div>
+    </div>
+
+    <!-- KPI Globaux -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Agents Actifs
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ total_agents }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                CA Mensuel Total
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ ca_mois_total|floatformat:0 }} FCFA
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Efficacité Moyenne
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ moyenne_efficacite|floatformat:0 }} FCFA
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Objectif Moyen
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ moyenne_objectif|floatformat:1 }}%
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-bullseye fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                CA Total
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ ca_total_global|floatformat:0 }} FCFA
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-bar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-secondary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
+                                Clients Servis
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ agents_performance.0.clients_servis|default:0 }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-user-tie fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Performers -->
+    <div class="row mb-4">
+        <!-- Top CA Mensuel -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="m-0 font-weight-bold">🥇 Top CA Mensuel</h6>
+                </div>
+                <div class="card-body">
+                    {% for agent in top_performers_mois %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0">
+                            <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center" 
+                                 style="width: 40px; height: 40px;">
+                                <span class="text-white fw-bold">{{ forloop.counter }}</span>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="mb-1">{{ agent.agent.user.get_full_name }}</h6>
+                            <div class="text-success fw-bold">{{ agent.ca_mois|floatformat:0 }} FCFA</div>
+                            <small class="text-muted">{{ agent.ventes_mois }} ventes</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Clients Servis -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h6 class="m-0 font-weight-bold">👥 Top Clients Servis</h6>
+                </div>
+                <div class="card-body">
+                    {% for agent in top_performers_clients %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0">
+                            <div class="bg-info rounded-circle d-flex align-items-center justify-content-center" 
+                                 style="width: 40px; height: 40px;">
+                                <span class="text-white fw-bold">{{ forloop.counter }}</span>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="mb-1">{{ agent.agent.user.get_full_name }}</h6>
+                            <div class="text-primary fw-bold">{{ agent.clients_servis }} clients</div>
+                            <small class="text-muted">{{ agent.ventes_total }} ventes totales</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Efficacité -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h6 class="m-0 font-weight-bold">📈 Top Efficacité</h6>
+                </div>
+                <div class="card-body">
+                    {% for agent in top_performers_efficacite %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0">
+                            <div class="bg-success rounded-circle d-flex align-items-center justify-content-center" 
+                                 style="width: 40px; height: 40px;">
+                                <span class="text-white fw-bold">{{ forloop.counter }}</span>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="mb-1">{{ agent.agent.user.get_full_name }}</h6>
+                            <div class="text-success fw-bold">{{ agent.efficacite|floatformat:0 }} FCFA/vente</div>
+                            <small class="text-muted">Panier moyen</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau détaillé des performances -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold">📊 Performance Détaillée des Agents</h6>
+                    <span class="badge bg-light text-primary">{{ total_agents }} agents</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>CA Total</th>
+                                    <th>CA Mois</th>
+                                    <th>Ventes Total</th>
+                                    <th>Ventes Mois</th>
+                                    <th>Clients Servis</th>
+                                    <th>Quantité Vendue</th>
+                                    <th>Efficacité</th>
+                                    <th>Panier Moyen</th>
+                                    <th>Objectif</th>
+                                    <th>Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for perf in agents_performance %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="flex-shrink-0">
+                                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
+                                                     style="width: 32px; height: 32px;">
+                                                    <i class="fas fa-user text-white"></i>
+                                                </div>
+                                            </div>
+                                            <div class="flex-grow-1 ms-2">
+                                                <strong>{{ perf.agent.user.get_full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ perf.agent.user.email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="fw-bold text-success">
+                                        {{ perf.ca_total|floatformat:0 }} FCFA
+                                    </td>
+                                    <td class="fw-bold text-primary">
+                                        {{ perf.ca_mois|floatformat:0 }} FCFA
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ perf.ventes_total }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ perf.ventes_mois }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ perf.clients_servis }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-warning text-dark">{{ perf.quantite_total }}</span>
+                                    </td>
+                                    <td class="fw-bold">
+                                        {{ perf.efficacite|floatformat:0 }} FCFA
+                                    </td>
+                                    <td>
+                                        {{ perf.panier_moyen|floatformat:0 }} FCFA
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar 
+                                                {% if perf.taux_objectif >= 100 %}bg-success
+                                                {% elif perf.taux_objectif >= 75 %}bg-warning
+                                                {% else %}bg-danger{% endif %}" 
+                                                 style="width: {{ perf.taux_objectif }}%">
+                                                {{ perf.taux_objectif|floatformat:1 }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if forloop.counter <= 3 %}
+                                        <span class="badge bg-warning text-dark">🥇 Top {{ forloop.counter }}</span>
+                                        {% elif perf.taux_objectif >= 100 %}
+                                        <span class="badge bg-success">🎯 Objectif Atteint</span>
+                                        {% elif perf.taux_objectif >= 75 %}
+                                        <span class="badge bg-info">📈 Bonne Performance</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">📊 En Cours</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Évolution des Top Performers -->
+    {% if evolution_agents %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white">
+                    <h6 class="m-0 font-weight-bold">📈 Évolution des Top 5 Agents (6 derniers mois)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Agent / Mois</th>
+                                    {% for month in evolution_months %}
+                                    <th class="text-center">{{ month.mois }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for agent_name, evolution in evolution_agents.items %}
+                                <tr>
+                                    <td><strong>{{ agent_name }}</strong></td>
+                                    {% for data in evolution %}
+                                    <td class="text-center fw-bold text-success">
+                                        {{ data.ca|floatformat:0 }} FCFA
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.card {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.border-left-primary { border-left: 0.25rem solid #4e73df !important; }
+.border-left-success { border-left: 0.25rem solid #1cc88a !important; }
+.border-left-info { border-left: 0.25rem solid #36b9cc !important; }
+.border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
+.border-left-secondary { border-left: 0.25rem solid #858796 !important; }
+
+.text-xs {
+    font-size: 0.7rem;
+}
+
+.shadow {
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
+}
+
+.progress {
+    border-radius: 0.25rem;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodButtons = document.querySelectorAll('[data-period]');
+    
+    periodButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            periodButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            const period = this.getAttribute('data-period');
+            // Ici vous pourriez ajouter une logique AJAX pour filtrer les données
+            filterData(period);
+        });
+    });
+
+    function filterData(period) {
+        // Simuler un filtrage (à implémenter avec AJAX si nécessaire)
+        console.log('Filtrage période:', period);
+        // Pour l'instant, on recharge la page avec le paramètre
+        window.location.href = window.location.pathname + '?period=' + period;
+    }
+});
+</script>
+{% endblock %}

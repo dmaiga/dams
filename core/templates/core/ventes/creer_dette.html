@@ -1,0 +1,387 @@
+<!-- core/templates/core/ventes/creer_dette.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Créer une Dette - Vente #{{ vente.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Créer une Dette</h4>
+                    <div>
+                        <a href="{% url 'detail_vente' vente.id %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Retour à la vente
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Messages -->
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Informations de la vente -->
+                        <div class="col-md-5">
+                            <div class="card border-primary mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">Informations de la Vente</h5>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-borderless table-sm">
+                                        <tr>
+                                            <th width="40%">Client:</th>
+                                            <td>
+                                                <strong>{{ vente.client.nom }}</strong>
+                                                {% if vente.client.contact %}
+                                                <br><small class="text-muted">{{ vente.client.contact }}</small>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Produit:</th>
+                                            <td>{{ vente.detail_distribution.lot.produit.nom }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Type vente:</th>
+                                            <td>
+                                                <span class="badge bg-{% if vente.type_vente == 'gros' %}info{% else %}success{% endif %}">
+                                                    {{ vente.get_type_vente_display }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Quantité:</th>
+                                            <td>{{ vente.quantite }} unités</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Prix unitaire:</th>
+                                            <td>{{ vente.prix_vente_unitaire }} FCFA</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Date vente:</th>
+                                            <td>{{ vente.date_vente|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                    </table>
+
+                                    <!-- Résumé financier -->
+                                    <div class="bg-light p-3 rounded">
+                                        <div class="text-center mb-3">
+                                            <h4 class="text-primary mb-0">{{ vente.total_vente }} FCFA</h4>
+                                            <small class="text-muted">Montant total de la dette</small>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Agent:</span>
+                                            <strong>{{ vente.agent.user.get_full_name|default:vente.agent.user.username }}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Information bonus -->
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-gift"></i> Système de Bonus</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info mb-2">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Bonus disponible !</strong>
+                                        <br>
+                                        <small>
+                                            Le client a <strong>48 heures</strong> pour régler sa dette et vous faire gagner un bonus.
+                                        </small>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Calcul du bonus:</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ vente.quantite }} produits × 100 FCFA = 
+                                            <strong>{{ vente.quantite|multiply:100 }} FCFA</strong>
+                                        </small>
+                                    </div>
+                                    <p class="small text-muted mb-0">
+                                        <i class="fas fa-lightbulb"></i>
+                                        Le bonus sera accordé automatiquement si la dette est réglée dans les délais.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Aide -->
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-question-circle"></i> Instructions</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ol class="small text-muted mb-0">
+                                        <li>Renseignez le lieu exact de la vente</li>
+                                        <li>Définissez une date d'échéance réaliste</li>
+                                        <li>Ajoutez des notes si nécessaire</li>
+                                        <li>Le délai de bonus est de 48 heures</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formulaire de création de dette -->
+                        <div class="col-md-7">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Informations de la Dette</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" id="dette-form">
+                                        {% csrf_token %}
+                                        
+                                        <!-- Localité -->
+                                        <div class="mb-3">
+                                            <label for="{{ form.nom_localite.id_for_label }}" class="form-label">
+                                                Lieu de la vente *
+                                            </label>
+                                            {{ form.nom_localite }}
+                                            {% if form.nom_localite.errors %}
+                                            <div class="text-danger small">{{ form.nom_localite.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Ex: "Grand Marché Central", "Boutique XYZ au Centre Commercial", etc.
+                                            </div>
+                                        </div>
+
+                                        <!-- Date d'échéance -->
+                                        <div class="mb-3">
+                                            <label for="{{ form.date_echeance.id_for_label }}" class="form-label">
+                                                Date d'échéance *
+                                            </label>
+                                            {{ form.date_echeance }}
+                                            {% if form.date_echeance.errors %}
+                                            <div class="text-danger small">{{ form.date_echeance.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Date limite pour le remboursement de la dette.
+                                            </div>
+                                        </div>
+
+                                        <!-- Délai bonus -->
+                                        <div class="mb-3">
+                                            <label for="{{ form.delai_bonus_heures.id_for_label }}" class="form-label">
+                                                Délai pour le bonus (heures)
+                                            </label>
+                                            {{ form.delai_bonus_heures }}
+                                            {% if form.delai_bonus_heures.errors %}
+                                            <div class="text-danger small">{{ form.delai_bonus_heures.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Délai en heures pour bénéficier du bonus (défaut: 48h).
+                                            </div>
+                                        </div>
+
+                                        <!-- Notes -->
+                                        <div class="mb-4">
+                                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                                Notes supplémentaires
+                                            </label>
+                                            {{ form.notes }}
+                                            {% if form.notes.errors %}
+                                            <div class="text-danger small">{{ form.notes.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Informations complémentaires sur la dette (conditions spéciales, etc.)
+                                            </div>
+                                        </div>
+
+                                        <!-- Résumé de la dette -->
+                                        <div class="card bg-light mb-4">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Résumé de la Dette</h6>
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <strong>Montant:</strong><br>
+                                                        <span class="h5 text-primary">{{ vente.total_vente }} FCFA</span>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <strong>Bonus potentiel:</strong><br>
+                                                        <span class="h5 text-success">{{ vente.quantite|multiply:100 }} FCFA</span>
+                                                    </div>
+                                                </div>
+                                                <div class="mt-2">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-clock"></i>
+                                                        Délai bonus: <span id="delai-bonus-affiche">48</span> heures
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Boutons d'action -->
+                                        <div class="d-flex gap-2">
+                                            <a href="{% url 'detail_vente' vente.id %}" class="btn btn-secondary">
+                                                <i class="fas fa-times"></i> Annuler
+                                            </a>
+                                            <button type="submit" class="btn btn-success flex-fill">
+                                                <i class="fas fa-check"></i> Créer la Dette
+                                            </button>
+                                        </div>
+
+                                        <!-- Avertissement -->
+                                        <div class="alert alert-warning mt-3 mb-0">
+                                            <small>
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                                <strong>Attention:</strong> Une fois la dette créée, vous pourrez enregistrer 
+                                                les paiements et suivre le recouvrement. Le système de bonus sera activé automatiquement.
+                                            </small>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Prévisualisation des dates -->
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Dates importantes</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-6">
+                                            <div class="border rounded p-2">
+                                                <small class="text-muted">Date de création</small>
+                                                <br>
+                                                <strong id="date-creation">{% now "d/m/Y H:i" %}</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="border rounded p-2">
+                                                <small class="text-muted">Limite bonus</small>
+                                                <br>
+                                                <strong id="date-limite-bonus">-</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 text-center">
+                                        <small class="text-muted" id="info-delai-bonus">
+                                            Le bonus sera disponible pendant 48 heures après la création
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const delaiBonusInput = document.getElementById('{{ form.delai_bonus_heures.id_for_label }}');
+    const dateEcheanceInput = document.getElementById('{{ form.date_echeance.id_for_label }}');
+    const delaiBonusAffiche = document.getElementById('delai-bonus-affiche');
+    const dateLimiteBonus = document.getElementById('date-limite-bonus');
+    const infoDelaiBonus = document.getElementById('info-delai-bonus');
+
+    // Fonction pour calculer la date limite du bonus
+    function updateDateLimiteBonus() {
+        const delaiHeures = parseInt(delaiBonusInput.value) || 48;
+        const maintenant = new Date();
+        const dateLimite = new Date(maintenant.getTime() + delaiHeures * 60 * 60 * 1000);
+        
+        // Formater la date pour l'affichage
+        const options = { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit'
+        };
+        const dateFormatee = dateLimite.toLocaleDateString('fr-FR', options);
+        
+        // Mettre à jour l'affichage
+        delaiBonusAffiche.textContent = delaiHeures;
+        dateLimiteBonus.textContent = dateFormatee;
+        infoDelaiBonus.textContent = `Le bonus sera disponible pendant ${delaiHeures} heures après la création`;
+    }
+
+    // Fonction pour suggérer une date d'échéance réaliste
+    function suggererDateEcheance() {
+        if (!dateEcheanceInput.value) {
+            const aujourdhui = new Date();
+            const echeance = new Date(aujourdhui.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 jours
+            dateEcheanceInput.value = echeance.toISOString().split('T')[0];
+        }
+    }
+
+    // Événements
+    delaiBonusInput.addEventListener('input', updateDateLimiteBonus);
+    delaiBonusInput.addEventListener('change', updateDateLimiteBonus);
+
+    // Initialisation
+    updateDateLimiteBonus();
+    suggererDateEcheance();
+
+    // Validation de la date d'échéance
+    dateEcheanceInput.addEventListener('change', function() {
+        const dateEcheance = new Date(this.value);
+        const aujourdhui = new Date();
+        
+        if (dateEcheance < aujourdhui) {
+            alert('La date d\'échéance ne peut pas être dans le passé.');
+            this.value = '';
+            suggererDateEcheance();
+        }
+    });
+
+    // Validation du délai bonus
+    delaiBonusInput.addEventListener('blur', function() {
+        const delai = parseInt(this.value) || 48;
+        if (delai < 1) {
+            this.value = 48;
+            updateDateLimiteBonus();
+        } else if (delai > 168) { // 7 jours max
+            this.value = 168;
+            updateDateLimiteBonus();
+            alert('Le délai maximum pour le bonus est de 7 jours (168 heures).');
+        }
+    });
+
+    // Focus sur le premier champ
+    document.getElementById('{{ form.nom_localite.id_for_label }}').focus();
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.form-control:focus {
+    border-color: #4dabf7;
+    box-shadow: 0 0 0 0.2rem rgba(77, 171, 247, 0.25);
+}
+.badge {
+    font-size: 0.75rem;
+}
+.table th {
+    font-weight: 600;
+}
+.alert {
+    border: none;
+    border-left: 4px solid;
+}
+.alert-warning {
+    border-left-color: #ffc107;
+}
+.alert-info {
+    border-left-color: #17a2b8;
+}
+</style>
+{% endblock %}
