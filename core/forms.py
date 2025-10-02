@@ -1,9 +1,11 @@
 from django import forms
 from datetime import datetime
+from django.utils import timezone
 from .models import (
-    Vente, Produit, Client, LotEntrepot, Fournisseur,
-    DistributionAgent, Agent, DetailDistribution, Facture
+    Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
+    DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent
 )
+
 
 # forms.py
 class ReceptionLotForm(forms.ModelForm):
@@ -56,10 +58,22 @@ class ReceptionLotForm(forms.ModelForm):
             'disabled': True
         })
     )
-
+    
+    date_reception = forms.DateTimeField(
+    required=True,
+    widget=forms.DateTimeInput(
+        attrs={
+            'class': 'form-control',
+            'type': 'datetime-local', 
+            'value': timezone.now().strftime("%Y-%m-%dT%H:%M")
+            }
+        )
+    )
     class Meta:
         model = LotEntrepot
-        fields = ['produit', 'fournisseur', 'quantite_initiale', 'prix_achat_unitaire']
+        fields = ['produit', 'fournisseur', 'quantite_initiale',
+                  'prix_achat_unitaire','date_reception'
+                ]
         widgets = {
             'produit': forms.Select(attrs={'class': 'form-select'}),
             'fournisseur': forms.Select(attrs={'class': 'form-select'}),
@@ -236,17 +250,11 @@ class DistributionForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         
-        # Définir le superviseur automatiquement (l'utilisateur connecté)
-        try:
-            superviseur = Agent.objects.get(user=self.current_user, type_agent='entrepot')
-            instance.superviseur = superviseur
-        except Agent.DoesNotExist:
-            # Créer un superviseur si nécessaire
-            superviseur = Agent.objects.create(
-                user=self.current_user,
-                type_agent='entrepot'
-            )
-            instance.superviseur = superviseur
+        superviseur, created = Agent.objects.get_or_create(
+            user=self.current_user,
+            defaults={'type_agent': 'entrepot'}
+        )
+        instance.superviseur = superviseur
 
         if commit:
             instance.save()
@@ -287,7 +295,6 @@ class DistributionForm(forms.ModelForm):
         return instance
 
 # === FORMULAIRE VENTE ===
-# forms.py
 class VenteForm(forms.ModelForm):
     # Nouveau client
     nouveau_client = forms.BooleanField(
@@ -300,8 +307,7 @@ class VenteForm(forms.ModelForm):
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Nom du client',
-            'disabled': True
+            'placeholder': 'Nom du client'
         })
     )
     client_contact = forms.CharField(
@@ -309,38 +315,64 @@ class VenteForm(forms.ModelForm):
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Contact (téléphone)',
-            'disabled': True
+            'placeholder': 'Contact (téléphone)'
         })
     )
     client_type = forms.ChoiceField(
         choices=Client.TYPE_CLIENT_CHOICES,
         required=False,
         initial='detail',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    
+    # Type de vente
+    type_vente = forms.ChoiceField(
+        choices=Vente.TYPE_VENTE_CHOICES,
+        initial='detail',
         widget=forms.Select(attrs={
             'class': 'form-select',
-            'disabled': True
-        })
+            'id': 'type-vente'
+        }),
+        help_text="Choisissez le type de vente (gros ou détail)"
+    )
+    
+    # Mode de paiement
+    mode_paiement = forms.ChoiceField(
+        choices=Vente.MODE_PAIEMENT_CHOICES,
+        initial='comptant',
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'mode-paiement'
+        }),
+        help_text="Choisissez le mode de paiement"
     )
 
     class Meta:
         model = Vente
-        fields = ['client', 'detail_distribution', 'quantite', 'prix_vente_unitaire']
+        fields = ['client', 'detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire']
         widgets = {
-            'client': forms.Select(attrs={'class': 'form-select'}),
-            'detail_distribution': forms.Select(attrs={'class': 'form-select'}),
+            'client': forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
+            'detail_distribution': forms.Select(attrs={'class': 'form-select', 'id': 'detail-distribution'}),
             'quantite': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'id': 'quantite-vente'}),
-            'prix_vente_unitaire': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'id': 'prix-vente'}),
+            'prix_vente_unitaire': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'step': '0.01', 
+                'id': 'prix-vente',
+                'readonly': 'readonly',
+                'placeholder': 'Le prix sera déterminé automatiquement'
+            }),
         }
 
     def __init__(self, *args, **kwargs):
         self.agent = kwargs.pop('agent', None)
         super().__init__(*args, **kwargs)
         
-        # Rendre tous les champs non obligatoires
+        # Rendre tous les champs non obligatoires sauf ceux nécessaires
         self.fields['client'].required = False
         self.fields['detail_distribution'].required = False
         self.fields['quantite'].required = False
+        self.fields['type_vente'].required = True
+        self.fields['mode_paiement'].required = True
         self.fields['prix_vente_unitaire'].required = False
         
         # Filtrer les clients existants
@@ -350,16 +382,22 @@ class VenteForm(forms.ModelForm):
         # Filtrer les détails de distribution disponibles pour cet agent
         if self.agent:
             self.fields['detail_distribution'].queryset = DetailDistribution.objects.filter(
-                distribution__agent_terrain=self.agent
+                distribution__agent_terrain=self.agent,
+                quantite__gt=0  # Seulement les distributions avec du stock disponible
             ).select_related('lot', 'lot__produit')
             
             # Ajouter des informations utiles dans l'affichage
             self.fields['detail_distribution'].label_from_instance = lambda obj: (
                 f"{obj.lot.produit.nom} - Lot {obj.lot.reference_lot} - "
-                f"Disponible: {obj.quantite} - "
-                f"Prix gros: {obj.prix_gros or 'N/D'} - "
-                f"Prix détail: {obj.prix_detail or 'N/D'}"
+                f"Stock: {obj.quantite} - "
+                f"Prix gros: {obj.prix_gros or 'N/D'} FCFA - "
+                f"Prix détail: {obj.prix_detail or 'N/D'} FCFA"
             )
+
+        # Initialiser les champs nouveau client comme désactivés
+        self.fields['client_nom'].widget.attrs['disabled'] = True
+        self.fields['client_contact'].widget.attrs['disabled'] = True
+        self.fields['client_type'].widget.attrs['disabled'] = True
 
     def clean(self):
         cleaned_data = super().clean()
@@ -379,15 +417,12 @@ class VenteForm(forms.ModelForm):
         if not cleaned_data.get('quantite') or cleaned_data.get('quantite', 0) <= 0:
             self.add_error('quantite', 'Quantité valide requise')
         
-        if not cleaned_data.get('prix_vente_unitaire') or cleaned_data.get('prix_vente_unitaire', 0) <= 0:
-            self.add_error('prix_vente_unitaire', 'Prix de vente valide requis')
-        
         # Vérifier la quantité disponible
         if cleaned_data.get('detail_distribution') and cleaned_data.get('quantite'):
             detail = cleaned_data['detail_distribution']
             if cleaned_data['quantite'] > detail.quantite:
                 self.add_error('quantite', f'Quantité insuffisante. Disponible: {detail.quantite}')
-            
+        
         return cleaned_data
 
     def save(self, commit=True):
@@ -405,6 +440,13 @@ class VenteForm(forms.ModelForm):
             )
             instance.client = client
 
+        # Déterminer automatiquement le prix si non fourni
+        if not instance.prix_vente_unitaire and instance.detail_distribution:
+            if instance.type_vente == 'gros':
+                instance.prix_vente_unitaire = instance.detail_distribution.prix_gros
+            else:
+                instance.prix_vente_unitaire = instance.detail_distribution.prix_detail
+
         if commit:
             instance.save()
             
@@ -414,44 +456,292 @@ class VenteForm(forms.ModelForm):
             detail.save()
             
         return instance
-
-# === FORMULAIRE FACTURE/VERSEMENT ===
+        
 class FactureForm(forms.ModelForm):
     class Meta:
         model = Facture
-        fields = ['type_facture', 'montant', 'fichier_facture', 'description']
+        fields = ['type_facture', 'montant', 'fichier_facture', 'description'] 
         widgets = {
             'type_facture': forms.Select(attrs={'class': 'form-select'}),
             'montant': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'fichier_facture': forms.FileInput(attrs={'class': 'form-control'}),
+            'fichier_facture': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
+# === FORMULAIRE DETTE (pour vente à crédit) ===
+class DetteForm(forms.ModelForm):
+    # Informations de localisation
+    nom_localite = forms.CharField(
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: Grand Marché Central, Boutique XYZ...'
+        }),
+        help_text="Nom du lieu où la dette a été contractée"
+    )
+    
+    date_echeance = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+            'min': timezone.now().date().isoformat()
+        }),
+        help_text="Date d'échéance pour le remboursement"
+    )
+    
+    delai_bonus_heures = forms.IntegerField(
+        required=False,
+        initial=48,
+        min_value=1,
+        max_value=168,  # 7 jours max
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': '48'
+        }),
+        help_text="Délai en heures pour bénéficier du bonus (défaut: 48h)"
+    )
+
+    class Meta:
+        model = Dette
+        fields = ['nom_localite', 'date_echeance', 'delai_bonus_heures', 'notes']
+        widgets = {
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Notes supplémentaires...'
+            }),
+        }
+
     def __init__(self, *args, **kwargs):
-        self.agent = kwargs.pop('agent', None)
+        self.vente = kwargs.pop('vente', None)
         super().__init__(*args, **kwargs)
         
-        # Rendre tous les champs non obligatoires
-        self.fields['type_facture'].required = False
-        self.fields['montant'].required = False
-        self.fields['fichier_facture'].required = False
-        self.fields['description'].required = False
+        # Définir la date d'échéance par défaut à 30 jours
+        if not self.instance.pk:
+            self.fields['date_echeance'].initial = timezone.now().date() + timedelta(days=30)
 
-    def clean(self):
-        cleaned_data = super().clean()
-        
-        # Validation de base
-        if not cleaned_data.get('montant') or cleaned_data.get('montant', 0) <= 0:
-            self.add_error('montant', 'Montant valide requis')
-            
-        return cleaned_data
+    def clean_date_echeance(self):
+        date_echeance = self.cleaned_data['date_echeance']
+        if date_echeance < timezone.now().date():
+            raise forms.ValidationError("La date d'échéance ne peut pas être dans le passé")
+        return date_echeance
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         
-        # Associer l'agent automatiquement
-        instance.agent = self.agent
-
+        if self.vente:
+            instance.vente = self.vente
+            instance.montant_total = self.vente.total_vente
+            instance.montant_restant = self.vente.total_vente
+        
         if commit:
             instance.save()
+            
         return instance
+
+# === FORMULAIRE DETTE (pour vente à crédit) ===
+class DetteForm(forms.ModelForm):
+
+    # Informations de localisation
+    nom_localite = forms.CharField(
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: Grand Marché Central, Boutique XYZ...'
+        }),
+        help_text="Nom du lieu où la dette a été contractée"
+    )
+    
+    date_echeance = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date',
+            'min': timezone.now().date().isoformat()
+        }),
+        help_text="Date d'échéance pour le remboursement"
+    )
+    
+    delai_bonus_heures = forms.IntegerField(
+        required=False,
+        initial=48,
+        min_value=1,
+        max_value=168,  # 7 jours max
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': '48'
+        }),
+        help_text="Délai en heures pour bénéficier du bonus (défaut: 48h)"
+    )
+
+    class Meta:
+        model = Dette
+        fields = ['nom_localite', 'date_echeance', 'delai_bonus_heures', 'notes']
+        widgets = {
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Notes supplémentaires...'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.vente = kwargs.pop('vente', None)
+        super().__init__(*args, **kwargs)
+        
+        # Définir la date d'échéance par défaut à 30 jours
+        if not self.instance.pk:
+            self.fields['date_echeance'].initial = timezone.now().date() + timedelta(days=30)
+
+    def clean_date_echeance(self):
+        date_echeance = self.cleaned_data['date_echeance']
+        if date_echeance < timezone.now().date():
+            raise forms.ValidationError("La date d'échéance ne peut pas être dans le passé")
+        return date_echeance
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        if self.vente:
+            instance.vente = self.vente
+            instance.montant_total = self.vente.total_vente
+            instance.montant_restant = self.vente.total_vente
+        
+        if commit:
+            instance.save()
+            
+        return instance
+    
+# === FORMULAIRE PAIEMENT DETTE ===
+class PaiementDetteForm(forms.ModelForm):
+    montant = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=0.01,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': 'Montant du paiement'
+        })
+    )
+    
+    mode_paiement = forms.ChoiceField(
+        choices=PaiementDette.MODE_PAIEMENT_CHOICES,
+        initial='espece',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = PaiementDette
+        fields = ['montant', 'mode_paiement', 'reference', 'notes']
+        widgets = {
+            'reference': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Référence du paiement (numéro chèque, etc.)'
+            }),
+            'notes': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Notes sur le paiement...'
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.dette = kwargs.pop('dette', None)
+        super().__init__(*args, **kwargs)
+        
+        if self.dette:
+            # Définir le montant maximum possible
+            montant_max = self.dette.montant_restant
+            self.fields['montant'].widget.attrs['max'] = str(montant_max)
+            self.fields['montant'].help_text = f"Montant restant: {montant_max} FCFA"
+
+    def clean_montant(self):
+        montant = self.cleaned_data['montant']
+        if self.dette and montant > self.dette.montant_restant:
+            raise forms.ValidationError(
+                f"Le montant ne peut pas dépasser le reste dû ({self.dette.montant_restant} FCFA)"
+            )
+        return montant
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        if self.dette:
+            instance.dette = self.dette
+        
+        if commit:
+            instance.save()
+            
+        return instance
+
+# === FORMULAIRE BONUS AGENT (consultation) ===
+class BonusAgentForm(forms.ModelForm):
+    class Meta:
+        model = BonusAgent
+        fields = []  # Formulaire en lecture seule pour consultation
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Rendre tous les champs en lecture seule
+        for field in self.fields:
+            self.fields[field].widget.attrs['readonly'] = True
+            self.fields[field].widget.attrs['class'] = 'form-control-plaintext'
+
+# === FORMULAIRE RAPPORT DETTES ===
+class RapportDettesForm(forms.Form):
+    STATUT_CHOICES = (
+        ('', 'Tous les statuts'),
+        ('en_cours', 'En cours'),
+        ('partiellement_paye', 'Partiellement payé'),
+        ('paye', 'Payé'),
+        ('en_retard', 'En retard'),
+    )
+    
+    date_debut = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        label="Date de début"
+    )
+    
+    date_fin = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        label="Date de fin"
+    )
+    
+    statut = forms.ChoiceField(
+        choices=STATUT_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Statut de la dette"
+    )
+    
+    agent = forms.ModelChoiceField(
+        queryset=Agent.objects.filter(type_agent='terrain'),
+        required=False,
+        empty_label="Tous les agents",
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Agent terrain"
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        date_debut = cleaned_data.get('date_debut')
+        date_fin = cleaned_data.get('date_fin')
+        
+        if date_debut and date_fin and date_debut > date_fin:
+            self.add_error('date_fin', "La date de fin ne peut pas être avant la date de début")
+            
+        return cleaned_data
+

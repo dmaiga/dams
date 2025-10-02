@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h3>Supprimer la facture de {{ facture.agent.user.first_name }} - {{ facture.montant }} FCFA ?</h3>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Confirmer</button>
+    <a href="{% url 'liste_factures' %}" class="btn btn-secondary">Annuler</a>
+</form>
+{% endblock %}

@@ -1,0 +1,418 @@
+<!-- core/templates/core/ventes/enregistrer_paiement.html -->
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Enregistrer un Paiement - Dette #{{ dette.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Enregistrer un Paiement</h4>
+                    <div>
+                        <a href="{% url 'detail_dette' dette.id %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Retour à la dette
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Messages -->
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Informations de la dette -->
+                        <div class="col-md-5">
+                            <div class="card border-primary mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">Informations de la Dette</h5>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-borderless table-sm">
+                                        <tr>
+                                            <th width="40%">Client:</th>
+                                            <td>{{ dette.vente.client.nom }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Produit:</th>
+                                            <td>{{ dette.vente.detail_distribution.lot.produit.nom }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Quantité:</th>
+                                            <td>{{ dette.vente.quantite }} unités</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Localité:</th>
+                                            <td>{{ dette.nom_localite }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Date échéance:</th>
+                                            <td class="{% if dette.est_en_retard %}text-danger fw-bold{% endif %}">
+                                                {{ dette.date_echeance|date:"d/m/Y" }}
+                                                {% if dette.est_en_retard %}
+                                                    <br><small class="text-danger">(En retard de {{ dette.jours_retard }} jour{{ dette.jours_retard|pluralize }})</small>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                    <!-- Résumé financier -->
+                                    <div class="bg-light p-3 rounded">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Montant total:</span>
+                                            <strong class="text-primary">{{ dette.montant_total }} FCFA</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Déjà payé:</span>
+                                           {{ dette.montant_total|subtract:dette.montant_restant }}
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span>Reste à payer:</span>
+                                            <strong class="text-danger">{{ dette.montant_restant }} FCFA</strong>
+                                        </div>
+                                        <hr>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Statut:</span>
+                                            <span class="badge bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'en_retard' %}danger{% elif dette.statut == 'partiellement_paye' %}warning{% else %}info{% endif %}">
+                                                {{ dette.get_statut_display }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Barre de progression -->
+                                    {% if dette.montant_total > 0 %}
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <small>Progression du paiement</small>
+                                            <small>{{ dette.montant_restant }} FCFA restant</small>
+                                        </div>
+                                        <div class="progress" style="height: 12px;">
+                                            {% widthratio dette.montant_restant dette.montant_total 100 as restant_pourcent %}
+                                            <div class="progress-bar 
+                                                {% if restant_pourcent|add:'0' > 50 %}bg-danger
+                                                {% elif restant_pourcent|add:'0' > 25 %}bg-warning
+                                                {% else %}bg-success{% endif %}" 
+                                                role="progressbar" 
+                                                style="width: {{ restant_pourcent }}%"
+                                                aria-valuenow="{{ restant_pourcent }}" 
+                                                aria-valuemin="0" 
+                                                aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Information bonus -->
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-gift"></i> Information Bonus</h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if dette.eligible_bonus %}
+                                    <div class="alert alert-success mb-2">
+                                        <i class="fas fa-clock"></i>
+                                        <strong>Bonus disponible !</strong>
+                                        <br>
+                                        <small>
+                                            Temps restant: <span id="temps-restant-bonus">{{ dette.temps_restant_bonus }}</span><br>
+                                            Montant potentiel: <strong>{{ dette.montant_bonus }} FCFA</strong>
+                                        </small>
+                                    </div>
+                                    <p class="small text-muted mb-0">
+                                        <i class="fas fa-info-circle"></i>
+                                        Le bonus sera accordé automatiquement si le paiement complet est effectué avant l'expiration du délai.
+                                    </p>
+                                    {% else %}
+                                        {% if dette.bonus_accorde %}
+                                        <div class="alert alert-success mb-0">
+                                            <i class="fas fa-check-circle"></i>
+                                            <strong>Bonus déjà accordé</strong><br>
+                                            <small>Montant: {{ dette.montant_bonus }} FCFA</small>
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-secondary mb-0">
+                                            <i class="fas fa-info-circle"></i>
+                                            <small>Délai pour le bonus expiré</small>
+                                        </div>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formulaire de paiement -->
+                        <div class="col-md-7">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Nouveau Paiement</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="post" id="paiement-form">
+                                        {% csrf_token %}
+                                        
+                                        <!-- Montant -->
+                                        <div class="mb-3">
+                                            <label for="{{ form.montant.id_for_label }}" class="form-label">
+                                                Montant du paiement (FCFA) *
+                                            </label>
+                                            {{ form.montant }}
+                                            {% if form.montant.errors %}
+                                            <div class="text-danger small">{{ form.montant.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Montant maximum: <strong id="montant-max">{{ dette.montant_restant }}</strong> FCFA
+                                            </div>
+                                        </div>
+
+                                        <!-- Mode de paiement -->
+                                        <div class="mb-3">
+                                            <label for="{{ form.mode_paiement.id_for_label }}" class="form-label">
+                                                Mode de paiement *
+                                            </label>
+                                            {{ form.mode_paiement }}
+                                            {% if form.mode_paiement.errors %}
+                                            <div class="text-danger small">{{ form.mode_paiement.errors }}</div>
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Référence -->
+                                        <div class="mb-3">
+                                            <label for="{{ form.reference.id_for_label }}" class="form-label">
+                                                Référence
+                                            </label>
+                                            {{ form.reference }}
+                                            {% if form.reference.errors %}
+                                            <div class="text-danger small">{{ form.reference.errors }}</div>
+                                            {% endif %}
+                                            <div class="form-text">
+                                                Numéro de chèque, référence de virement, etc.
+                                            </div>
+                                        </div>
+
+                                        <!-- Notes -->
+                                        <div class="mb-4">
+                                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                                Notes (optionnel)
+                                            </label>
+                                            {{ form.notes }}
+                                            {% if form.notes.errors %}
+                                            <div class="text-danger small">{{ form.notes.errors }}</div>
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Simulation du résultat -->
+                                        <div class="card bg-light mb-4" id="simulation-paiement" style="display: none;">
+                                            <div class="card-body">
+                                                <h6 class="card-title">Simulation après paiement</h6>
+                                                <div class="row text-center">
+                                                    <div class="col-4">
+                                                        <div class="h5 text-primary" id="sim-montant-paye">0</div>
+                                                        <small>Montant payé</small>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <div class="h5 text-danger" id="sim-reste-payer">0</div>
+                                                        <small>Reste à payer</small>
+                                                    </div>
+                                                    <div class="col-4">
+                                                        <div class="h5 text-success" id="sim-bonus">0</div>
+                                                        <small>Bonus potentiel</small>
+                                                    </div>
+                                                </div>
+                                                <div id="simulation-bonus-info" class="mt-2 text-center" style="display: none;">
+                                                    <small class="text-success">
+                                                        <i class="fas fa-gift"></i>
+                                                        Bonus de <span id="sim-montant-bonus">0</span> FCFA sera accordé
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Boutons d'action -->
+                                        <div class="d-flex gap-2">
+                                            <a href="{% url 'detail_dette' dette.id %}" class="btn btn-secondary">
+                                                <i class="fas fa-times"></i> Annuler
+                                            </a>
+                                            <button type="submit" class="btn btn-success flex-fill">
+                                                <i class="fas fa-check"></i> Enregistrer le Paiement
+                                            </button>
+                                        </div>
+
+                                        <!-- Paiement rapide -->
+                                        {% if dette.montant_restant > 0 %}
+                                        <div class="mt-3">
+                                            <hr>
+                                            <h6 class="text-muted">Paiement rapide</h6>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="setMontant({{ dette.montant_restant }})">
+                                                    Paiement total ({{ dette.montant_restant }} FCFA)
+                                                </button>
+                                                {% if dette.montant_restant > 500 %}
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setMontant(500)">
+                                                    500 FCFA
+                                                </button>
+                                                {% endif %}
+                                                {% if dette.montant_restant > 1000 %}
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setMontant(1000)">
+                                                    1 000 FCFA
+                                                </button>
+                                                {% endif %}
+                                                {% if dette.montant_restant > 5000 %}
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setMontant(5000)">
+                                                    5 000 FCFA
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Historique des paiements récents -->
+                            {% if dette.paiements.all %}
+                            <div class="card mt-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Derniers Paiements</h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="list-group list-group-flush">
+                                        {% for paiement in dette.paiements.all|slice:":3" %}
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ paiement.montant }} FCFA</strong>
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        {{ paiement.get_mode_paiement_display }} • 
+                                                        {{ paiement.date_paiement|date:"d/m/Y H:i" }}
+                                                    </small>
+                                                </div>
+                                                {% if paiement.bonus_genere %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-gift"></i> Bonus
+                                                </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const montantInput = document.getElementById('{{ form.montant.id_for_label }}');
+    const simulationDiv = document.getElementById('simulation-paiement');
+    const montantMax = {{ dette.montant_restant }};
+    const estEligibleBonus = {{ dette.eligible_bonus|yesno:"true,false" }};
+    const montantBonus = {{ dette.montant_bonus|default:0 }};
+
+    // Fonction pour mettre à jour la simulation
+    function updateSimulation() {
+        const montant = parseFloat(montantInput.value) || 0;
+        
+        if (montant > 0 && montant <= montantMax) {
+            // Mettre à jour les valeurs de simulation
+            document.getElementById('sim-montant-paye').textContent = montant.toLocaleString() + ' F';
+            document.getElementById('sim-reste-payer').textContent = (montantMax - montant).toLocaleString() + ' F';
+            
+            // Gérer l'affichage du bonus
+            const bonusInfo = document.getElementById('simulation-bonus-info');
+            if (estEligibleBonus && montant === montantMax) {
+                document.getElementById('sim-bonus').textContent = montantBonus.toLocaleString() + ' F';
+                document.getElementById('sim-montant-bonus').textContent = montantBonus.toLocaleString();
+                bonusInfo.style.display = 'block';
+            } else {
+                document.getElementById('sim-bonus').textContent = '0 F';
+                bonusInfo.style.display = 'none';
+            }
+            
+            simulationDiv.style.display = 'block';
+        } else {
+            simulationDiv.style.display = 'none';
+        }
+    }
+
+    // Fonction pour définir le montant (boutons rapides)
+    function setMontant(montant) {
+        montantInput.value = montant;
+        updateSimulation();
+    }
+
+    // Événements
+    montantInput.addEventListener('input', updateSimulation);
+    montantInput.addEventListener('change', updateSimulation);
+
+    // Validation du montant
+    montantInput.addEventListener('blur', function() {
+        const montant = parseFloat(this.value) || 0;
+        if (montant > montantMax) {
+            this.value = montantMax;
+            updateSimulation();
+        }
+    });
+
+    // Initialiser la simulation si montant déjà saisi
+    if (montantInput.value) {
+        updateSimulation();
+    }
+
+    // Mettre à jour le compteur de temps restant pour le bonus
+    {% if dette.eligible_bonus %}
+    function updateTempsRestant() {
+        // Cette fonction pourrait être implémentée avec du JavaScript
+        // pour un compte à rebours en temps réel
+        console.log("Bonus disponible - mise à jour du temps restant");
+    }
+    setInterval(updateTempsRestant, 60000); // Mise à jour toutes les minutes
+    {% endif %}
+});
+
+// Fonction pour formater l'affichage des montants
+function formatMontant(montant) {
+    return new Intl.NumberFormat('fr-FR').format(montant);
+}
+</script>
+
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.progress {
+    border-radius: 10px;
+}
+.list-group-item {
+    border: none;
+    padding: 1rem;
+}
+.badge {
+    font-size: 0.7rem;
+}
+.form-control:focus {
+    border-color: #4dabf7;
+    box-shadow: 0 0 0 0.2rem rgba(77, 171, 247, 0.25);
+}
+</style>
+{% endblock %}

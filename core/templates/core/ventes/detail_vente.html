@@ -1,0 +1,284 @@
+<!-- core/templates/core/ventes/detail_vente.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Détail de la Vente #{{ vente.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Détail de la Vente #{{ vente.id }}</h4>
+                    <div>
+                        <a href="{% url 'liste_ventes' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Retour aux ventes
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Messages -->
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Informations principales -->
+                        <div class="col-md-8">
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Informations de la Vente</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <table class="table table-borderless">
+                                                <tr>
+                                                    <th width="40%">Client:</th>
+                                                    <td>{{ vente.client.nom }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Contact:</th>
+                                                    <td>{{ vente.client.contact|default:"Non renseigné" }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Type client:</th>
+                                                    <td>
+                                                        <span class="badge bg-{% if vente.client.type_client == 'grossiste' %}primary{% else %}secondary{% endif %}">
+                                                            {{ vente.client.get_type_client_display }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Agent:</th>
+                                                    <td>{{ vente.agent.user.get_full_name|default:vente.agent.user.username }}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <table class="table table-borderless">
+                                                <tr>
+                                                    <th width="40%">Date vente:</th>
+                                                    <td>{{ vente.date_vente|date:"d/m/Y H:i" }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Type vente:</th>
+                                                    <td>
+                                                        <span class="badge bg-{% if vente.type_vente == 'gros' %}warning{% else %}info{% endif %}">
+                                                            {{ vente.get_type_vente_display }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Mode paiement:</th>
+                                                    <td>
+                                                        <span class="badge bg-{% if vente.mode_paiement == 'credit' %}danger{% else %}success{% endif %}">
+                                                            {{ vente.get_mode_paiement_display }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Statut:</th>
+                                                    <td>
+                                                        {% if vente.mode_paiement == 'credit' and dette %}
+                                                            <span class="badge bg-{{ dette.get_statut_display|lower }}">
+                                                                {{ dette.get_statut_display }}
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="badge bg-success">Réglée</span>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Détails du produit -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Détails du Produit</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <strong>Produit:</strong><br>
+                                            {{ vente.detail_distribution.lot.produit.nom }}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Lot:</strong><br>
+                                            {{ vente.detail_distribution.lot.reference_lot|default:"N/A" }}
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Quantité vendue:</strong><br>
+                                            {{ vente.quantite }} unités
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-4">
+                                            <strong>Prix unitaire:</strong><br>
+                                            {{ vente.prix_vente_unitaire }} FCFA
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Total:</strong><br>
+                                            <h5 class="text-primary">{{ vente.total_vente }} FCFA</h5>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong>Distribution:</strong><br>
+                                            {{ vente.detail_distribution.distribution.date_distribution|date:"d/m/Y" }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section Dette (si crédit) -->
+                        <div class="col-md-4">
+                            {% if vente.mode_paiement == 'credit' and dette %}
+                            <div class="card border-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'en_retard' %}danger{% else %}warning{% endif %}">
+                                <div class="card-header bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'en_retard' %}danger{% else %}warning{% endif %} text-white">
+                                    <h5 class="mb-0">Détails de la Dette</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <strong>Montant total:</strong><br>
+                                        <h4 class="text-primary">{{ dette.montant_total }} FCFA</h4>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Montant restant:</strong><br>
+                                        <h5 class="{% if dette.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                                            {{ dette.montant_restant }} FCFA
+                                        </h5>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Date échéance:</strong><br>
+                                        <span class="{% if dette.est_en_retard %}text-danger{% endif %}">
+                                            {{ dette.date_echeance|date:"d/m/Y" }}
+                                            {% if dette.est_en_retard %}
+                                                <small class="text-danger">(En retard de {{ dette.jours_retard }} jour{{ dette.jours_retard|pluralize }})</small>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Localité:</strong><br>
+                                        {{ dette.nom_localite|default:"Non spécifiée" }}
+                                    </div>
+                                    <div class="mb-3">
+                                        <strong>Bonus:</strong><br>
+                                        {% if dette.bonus_accorde %}
+                                            <span class="badge bg-success">Accordé ({{ dette.montant_bonus }} FCFA)</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Non accordé</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Actions -->
+                                    <div class="d-grid gap-2">
+                                        {% if dette.montant_restant > 0 %}
+                                        <a href="{% url 'enregistrer_paiement_dette' dette.id %}" class="btn btn-success">
+                                            <i class="fas fa-money-bill-wave"></i> Enregistrer Paiement
+                                        </a>
+                                        {% endif %}
+                                        <a href="{% url 'detail_dette' dette.id %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-eye"></i> Voir Détail Dette
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% elif vente.mode_paiement == 'credit' and not dette %}
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="mb-0">Dette à Créer</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted">
+                                        Cette vente est en mode crédit mais aucune dette n'a été créée.
+                                    </p>
+                                    <a href="{% url 'creer_dette' %}" class="btn btn-warning">
+                                        <i class="fas fa-plus"></i> Créer la Dette
+                                    </a>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0">Paiement Comptant</h5>
+                                </div>
+                                <div class="card-body text-center">
+                                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                    <p class="mb-0">Vente réglée immédiatement</p>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            
+                        </div>
+                    </div>
+
+                    <!-- Historique des paiements (si dette existe) -->
+                    {% if vente.mode_paiement == 'credit' and dette %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Historique des Paiements</h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if dette.paiements.all %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Montant</th>
+                                                    <th>Mode</th>
+                                                    <th>Référence</th>
+                                                    <th>Bonus</th>
+                                                    <th>Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for paiement in dette.paiements.all %}
+                                                <tr>
+                                                    <td>{{ paiement.date_paiement|date:"d/m/Y H:i" }}</td>
+                                                    <td>{{ paiement.montant }} FCFA</td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            {{ paiement.get_mode_paiement_display }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ paiement.reference|default:"-" }}</td>
+                                                    <td>
+                                                        {% if paiement.bonus_genere %}
+                                                            <span class="badge bg-success">Oui</span>
+                                                        {% else %}
+                                                            <span class="badge bg-secondary">Non</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>{{ paiement.notes|default:"-" }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-muted text-center">Aucun paiement enregistré pour cette dette.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

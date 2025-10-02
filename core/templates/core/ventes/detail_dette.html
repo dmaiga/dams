@@ -1,0 +1,484 @@
+<!-- core/templates/core/ventes/detail_dette.html -->
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Détail de la Dette #{{ dette.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Détail de la Dette #{{ dette.id }}</h4>
+                    <div>
+                        <a href="{% url 'liste_dettes' %}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Retour aux dettes
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Messages -->
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+
+                    <div class="row">
+                        <!-- Informations principales de la dette -->
+                        <div class="col-md-8">
+                            <div class="card mb-4">
+                                <div class="card-header bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'en_retard' %}danger{% else %}warning{% endif %} text-white">
+                                    <h5 class="mb-0">Informations de la Dette</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <table class="table table-borderless">
+                                                <tr>
+                                                    <th width="40%">Client:</th>
+                                                    <td>
+                                                        <strong>{{ dette.vente.client.nom }}</strong>
+                                                        {% if dette.vente.client.contact %}
+                                                        <br><small class="text-muted">{{ dette.vente.client.contact }}</small>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Produit:</th>
+                                                    <td>{{ dette.vente.detail_distribution.lot.produit.nom }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Quantité:</th>
+                                                    <td>{{ dette.vente.quantite }} unités</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Agent:</th>
+                                                    <td>{{ dette.vente.agent.user.get_full_name|default:dette.vente.agent.user.username }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Localité:</th>
+                                                    <td>
+                                                        <span class="badge bg-info">{{ dette.nom_localite }}</span>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <table class="table table-borderless">
+                                                <tr>
+                                                    <th width="40%">Montant total:</th>
+                                                    <td><h5 class="text-primary">{{ dette.montant_total }} FCFA</h5></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Montant restant:</th>
+                                                    <td>
+                                                        <h5 class="{% if dette.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                                                            {{ dette.montant_restant }} FCFA
+                                                        </h5>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Statut:</th>
+                                                    <td>
+                                                        <span class="badge bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'en_retard' %}danger{% elif dette.statut == 'partiellement_paye' %}warning{% else %}info{% endif %} fs-6">
+                                                            {{ dette.get_statut_display }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Date création:</th>
+                                                    <td>{{ dette.date_creation|date:"d/m/Y H:i" }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Date échéance:</th>
+                                                    <td>
+                                                        <span class="{% if dette.est_en_retard %}text-danger fw-bold{% endif %}">
+                                                            {{ dette.date_echeance|date:"d/m/Y" }}
+                                                            {% if dette.est_en_retard %}
+                                                                <br><small class="text-danger">(En retard de {{ dette.jours_retard }} jour{{ dette.jours_retard|pluralize }})</small>
+                                                            {% endif %}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% if dette.date_reglement %}
+                                                <tr>
+                                                    <th>Date règlement:</th>
+                                                    <td class="text-success">{{ dette.date_reglement|date:"d/m/Y" }}</td>
+                                                </tr>
+                                                {% endif %}
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Barre de progression du paiement -->
+                                    {% if dette.montant_total > 0 %}
+                                    <div class="mt-4">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <small>Progression du paiement</small>
+                                            <small>{{ dette.montant_restant }} FCFA restant</small>
+                                        </div>
+                                        <div class="progress" style="height: 20px;">
+                                            {% widthratio dette.montant_restant dette.montant_total 100 as restant_pourcent %}
+                                            <div class="progress-bar 
+                                                {% if restant_pourcent|add:'0' > 50 %}bg-danger
+                                                {% elif restant_pourcent|add:'0' > 25 %}bg-warning
+                                                {% else %}bg-success{% endif %}" 
+                                                role="progressbar" 
+                                                style="width: {{ restant_pourcent }}%"
+                                                aria-valuenow="{{ restant_pourcent }}" 
+                                                aria-valuemin="0" 
+                                                aria-valuemax="100">
+                                                {{ restant_pourcent }}%
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between mt-1">
+                                            <small>0 FCFA</small>
+                                            <small>{{ dette.montant_total }} FCFA</small>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Informations bonus -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Informations Bonus</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>Bonus accordé:</strong>
+                                            {% if dette.bonus_accorde %}
+                                                <span class="badge bg-success ms-2">OUI</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary ms-2">NON</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Montant bonus:</strong>
+                                            <span class="fw-bold text-success">{{ dette.montant_bonus }} FCFA</span>
+                                        </div>
+                                    </div>
+                                    {% if not dette.bonus_accorde and dette.montant_restant == 0 %}
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle"></i>
+                                            Le bonus n'a pas été accordé car le paiement n'a pas été effectué dans les délais.
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="col-md-4">
+                            <!-- Carte d'actions -->
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Actions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        {% if dette.montant_restant > 0 %}
+                                        <a href="{% url 'enregistrer_paiement_dette' dette.id %}" class="btn btn-success btn-lg">
+                                            <i class="fas fa-money-bill-wave"></i> Enregistrer Paiement
+                                        </a>
+                                        {% endif %}
+                                        
+                                        <a href="{% url 'detail_vente' dette.vente.id %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-shopping-cart"></i> Voir Détail Vente
+                                        </a>
+                                        
+                                        <a href="{% url 'liste_dettes' %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-list"></i> Retour aux Dettes
+                                        </a>
+
+                                        <!-- Lien externe pour règlement (optionnel) -->
+                                        {% if dette.montant_restant > 0 %}
+                                        <div class="mt-3">
+                                            <small class="text-muted d-block text-center">Règlement en ligne</small>
+                                            <button type="button" class="btn btn-outline-info w-100" data-bs-toggle="modal" data-bs-target="#lienPaiementModal">
+                                                <i class="fas fa-external-link-alt"></i> Générer Lien de Paiement
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Statut rapide -->
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    {% if dette.montant_restant == 0 %}
+                                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                    <h5 class="text-success">Dette Réglée</h5>
+                                    <p class="text-muted mb-0">Totalement payée le {{ dette.date_reglement|date:"d/m/Y" }}</p>
+                                    {% elif dette.est_en_retard %}
+                                    <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                                    <h5 class="text-danger">En Retard</h5>
+                                    <p class="text-muted mb-0">{{ dette.jours_retard }} jour{{ dette.jours_retard|pluralize }} de retard</p>
+                                    {% else %}
+                                    <i class="fas fa-clock fa-3x text-warning mb-3"></i>
+                                    <h5 class="text-warning">En Cours</h5>
+                                    <p class="text-muted mb-0">Échéance: {{ dette.date_echeance|date:"d/m/Y" }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historique des paiements -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">Historique des Paiements</h5>
+                                    <span class="badge bg-primary">{{ paiements|length }} paiement{{ paiements|pluralize }}</span>
+                                </div>
+                                <div class="card-body">
+                                    {% if paiements %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Montant</th>
+                                                    <th>Mode</th>
+                                                    <th>Référence</th>
+                                                    <th>Bonus Généré</th>
+                                                    <th>Notes</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for paiement in paiements %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ paiement.date_paiement|date:"d/m/Y" }}</strong>
+                                                        <br>
+                                                        <small class="text-muted">{{ paiement.date_paiement|date:"H:i" }}</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="fw-bold text-success">{{ paiement.montant }} FCFA</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if paiement.mode_paiement == 'espece' %}success{% elif paiement.mode_paiement == 'cheque' %}warning{% else %}info{% endif %}">
+                                                            {{ paiement.get_mode_paiement_display }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ paiement.reference|default:"-" }}</td>
+                                                    <td>
+                                                        {% if paiement.bonus_genere %}
+                                                            <span class="badge bg-success">
+                                                                <i class="fas fa-check"></i> Oui
+                                                            </span>
+                                                            <br>
+                                                            <small class="text-success">+{{ paiement.montant_bonus }} FCFA</small>
+                                                        {% else %}
+                                                            <span class="badge bg-secondary">Non</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if paiement.notes %}
+                                                            <span title="{{ paiement.notes }}">
+                                                                <i class="fas fa-sticky-note text-info"></i>
+                                                            </span>
+                                                        {% else %}
+                                                            -
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button type="button" class="btn btn-outline-info" 
+                                                                    data-bs-toggle="tooltip" 
+                                                                    title="Voir détails"
+                                                                    onclick="showPaiementDetails({{ paiement.id }})">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr class="table-primary">
+                                                    <td colspan="1" class="text-end"><strong>Total payé:</strong></td>
+{{ dette.montant_total|subtract:dette.montant_restant }}
+                                                    <td colspan="5"></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center py-4">
+                                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">Aucun paiement enregistré</h5>
+                                        <p class="text-muted">Aucun paiement n'a été enregistré pour cette dette.</p>
+                                        <a href="{% url 'enregistrer_paiement_dette' dette.id %}" class="btn btn-success">
+                                            <i class="fas fa-plus"></i> Premier Paiement
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes de la dette -->
+                    {% if dette.notes %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Notes</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p class="mb-0">{{ dette.notes }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour le lien de paiement -->
+<div class="modal fade" id="lienPaiementModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Lien de Paiement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Générez un lien de paiement sécurisé pour envoyer au client :</p>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="lienPaiement" 
+                           value="{{ request.scheme }}://{{ request.get_host }}{% url 'enregistrer_paiement_dette' dette.id %}" 
+                           readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="copierLien()">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="alert alert-info">
+                    <small>
+                        <i class="fas fa-info-circle"></i>
+                        Ce lien permet au client d'accéder directement au formulaire de paiement.
+                    </small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="partagerLien()">
+                    <i class="fas fa-share-alt"></i> Partager
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour détails du paiement -->
+<div class="modal fade" id="paiementDetailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Détails du Paiement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="paiementDetailsContent">
+                <!-- Contenu chargé dynamiquement -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Fonction pour copier le lien de paiement
+function copierLien() {
+    const lienInput = document.getElementById('lienPaiement');
+    lienInput.select();
+    lienInput.setSelectionRange(0, 99999);
+    document.execCommand('copy');
+    
+    // Afficher une notification
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-success position-fixed top-0 end-0 m-3';
+    toast.style.zIndex = '1060';
+    toast.innerHTML = '<i class="fas fa-check"></i> Lien copié dans le presse-papier';
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// Fonction pour partager le lien
+function partagerLien() {
+    const lien = document.getElementById('lienPaiement').value;
+    const message = `Bonjour, voici le lien pour régler votre dette de ${lien}`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'Paiement de dette',
+            text: message,
+            url: lien
+        });
+    } else {
+        // Fallback pour les navigateurs qui ne supportent pas l'API Share
+        window.open(`mailto:?subject=Paiement de dette&body=${encodeURIComponent(message)}`);
+    }
+}
+
+// Fonction pour afficher les détails d'un paiement
+function showPaiementDetails(paiementId) {
+    // Ici vous pouvez charger les détails via AJAX si nécessaire
+    // Pour l'instant, on affiche un message simple
+    document.getElementById('paiementDetailsContent').innerHTML = `
+        <p>Détails du paiement #${paiementId}</p>
+        <p>Fonctionnalité à implémenter avec une vue dédiée.</p>
+    `;
+    new bootstrap.Modal(document.getElementById('paiementDetailsModal')).show();
+}
+
+// Initialiser les tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+
+<style>
+.progress {
+    border-radius: 10px;
+}
+.progress-bar {
+    border-radius: 10px;
+    transition: width 0.6s ease;
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.card-header {
+    border-bottom: 1px solid rgba(0,0,0,.125);
+}
+</style>
+{% endblock %}

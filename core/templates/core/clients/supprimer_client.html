@@ -1,0 +1,50 @@
+<!-- templates/core/clients/supprimer_client.html -->
+{% extends 'base.html' %}
+
+{% block title %}Supprimer {{ client.nom }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Supprimer le Client</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Attention!</h5>
+                        <p class="mb-0">
+                            Vous êtes sur le point de supprimer le client <strong>{{ client.nom }}</strong>.
+                            Cette action est irréversible.
+                        </p>
+                    </div>
+
+                    {% if client.vente_set.exists %}
+                    <div class="alert alert-warning">
+                        <h6>Informations importantes:</h6>
+                        <ul class="mb-0">
+                            <li>Ce client a {{ client.vente_set.count }} vente(s) associée(s)</li>
+                            <li>Les ventes existantes ne seront pas supprimées</li>
+                            <li>Le client restera visible dans l'historique des ventes</li>
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Confirmer la suppression
+                            </button>
+                            <a href="{% url 'detail_client' client.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

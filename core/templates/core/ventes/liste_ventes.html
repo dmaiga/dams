@@ -1,95 +1,301 @@
-<!-- templates/ventes/liste_ventes.html -->
+<!-- templates/core/ventes/liste_ventes.html -->
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mes Ventes{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Historique des Ventes</h1>
-    <div>
-        <a href="{% url 'enregistrer_vente' %}" class="btn btn-success">➕ Nouvelle vente</a>
-        <a href="{% url 'dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Mes Ventes</h4>
+                    <div>
+                        <a href="{% url 'enregistrer_vente' %}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Nouvelle Vente
+                        </a>
+                       
+                        <a href="{% url 'consulter_bonus' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-shopping-cart"></i> Voir Mes Bonus
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Indicateurs de performance -->
+                    <div class="row mb-4">
+                        <div class="col-xl-2 col-md-4 col-6 mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center p-3">
+                                    <h4 class="mb-1">{{ total_ventes }}</h4>
+                                    <small class="opacity-8">Ventes Total</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6 mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center p-3">
+                                    <h4 class="mb-1">{{ chiffre_affaires_total|floatformat:0 }} F</h4>
+                                    <small class="opacity-8">Chiffre d'Affaires</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6 mb-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center p-3">
+                                    <h4 class="mb-1">{{ ventes_gros_count }}</h4>
+                                    <small class="opacity-8">Ventes en Gros</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6 mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center p-3">
+                                    <h4 class="mb-1">{{ ventes_credit_count }}</h4>
+                                    <small class="opacity-8">Ventes Crédit</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6 mb-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body text-center p-3">
+                                    <h4 class="mb-1">{{ dettes_en_cours }}</h4>
+                                    <small class="opacity-8">Dettes en Cours</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-md-4 col-6 mb-3">
+                            <div class="card bg-dark text-white">
+                                <div class="card-body text-center p-3">
+                                    <h4 class="mb-1">{{ bonus_obtenus|floatformat:0 }} F</h4>
+                                    <small class="opacity-8">Bonus Obtenus</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Répartition visuelle -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Répartition par Type</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Ventes en Gros</span>
+                                        <span class="fw-bold">{{ ventes_gros_count }} ({% widthratio ventes_gros_count total_ventes 100 %}%)</span>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 10px;">
+                                        <div class="progress-bar bg-info" style="width: {% widthratio ventes_gros_count total_ventes 100 %}%"></div>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Ventes au Détail</span>
+                                        <span class="fw-bold">{{ ventes_detail_count }} ({% widthratio ventes_detail_count total_ventes 100 %}%)</span>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 10px;">
+                                        <div class="progress-bar bg-success" style="width: {% widthratio ventes_detail_count total_ventes 100 %}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Répartition Paiement</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Paiement Comptant</span>
+                                        <span class="fw-bold">{{ ventes_comptant_count }} ({% widthratio ventes_comptant_count total_ventes 100 %}%)</span>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 10px;">
+                                        <div class="progress-bar bg-success" style="width: {% widthratio ventes_comptant_count total_ventes 100 %}%"></div>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Paiement Crédit</span>
+                                        <span class="fw-bold">{{ ventes_credit_count }} ({% widthratio ventes_credit_count total_ventes 100 %}%)</span>
+                                    </div>
+                                    <div class="progress mb-3" style="height: 10px;">
+                                        <div class="progress-bar bg-warning" style="width: {% widthratio ventes_credit_count total_ventes 100 %}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Liste des ventes -->
+                    {% if ventes %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Historique des Ventes</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Client</th>
+                                            <th>Produit</th>
+                                            <th class="text-center">Quantité</th>
+                                            <th class="text-center">Type</th>
+                                            <th class="text-center">Paiement</th>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-center">Statut</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for vente in ventes %}
+                                        <tr>
+                                            <td>
+                                                <small class="text-muted">{{ vente.date_vente|date:"d/m/Y" }}</small>
+                                                <br>
+                                                <small class="text-muted">{{ vente.date_vente|date:"H:i" }}</small>
+                                            </td>
+                                            <td>
+                                                <strong>{{ vente.client.nom }}</strong>
+                                                {% if vente.client.contact %}
+                                                <br>
+                                                <small class="text-muted">{{ vente.client.contact }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {{ vente.detail_distribution.lot.produit.nom }}
+                                                <br>
+                                                <small class="text-muted">Lot: {{ vente.detail_distribution.lot.reference_lot|default:"N/A" }}</small>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary rounded-pill">{{ vente.quantite }}</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-{% if vente.type_vente == 'gros' %}info{% else %}success{% endif %}">
+                                                    {{ vente.get_type_vente_display }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-{% if vente.mode_paiement == 'comptant' %}success{% else %}warning{% endif %}">
+                                                    {{ vente.get_mode_paiement_display }}
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong>{{ vente.total_vente }} FCFA</strong>
+                                                <br>
+                                                <small class="text-muted">{{ vente.prix_vente_unitaire }} F/u</small>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if vente.mode_paiement == 'credit' %}
+                                                    {% if vente.dette %}
+                                                        {% if vente.dette.statut == 'paye' %}
+                                                            <span class="badge bg-success" title="Bonus: {{ vente.dette.montant_bonus }} FCFA">
+                                                                <i class="fas fa-check"></i> Payée
+                                                                {% if vente.dette.bonus_accorde %}
+                                                                    <i class="fas fa-gift text-warning ms-1" title="Bonus obtenu"></i>
+                                                                {% endif %}
+                                                            </span>
+                                                        {% elif vente.dette.statut == 'partiellement_paye' %}
+                                                            <span class="badge bg-warning">
+                                                                <i class="fas fa-clock"></i> Partiel
+                                                            </span>
+                                                        {% elif vente.dette.statut == 'en_retard' %}
+                                                            <span class="badge bg-danger">
+                                                                <i class="fas fa-exclamation-triangle"></i> Retard
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="badge bg-secondary">
+                                                                <i class="fas fa-hourglass"></i> En cours
+                                                            </span>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <span class="badge bg-light text-dark">
+                                                            <i class="fas fa-plus"></i> Dette à créer
+                                                        </span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check"></i> Réglée
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'detail_vente' vente.id %}" 
+                                                       class="btn btn-outline-primary" 
+                                                       title="Voir détails">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if vente.mode_paiement == 'credit' and vente.dette %}
+                                                    <a href="{% url 'detail_dette' vente.dette.id %}" 
+                                                       class="btn btn-outline-warning" 
+                                                       title="Voir dette">
+                                                        <i class="fas fa-file-invoice-dollar"></i>
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-shopping-cart fa-4x text-muted"></i>
+                        </div>
+                        <h4 class="text-muted">Aucune vente enregistrée</h4>
+                        <p class="text-muted mb-4">Commencez par enregistrer votre première vente</p>
+                        <a href="{% url 'enregistrer_vente' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus"></i> Première Vente
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+{% endblock %}
 
-<div class="card">
-    <div class="card-body">
-        {% if ventes %}
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Agent</th>
-                        <th>Client</th>
-                        <th>Produit</th>
-                        <th>Quantité</th>
-                        <th>Type</th>
-                        <th>Prix unit.</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for vente in ventes %}
-                    <tr>
-                        <td>{{ vente.date_vente|date:"d/m/Y H:i" }}</td>
-                        <td>{{ vente.agent.user.first_name }}</td>
-                        <td>{{ vente.client.prenom }} {{ vente.client.nom }}</td>
-                        <td>{{ vente.produit_nom }}</td>
-                        <td>{{ vente.quantite }}</td>
-                        <td>
-                            <span class="badge {% if vente.type_vente == 'gros' %}bg-primary{% else %}bg-success{% endif %}">
-                                {{ vente.get_type_vente_display }}
-                            </span>
-                        </td>
-                        <td>{{ vente.prix_vente }} FCFA</td>
-                        <td><strong>{{ vente.total_vente }} FCFA</strong></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+{% block extra_js %}
+<script>
+// Fonction pour filtrer les ventes (optionnel)
+function filtrerVentes(type) {
+    // Implémentation future pour le filtrage
+    console.log('Filtrage par:', type);
+}
 
-        <!-- Statistiques -->
-        <div class="row mt-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body text-center">
-                        <h5>{{ ventes|length }}</h5>
-                        <p class="mb-0">Ventes totales</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body text-center">
-                        <h5>{{ ventes|length }}</h5>
-                        <p class="mb-0">Clients servis</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body text-center">
-                        <h5>0 FCFA</h5>
-                        <p class="mb-0">Chiffre d'affaires</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body text-center">
-                        <h5>{{ ventes|length }}</h5>
-                        <p class="mb-0">Agents actifs</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+// Initialiser les tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
 
-        {% else %}
-        <div class="text-center py-4">
-            <p class="text-muted">Aucune vente enregistrée</p>
-            <a href="{% url 'enregistrer_vente' %}" class="btn btn-primary">Enregistrer la première vente</a>
-        </div>
-        {% endif %}
-    </div>
-</div>
+<style>
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.badge {
+    font-size: 0.75rem;
+}
+.progress {
+    border-radius: 10px;
+}
+</style>
 {% endblock %}

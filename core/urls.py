@@ -1,11 +1,11 @@
 # urls.py
 from django.urls import path
 from . import views
-
+from  .views import DashboardView,PerformanceAgentsView
 urlpatterns = [
     # Dashboard
-    path('', views.dashboard, name='dashboard'),
-    
+   path('', DashboardView.as_view(), name='dashboard'),
+    path('dashboard/agent/', views.dashboard_agent, name='dashboard_agent'),
     # Agents
     path('agents/', views.liste_agents, name='liste_agents'),
     path('agents/creer/', views.creer_agent, name='creer_agent'),
@@ -20,7 +20,39 @@ urlpatterns = [
     path('distribution/<int:distribution_id>/', views.detail_distribution, name='detail_distribution'),
     path('api/stock-produit/<int:produit_id>/', views.get_stock_produit, name='api_stock_produit'),
 # Ventes
-    path('ventes/nouvelle/', views.enregistrer_vente, name='enregistrer_vente'),
-    path('ventes/liste/', views.liste_ventes, name='liste_ventes'),
-    path('api/info-distribution/<int:detail_id>/', views.get_info_distribution, name='api_info_distribution'),
+  # Ventes personnelles
+    path('ventes/enregistrer/', views.enregistrer_vente, name='enregistrer_vente'),
+    path('ventes/', views.liste_ventes, name='liste_ventes'),
+    path('ventes/<int:vente_id>/', views.detail_vente, name='detail_vente'),
+    
+    # Dettes personnelles
+    path('dettes/creer/', views.creer_dette, name='creer_dette'),
+    path('dettes/', views.liste_dettes, name='liste_dettes'),
+    path('dettes/<int:dette_id>/', views.detail_dette, name='detail_dette'),
+    path('dettes/<int:dette_id>/paiement/', views.enregistrer_paiement_dette, name='enregistrer_paiement_dette'),
+    
+    # Bonus personnel
+    path('bonus/', views.consulter_bonus, name='consulter_bonus'),
+    
+    # Administration (toutes les données)
+    path('admin/ventes/', views.toutes_les_ventes, name='toutes_les_ventes'),
+    path('admin/dettes/', views.toutes_les_dettes, name='toutes_les_dettes'),
+    path('admin/bonus/', views.tous_les_bonus, name='tous_les_bonus'),
+    
+    # API
+    path('api/info-distribution/<int:detail_id>/', views.get_info_distribution, name='get_info_distribution'),
+#factures
+    path('factures/', views.liste_factures, name='liste_factures'),
+    path('factures/creer/', views.creer_facture, name='creer_facture'),
+    path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
+    path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),
+#Clients
+    path('clients/', views.ClientListView.as_view(), name='liste_clients'),
+    path('clients/ajouter/', views.ClientCreateView.as_view(), name='ajouter_client'),
+    path('clients/<int:pk>/', views.ClientDetailView.as_view(), name='detail_client'),
+    path('clients/<int:pk>/modifier/', views.ClientUpdateView.as_view(), name='modifier_client'),
+    path('clients/<int:pk>/supprimer/', views.ClientDeleteView.as_view(), name='supprimer_client'),
+#statistique
+    
+    path('performances/agents/', PerformanceAgentsView.as_view(), name='performance_agents'),
 ]
