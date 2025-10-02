@@ -1,0 +1,61 @@
+<!-- core/distribution/restaurer_distribution.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Restaurer Distribution #{{ distribution.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-undo"></i>
+                        Restaurer Distribution #{{ distribution.id }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Informations de la distribution supprimée -->
+                    <div class="alert alert-info">
+                        <h6>Distribution supprimée :</h6>
+                        <p class="mb-1"><strong>Date :</strong> {{ distribution.date_distribution|date:"d/m/Y H:i" }}</p>
+                        <p class="mb-1"><strong>Superviseur :</strong> {{ distribution.superviseur.full_name }}</p>
+                        <p class="mb-1"><strong>Destinataire :</strong> 
+                            {% if distribution.type_distribution == 'AUTO' %}
+                            {{ distribution.superviseur.full_name }} (Auto)
+                            {% else %}
+                            {{ distribution.agent_terrain.full_name }}
+                            {% endif %}
+                        </p>
+                        <p class="mb-1"><strong>Supprimée le :</strong> {{ distribution.date_suppression|date:"d/m/Y H:i" }}</p>
+                        {% if distribution.raison_suppression %}
+                        <p class="mb-0"><strong>Raison :</strong> {{ distribution.raison_suppression }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-info-circle"></i> Information</h6>
+                        <p class="mb-0">
+                            Cette action rendra à nouveau visible la distribution dans les listes et rapports.
+                        </p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-undo"></i> Confirmer la restauration
+                            </button>
+                            <a href="{% url 'liste_distributions' %}?show_deleted=true" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

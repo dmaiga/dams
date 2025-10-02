@@ -18,13 +18,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
-from core.views import logout_user
+from core.views import logout_user,custom_login
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
         # URLs d'authentification
-    path('accounts/login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('accounts/login/', custom_login, name='login'),
     path('accounts/logout/', logout_user, name='logout'),
     path('accounts/password_change/', auth_views.PasswordChangeView.as_view(template_name='registration/password_change.html'), name='password_change'),
     path('accounts/password_change/done/', auth_views.PasswordChangeDoneView.as_view(template_name='registration/password_change_done.html'), name='password_change_done'),

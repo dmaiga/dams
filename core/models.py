@@ -51,10 +51,24 @@ class LotEntrepot(models.Model):
     date_reception = models.DateTimeField(default=timezone.now)
     date_enregistrement = models.DateTimeField(auto_now_add=True)
     reference_lot = models.CharField(max_length=50, unique=True, blank=True, null=True)  # AJOUTEZ CE CHAMP
-
+    facture = models.FileField(
+        upload_to='factures_entrepot/%Y/%m/',
+        null=True,
+        blank=True,
+        verbose_name="Facture (optionnel)"
+    )
+    date_upload_facture = models.DateTimeField(
+        null=True, 
+        blank=True,
+        verbose_name="Date d'upload de la facture"
+    )
     def __str__(self):
         return f"{self.produit.nom} - {self.reference_lot} - {self.quantite_restante} restants"
 
+    @property
+    def montant_total(self):
+        """Calcule le montant total du lot"""
+        return self.quantite_initiale * (self.prix_achat_unitaire or 0)
     @staticmethod
     def get_lots_disponibles(produit_nom):
         return LotEntrepot.objects.filter(
@@ -64,33 +78,175 @@ class LotEntrepot(models.Model):
 
 class Agent(models.Model):
     TYPE_AGENT_CHOICES = (
-        ('entrepot', 'Superviseur (entrepôt)'),
-        ('terrain', 'Agent terrain'),
+        ('entrepot', 'Superviseur'),
+        ('terrain', 'Agent'),
     )
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     type_agent = models.CharField(max_length=10, choices=TYPE_AGENT_CHOICES)
     telephone = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.get_type_agent_display()}"
+        return f"{self.full_name} - {self.get_type_agent_display()}"
+
+    @property
+    def full_name(self):
+        """Retourne le nom complet de l’agent"""
+        return self.user.get_full_name() or self.user.username
 
 class DistributionAgent(models.Model):
+    TYPE_DISTRIBUTION = (
+        ('TERRAIN', 'Distribution à un agent '),
+        ('AUTO', 'Auto-distribution '),
+    )
+    
     superviseur = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        related_name="distributions_envoyees",
-        limit_choices_to={'type_agent': 'entrepot'}
+        related_name="distributions_envoyees"
     )
     agent_terrain = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
         related_name="distributions_recues",
-        limit_choices_to={'type_agent': 'terrain'}
+        null=True,
+        blank=True
     )
+    type_distribution = models.CharField(
+        max_length=10, 
+        choices=TYPE_DISTRIBUTION,
+        default='TERRAIN'
+    )
+    
+    # Champs immuables pour l'historique
+    quantite_totale = models.PositiveIntegerField(default=0, verbose_name="Quantité totale distribuée")
+    valeur_gros_totale = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Valeur totale (gros)"
+    )
+    valeur_detail_totale = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Valeur totale (détail)"
+    )
+    nombre_produits_differents = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Nombre de produits différents"
+    )
+    
     date_distribution = models.DateTimeField(default=timezone.now)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True, verbose_name="Dernière modification")
+    est_retroactive = models.BooleanField(default=False)
+    
+    # Soft delete
+    est_supprime = models.BooleanField(default=False, verbose_name="Supprimé")
+    date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
+    raison_suppression = models.TextField(blank=True, verbose_name="Raison de la suppression")
+    
+    # Audit des modifications
+    nombre_modifications = models.PositiveIntegerField(default=0, verbose_name="Nombre de modifications")
+    derniere_modification_par = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='distributions_modifiees',
+        verbose_name="Dernière modification par"
+    )
 
     def __str__(self):
-        return f"Distribution {self.id} de {self.superviseur} → {self.agent_terrain}"
+        if self.est_supprime:
+            return f"[SUPPRIMÉ] Distribution {self.id} de {self.superviseur}"
+        elif self.type_distribution == 'AUTO':
+            return f"Auto-distribution {self.id} de {self.superviseur}"
+        else:
+            return f"Distribution {self.id} de {self.superviseur} → {self.agent_terrain}"
+
+    def save(self, *args, **kwargs):
+        # Si c'est une auto-distribution, l'agent_terrain est le superviseur lui-même
+        if self.type_distribution == 'AUTO':
+            self.agent_terrain = self.superviseur
+        
+        # Marquer comme modifié si c'est une mise à jour
+        if self.pk:
+            self.nombre_modifications += 1
+        
+        super().save(*args, **kwargs)
+
+    def soft_delete(self, user=None, raison=""):
+        """Soft delete de la distribution"""
+        self.est_supprime = True
+        self.date_suppression = timezone.now()
+        self.raison_suppression = raison
+        if user:
+            self.derniere_modification_par = user
+        self.save()
+        
+        # Soft delete des détails associés
+        self.detaildistribution_set.update(est_supprime=True)
+
+    def restaurer(self, user=None):
+        """Restaurer une distribution supprimée"""
+        self.est_supprime = False
+        self.date_suppression = None
+        self.raison_suppression = ""
+        if user:
+            self.derniere_modification_par = user
+        self.save()
+        
+        # Restaurer les détails associés
+        self.detaildistribution_set.update(est_supprime=False)
+
+    def _mettre_a_jour_totaux(self, user=None):
+        """Met à jour les totaux immuables de la distribution"""
+        from django.db import transaction
+        
+        with transaction.atomic():
+            # Recharger l'objet pour éviter les problèmes de concurrence
+            distribution = DistributionAgent.objects.select_for_update().get(pk=self.pk)
+            details = distribution.detaildistribution_set.filter(est_supprime=False)
+            
+            # Calculer les nouveaux totaux
+            quantite_totale = sum(detail.quantite for detail in details)
+            valeur_gros_totale = sum((detail.prix_gros or 0) * detail.quantite for detail in details)
+            valeur_detail_totale = sum((detail.prix_detail or 0) * detail.quantite for detail in details)
+            nombre_produits_differents = details.values('lot__produit').distinct().count()
+            
+            # Mettre à jour les champs immuables
+            DistributionAgent.objects.filter(pk=self.pk).update(
+                quantite_totale=quantite_totale,
+                valeur_gros_totale=valeur_gros_totale,
+                valeur_detail_totale=valeur_detail_totale,
+                nombre_produits_differents=nombre_produits_differents,
+                date_modification=timezone.now(),
+                derniere_modification_par=user
+            )
+            
+            # Recharger l'instance
+            self.refresh_from_db()
+
+    @property
+    def est_modifie(self):
+        """Vérifie si la distribution a été modifiée"""
+        return self.nombre_modifications > 0
+
+    @property
+    def statut(self):
+        """Retourne le statut de la distribution"""
+        if self.est_supprime:
+            return "supprime"
+        elif self.est_modifie:
+            return "modifie"
+        else:
+            return "actif"
+
+    class Meta:
+        ordering = ['-date_distribution']
+        verbose_name = "Distribution"
+        verbose_name_plural = "Distributions"
 
 class DetailDistribution(models.Model):
     distribution = models.ForeignKey(DistributionAgent, on_delete=models.CASCADE)
@@ -100,9 +256,18 @@ class DetailDistribution(models.Model):
     # Prix fixés par le superviseur
     prix_gros = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     prix_detail = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    # Soft delete
+    est_supprime = models.BooleanField(default=False)
+    date_suppression = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.quantite} {self.lot.produit.nom} du lot {self.lot.id}"
+        statut = " [SUPPRIMÉ]" if self.est_supprime else ""
+        return f"{self.quantite} {self.lot.produit.nom} du lot {self.lot.id}{statut}"
+
+    class Meta:
+        verbose_name = "Détail de distribution"
+        verbose_name_plural = "Détails de distribution"
 
 class MouvementStock(models.Model):
     TYPE_MOUVEMENT = (
@@ -121,6 +286,30 @@ class MouvementStock(models.Model):
 
     def __str__(self):
         return f"{self.type_mouvement} - {self.produit.nom} ({self.quantite})"
+
+class JournalModificationDistribution(models.Model):
+    TYPE_ACTION = (
+        ('CREATION', 'Création'),
+        ('MODIFICATION', 'Modification'),
+        ('SUPPRESSION', 'Suppression'),
+        ('RESTAURATION', 'Restauration'),
+    )
+    
+    distribution = models.ForeignKey(DistributionAgent, on_delete=models.CASCADE)
+    utilisateur = models.ForeignKey(User, on_delete=models.CASCADE)
+    type_action = models.CharField(max_length=20, choices=TYPE_ACTION)
+    date_action = models.DateTimeField(auto_now_add=True)
+    details = models.TextField(blank=True)
+    anciennes_valeurs = models.JSONField(null=True, blank=True)
+    nouvelles_valeurs = models.JSONField(null=True, blank=True)
+    
+    def __str__(self):
+        return f"{self.type_action} - Distribution #{self.distribution.id} par {self.utilisateur}"
+    
+    class Meta:
+        ordering = ['-date_action']
+        verbose_name = "Journal des modifications"
+        verbose_name_plural = "Journal des modifications"
 
 class Facture(models.Model):
 

@@ -1,38 +1,90 @@
+<!-- Modifiez votre template liste_factures.html existant -->
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Factures Dépôts{% endblock %}
 
 {% block content %}
-<h1>Factures</h1>
-<a href="{% url 'creer_facture' %}" class="btn btn-success mb-3">➕ Nouvelle Facture</a>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">💰 Factures Dépôts</h1>
+            <p class="text-muted">Factures des dépôts d'agents</p>
+        </div>
+        <div>
+            <a href="{% url 'creer_facture' %}" class="btn btn-success">
+                <i class="fas fa-plus"></i> Nouvelle Facture
+            </a>
+            <a href="{% url 'liste_factures_entrepot' %}" class="btn btn-outline-primary">
+                <i class="fas fa-warehouse"></i> Voir Factures Entrepôt
+            </a>
+        </div>
+    </div>
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Agent</th>
-            <th>Montant</th>
-            <th>Fichier</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for facture in factures %}
-        <tr>
-            <td>{{ facture.date_depot|date:"d/m/Y H:i" }}</td>
-            <td>{{ facture.get_type_facture_display }}</td>
-            <td>{{ facture.agent.user.first_name }}</td>
-            <td>{{ facture.montant }} FCFA</td>
-            <td>
-                {% if facture.fichier_facture %}
-                    <a href="{{ facture.fichier_facture.url }}" target="_blank">Voir</a>
-                {% endif %}
-            </td>
-            <td>
-                <a href="{% url 'modifier_facture' facture.id %}" class="btn btn-sm btn-primary">Modifier</a>
-                <a href="{% url 'supprimer_facture' facture.id %}" class="btn btn-sm btn-danger">Supprimer</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Factures des Dépôts</h5>
+        </div>
+        <div class="card-body">
+            {% if factures %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Agent</th>
+                            <th>Montant</th>
+                            <th>Fichier</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for facture in factures %}
+                        <tr>
+                            <td>{{ facture.date_depot|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <span class="badge {% if facture.type_facture == 'entree' %}bg-primary{% else %}bg-success{% endif %}">
+                                    {{ facture.get_type_facture_display }}
+                                </span>
+                            </td>
+                            <td>{{ facture.agent.user.get_full_name|default:facture.agent.user.username }}</td>
+                            <td><strong>{{ facture.montant|floatformat:0 }}</strong> FCFA</td>
+                            <td>
+                                {% if facture.fichier_facture %}
+                                    <a href="{{ facture.fichier_facture.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i> Voir
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'modifier_facture' facture.id %}" class="btn btn-outline-warning">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'supprimer_facture' facture.id %}" class="btn btn-outline-danger">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Aucune facture de dépôt</h5>
+                <p class="text-muted">Créez votre première facture de dépôt</p>
+                <a href="{% url 'creer_facture' %}" class="btn btn-success">
+                    <i class="fas fa-plus"></i> Créer une facture
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}

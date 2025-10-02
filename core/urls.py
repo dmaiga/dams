@@ -15,10 +15,15 @@ urlpatterns = [
     path('entrepot/reception/', views.reception_lot, name='reception_lot'),
     path('entrepot/lots/', views.liste_lots, name='liste_lots'),
 # Distribution
-    path('distribution/nouvelle/', views.distribuer_produits_agent, name='distribuer_produits'),
-    path('distribution/liste/', views.liste_distributions, name='liste_distributions'),
+    path('distribuer/', views.distribuer_produits_agent, name='distribuer_produits'),
+    path('distribution/<int:distribution_id>/modifier/', views.modifier_distribution, name='modifier_distribution'),
+    path('distribution/<int:distribution_id>/supprimer/', views.supprimer_distribution, name='supprimer_distribution'),
+    path('distribution/<int:distribution_id>/restaurer/', views.restaurer_distribution, name='restaurer_distribution'),
+    path('distributions/', views.liste_distributions, name='liste_distributions'),
     path('distribution/<int:distribution_id>/', views.detail_distribution, name='detail_distribution'),
-    path('api/stock-produit/<int:produit_id>/', views.get_stock_produit, name='api_stock_produit'),
+    path('api/stock-produit/<int:produit_id>/', views.get_stock_produit, name='get_stock_produit'),
+    path('api/stock-produit-date/', views.get_stock_produit_a_date, name='get_stock_produit_date'),
+    path('stats-superviseurs/', views.stats_superviseurs, name='stats_superviseurs'),
 # Ventes
   # Ventes personnelles
     path('ventes/enregistrer/', views.enregistrer_vente, name='enregistrer_vente'),
@@ -42,7 +47,9 @@ urlpatterns = [
     # API
     path('api/info-distribution/<int:detail_id>/', views.get_info_distribution, name='get_info_distribution'),
 #factures
-    path('factures/', views.liste_factures, name='liste_factures'),
+    path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
+    path('factures/depots/', views.liste_factures, name='liste_factures'),
+        path('lots/<int:lot_id>/', views.detail_lot, name='detail_lot'),
     path('factures/creer/', views.creer_facture, name='creer_facture'),
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
     path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),

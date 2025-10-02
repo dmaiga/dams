@@ -1,3 +1,4 @@
+<!-- core/distribution/detail_distribution.html -->
 {% extends 'base.html' %}
 {% load static %}
 
@@ -7,394 +8,95 @@
 <div class="container-fluid py-4">
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header pb-0">
-                    <div class="d-flex align-items-center">
-                        <h4>Détail de la Distribution #{{ distribution.id }}</h4>
-                        <div class="ms-auto">
-                            <a href="{% url 'liste_distributions' %}" class="btn btn-outline-primary btn-sm me-2">
-                                <i class="fas fa-arrow-left me-2"></i>Retour
-                            </a>
-                            <button class="btn btn-info btn-sm" onclick="window.print()">
-                                <i class="fas fa-print me-2"></i>Imprimer
-                            </button>
+            <!-- En-tête -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Détail Distribution #{{ distribution.id }}</h4>
+                        <div>
+                            {% if distribution.type_distribution == 'AUTO' %}
+                            <span class="badge bg-success">Auto-distribution</span>
+                            {% else %}
+                            <span class="badge bg-primary">Distribution Terrain</span>
+                            {% endif %}
+                            {% if distribution.est_retroactive %}
+                            <span class="badge bg-warning">Rétroactive</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- En-tête de la distribution -->
-                    <div class="row mb-4">
+                    <div class="row">
                         <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">Informations Générales</h6>
-                                    <table class="table table-sm table-borderless">
-                                        <tr>
-                                            <td class="text-bold">Agent Terrain:</td>
-                                            <td>{{ distribution.agent_terrain.nom }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-bold">Date Distribution:</td>
-                                            <td>{{ distribution.date_distribution|date:"d/m/Y H:i" }}</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-bold">Statut:</td>
-                                            <td>
-                                                <span class="badge badge-{% if distribution.statut == 'DISTRIBUE' %}success{% elif distribution.statut == 'VENDU' %}primary{% else %}warning{% endif %}">
-                                                    {{ distribution.get_statut_display }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-bold">Notes:</td>
-                                            <td>{{ distribution.notes|default:"Aucune note" }}</td>
-                                        </tr>
-                                    </table>
-                                </div>
-                            </div>
+                            <p><strong>Superviseur:</strong> {{ distribution.superviseur.full_name }}</p>
+                            <p><strong>Destinataire:</strong> 
+                                {% if distribution.type_distribution == 'AUTO' %}
+                                {{ distribution.superviseur.full_name }} (Auto-distribution)
+                                {% else %}
+                                {{ distribution.agent_terrain.full_name }}
+                                {% endif %}
+                            </p>
                         </div>
                         <div class="col-md-6">
-                            <div class="card bg-gradient-primary">
-                                <div class="card-body text-white">
-                                    <h6 class="text-white">Résumé Financier</h6>
-                                    <div class="row text-center">
-                                        <div class="col-4">
-                                            <small>Produits</small>
-                                            <h4 class="mb-0">{{ details|length }}</h4>
-                                        </div>
-                                        <div class="col-4">
-                                            <small>Quantité Totale</small>
-                                            <h4 class="mb-0">{{ distribution.quantite_totale }}</h4>
-                                        </div>
-                                        <div class="col-4">
-                                            <small>Valeur Totale</small>
-                                            <h4 class="mb-0">{{ distribution.total_vente_estime|floatformat:0 }} FCFA</h4>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Détails des produits distribués -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">Produits Distribués</h5>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-flush table-hover">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th>Produit</th>
-                                            <th>Lot Source</th>
-                                            <th>Quantité</th>
-                                            <th>Prix d'Achat</th>
-                                            <th>Prix de Vente</th>
-                                            <th>Marge Unitaire</th>
-                                            <th>Valeur Totale</th>
-                                            <th>Marge Totale</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for detail in details %}
-                                        <tr>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div>
-                                                        <h6 class="mb-0 text-sm">
-                                                            {% if detail.lot.produit %}
-                                                                {{ detail.lot.produit.nom }}
-                                                            {% else %}
-                                                                {{ detail.lot.produit_nom }}
-                                                            {% endif %}
-                                                        </h6>
-                                                        <small class="text-muted">
-                                                            Ref: {{ detail.lot.reference_lot }}
-                                                        </small>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <span class="badge badge-info">
-                                                    {{ detail.lot.reference_lot }}
-                                                </span>
-                                                <br>
-                                                <small class="text-muted">
-                                                    Fourn: {{ detail.lot.fournisseur }}
-                                                </small>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="font-weight-bold">{{ detail.quantite }}</span>
-                                            </td>
-                                            <td>
-                                                {{ detail.lot.prix_achat_unitaire }} FCFA
-                                            </td>
-                                            <td>
-                                                <span class="font-weight-bold text-success">
-                                                    {{ detail.prix_vente_unitaire }} FCFA
-                                                </span>
-                                            </td>
-                                            <td>
-                                                {% with marge_unitaire=detail.prix_vente_unitaire|floatformat:2 %}
-                                                {% with prix_achat=detail.lot.prix_achat_unitaire|floatformat:2 %}
-                                                {% with marge=detail.prix_vente_unitaire|sub:detail.lot.prix_achat_unitaire %}
-                                                    <span class="badge badge-{% if marge > 0 %}success{% else %}danger{% endif %}">
-                                                        {{ marge|floatformat:2 }} FCFA
-                                                    </span>
-                                                {% endwith %}
-                                                {% endwith %}
-                                                {% endwith %}
-                                            </td>
-                                            <td class="font-weight-bold">
-                                                {{ detail.valeur_total|floatformat:2 }} FCFA
-                                            </td>
-                                            <td>
-                                                {% with marge_totale=detail.valeur_total|floatformat:2 %}
-                                                {% with cout_total=detail.quantite|multiply:detail.lot.prix_achat_unitaire %}
-                                                {% with marge=detail.valeur_total|sub:cout_total %}
-                                                    <span class="badge badge-{% if marge > 0 %}success{% else %}danger{% endif %}">
-                                                        {{ marge|floatformat:2 }} FCFA
-                                                    </span>
-                                                {% endwith %}
-                                                {% endwith %}
-                                                {% endwith %}
-                                            </td>
-                                        </tr>
-                                        {% empty %}
-                                        <tr>
-                                            <td colspan="8" class="text-center py-4">
-                                                <i class="fas fa-box-open fa-2x mb-3 text-muted"></i>
-                                                <p class="text-muted">Aucun produit distribué</p>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                    <tfoot class="thead-light">
-                                        <tr>
-                                            <th colspan="2">TOTAUX</th>
-                                            <th class="text-center">{{ distribution.quantite_totale }}</th>
-                                            <th></th>
-                                            <th></th>
-                                            <th></th>
-                                            <th class="font-weight-bold">{{ distribution.total_vente_estime|floatformat:2 }} FCFA</th>
-                                            <th class="font-weight-bold text-success">
-                                                {% with total_cout=0 %}
-                                                {% for detail in details %}
-                                                {% widthratio detail.quantite 1 detail.lot.prix_achat_unitaire as cout %}
-                                                {% with total_cout=total_cout|add:cout %}
-                                                {% endwith %}
-                                                {% endfor %}
-                                                {{ distribution.total_vente_estime|sub:total_cout|floatformat:2 }} FCFA
-                                                {% endwith %}
-                                            </th>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Informations sur les lots -->
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 class="mb-0">Traçabilité des Lots</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        {% for detail in details %}
-                                        <div class="col-md-6 mb-3">
-                                            <div class="card card-sm">
-                                                <div class="card-body">
-                                                    <h6 class="card-title mb-2">
-                                                        {% if detail.lot.produit %}
-                                                            {{ detail.lot.produit.nom }}
-                                                        {% else %}
-                                                            {{ detail.lot.produit_nom }}
-                                                        {% endif %}
-                                                    </h6>
-                                                    <div class="row">
-                                                        <div class="col-6">
-                                                            <small class="text-muted">Lot:</small>
-                                                            <br>
-                                                            <strong>{{ detail.lot.reference_lot }}</strong>
-                                                        </div>
-                                                        <div class="col-6">
-                                                            <small class="text-muted">Quantité:</small>
-                                                            <br>
-                                                            <strong>{{ detail.quantite }} unités</strong>
-                                                        </div>
-                                                    </div>
-                                                    <div class="row mt-2">
-                                                        <div class="col-6">
-                                                            <small class="text-muted">Prix Achat:</small>
-                                                            <br>
-                                                            <span class="text-info">{{ detail.lot.prix_achat_unitaire }} FCFA</span>
-                                                        </div>
-                                                        <div class="col-6">
-                                                            <small class="text-muted">Prix Vente:</small>
-                                                            <br>
-                                                            <span class="text-success">{{ detail.prix_vente_unitaire }} FCFA</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mt-2">
-                                                        <small class="text-muted">Fournisseur:</small>
-                                                        <br>
-                                                        <span class="text-primary">{{ detail.lot.fournisseur }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6>Actions</h6>
-                                    <div class="btn-group">
-                                        {% if distribution.statut == 'DISTRIBUE' %}
-                                        <form method="post" action="{% url 'marquer_vendu' distribution.id %}" class="d-inline">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-success me-2">
-                                                <i class="fas fa-check me-2"></i>Marquer comme Vendu
-                                            </button>
-                                        </form>
-                                        <form method="post" action="{% url 'marquer_retour' distribution.id %}" class="d-inline">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-warning">
-                                                <i class="fas fa-undo me-2"></i>Marquer Retour
-                                            </button>
-                                        </form>
-                                        {% endif %}
-                                        
-                                        <a href="{% url 'modifier_distribution' distribution.id %}" class="btn btn-info me-2">
-                                            <i class="fas fa-edit me-2"></i>Modifier
-                                        </a>
-                                        
-                                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#supprimerModal">
-                                            <i class="fas fa-trash me-2"></i>Supprimer
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            <p><strong>Date de distribution:</strong> {{ distribution.date_distribution|date:"d/m/Y H:i" }}</p>
+                            <p><strong>Date de création:</strong> {{ distribution.date_creation|date:"d/m/Y H:i" }}</p>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Modal de suppression -->
-<div class="modal fade" id="supprimerModal" tabindex="-1" role="dialog" aria-labelledby="supprimerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="supprimerModalLabel">Confirmation de suppression</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p>Êtes-vous sûr de vouloir supprimer cette distribution ?</p>
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Cette action est irréversible. Les stocks seront remis en disponibilité.
+            <!-- Produits distribués -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Produits Distribués</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Lot</th>
+                                    <th>Quantité</th>
+                                    <th>Prix Gros</th>
+                                    <th>Prix Détail</th>
+                                    <th>Valeur Gros</th>
+                                    <th>Valeur Détail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for produit in produits_distribues %}
+                                <tr>
+                                    <td>{{ produit.produit.nom }}</td>
+                                    <td>{{ produit.lot.reference_lot|default:"Lot#" }}{{ produit.lot.id }}</td>
+                                    <td class="text-center">{{ produit.quantite }}</td>
+                                    <td class="text-end">{{ produit.prix_gros|default:"-"|floatformat:0 }} FCFA</td>
+                                    <td class="text-end">{{ produit.prix_detail|default:"-"|floatformat:0 }} FCFA</td>
+                                    <td class="text-end text-warning">{{ produit.valeur_gros|floatformat:0 }} FCFA</td>
+                                    <td class="text-end text-info">{{ produit.valeur_detail|floatformat:0 }} FCFA</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <th colspan="2" class="text-end">Totaux:</th>
+                                    <th class="text-center">{{ quantite_totale }}</th>
+                                    <th colspan="2"></th>
+                                    <th class="text-end text-warning">{{ valeur_gros_totale|floatformat:0 }} FCFA</th>
+                                    <th class="text-end text-info">{{ valeur_detail_totale|floatformat:0 }} FCFA</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <form method="post" action="{% url 'supprimer_distribution' distribution.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">Supprimer définitivement</button>
-                </form>
+
+            <div class="mt-3">
+                <a href="{% url 'liste_distributions' %}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour à la liste
+                </a>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Animation pour les cartes de lots
-    const lotCards = document.querySelectorAll('.card-sm');
-    lotCards.forEach(card => {
-        card.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-2px)';
-            this.style.transition = 'transform 0.2s ease';
-        });
-        
-        card.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0)';
-        });
-    });
-
-    // Export PDF
-    document.getElementById('export-pdf').addEventListener('click', function() {
-        // Implémentation de l'export PDF (à adapter selon vos besoins)
-        window.print();
-    });
-});
-</script>
-
-<style>
-.card-header {
-    background: linear-gradient(87.4deg, #5e72e4 0, #825ee4 100%);
-}
-
-.card-header h4, .card-header h5 {
-    color: white;
-    margin-bottom: 0;
-}
-
-.bg-gradient-primary {
-    background: linear-gradient(87.4deg, #5e72e4 0, #825ee4 100%) !important;
-}
-
-.card-sm {
-    border-left: 4px solid #5e72e4;
-    transition: all 0.3s ease;
-}
-
-.table th {
-    border-top: none;
-    font-weight: 600;
-    color: #525f7f;
-}
-
-.text-bold {
-    font-weight: 600;
-    color: #525f7f;
-}
-
-.badge {
-    font-size: 0.75em;
-}
-
-@media print {
-    .btn, .modal, .card-header .ms-auto {
-        display: none !important;
-    }
-    
-    .card {
-        border: 1px solid #ddd !important;
-        box-shadow: none !important;
-    }
-    
-    .bg-gradient-primary {
-        background: #f8f9fa !important;
-        color: #000 !important;
-    }
-}
-</style>
 {% endblock %}
