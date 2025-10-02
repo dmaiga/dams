@@ -25,18 +25,68 @@
                     <form method="post" id="distribution-form">
                         {% csrf_token %}
                         
-                        <!-- Agent -->
+                        <!-- Type de Distribution -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Agent</h5>
+                                <h5 class="mb-0">Type de Distribution</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-12">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="type_distribution" 
+                                                   id="type_terrain" value="TERRAIN" checked>
+                                            <label class="form-check-label" for="type_terrain">
+                                                <i class="fas fa-user-friends text-primary"></i>
+                                                Distribution à un agent terrain
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="type_distribution" 
+                                                   id="type_auto" value="AUTO">
+                                            <label class="form-check-label" for="type_auto">
+                                                <i class="fas fa-user text-success"></i>
+                                                Auto-distribution (pour mes ventes)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info mt-2 mb-0">
+                                    <small>
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Auto-distribution :</strong> Vous recevez les produits pour vos propres ventes directes.
+                                        <strong>Distribution terrain :</strong> Vous distribuez les produits à un agent terrain.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Agent et Date -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Destinataire et Date</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Champ Agent Terrain (conditionnel) -->
+                                    <div class="col-md-6" id="agent-terrain-field">
                                         <label class="form-label">Agent Terrain *</label>
                                         {{ form.agent_terrain }}
                                         {% if form.agent_terrain.errors %}
                                         <div class="text-danger small">{{ form.agent_terrain.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Date de Distribution -->
+                                    <div class="col-md-6">
+                                        <label class="form-label">Date de Distribution *</label>
+                                        {{ form.date_distribution }}
+                                        <div class="form-text">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            Vous pouvez sélectionner une date antérieure pour les distributions rétroactives
+                                        </div>
+                                        {% if form.date_distribution.errors %}
+                                        <div class="text-danger small">{{ form.date_distribution.errors }}</div>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -57,7 +107,9 @@
                                         <div class="text-danger small">{{ form.produit.errors }}</div>
                                         {% endif %}
                                         <div class="form-text">
-                                            Stock disponible: <span id="stock-disponible" class="fw-bold">-</span> unités
+                                            Stock disponible: 
+                                            <span id="stock-disponible" class="fw-bold">-</span> unités
+                                            <span id="stock-date-info" class="text-muted"></span>
                                         </div>
                                     </div>
                                     <div class="col-md-3">
@@ -66,6 +118,10 @@
                                         {% if form.quantite.errors %}
                                         <div class="text-danger small">{{ form.quantite.errors }}</div>
                                         {% endif %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Unité</label>
+                                        <input type="text" class="form-control" id="unite-produit" readonly value="-">
                                     </div>
                                 </div>
                                 
@@ -94,10 +150,21 @@
                                         {{ form.prix_detail }}
                                         <div class="form-text">Prix pour les détaillants</div>
                                     </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Valeur Totale</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">Gros</span>
+                                            <input type="text" class="form-control" id="valeur-gros-totale" readonly value="0 FCFA">
+                                        </div>
+                                        <div class="input-group mt-1">
+                                            <span class="input-group-text">Détail</span>
+                                            <input type="text" class="form-control" id="valeur-detail-totale" readonly value="0 FCFA">
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="form-text text-info">
+                                <div class="form-text text-info mt-2">
                                     <i class="fas fa-info-circle"></i>
-                                    Les prix sont optionnels et peuvent être ajustés par l'agent lors de la vente
+                                    Les prix sont immuables et ne peuvent plus être ajustés par l'agent lors de la vente
                                 </div>
                             </div>
                         </div>
@@ -107,25 +174,38 @@
                             <div class="card-body">
                                 <h6>Résumé de la Distribution</h6>
                                 <div class="row text-center">
-                                    <div class="col-4">
-                                        <div class="h5" id="resume-agent">-</div>
-                                        <small>Agent</small>
+                                    <div class="col-3">
+                                        <div class="h5" id="resume-type">Terrain</div>
+                                        <small>Type</small>
                                     </div>
-                                    <div class="col-4">
+                                    <div class="col-3">
+                                        <div class="h5" id="resume-agent">-</div>
+                                        <small>Destinataire</small>
+                                    </div>
+                                    <div class="col-3">
                                         <div class="h5" id="resume-produit">-</div>
                                         <small>Produit</small>
                                     </div>
-                                    <div class="col-4">
+                                    <div class="col-3">
                                         <div class="h5" id="resume-quantite">0</div>
                                         <small>Unités</small>
+                                    </div>
+                                </div>
+                                <div class="row text-center mt-2">
+                                    <div class="col-12">
+                                        <small class="text-muted" id="resume-date">Date: {{ form.date_distribution.initial|default:"Aujourd'hui" }}</small>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="d-flex gap-2">
-                            <a href="{% url 'liste_distributions' %}" class="btn btn-secondary">Annuler</a>
-                            <button type="submit" class="btn btn-primary">Distribuer</button>
+                            <a href="{% url 'liste_distributions' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Annuler
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Distribuer
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -136,90 +216,247 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const typeDistributionRadios = document.querySelectorAll('input[name="type_distribution"]');
+    const agentTerrainField = document.getElementById('agent-terrain-field');
     const produitSelect = document.getElementById('{{ form.produit.id_for_label }}');
     const quantiteInput = document.getElementById('{{ form.quantite.id_for_label }}');
     const agentSelect = document.getElementById('{{ form.agent_terrain.id_for_label }}');
+    const dateDistributionInput = document.getElementById('{{ form.date_distribution.id_for_label }}');
+    const prixGrosInput = document.getElementById('{{ form.prix_gros.id_for_label }}');
+    const prixDetailInput = document.getElementById('{{ form.prix_detail.id_for_label }}');
+    
     const stockDisponibleSpan = document.getElementById('stock-disponible');
+    const stockDateInfoSpan = document.getElementById('stock-date-info');
     const lotsInfoDiv = document.getElementById('lots-info');
     const lotsListDiv = document.getElementById('lots-list');
+    const uniteProduitInput = document.getElementById('unite-produit');
     
+    const resumeType = document.getElementById('resume-type');
     const resumeAgent = document.getElementById('resume-agent');
     const resumeProduit = document.getElementById('resume-produit');
     const resumeQuantite = document.getElementById('resume-quantite');
+    const resumeDate = document.getElementById('resume-date');
+    
+    const valeurGrosTotale = document.getElementById('valeur-gros-totale');
+    const valeurDetailTotale = document.getElementById('valeur-detail-totale');
 
+    // Gestion du type de distribution
+    function gererTypeDistribution() {
+        const typeSelectionne = document.querySelector('input[name="type_distribution"]:checked').value;
+        
+        if (typeSelectionne === 'AUTO') {
+            agentTerrainField.style.display = 'none';
+            resumeType.textContent = 'Auto';
+            resumeType.className = 'h5 text-success';
+            resumeAgent.textContent = 'Moi-même';
+            resumeAgent.className = 'h5 text-success';
+        } else {
+            agentTerrainField.style.display = 'block';
+            resumeType.textContent = 'Terrain';
+            resumeType.className = 'h5 text-primary';
+            updateResumeAgent();
+        }
+    }
+
+    // Mettre à jour les informations de stock
     async function updateStockInfo() {
         const produitId = produitSelect.value;
+        const dateDistribution = dateDistributionInput.value;
         
-        if (produitId) {
+        if (produitId && dateDistribution) {
             try {
-                const response = await fetch(`/api/stock-produit/${produitId}/`);
+                const response = await fetch(`/api/stock-produit-date/?produit_id=${produitId}&date=${dateDistribution}`);
                 const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
                 
                 stockDisponibleSpan.textContent = data.stock;
                 stockDisponibleSpan.className = data.stock > 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
                 
+                // Info sur la date de référence
+                stockDateInfoSpan.textContent = `(au ${data.date_reference})`;
+                
                 // Mettre à jour le max de la quantité
                 if (quantiteInput) {
                     quantiteInput.max = data.stock;
-                    if (quantiteInput.value > data.stock) {
+                    if (parseInt(quantiteInput.value) > data.stock) {
                         quantiteInput.value = data.stock;
                     }
                 }
                 
                 // Afficher les lots disponibles
+                // Dans votre template, mettez à jour la partie d'affichage des lots
                 if (data.lots_disponibles && data.lots_disponibles.length > 0) {
                     let lotsHTML = '';
                     data.lots_disponibles.forEach(lot => {
-                        lotsHTML += `<div>${lot.reference} - ${lot.quantite_restante} unités (reçu le ${lot.date_reception})</div>`;
+                        lotsHTML += `
+                            <div class="border-bottom pb-1 mb-1">
+                                <strong>${lot.reference}</strong> - 
+                                ${lot.quantite_restante} unités - 
+                                Reçu le ${lot.date_reception} - 
+                                Prix d'achat: ${lot.prix_achat.toLocaleString('fr-FR')} FCFA
+                            </div>`;
                     });
                     lotsListDiv.innerHTML = lotsHTML;
                     lotsInfoDiv.style.display = 'block';
                 } else {
                     lotsInfoDiv.style.display = 'none';
                 }
-                
+                                
                 updateResume();
+                updateValeursTotales();
                 
             } catch (error) {
+                console.error('Erreur:', error);
                 stockDisponibleSpan.textContent = 'Erreur';
                 stockDisponibleSpan.className = 'fw-bold text-danger';
+                stockDateInfoSpan.textContent = '';
                 lotsInfoDiv.style.display = 'none';
             }
         } else {
             stockDisponibleSpan.textContent = '-';
             stockDisponibleSpan.className = 'fw-bold';
+            stockDateInfoSpan.textContent = '';
             lotsInfoDiv.style.display = 'none';
             updateResume();
         }
     }
 
+    // Mettre à jour l'unité du produit
+    function updateUniteProduit() {
+        const produitText = produitSelect.options[produitSelect.selectedIndex]?.text || '';
+        // Extraire l'unité du texte du produit (suppose que l'unité est entre parenthèses)
+        const match = produitText.match(/\(([^)]+)\)/);
+        if (match) {
+            uniteProduitInput.value = match[1];
+        } else {
+            uniteProduitInput.value = 'unité';
+        }
+    }
+
+    // Mettre à jour l'agent dans le résumé
+    function updateResumeAgent() {
+        const typeSelectionne = document.querySelector('input[name="type_distribution"]:checked').value;
+        if (typeSelectionne === 'TERRAIN') {
+            const agentText = agentSelect.options[agentSelect.selectedIndex]?.text || '-';
+            resumeAgent.textContent = agentText.includes('Sélectionner') ? '-' : agentText;
+            resumeAgent.className = 'h5 text-primary';
+        }
+    }
+
+    // Mettre à jour les valeurs totales
+    function updateValeursTotales() {
+        const quantite = parseInt(quantiteInput.value) || 0;
+        const prixGros = parseFloat(prixGrosInput.value) || 0;
+        const prixDetail = parseFloat(prixDetailInput.value) || 0;
+        
+        valeurGrosTotale.value = (quantite * prixGros).toLocaleString('fr-FR') + ' FCFA';
+        valeurDetailTotale.value = (quantite * prixDetail).toLocaleString('fr-FR') + ' FCFA';
+    }
+
+    // Mettre à jour le résumé complet
     function updateResume() {
+        // Type (déjà géré par gererTypeDistribution)
+        
         // Agent
-        const agentText = agentSelect.options[agentSelect.selectedIndex]?.text || '-';
-        resumeAgent.textContent = agentText.includes('Sélectionner') ? '-' : agentText;
+        updateResumeAgent();
         
         // Produit
         const produitText = produitSelect.options[produitSelect.selectedIndex]?.text || '-';
-        resumeProduit.textContent = produitText.includes('Sélectionner') ? '-' : produitText;
+        resumeProduit.textContent = produitText.includes('Sélectionner') ? '-' : produitText.split(' (')[0];
         
         // Quantité
         resumeQuantite.textContent = quantiteInput.value || '0';
+        
+        // Date
+        const dateValue = dateDistributionInput.value;
+        if (dateValue) {
+            const dateObj = new Date(dateValue);
+            const now = new Date();
+            
+            if (dateObj.toDateString() === now.toDateString()) {
+                resumeDate.textContent = 'Date: Aujourd\'hui';
+            } else if (dateObj < now) {
+                resumeDate.textContent = `Date: ${dateObj.toLocaleDateString('fr-FR')} (rétroactive)`;
+                resumeDate.className = 'text-muted text-warning';
+            } else {
+                resumeDate.textContent = `Date: ${dateObj.toLocaleDateString('fr-FR')}`;
+                resumeDate.className = 'text-muted';
+            }
+        }
+        
+        updateUniteProduit();
     }
 
     // Événements
+    typeDistributionRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            gererTypeDistribution();
+            updateStockInfo();
+        });
+    });
+    
     if (produitSelect) {
-        produitSelect.addEventListener('change', updateStockInfo);
+        produitSelect.addEventListener('change', function() {
+            updateStockInfo();
+            updateUniteProduit();
+        });
     }
+    
     if (quantiteInput) {
-        quantiteInput.addEventListener('input', updateResume);
+        quantiteInput.addEventListener('input', function() {
+            updateResume();
+            updateValeursTotales();
+        });
     }
+    
     if (agentSelect) {
-        agentSelect.addEventListener('change', updateResume);
+        agentSelect.addEventListener('change', updateResumeAgent);
+    }
+    
+    if (dateDistributionInput) {
+        dateDistributionInput.addEventListener('change', updateStockInfo);
+    }
+    
+    if (prixGrosInput) {
+        prixGrosInput.addEventListener('input', updateValeursTotales);
+    }
+    
+    if (prixDetailInput) {
+        prixDetailInput.addEventListener('input', updateValeursTotales);
     }
 
     // Initialisation
+    gererTypeDistribution();
     updateStockInfo();
     updateResume();
+    updateValeursTotales();
 });
 </script>
+
+<style>
+.form-check-inline {
+    margin-right: 2rem;
+}
+
+.form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+#agent-terrain-field {
+    transition: all 0.3s ease;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.bg-light {
+    background-color: #f8f9fa !important;
+}
+</style>
 {% endblock %}

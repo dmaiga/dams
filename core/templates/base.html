@@ -280,13 +280,7 @@
                                 {% endif %}
                             </a>
                         </li>
-                           <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'liste_factures' %}active{% endif %}" 
-                               href="{% url 'liste_factures' %}">
-                                <i class="fas fa-file-invoice-dollar"></i>
-                                <span>Factures </span>
-                            </a>
-                        </li>
+
 
                         <!-- ===== MENU SUPERVISEUR/ADMIN ===== -->
                         {% else %}
@@ -296,22 +290,10 @@
                                href="{% url 'dashboard' %}">
                                 <i class="fas fa-tachometer-alt"></i>
                                 <span>Tableau de Bord</span>
-                                {% if request.user.agent.type_agent == 'superviseur' %}
-                                <span class="agent-badge">Superviseur</span>
-                                {% else %}
-                                <span class="agent-badge">Admin</span>
-                                {% endif %}
+                               
                             </a>
                         </li>
-                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'performance_agents' %}active{% endif %}" 
-                               href="{% url 'performance_agents' %}">
-                                <i class="fas fa-chart-line"></i>
-                                <span>Performance Agents</span>
-                            </a>
-                        </li>
-
-                        <li class="nav-item">
+                                                <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name in 'liste_agents,ajouter_agent,modifier_agent,detail_agent' %}active{% endif %}" 
                                href="{% url 'liste_agents' %}">
                                 <i class="fas fa-users"></i>
@@ -335,20 +317,56 @@
                             </a>
                         </li>
                  
-                        
+                    
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'liste_factures' %}active{% endif %}" 
-                               href="{% url 'liste_factures' %}">
-                                <i class="fas fa-file-invoice-dollar"></i>
-                                <span>Factures </span>
+                            <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
+                               href="{% url 'liste_ventes' %}">
+                                <i class="fas fa-cash-register"></i>
+                                <span>Mes Ventes</span>
+                                {% if mes_ventes_count %}
+                                <span class="nav-badge">{{ mes_ventes_count }}</span>
+                                {% endif %}
                             </a>
                         </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name in 'liste_dettes,detail_dette,enregistrer_paiement_dette,creer_dette' %}active{% endif %}" 
+                               href="{% url 'liste_dettes' %}">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                                <span>Mes Dettes</span>
+                                {% if mes_dettes_count %}
+                                <span class="nav-badge">{{ mes_dettes_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+
+
+                        
+                        <!-- Dans votre navigation -->
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+        <i class="fas fa-file-invoice"></i> Factures
+    </a>
+    <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{% url 'liste_factures_entrepot' %}">📦 Factures Entrepôt</a></li>
+        <li><a class="dropdown-item" href="{% url 'liste_factures' %}">💰 Factures Dépôts</a></li>
+    </ul>
+</li>
 
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
                                href="{% url 'liste_clients' %}">
                                 <i class="fas fa-user-tie"></i>
                                 <span>Clients</span>
+                            </a>
+                        </li>
+                        <hr>
+                        
+                         <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'performance_agents' %}active{% endif %}" 
+                               href="{% url 'performance_agents' %}">
+                                <i class="fas fa-chart-line"></i>
+                                <span>Performance Agents</span>
                             </a>
                         </li>
                         

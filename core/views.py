@@ -54,6 +54,47 @@ from django.views.generic import TemplateView
 from django.contrib.auth import logout
 from django.shortcuts import redirect
 
+from .models import Vente, Dette, PaiementDette, BonusAgent, Agent, DetailDistribution, Client,JournalModificationDistribution,MouvementStock
+from .forms import VenteForm, DetteForm, PaiementDetteForm,DistributionSuppressionForm,DistributionModificationForm
+
+
+from django.contrib.auth import authenticate, login
+from django.shortcuts import render, redirect
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib import messages
+from .models import Agent
+
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from .forms import DistributionForm
+from .models import Produit, LotEntrepot, DetailDistribution
+
+
+
+def custom_login(request):
+    if request.method == "POST":
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+
+            # Vérifier si c'est un agent
+            try:
+                agent = Agent.objects.get(user=user)
+                return redirect("dashboard_agent")
+            except Agent.DoesNotExist:
+                return redirect("dashboard")
+        else:
+            messages.error(request, "Nom d'utilisateur ou mot de passe incorrect.")
+    else:
+        form = AuthenticationForm()
+
+    return render(request, "registration/login.html", {"form": form})
+
+
+
 def logout_user(request):
     logout(request)  
     return redirect('login') 
@@ -263,7 +304,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         return context
     
-# views.py
 class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
     template_name = 'core/statistiques/stat_agents.html'
     
@@ -275,9 +315,36 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
         debut_mois = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         debut_semaine = today - timedelta(days=today.weekday())
         
+        # === CONFIGURATION DES OBJECTIFS ===
+        OBJECTIF_JACKPOT = 500  # Jackpot à 500 produits
+        PALIER_1 = 200  # Premier palier
+        PALIER_2 = 300  # Deuxième palier
+        
+        def get_couleur_objectif(nombre_produits):
+            """Retourne la couleur en fonction du nombre de produits vendus"""
+            if nombre_produits >= OBJECTIF_JACKPOT:
+                return "success"  # Vert - Jackpot atteint
+            elif nombre_produits >= PALIER_2:
+                return "warning"  # Orange - Palier 2
+            elif nombre_produits >= PALIER_1:
+                return "info"    # Bleu - Palier 1
+            else:
+                return "danger"  # Rouge - En dessous des objectifs
+        
+        def get_statut_objectif(nombre_produits):
+            """Retourne le statut textuel de l'objectif"""
+            if nombre_produits >= OBJECTIF_JACKPOT:
+                return "Jackpot Atteint! 🎉"
+            elif nombre_produits >= PALIER_2:
+                return f"Palier 2 (> {PALIER_2})"
+            elif nombre_produits >= PALIER_1:
+                return f"Palier 1 (> {PALIER_1})"
+            else:
+                return f"Objectif en cours (< {PALIER_1})"
+        
         # === PERFORMANCE GLOBALE DES AGENTS ===
         agents_performance = []
-        agents = Agent.objects.filter(type_agent='terrain').select_related('user')
+        agents = Agent.objects.select_related('user')
         
         for agent in agents:
             # Ventes de l'agent
@@ -290,6 +357,8 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
             ca_mois = 0
             ca_semaine = 0
             quantite_total = 0
+            quantite_mois = 0
+            quantite_semaine = 0
             
             for vente in ventes_agent:
                 montant = float(vente.quantite * vente.prix_vente_unitaire)
@@ -297,10 +366,14 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
                 quantite_total += vente.quantite
             
             for vente in ventes_mois:
-                ca_mois += float(vente.quantite * vente.prix_vente_unitaire)
+                montant = float(vente.quantite * vente.prix_vente_unitaire)
+                ca_mois += montant
+                quantite_mois += vente.quantite
                 
             for vente in ventes_semaine:
-                ca_semaine += float(vente.quantite * vente.prix_vente_unitaire)
+                montant = float(vente.quantite * vente.prix_vente_unitaire)
+                ca_semaine += montant
+                quantite_semaine += vente.quantite
             
             # Clients servis
             clients_servis = ventes_agent.values('client').distinct().count()
@@ -309,9 +382,30 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
             # Efficacité commerciale (CA moyen par vente)
             efficacite = ca_total / ventes_agent.count() if ventes_agent.count() > 0 else 0
             
-            # Objectifs (vous pouvez personnaliser cette logique)
-            objectif_mensuel = 500000  # 500,000 FCFA par défaut
-            taux_objectif = (ca_mois / objectif_mensuel * 100) if objectif_mensuel > 0 else 0
+            # === OBJECTIFS BASÉS SUR LE NOMBRE DE PRODUITS ===
+            objectif_jackpot = OBJECTIF_JACKPOT
+            produits_mois = quantite_mois
+            
+            # Calcul du pourcentage vers le jackpot
+            pourcentage_jackpot = min((produits_mois / objectif_jackpot) * 100, 100) if objectif_jackpot > 0 else 0
+            
+            # Couleur et statut de l'objectif
+            couleur_objectif = get_couleur_objectif(produits_mois)
+            statut_objectif = get_statut_objectif(produits_mois)
+            
+            # Indicateur de progression vers le prochain palier
+            if produits_mois < PALIER_1:
+                prochain_palier = PALIER_1
+                produits_restants = PALIER_1 - produits_mois
+            elif produits_mois < PALIER_2:
+                prochain_palier = PALIER_2
+                produits_restants = PALIER_2 - produits_mois
+            elif produits_mois < OBJECTIF_JACKPOT:
+                prochain_palier = OBJECTIF_JACKPOT
+                produits_restants = OBJECTIF_JACKPOT - produits_mois
+            else:
+                prochain_palier = None
+                produits_restants = 0
             
             agents_performance.append({
                 'agent': agent,
@@ -324,30 +418,45 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
                 'clients_servis': clients_servis,
                 'clients_mois': clients_mois,
                 'quantite_total': quantite_total,
+                'quantite_mois': quantite_mois,
+                'quantite_semaine': quantite_semaine,
                 'efficacite': efficacite,
-                'objectif_mensuel': objectif_mensuel,
-                'taux_objectif': taux_objectif,
+                'objectif_jackpot': objectif_jackpot,
+                'produits_mois': produits_mois,
+                'pourcentage_jackpot': pourcentage_jackpot,
+                'couleur_objectif': couleur_objectif,
+                'statut_objectif': statut_objectif,
+                'prochain_palier': prochain_palier,
+                'produits_restants': produits_restants,
+                'palier_1': PALIER_1,
+                'palier_2': PALIER_2,
                 'panier_moyen': ca_total / ventes_agent.count() if ventes_agent.count() > 0 else 0,
             })
         
-        # Trier par CA du mois (performance)
-        agents_performance.sort(key=lambda x: x['ca_mois'], reverse=True)
+        # Trier par nombre de produits du mois (performance objectif)
+        agents_performance.sort(key=lambda x: x['produits_mois'], reverse=True)
         
         # === STATISTIQUES GLOBALES ===
         total_agents = len(agents_performance)
         ca_mois_total = sum(agent['ca_mois'] for agent in agents_performance)
         ca_total_global = sum(agent['ca_total'] for agent in agents_performance)
+        produits_mois_total = sum(agent['quantite_mois'] for agent in agents_performance)
         moyenne_efficacite = sum(agent['efficacite'] for agent in agents_performance) / total_agents if total_agents > 0 else 0
-        moyenne_objectif = sum(agent['taux_objectif'] for agent in agents_performance) / total_agents if total_agents > 0 else 0
+        
+        # Statistiques des objectifs
+        agents_jackpot = sum(1 for agent in agents_performance if agent['produits_mois'] >= OBJECTIF_JACKPOT)
+        agents_palier_2 = sum(1 for agent in agents_performance if agent['produits_mois'] >= PALIER_2)
+        agents_palier_1 = sum(1 for agent in agents_performance if agent['produits_mois'] >= PALIER_1)
         
         # === TOP PERFORMERS ===
+        top_performers_produits = sorted(agents_performance, key=lambda x: x['produits_mois'], reverse=True)[:3]
         top_performers_mois = sorted(agents_performance, key=lambda x: x['ca_mois'], reverse=True)[:3]
         top_performers_clients = sorted(agents_performance, key=lambda x: x['clients_servis'], reverse=True)[:3]
         top_performers_efficacite = sorted(agents_performance, key=lambda x: x['efficacite'], reverse=True)[:3]
         
         # === ÉVOLUTION MENSUELLE PAR AGENT ===
         evolution_agents = {}
-        evolution_months = []  # Pour stocker les mois une seule fois
+        evolution_months = []
         
         # Récupérer les mois une fois pour toutes
         for i in range(6):  # 6 derniers mois
@@ -358,9 +467,9 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
                 'date': debut_mois_ref
             })
         
-        evolution_months.reverse()  # De l'ancien au récent
+        evolution_months.reverse()
         
-        for agent_perf in agents_performance[:5]:  # Top 5 agents seulement pour éviter la surcharge
+        for agent_perf in agents_performance[:5]:  # Top 5 agents seulement
             agent = agent_perf['agent']
             evolution_data = []
             
@@ -374,12 +483,15 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
                 )
                 
                 ca_mois_ref = 0
+                produits_mois_ref = 0
                 for vente in ventes_mois_ref:
                     ca_mois_ref += float(vente.quantite * vente.prix_vente_unitaire)
+                    produits_mois_ref += vente.quantite
                 
                 evolution_data.append({
                     'mois': month_data['mois'],
-                    'ca': ca_mois_ref
+                    'ca': ca_mois_ref,
+                    'produits': produits_mois_ref
                 })
             
             evolution_agents[agent.user.get_full_name()] = evolution_data
@@ -389,13 +501,20 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
             'total_agents': total_agents,
             'ca_mois_total': ca_mois_total,
             'ca_total_global': ca_total_global,
+            'produits_mois_total': produits_mois_total,
             'moyenne_efficacite': moyenne_efficacite,
-            'moyenne_objectif': moyenne_objectif,
+            'agents_jackpot': agents_jackpot,
+            'agents_palier_2': agents_palier_2,
+            'agents_palier_1': agents_palier_1,
+            'top_performers_produits': top_performers_produits,
             'top_performers_mois': top_performers_mois,
             'top_performers_clients': top_performers_clients,
             'top_performers_efficacite': top_performers_efficacite,
             'evolution_agents': evolution_agents,
-            'evolution_months': evolution_months,  # Ajout des mois séparément
+            'evolution_months': evolution_months,
+            'OBJECTIF_JACKPOT': OBJECTIF_JACKPOT,
+            'PALIER_1': PALIER_1,
+            'PALIER_2': PALIER_2,
         })
         
         return context
@@ -567,12 +686,25 @@ def reception_lot(request):
         if form.is_valid():
             try:
                 lot = form.save()
-                messages.success(request, f"Lot {lot.reference_lot} réceptionné avec succès!")
+                
+                # Créer un mouvement de stock
+                MouvementStock.objects.create(
+                    produit=lot.produit,
+                    lot=lot,
+                    type_mouvement='RECEPTION',
+                    quantite=lot.quantite_initiale,
+                    date_mouvement=lot.date_reception
+                )
+                
+                messages.success(request, f"✅ Lot {lot.reference_lot} réceptionné avec succès!")
+                if lot.facture:
+                    messages.info(request, "📎 Facture uploadée avec succès")
                 return redirect('liste_lots')
+                
             except Exception as e:
-                messages.error(request, f"Erreur lors de l'enregistrement: {str(e)}")
+                messages.error(request, f"❌ Erreur lors de l'enregistrement: {str(e)}")
         else:
-            messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+            messages.error(request, "❌ Veuillez corriger les erreurs ci-dessous.")
     else:
         form = ReceptionLotForm()
     
@@ -628,77 +760,302 @@ def distribuer_produits_agent(request):
         if form.is_valid():
             try:
                 distribution = form.save()
-                messages.success(request, f"Distribution #{distribution.id} créée avec succès!")
+                
+                # Message personnalisé selon le type de distribution
+                if distribution.type_distribution == 'AUTO':
+                    messages.success(request, f"✅ Auto-distribution #{distribution.id} créée avec succès! Vous pouvez maintenant vendre ces produits.")
+                else:
+                    messages.success(request, f"✅ Distribution #{distribution.id} vers {distribution.agent_terrain} créée avec succès!")
+                
                 return redirect('liste_distributions')
             except Exception as e:
-                messages.error(request, f"Erreur lors de la distribution: {str(e)}")
+                messages.error(request, f"❌ Erreur lors de la distribution: {str(e)}")
         else:
-            messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+            messages.error(request, "❌ Veuillez corriger les erreurs ci-dessous.")
     else:
         form = DistributionForm(current_user=request.user)
     
     return render(request, 'core/distribution/distribuer.html', {
-        'form': form
+        'form': form,
+        'title': 'Nouvelle Distribution'
     })
 
 @login_required
+def modifier_distribution(request, distribution_id):
+    """Modifier une distribution existante"""
+    distribution = get_object_or_404(
+        DistributionAgent.objects.select_related('superviseur', 'agent_terrain'),
+        id=distribution_id,
+        est_supprime=False
+    )
+    
+    # Vérifier que l'utilisateur peut modifier cette distribution
+    if not request.user.is_superuser and distribution.superviseur.user != request.user:
+        messages.error(request, "Vous n'avez pas la permission de modifier cette distribution.")
+        return redirect('liste_distributions')
+    
+    if request.method == 'POST':
+        form = DistributionModificationForm(request.POST, instance=distribution, current_user=request.user)
+        if form.is_valid():
+            try:
+                distribution_modifiee = form.save()
+                
+                # Mettre à jour les totaux
+                distribution_modifiee._mettre_a_jour_totaux(user=request.user)
+                
+                # Journaliser la modification
+                JournalModificationDistribution.objects.create(
+                    distribution=distribution_modifiee,
+                    utilisateur=request.user,
+                    type_action='MODIFICATION',
+                    details=f"Raison: {form.cleaned_data['raison_modification']}",
+                    anciennes_valeurs={
+                        'date_distribution': str(distribution.date_distribution),
+                    },
+                    nouvelles_valeurs={
+                        'date_distribution': str(distribution_modifiee.date_distribution),
+                    }
+                )
+                
+                messages.success(request, f"✅ Distribution #{distribution.id} modifiée avec succès!")
+                return redirect('detail_distribution', distribution_id=distribution.id)
+                
+            except Exception as e:
+                messages.error(request, f"❌ Erreur lors de la modification: {str(e)}")
+    else:
+        form = DistributionModificationForm(instance=distribution, current_user=request.user)
+    
+    context = {
+        'form': form,
+        'distribution': distribution,
+        'title': f'Modifier Distribution #{distribution.id}'
+    }
+    
+    return render(request, 'core/distribution/modifier_distribution.html', context)
+
+@login_required
+def supprimer_distribution(request, distribution_id):
+    """Soft delete d'une distribution"""
+    distribution = get_object_or_404(
+        DistributionAgent.objects.select_related('superviseur', 'agent_terrain'),
+        id=distribution_id,
+        est_supprime=False
+    )
+    
+    # Vérifier les permissions
+    if not request.user.is_superuser and distribution.superviseur.user != request.user:
+        messages.error(request, "Vous n'avez pas la permission de supprimer cette distribution.")
+        return redirect('liste_distributions')
+    
+    if request.method == 'POST':
+        form = DistributionSuppressionForm(request.POST)
+        if form.is_valid():
+            try:
+                # Soft delete
+                distribution.soft_delete(
+                    user=request.user,
+                    raison=form.cleaned_data['raison_suppression']
+                )
+                
+                # Journaliser la suppression
+                JournalModificationDistribution.objects.create(
+                    distribution=distribution,
+                    utilisateur=request.user,
+                    type_action='SUPPRESSION',
+                    details=f"Raison: {form.cleaned_data['raison_suppression']}"
+                )
+                
+                messages.success(request, f"✅ Distribution #{distribution.id} supprimée avec succès!")
+                return redirect('liste_distributions')
+                
+            except Exception as e:
+                messages.error(request, f"❌ Erreur lors de la suppression: {str(e)}")
+    else:
+        form = DistributionSuppressionForm()
+    
+    context = {
+        'form': form,
+        'distribution': distribution,
+        'title': f'Supprimer Distribution #{distribution.id}'
+    }
+    
+    return render(request, 'core/distribution/supprimer_distribution.html', context)
+
+@login_required
+def restaurer_distribution(request, distribution_id):
+    """Restaurer une distribution supprimée"""
+    distribution = get_object_or_404(
+        DistributionAgent.objects.select_related('superviseur', 'agent_terrain'),
+        id=distribution_id,
+        est_supprime=True
+    )
+    
+    if request.method == 'POST':
+        try:
+            distribution.restaurer(user=request.user)
+            
+            # Journaliser la restauration
+            JournalModificationDistribution.objects.create(
+                distribution=distribution,
+                utilisateur=request.user,
+                type_action='RESTAURATION',
+                details="Distribution restaurée"
+            )
+            
+            messages.success(request, f"✅ Distribution #{distribution.id} restaurée avec succès!")
+            return redirect('detail_distribution', distribution_id=distribution.id)
+            
+        except Exception as e:
+            messages.error(request, f"❌ Erreur lors de la restauration: {str(e)}")
+    
+    context = {
+        'distribution': distribution,
+        'title': f'Restaurer Distribution #{distribution.id}'
+    }
+    
+    return render(request, 'core/distribution/restaurer_distribution.html', context)
+
+
+@login_required
 def liste_distributions(request):
-    """Liste toutes les distributions avec valeurs gros et détail"""
-    distributions = DistributionAgent.objects.all().order_by('-date_distribution')
+    """Liste toutes les distributions - Vue épurée"""
+    # Filtres
+    show_deleted = request.GET.get('show_deleted') == 'true'
+    type_filter = request.GET.get('type')
+    agent_filter = request.GET.get('agent')
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
     
-    total_quantite = 0
-    total_valeur_gros = 0
-    total_valeur_detail = 0
-    agents_distincts = set()
-    produits_distincts = set()
+    # Base queryset
+    distributions = DistributionAgent.objects.select_related(
+        'superviseur', 'agent_terrain'
+    ).prefetch_related(
+        'detaildistribution_set__lot__produit'
+    ).order_by('-date_distribution')
     
-    for dist in distributions:
-        details = dist.detaildistribution_set.all()
-        dist.quantite_totale = sum(detail.quantite for detail in details)
-        dist.valeur_attendue_gros = sum((detail.prix_gros or 0) * detail.quantite for detail in details)
-        dist.valeur_attendue_detail = sum((detail.prix_detail or 0) * detail.quantite for detail in details)
-        
-        total_quantite += dist.quantite_totale
-        total_valeur_gros += dist.valeur_attendue_gros
-        total_valeur_detail += dist.valeur_attendue_detail
-        
-        agents_distincts.add(dist.agent_terrain)
-        for detail in details:
-            produits_distincts.add(detail.lot.produit)
+    # Appliquer les filtres
+    if not show_deleted:
+        distributions = distributions.filter(est_supprime=False)
+    if type_filter:
+        distributions = distributions.filter(type_distribution=type_filter)
+    if agent_filter:
+        distributions = distributions.filter(agent_terrain_id=agent_filter)
+    if date_debut:
+        distributions = distributions.filter(date_distribution__gte=date_debut)
+    if date_fin:
+        distributions = distributions.filter(date_distribution__lte=date_fin)
+    
+    # Calcul des totaux globaux
+    total_distributions = distributions.count()
+    total_quantite = sum(dist.quantite_totale for dist in distributions)
+    total_valeur_gros = sum(dist.valeur_gros_totale for dist in distributions)
+    total_valeur_detail = sum(dist.valeur_detail_totale for dist in distributions)
     
     context = {
         'distributions': distributions,
-        'total_distributions': distributions.count(),
+        'total_distributions': total_distributions,
         'total_quantite': total_quantite,
         'total_valeur_gros': total_valeur_gros,
         'total_valeur_detail': total_valeur_detail,
-        'total_agents': len(agents_distincts),
-        'total_produits': len(produits_distincts),
+        'agents_terrain': Agent.objects.filter(type_agent='terrain'),
+        'filter_type': type_filter,
+        'filter_agent': agent_filter,
+        'date_debut': date_debut,
+        'date_fin': date_fin,
+        'show_deleted': show_deleted,
     }
     
     return render(request, 'core/distribution/liste_distributions.html', context)
 
 
 
+@login_required
 def detail_distribution(request, distribution_id):
-    """Détail d'une distribution spécifique"""
-    distribution = get_object_or_404(DistributionAgent, id=distribution_id)
+    """Détail d'une distribution spécifique - Données immuables"""
+    distribution = get_object_or_404(
+        DistributionAgent.objects.select_related('superviseur', 'agent_terrain')
+        .prefetch_related('detaildistribution_set__lot__produit'), 
+        id=distribution_id
+    )
+    
+    # Récupérer les détails figés
     details = distribution.detaildistribution_set.all()
     
-    # Calcul de la quantité totale
+    # Données immuables
+    produits_distribues = []
+    for detail in details:
+        produits_distribues.append({
+            'produit': detail.lot.produit,
+            'lot': detail.lot,
+            'quantite': detail.quantite,
+            'prix_gros': detail.prix_gros,
+            'prix_detail': detail.prix_detail,
+            'valeur_gros': (detail.prix_gros or 0) * detail.quantite,
+            'valeur_detail': (detail.prix_detail or 0) * detail.quantite,
+        })
+    
+    # Totaux immuables
     quantite_totale = sum(detail.quantite for detail in details)
+    valeur_gros_totale = sum((detail.prix_gros or 0) * detail.quantite for detail in details)
+    valeur_detail_totale = sum((detail.prix_detail or 0) * detail.quantite for detail in details)
     
     context = {
         'distribution': distribution,
-        'details': details,
+        'produits_distribues': produits_distribues,
         'quantite_totale': quantite_totale,
+        'valeur_gros_totale': valeur_gros_totale,
+        'valeur_detail_totale': valeur_detail_totale,
     }
     
     return render(request, 'core/distribution/detail_distribution.html', context)
 
-# API pour récupérer le stock d'un produit
+# Dans votre views.py, modifiez l'API get_stock_produit_a_date
+# Dans votre views.py
+
+def get_stock_produit_a_date(request):
+    """API pour récupérer le stock d'un produit à une date donnée (AJAX)"""
+    try:
+        produit_id = request.GET.get('produit_id')
+        date_str = request.GET.get('date')
+        
+        if not produit_id or not date_str:
+            return JsonResponse({'error': 'Paramètres manquants'}, status=400)
+        
+        produit = Produit.objects.get(id=produit_id)
+        date_reference = timezone.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        
+        # Créer une instance de formulaire pour utiliser ses méthodes
+        form = DistributionForm(current_user=request.user)
+        stock_disponible = form.get_stock_a_date(produit.nom, date_reference)
+        
+        # Récupérer les vrais lots avec leurs quantités restantes
+        lots_disponibles = form.get_lots_disponibles_a_date(produit.nom, date_reference)
+        lots_info = []
+        
+        for lot in lots_disponibles:
+            lots_info.append({
+                'lot_id': lot.id,
+                'reference': lot.reference_lot or f"Lot#{lot.id}",
+                'quantite_restante': getattr(lot, '_quantite_restante_calculee', lot.quantite_restante),
+                'date_reception': lot.date_reception.strftime('%d/%m/%Y'),
+                'prix_achat': float(lot.prix_achat_unitaire)
+            })
+        
+        return JsonResponse({
+            'stock': stock_disponible,
+            'produit': produit.nom,
+            'lots_disponibles': lots_info,
+            'date_reference': date_reference.strftime('%d/%m/%Y %H:%M')
+        })
+        
+    except Produit.DoesNotExist:
+        return JsonResponse({'error': 'Produit non trouvé'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# API pour récupérer le stock actuel (conservée pour compatibilité)
 def get_stock_produit(request, produit_id):
-    """API pour récupérer le stock d'un produit (AJAX)"""
+    """API pour récupérer le stock actuel d'un produit (AJAX)"""
     try:
         produit = Produit.objects.get(id=produit_id)
         lots_disponibles = LotEntrepot.get_lots_disponibles(produit.nom)
@@ -722,12 +1079,64 @@ def get_stock_produit(request, produit_id):
     except Produit.DoesNotExist:
         return JsonResponse({'error': 'Produit non trouvé'}, status=404)
 
+@login_required
+def stats_superviseurs(request):
+    """Statistiques des distributions et ventes des superviseurs"""
+    # Récupérer le superviseur connecté
+    superviseur = get_object_or_404(Agent, user=request.user)
+    
+    # Distributions du superviseur
+    distributions = DistributionAgent.objects.filter(superviseur=superviseur)
+    
+    # Auto-distributions
+    auto_distributions = distributions.filter(type_distribution='AUTO')
+    
+    # Distributions aux agents terrain
+    distributions_terrain = distributions.filter(type_distribution='TERRAIN')
+    
+    # Calcul des statistiques
+    stats = {
+        'total_distributions': distributions.count(),
+        'auto_distributions_count': auto_distributions.count(),
+        'terrain_distributions_count': distributions_terrain.count(),
+        'total_produits_distribues': sum(
+            sum(detail.quantite for detail in dist.detaildistribution_set.all())
+            for dist in distributions
+        ),
+        'valeur_totale_gros': sum(
+            sum((detail.prix_gros or 0) * detail.quantite for detail in dist.detaildistribution_set.all())
+            for dist in distributions
+        ),
+        'valeur_totale_detail': sum(
+            sum((detail.prix_detail or 0) * detail.quantite for detail in dist.detaildistribution_set.all())
+            for dist in distributions
+        ),
+    }
+    
+    # Top produits distribués
+    produits_distribues = {}
+    for dist in distributions:
+        for detail in dist.detaildistribution_set.all():
+            produit_nom = detail.lot.produit.nom
+            if produit_nom not in produits_distribues:
+                produits_distribues[produit_nom] = 0
+            produits_distribues[produit_nom] += detail.quantite
+    
+    top_produits = sorted(produits_distribues.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    context = {
+        'superviseur': superviseur,
+        'stats': stats,
+        'auto_distributions': auto_distributions[:10],  # 10 dernières
+        'distributions_terrain': distributions_terrain[:10],  # 10 dernières
+        'top_produits': top_produits,
+    }
+    
+    return render(request, 'core/distribution/stats_superviseurs.html', context)
 
 #=====
 #VENTE
 #=====
-from .models import Vente, Dette, PaiementDette, BonusAgent, Agent, DetailDistribution, Client
-from .forms import VenteForm, DetteForm, PaiementDetteForm
 
 @login_required
 def enregistrer_vente(request):
@@ -1178,8 +1587,32 @@ def liste_factures(request):
     factures = Facture.objects.all().order_by('-date_depot')
     return render(request, 'core/factures/liste_factures.html', {'factures': factures})
 
-# Créer une facture
+# views.py
+@login_required
+def detail_lot(request, lot_id):
+    """Détail d'un lot avec sa facture"""
+    lot = get_object_or_404(
+        LotEntrepot.objects.select_related('produit', 'fournisseur'),
+        id=lot_id
+    )
+    
+    context = {
+        'lot': lot,
+        'title': f'Lot {lot.reference_lot}'
+    }
+    return render(request, 'core/factures/detail_lot.html', context)
 
+@login_required
+def liste_factures_entrepot(request):
+    """Liste des factures liées aux réceptions d'entrepôt"""
+    lots_avec_facture = LotEntrepot.objects.exclude(facture='').order_by('-date_reception')
+    
+    context = {
+        'lots_avec_facture': lots_avec_facture,
+        'title': 'Factures Entrepôt'
+    }
+    return render(request, 'core/factures/liste_factures_entrepot.html', context)
+# Créer une facture
 
 def creer_facture(request):
     if request.method == 'POST':

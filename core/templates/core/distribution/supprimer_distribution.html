@@ -1,0 +1,80 @@
+<!-- core/distribution/supprimer_distribution.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Supprimer Distribution #{{ distribution.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-trash"></i>
+                        Supprimer Distribution #{{ distribution.id }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Aperçu de la distribution -->
+                    <div class="alert alert-warning">
+                        <h6>Distribution à supprimer :</h6>
+                        <p class="mb-1"><strong>Date :</strong> {{ distribution.date_distribution|date:"d/m/Y H:i" }}</p>
+                        <p class="mb-1"><strong>Superviseur :</strong> {{ distribution.superviseur.full_name }}</p>
+                        <p class="mb-1"><strong>Destinataire :</strong> 
+                            {% if distribution.type_distribution == 'AUTO' %}
+                            {{ distribution.superviseur.full_name }} (Auto)
+                            {% else %}
+                            {{ distribution.agent_terrain.full_name }}
+                            {% endif %}
+                        </p>
+                        <p class="mb-1"><strong>Quantité :</strong> {{ distribution.quantite_totale }} produits</p>
+                        <p class="mb-0"><strong>Valeur :</strong> {{ distribution.valeur_gros_totale|floatformat:0 }} FCFA (gros)</p>
+                    </div>
+
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Attention</h6>
+                        <p class="mb-0">
+                            Cette action masquera la distribution des vues principales mais la conservera dans l'historique.
+                            Vous pourrez la restaurer ultérieurement si nécessaire.
+                        </p>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Raison de la suppression *</label>
+                            {{ form.raison_suppression }}
+                            {% if form.raison_suppression.errors %}
+                            <div class="text-danger small">{{ form.raison_suppression.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.confirmer_suppression }}
+                                <label class="form-check-label" for="{{ form.confirmer_suppression.id_for_label }}">
+                                    Je confirme vouloir supprimer cette distribution
+                                </label>
+                            </div>
+                            {% if form.confirmer_suppression.errors %}
+                            <div class="text-danger small">{{ form.confirmer_suppression.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Confirmer la suppression
+                            </button>
+                            <a href="{% url 'detail_distribution' distribution.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
