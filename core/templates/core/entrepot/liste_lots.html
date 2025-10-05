@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-
+{% load humanize %} 
 {% block title %}Liste des Lots - Entrepôt{% endblock %}
 
 {% block content %}
@@ -44,86 +44,112 @@
                     </div>
 
                     <!-- Statistiques -->
-                    <div class="row mb-4">
-                        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                            <div class="card">
-                                <div class="card-body p-3">
-                                    <div class="row">
-                                        <div class="col-8">
-                                            <div class="numbers">
-                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Total Lots</p>
-                                                <h5 class="font-weight-bolder mb-0">{{ total_lots }}</h5>
-                                            </div>
-                                        </div>
-                                        <div class="col-4 text-end">
-                                            <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
-                                                <i class="fas fa-boxes text-lg opacity-10"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                            <div class="card">
-                                <div class="card-body p-3">
-                                    <div class="row">
-                                        <div class="col-8">
-                                            <div class="numbers">
-                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Stock Total</p>
-                                                <h5 class="font-weight-bolder mb-0">{{ total_stock }}</h5>
-                                            </div>
-                                        </div>
-                                        <div class="col-4 text-end">
-                                            <div class="icon icon-shape bg-gradient-success shadow text-center border-radius-md">
-                                                <i class="fas fa-cubes text-lg opacity-10"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                            <div class="card">
-                                <div class="card-body p-3">
-                                    <div class="row">
-                                        <div class="col-8">
-                                            <div class="numbers">
-                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Valeur Stock</p>
-                                                <h5 class="font-weight-bolder mb-0">{{ total_valeur|floatformat:0 }} FCFA</h5>
-                                            </div>
-                                        </div>
-                                        <div class="col-4 text-end">
-                                            <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
-                                                <i class="fas fa-money-bill text-lg opacity-10"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-3 col-sm-6">
-                            <div class="card">
-                                <div class="card-body p-3">
-                                    <div class="row">
-                                        <div class="col-8">
-                                            <div class="numbers">
-                                                <p class="text-sm mb-0 text-capitalize font-weight-bold">Lots Épuisés</p>
-                                                <h5 class="font-weight-bolder mb-0">
-                                                    {{ lots|length|add:"-1" }}  {# Exemple, à adapter #}
-                                                </h5>
-                                            </div>
-                                        </div>
-                                        <div class="col-4 text-end">
-                                            <div class="icon icon-shape bg-gradient-danger shadow text-center border-radius-md">
-                                                <i class="fas fa-exclamation-triangle text-lg opacity-10"></i>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+<!-- Statistiques -->
+<div class="row mb-4">
+    <!-- Total Lots -->
+    <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+        <div class="card">
+            <div class="card-body p-3">
+                <div class="row">
+                    <div class="col-8">
+                        <div class="numbers">
+                            <p class="text-sm mb-0 text-capitalize font-weight-bold">Total Lots</p>
+                            <h5 class="font-weight-bolder mb-0">
+                                {{ total_lots|intcomma }}
+                            </h5>
                         </div>
                     </div>
+                    <div class="col-4 text-end">
+                        <div class="icon icon-shape bg-gradient-primary shadow text-center border-radius-md">
+                            <i class="fas fa-boxes text-lg opacity-10"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stock Total -->
+    <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+        <div class="card">
+            <div class="card-body p-3">
+                <div class="row">
+                    <div class="col-8">
+                        <div class="numbers">
+                            <p class="text-sm mb-0 text-capitalize font-weight-bold">Stock Total</p>
+                            <h5 class="font-weight-bolder mb-0">
+                                {{ total_stock|intcomma }}
+                            </h5>
+                        </div>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="icon icon-shape bg-gradient-success shadow text-center border-radius-md">
+                            <i class="fas fa-cubes text-lg opacity-10"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Valeur Stock -->
+    <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+        <div class="card">
+            <div class="card-body p-3">
+                <div class="row">
+                    <div class="col-8">
+                        <div class="numbers">
+                            <p class="text-sm mb-0 text-capitalize font-weight-bold">Valeur Stock</p>
+                            <h5 class="font-weight-bolder mb-0">
+                                {{ total_valeur|intcomma }} FCFA
+                            </h5>
+                            <small class="text-sm text-muted">
+                                {% if total_valeur >= 1000000 %}
+                                    {{ total_valeur|intword }} FCFA
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
+                            <i class="fas fa-money-bill text-lg opacity-10"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Lots Épuisés -->
+    <div class="col-xl-3 col-sm-6">
+        <div class="card">
+            <div class="card-body p-3">
+                <div class="row">
+                    <div class="col-8">
+                        <div class="numbers">
+                            <p class="text-sm mb-0 text-capitalize font-weight-bold">Lots Épuisés</p>
+                            <h5 class="font-weight-bolder mb-0">
+                                {{ lots_epuises|intcomma }}
+                            </h5>
+                            <small class="text-sm {% if lots_epuises > 0 %}text-danger{% else %}text-success{% endif %}">
+                                {% if total_lots > 0 %}
+                                    ({{ lots_epuises|floatformat:0 }}%)
+                                {% else %}
+                                    (0%)
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="icon icon-shape bg-gradient-danger shadow text-center border-radius-md">
+                            <i class="fas fa-exclamation-triangle text-lg opacity-10"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
                     <!-- Tableau des lots -->
                     <div class="table-responsive">

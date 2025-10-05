@@ -1,0 +1,496 @@
+<!-- templates/core/admin/analyse_produits.html -->
+{% extends 'base_admin.html' %}
+{% load humanize %}
+
+{% block title %}Analyse Produits - Administration{% endblock %}
+
+{% block page_title %}Analyse des Produits{% endblock %}
+{% block page_subtitle %}Performance, rotation et optimisation du portefeuille produits{% endblock %}
+
+{% block quick_stats %}
+<div class="container-fluid mt-4">
+    <div class="quick-stats">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ total_produits|intcomma }}</h3>
+                    <p class="mb-0">Produits Vendus</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-cubes fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ ca_total_produits|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">CA Total Produits</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-chart-line fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ quantite_total_vendue|intcomma }}</h3>
+                    <p class="mb-0">Quantité Totale Vendue</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-box fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ produits_par_ca.0.total_ca|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Meilleur Produit</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-trophy fa-2x text-danger"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Navigation entre les vues -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="#performance" class="btn btn-outline-primary active">Performance</a>
+                        <a href="#stock" class="btn btn-outline-primary">Stock vs Ventes</a>
+                        <a href="#saisonnalite" class="btn btn-outline-primary">Saisonnalité</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Performance -->
+    <div id="performance" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy"></i> Performance par Produit
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Top Produits par CA -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-money-bill-wave text-success"></i>
+                                        Top 10 Produits par Chiffre d'Affaires
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Produit</th>
+                                                    <th>CA Total</th>
+                                                    <th>Quantité</th>
+                                                    <th>Ventes</th>
+                                                    <th>Panier Moyen</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for produit in produits_par_ca|slice:":10" %}
+                                                <tr>
+                                                    <td>{{ forloop.counter }}</td>
+                                                    <td>
+                                                        <strong>{{ produit.produit.nom }}</strong>
+                                                    </td>
+                                                    <td class="text-success">
+                                                        <strong>{{ produit.total_ca|floatformat:0|intcomma }} FCFA</strong>
+                                                    </td>
+                                                    <td>{{ produit.total_quantite|intcomma }}</td>
+                                                    <td>{{ produit.ventes_count }}</td>
+                                                    <td>{{ produit.panier_moyen|floatformat:0|intcomma }} FCFA</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Produits par Quantité -->
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-boxes text-info"></i>
+                                        Top 10 Produits par Quantité Vendue
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Produit</th>
+                                                    <th>Quantité</th>
+                                                    <th>CA Total</th>
+                                                    <th>Clients</th>
+                                                    <th>Rotation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for produit in produits_par_quantite|slice:":10" %}
+                                                <tr>
+                                                    <td>{{ forloop.counter }}</td>
+                                                    <td>
+                                                        <strong>{{ produit.produit.nom }}</strong>
+                                                    </td>
+                                                    <td class="text-info">
+                                                        <strong>{{ produit.total_quantite|intcomma }}</strong>
+                                                    </td>
+                                                    <td>{{ produit.total_ca|floatformat:0|intcomma }} FCFA</td>
+                                                    <td>{{ produit.clients_count }}</td>
+                                                    <td>
+                                                        <span class="badge bg-{% if produit.taux_rotation_mois > 50 %}success{% elif produit.taux_rotation_mois > 20 %}warning{% else %}danger{% endif %}">
+                                                            {{ produit.taux_rotation_mois|floatformat:1 }}%
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tableau détaillé complet -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-list"></i>
+                                        Vue Détaillée de Tous les Produits
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover" id="tableProduits">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Produit</th>
+                                                    <th>CA Total</th>
+                                                    <th>CA Mois</th>
+                                                    <th>Quantité Totale</th>
+                                                    <th>Quantité Mois</th>
+                                                    <th>Nb Ventes</th>
+                                                    <th>Nb Clients</th>
+                                                    <th>Nb Agents</th>
+                                                    <th>Panier Moyen</th>
+                                                    <th>Rotation Mois</th>
+                                                    <th>Performance</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for produit in produits_par_ca %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ produit.produit.nom }}</strong>
+                                                    </td>
+                                                    <td class="text-success">
+                                                        <strong>{{ produit.total_ca|floatformat:0|intcomma }}</strong>
+                                                    </td>
+                                                    <td>{{ produit.ca_mois|floatformat:0|intcomma }}</td>
+                                                    <td>{{ produit.total_quantite|intcomma }}</td>
+                                                    <td>{{ produit.quantite_mois }}</td>
+                                                    <td>{{ produit.ventes_count }}</td>
+                                                    <td>{{ produit.clients_count }}</td>
+                                                    <td>{{ produit.agents_count }}</td>
+                                                    <td>{{ produit.panier_moyen|floatformat:0|intcomma }}</td>
+                                                    <td>
+                                                        <span class="badge bg-{% if produit.taux_rotation_mois > 50 %}success{% elif produit.taux_rotation_mois > 20 %}warning{% else %}danger{% endif %}">
+                                                            {{ produit.taux_rotation_mois|floatformat:1 }}%
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {% with ratio=produit.ca_mois|default:0 %}
+                                                        {% if ratio > 100000 %}
+                                                        <span class="badge bg-success">Étoile</span>
+                                                        {% elif ratio > 50000 %}
+                                                        <span class="badge bg-info">Performant</span>
+                                                        {% elif ratio > 20000 %}
+                                                        <span class="badge bg-warning">Moyen</span>
+                                                        {% else %}
+                                                        <span class="badge bg-danger">Faible</span>
+                                                        {% endif %}
+                                                        {% endwith %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Stock vs Ventes -->
+    <div id="stock" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-warehouse"></i> Analyse Stock vs Ventes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-warning">
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Stock Restant</th>
+                                    <th>Ventes du Mois</th>
+                                    <th>Taux Écoulement</th>
+                                    <th>Jours de Stock</th>
+                                    <th>Statut</th>
+                                    <th>Recommandation</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in stock_ventes_data %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.produit.nom }}</strong>
+                                    </td>
+                                    <td>{{ item.stock_restant|intcomma }}</td>
+                                    <td>{{ item.ventes_mois }}</td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            <div class="progress-bar 
+                                                {% if item.taux_ecoulement > 80 %}bg-success
+                                                {% elif item.taux_ecoulement > 50 %}bg-info
+                                                {% elif item.taux_ecoulement > 20 %}bg-warning
+                                                {% else %}bg-danger{% endif %}" 
+                                                style="width: {{ item.taux_ecoulement }}%">
+                                                {{ item.taux_ecoulement|floatformat:1 }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if item.jours_stock < 15 %}danger{% elif item.jours_stock < 60 %}success{% else %}warning{% endif %}">
+                                            {{ item.jours_stock|floatformat:0 }} jours
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if item.statut_stock == 'FAIBLE' %}
+                                        <span class="badge bg-danger">Stock Faible</span>
+                                        {% elif item.statut_stock == 'NORMAL' %}
+                                        <span class="badge bg-success">Stock Normal</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Stock Excédentaire</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.jours_stock < 15 %}
+                                        <span class="text-danger">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            Réapprovisionner
+                                        </span>
+                                        {% elif item.jours_stock > 180 %}
+                                        <span class="text-warning">
+                                            <i class="fas fa-pause"></i>
+                                            Réduire commandes
+                                        </span>
+                                        {% else %}
+                                        <span class="text-success">
+                                            <i class="fas fa-check"></i>
+                                            Maintenir
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Légende -->
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="alert alert-danger">
+                                <strong><i class="fas fa-exclamation-triangle"></i> Stock Faible:</strong> Moins de 15 jours de stock
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-success">
+                                <strong><i class="fas fa-check"></i> Stock Normal:</strong> 15 à 60 jours de stock
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="alert alert-warning">
+                                <strong><i class="fas fa-boxes"></i> Stock Excédentaire:</strong> Plus de 60 jours de stock
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Saisonnalité -->
+    <div id="saisonnalite" class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-calendar-alt"></i> Analyse de Saisonnalité
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for produit_nom, donnees in saisonnalite_data.items %}
+                        {% if forloop.counter0|divisibleby:2 %}
+                    </div>
+                    <div class="row mb-4">
+                        {% endif %}
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">{{ produit_nom }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="chart{{ forloop.counter }}" height="120"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Navigation smooth scroll
+    $('.btn-group a').on('click', function(e) {
+        e.preventDefault();
+        $('.btn-group a').removeClass('active');
+        $(this).addClass('active');
+        
+        var target = $(this).attr('href');
+        $('html, body').animate({
+            scrollTop: $(target).offset().top - 100
+        }, 500);
+    });
+
+    // Initialisation des graphiques de saisonnalité
+    {% for produit_nom, donnees in saisonnalite_data.items %}
+    {% with chart_id=forloop.counter %}
+    var ctx{{ chart_id }} = document.getElementById('chart{{ chart_id }}').getContext('2d');
+    var chart{{ chart_id }} = new Chart(ctx{{ chart_id }}, {
+        type: 'line',
+        data: {
+            labels: [{% for donnee in donnees %}'{{ donnee.mois }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Quantité vendue',
+                data: [{% for donnee in donnees %}{{ donnee.quantite }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Quantité'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Mois'
+                    }
+                }
+            }
+        }
+    });
+    {% endwith %}
+    {% endfor %}
+
+    // Tri des tableaux
+    $('#tableProduits').DataTable({
+        pageLength: 25,
+        order: [[1, 'desc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+});
+</script>
+
+<style>
+.progress {
+    background-color: #e9ecef;
+    border-radius: 10px;
+}
+.progress-bar {
+    border-radius: 10px;
+    font-size: 0.8rem;
+    line-height: 20px;
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+</style>
+{% endblock %}

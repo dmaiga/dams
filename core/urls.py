@@ -1,10 +1,10 @@
 # urls.py
 from django.urls import path
 from . import views
-from  .views import DashboardView,PerformanceAgentsView
+from  .views import DashboardView,PerformanceAgentsView,AnalyseAgentsView,AnalyseClientsView,AnalyseProduitsView
 urlpatterns = [
     # Dashboard
-   path('', DashboardView.as_view(), name='dashboard'),
+  
     path('dashboard/agent/', views.dashboard_agent, name='dashboard_agent'),
     # Agents
     path('agents/', views.liste_agents, name='liste_agents'),
@@ -14,6 +14,7 @@ urlpatterns = [
 # Entrepôt
     path('entrepot/reception/', views.reception_lot, name='reception_lot'),
     path('entrepot/lots/', views.liste_lots, name='liste_lots'),
+    path('agent/mon-stock/', views.mon_stock, name='mon_stock'),
 # Distribution
     path('distribuer/', views.distribuer_produits_agent, name='distribuer_produits'),
     path('distribution/<int:distribution_id>/modifier/', views.modifier_distribution, name='modifier_distribution'),
@@ -24,6 +25,7 @@ urlpatterns = [
     path('api/stock-produit/<int:produit_id>/', views.get_stock_produit, name='get_stock_produit'),
     path('api/stock-produit-date/', views.get_stock_produit_a_date, name='get_stock_produit_date'),
     path('stats-superviseurs/', views.stats_superviseurs, name='stats_superviseurs'),
+    path('agent/mes-distributions/', views.mes_distributions, name='mes_distributions'),
 # Ventes
   # Ventes personnelles
     path('ventes/enregistrer/', views.enregistrer_vente, name='enregistrer_vente'),
@@ -59,7 +61,18 @@ urlpatterns = [
     path('clients/<int:pk>/', views.ClientDetailView.as_view(), name='detail_client'),
     path('clients/<int:pk>/modifier/', views.ClientUpdateView.as_view(), name='modifier_client'),
     path('clients/<int:pk>/supprimer/', views.ClientDeleteView.as_view(), name='supprimer_client'),
-#statistique
-    
+#tableau_de_bord
+   path('tableau-de-bord/superviseur/', views.tableau_de_bord_superviseur, name='tableau_de_bord_superviseur'),
+   path('tableau-de-bord/agent/<int:agent_id>/', views.vue_detail_agent, name='vue_detail_agent'),
+
+#ADMIN
+    path('', DashboardView.as_view(), name='dashboard'),
+    path('analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
+    path('analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
+    path('analyses/ventes', views.toutes_les_ventes, name='toutes_les_ventes'),  
     path('performances/agents/', PerformanceAgentsView.as_view(), name='performance_agents'),
+    path('analyses/produits/', AnalyseProduitsView.as_view(), name='analyse_produits'),
+    path('analyses/clients/', AnalyseClientsView.as_view(), name='analyse_clients'),
+    path('analyses/agents/', AnalyseAgentsView.as_view(), name='analyse_agents'),
+
 ]

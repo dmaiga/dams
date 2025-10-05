@@ -1,37 +1,38 @@
 <!-- core/distribution/liste_distributions.html -->
 {% extends 'base.html' %}
 {% load static %}
+{% load humanize %}
 
 {% block title %}Historique des Distributions{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- En-tête minimaliste -->
+<div class="container-fluid py-3">
+    <!-- Header minimaliste -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h4 class="mb-1">📦 Distributions</h4>
+            <h4 class="mb-1 text-dark">📦 Distributions</h4>
             <p class="text-muted mb-0">Historique des distributions superviseur → agents</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'distribuer_produits' %}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Nouvelle Distribution
+        <div>
+            <a href="{% url 'distribuer_produits' %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus me-1"></i> Nouvelle Distribution
             </a>
         </div>
     </div>
 
-    <!-- Filtres compact -->
-    <div class="card mb-4">
-        <div class="card-body py-3">
+    <!-- Filtres compact en ligne -->
+    <div class="card card-sm mb-4">
+        <div class="card-body py-2">
             <form method="get" class="row g-2 align-items-center">
                 <div class="col-auto">
-                    <select name="type" class="form-select form-select-sm">
+                    <select name="type" class="form-select form-select-sm" style="width: 120px;">
                         <option value="">Tous types</option>
                         <option value="AUTO" {% if filter_type == 'AUTO' %}selected{% endif %}>Auto</option>
                         <option value="TERRAIN" {% if filter_type == 'TERRAIN' %}selected{% endif %}>Terrain</option>
                     </select>
                 </div>
                 <div class="col-auto">
-                    <select name="agent" class="form-select form-select-sm">
+                    <select name="agent" class="form-select form-select-sm" style="width: 150px;">
                         <option value="">Tous agents</option>
                         {% for agent in agents_terrain %}
                         <option value="{{ agent.id }}" {% if filter_agent == agent.id|stringformat:"s" %}selected{% endif %}>
@@ -41,176 +42,216 @@
                     </select>
                 </div>
                 <div class="col-auto">
-                    <input type="date" name="date_debut" class="form-control form-control-sm" value="{{ date_debut }}" placeholder="Début">
+                    <input type="date" name="date_debut" class="form-control form-control-sm" 
+                           value="{{ date_debut }}" placeholder="Début" style="width: 140px;">
                 </div>
                 <div class="col-auto">
-                    <input type="date" name="date_fin" class="form-control form-control-sm" value="{{ date_fin }}" placeholder="Fin">
+                    <input type="date" name="date_fin" class="form-control form-control-sm" 
+                           value="{{ date_fin }}" placeholder="Fin" style="width: 140px;">
                 </div>
                 <div class="col-auto">
-                    <div class="form-check">
+                    <div class="form-check form-check-inline">
                         <input type="checkbox" name="show_deleted" value="true" class="form-check-input" 
                                id="show_deleted" {% if show_deleted %}checked{% endif %}>
-                        <label class="form-check-label" for="show_deleted">Voir supprimés</label>
+                        <label class="form-check-label small" for="show_deleted">Supprimés</label>
                     </div>
                 </div>
                 <div class="col-auto">
-                    <button type="submit" class="btn btn-sm btn-outline-primary">Filtrer</button>
-                    <a href="{% url 'liste_distributions' %}" class="btn btn-sm btn-outline-secondary">Reset</a>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-filter me-1"></i> Filtrer
+                    </button>
+                    <a href="{% url 'liste_distributions' %}" class="btn btn-outline-secondary btn-sm">Reset</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Indicateurs rapides -->
-    <div class="row mb-4">
-        <div class="col-3">
-            <div class="card border-0 bg-light">
-                <div class="card-body text-center py-3">
-                    <div class="h5 mb-1">{{ total_distributions }}</div>
-                    <small class="text-muted">Distributions</small>
+    <!-- Cartes indicateurs minimalistes -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title text-muted mb-1">Distributions</h6>
+                            <h4 class="mb-0 text-dark">{{ total_distributions|intcomma }}</h4>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <div class="avatar-sm rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center">
+                                <i class="fas fa-truck fa-lg"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-3">
-            <div class="card border-0 bg-light">
-                <div class="card-body text-center py-3">
-                    <div class="h5 mb-1 text-success">{{ total_quantite }}</div>
-                    <small class="text-muted">Produits</small>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title text-muted mb-1">Produits distribués</h6>
+                            <h4 class="mb-0 text-success">{{ total_quantite|intcomma }}</h4>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <div class="avatar-sm rounded-circle bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center">
+                                <i class="fas fa-cubes fa-lg"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-3">
-            <div class="card border-0 bg-light">
-                <div class="card-body text-center py-3">
-                    <div class="h5 mb-1 text-warning">{{ total_valeur_gros|floatformat:0 }}</div>
-                    <small class="text-muted">Valeur Gros</small>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title text-muted mb-1">Valeur Gros</h6>
+                            <h4 class="mb-0 ">{{ total_valeur_gros|intcomma }} <small class="fs-6">FCFA</small></h4>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <div class="avatar-sm rounded-circle bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center">
+                                <i class="fas fa-money-bill-wave fa-lg"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-3">
-            <div class="card border-0 bg-light">
-                <div class="card-body text-center py-3">
-                    <div class="h5 mb-1 text-info">{{ total_valeur_detail|floatformat:0 }}</div>
-                    <small class="text-muted">Valeur Détail</small>
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat border-0 shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            <h6 class="card-title text-muted mb-1">Valeur Détail</h6>
+                            <h4 class="mb-0 ">{{ total_valeur_detail|intcomma }} <small class="fs-6">FCFA</small></h4>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <div class="avatar-sm rounded-circle bg-info bg-opacity-10 text-info d-flex align-items-center justify-content-center">
+                                <i class="fas fa-chart-line fa-lg"></i>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tableau principal -->
-    <div class="card">
+    <!-- Tableau principal épuré -->
+    <div class="card border-0 shadow-sm">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-sm mb-0">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th width="80">#</th>
-                            <th width="120">Date</th>
+                            <th class="ps-3" style="width: 80px;">ID</th>
+                            <th style="width: 120px;">Date</th>
                             <th>Superviseur</th>
                             <th>Destinataire</th>
-                            <th width="100" class="text-center">Type</th>
-                            <th width="100" class="text-center">Quantité</th>
-                            <th width="120" class="text-end">Valeur Gros</th>
-                            <th width="120" class="text-end">Valeur Détail</th>
-                            <th width="100" class="text-center">Statut</th>
-                            <th width="80" class="text-center">Actions</th>
+                            <th class="text-center" style="width: 100px;">Type</th>
+                            <th class="text-center" style="width: 100px;">Quantité</th>
+                            <th class="text-end" style="width: 130px;">Valeur Gros</th>
+                            <th class="text-end" style="width: 130px;">Valeur Détail</th>
+                            <th class="text-center" style="width: 100px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for dist in distributions %}
-                        <tr class="{% if dist.est_supprime %}text-muted bg-light{% endif %}">
+                        <tr class="{% if dist.est_supprime %}table-light text-muted{% endif %}">
                             <!-- ID -->
-                            <td>
-                                <strong>#{{ dist.id }}</strong>
+                            <td class="ps-3">
+                                <div class="fw-semibold text-dark">#{{ dist.id }}</div>
                                 {% if dist.est_retroactive %}
-                                <br><small class="text-warning">rétro</small>
+                                <small class="text-warning">rétro</small>
                                 {% endif %}
                             </td>
                             
                             <!-- Date -->
                             <td>
-                                <small>{{ dist.date_distribution|date:"d/m/y" }}</small>
-                                <br>
+                                <div class="text-dark fw-medium">{{ dist.date_distribution|date:"d/m/y" }}</div>
                                 <small class="text-muted">{{ dist.date_distribution|date:"H:i" }}</small>
                             </td>
                             
                             <!-- Superviseur -->
                             <td>
-                                <div class="fw-medium">{{ dist.superviseur.full_name|truncatechars:20 }}</div>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-xs bg-primary bg-opacity-10 text-primary rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                        <i class="fas fa-user-tie fs-6"></i>
+                                    </div>
+                                    <span class="fw-medium">{{ dist.superviseur.full_name|truncatechars:18 }}</span>
+                                </div>
                             </td>
                             
                             <!-- Destinataire -->
                             <td>
-                                {% if dist.type_distribution == 'AUTO' %}
-                                <span class="text-success">
-                                    <i class="fas fa-user"></i> {{ dist.superviseur.full_name|truncatechars:20 }}
-                                </span>
-                                {% else %}
-                                <div class="fw-medium">{{ dist.agent_terrain.full_name|truncatechars:20 }}</div>
-                                {% endif %}
+                                <div class="d-flex align-items-center">
+                                    {% if dist.type_distribution == 'AUTO' %}
+                                    <div class="avatar-xs bg-success bg-opacity-10 text-success rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                        <i class="fas fa-user fs-6"></i>
+                                    </div>
+                                    <span class="text-success fw-medium">{{ dist.superviseur.full_name|truncatechars:18 }}</span>
+                                    {% else %}
+                                    <div class="avatar-xs bg-info bg-opacity-10 text-info rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                        <i class="fas fa-user-check fs-6"></i>
+                                    </div>
+                                    <span class="fw-medium">{{ dist.agent_terrain.full_name|truncatechars:18 }}</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             
                             <!-- Type -->
                             <td class="text-center">
                                 {% if dist.type_distribution == 'AUTO' %}
-                                <span class="badge bg-success">Auto</span>
+                                <span >Auto</span>
                                 {% else %}
-                                <span class="badge bg-primary">Terrain</span>
+                                <span >Terrain</span>
                                 {% endif %}
                             </td>
                             
                             <!-- Quantité -->
                             <td class="text-center">
-                                <strong>{{ dist.quantite_totale }}</strong>
+                                <span class="fw-bold text-dark fs-6">{{ dist.quantite_totale|intcomma }}</span>
                             </td>
                             
                             <!-- Valeurs -->
                             <td class="text-end">
-                                <span class="fw-bold text-warning">{{ dist.valeur_gros_totale|floatformat:0 }}</span>
-                                <br>
-                                <small class="text-muted">FCFA</small>
+                                <span class="fw-bold ">{{ dist.valeur_gros_totale|intcomma }}</span>
+                                <div class="text-muted small">FCFA</div>
                             </td>
                             <td class="text-end">
-                                <span class="fw-bold text-info">{{ dist.valeur_detail_totale|floatformat:0 }}</span>
-                                <br>
-                                <small class="text-muted">FCFA</small>
-                            </td>
-                            
-                            <!-- Statut -->
-                            <td class="text-center">
-                                {% if dist.est_supprime %}
-                                <span class="badge bg-danger">Supprimé</span>
-                                {% elif dist.est_modifie %}
-                                <span class="badge bg-warning">Modifié</span>
-                                {% else %}
-                                <span class="badge bg-success">Actif</span>
-                                {% endif %}
+                                <span class="fw-bold ">{{ dist.valeur_detail_totale|intcomma }}</span>
+                                <div class="text-muted small">FCFA</div>
                             </td>
                             
                             <!-- Actions -->
                             <td class="text-center">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{% url 'detail_distribution' dist.id %}" 
-                                       class="btn btn-outline-primary" 
-                                       title="Voir détails">
+                                       class="btn btn-outline-primary btn-sm rounded-start" 
+                                       title="Voir détails"
+                                       data-bs-toggle="tooltip">
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     
                                     {% if not dist.est_supprime %}
                                     <a href="{% url 'modifier_distribution' dist.id %}" 
-                                       class="btn btn-outline-warning" 
-                                       title="Modifier">
+                                       class="btn btn-outline-warning btn-sm" 
+                                       title="Modifier"
+                                       data-bs-toggle="tooltip">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     <a href="{% url 'supprimer_distribution' dist.id %}" 
-                                       class="btn btn-outline-danger" 
-                                       title="Supprimer">
+                                       class="btn btn-outline-danger btn-sm rounded-end" 
+                                       title="Supprimer"
+                                       data-bs-toggle="tooltip">
                                         <i class="fas fa-trash"></i>
                                     </a>
                                     {% else %}
                                     <a href="{% url 'restaurer_distribution' dist.id %}" 
-                                       class="btn btn-outline-success" 
-                                       title="Restaurer">
+                                       class="btn btn-outline-success btn-sm rounded-end" 
+                                       title="Restaurer"
+                                       data-bs-toggle="tooltip">
                                         <i class="fas fa-undo"></i>
                                     </a>
                                     {% endif %}
@@ -219,9 +260,15 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="10" class="text-center py-4">
-                                <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
-                                <p class="text-muted mb-0">Aucune distribution trouvée</p>
+                            <td colspan="9" class="text-center py-5">
+                                <div class="py-4">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <h5 class="text-muted">Aucune distribution trouvée</h5>
+                                    <p class="text-muted mb-3">Aucune distribution ne correspond à vos critères de recherche</p>
+                                    <a href="{% url 'distribuer_produits' %}" class="btn btn-primary">
+                                        <i class="fas fa-plus me-1"></i> Créer la première distribution
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -233,26 +280,92 @@
 </div>
 
 <style>
+.card-stat {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.card-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+}
+
+.avatar-sm {
+    width: 48px;
+    height: 48px;
+}
+
+.avatar-xs {
+    width: 32px;
+    height: 32px;
+}
+
 .table th {
     border-top: none;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    color: #6c757d;
+    padding: 12px 8px;
 }
 
 .table td {
+    padding: 12px 8px;
     font-size: 0.9rem;
     vertical-align: middle;
 }
 
-.card {
-    border: 1px solid #e3e6f0;
-    box-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.05);
+.table > :not(caption) > * > * {
+    border-bottom-width: 1px;
 }
 
 .btn-group-sm > .btn {
-    padding: 0.25rem 0.5rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 0.375rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+    
+    .btn-group-sm > .btn {
+        padding: 0.25rem 0.4rem;
+    }
+    
+    .avatar-sm {
+        width: 40px;
+        height: 40px;
+    }
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser les tooltips Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Auto-submit des filtres date
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
 {% endblock %}

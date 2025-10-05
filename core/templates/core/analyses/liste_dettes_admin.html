@@ -1,0 +1,618 @@
+<!-- templates/core/admin/liste_dettes_admin.html -->
+{% extends 'base_admin.html' %}
+{% load humanize %}
+
+{% block title %}Gestion des Dettes - Administration{% endblock %}
+
+{% block page_title %}Gestion des Dettes et Crédits{% endblock %}
+{% block page_subtitle %}Suivi complet du recouvrement et gestion des paiements en attente{% endblock %}
+
+{% block quick_stats %}
+<div class="container-fluid mt-4">
+    <div class="quick-stats">
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ dettes.count|intcomma }}</h3>
+                    <p class="mb-0">Dettes Total</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-file-invoice-dollar fa-2x text-danger"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ total_montant_restant|default:0|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Montant à Recouvrer</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-money-bill-wave fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ dettes_en_retard|default:0|intcomma }}</h3>
+                    <p class="mb-0">Dettes en Retard</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-exclamation-triangle fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ taux_recouvrement|default:0|floatformat:1 }}%</h3>
+                    <p class="mb-0">Taux de Recouvrement</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-percentage fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Filtres et Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-4">
+                            <label for="filtre_statut" class="form-label">Statut de la dette</label>
+                            <select class="form-select" id="filtre_statut" onchange="appliquerFiltres()">
+                                <option value="">Tous les statuts</option>
+                                <option value="en_cours" {% if statut_actuel == 'en_cours' %}selected{% endif %}>En cours</option>
+                                <option value="partiellement_paye" {% if statut_actuel == 'partiellement_paye' %}selected{% endif %}>Partiellement payé</option>
+                                <option value="paye" {% if statut_actuel == 'paye' %}selected{% endif %}>Payé</option>
+                                <option value="en_retard" {% if statut_actuel == 'en_retard' %}selected{% endif %}>En retard</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filtre_agent" class="form-label">Agent</label>
+                            <select class="form-select" id="filtre_agent" onchange="appliquerFiltres()">
+                                <option value="">Tous les agents</option>
+                                {% for agent in agents_list %}
+                                <option value="{{ agent.id }}">{{ agent.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filtre_delai" class="form-label">Délai de paiement</label>
+                            <select class="form-select" id="filtre_delai" onchange="appliquerFiltres()">
+                                <option value="">Tous les délais</option>
+                                <option value="7">Moins de 7 jours</option>
+                                <option value="30">Moins de 30 jours</option>
+                                <option value="retard">En retard</option>
+                                <option value="bonus">Éligible bonus</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12 mt-3">
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" onclick="reinitialiserFiltres()">
+                                    <i class="fas fa-redo"></i> Réinitialiser
+                                </button>
+                                <button class="btn btn-success" onclick="exporterExcel()">
+                                    <i class="fas fa-file-excel"></i> Exporter Excel
+                                </button>
+                                <button class="btn btn-primary" onclick="genererRapport()">
+                                    <i class="fas fa-chart-bar"></i> Rapport détaillé
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des dettes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-file-invoice-dollar"></i> Liste des Dettes en Cours
+                    </h5>
+                    <span class="badge bg-light text-primary fs-6">
+                        {{ dettes.count }} dette{{ dettes.count|pluralize }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="tableDettes">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="80">ID</th>
+                                    <th width="120">Date Création</th>
+                                    <th width="120">Échéance</th>
+                                    <th>Client</th>
+                                    <th>Agent</th>
+                                    <th>Produit</th>
+                                    <th width="120">Montant Total</th>
+                                    <th width="120">Montant Restant</th>
+                                    <th width="100">Progression</th>
+                                    <th width="100">Statut</th>
+                                    <th width="100">Jours Restants</th>
+                                    <th width="100">Bonus</th>
+                                    <th width="120">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dette in dettes %}
+                                <tr class="{% if dette.statut == 'en_retard' %}table-danger{% elif dette.statut == 'partiellement_paye' %}table-warning{% elif dette.statut == 'paye' %}table-success{% endif %}">
+                                    <td>
+                                        <strong>#{{ dette.id }}</strong>
+                                    </td>
+                                    <td>
+                                        <small>{{ dette.date_creation|date:"d/m/Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <small>{{ dette.date_echeance|date:"d/m/Y" }}</small>
+                                        {% if dette.date_reglement %}
+                                        <br>
+                                        <small class="text-success">Réglé le {{ dette.date_reglement|date:"d/m/Y" }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ dette.vente.client.nom }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ dette.vente.client.get_type_client_display }}
+                                            {% if dette.vente.client.contact %}
+                                            • {{ dette.vente.client.contact }}
+                                            {% endif %}
+                                        </small>
+                                        <br>
+                                        <small class="text-info">
+                                            <i class="fas fa-map-marker-alt"></i>
+                                            {{ dette.nom_localite|default:"Localité non précisée" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-info rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                 style="width: 30px; height: 30px;">
+                                                <span class="text-white fw-bold">
+                                                    {{ dette.vente.agent.user.first_name|first }}{{ dette.vente.agent.user.last_name|first }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <strong>{{ dette.vente.agent.full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ dette.vente.agent.telephone|default:"-" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>{{ dette.vente.detail_distribution.lot.produit.nom }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ dette.vente.quantite }} unité{{ dette.vente.quantite|pluralize }}
+                                            • {{ dette.vente.prix_vente_unitaire|floatformat:0|intcomma }} FCFA/u
+                                        </small>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>{{ dette.montant_total|floatformat:0|intcomma }} FCFA</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong class="{% if dette.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
+                                            {{ dette.montant_restant|floatformat:0|intcomma }} FCFA
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            {% with pourcentage_paye=100|add:0 %}
+                                            {% widthratio dette.montant_restant dette.montant_total 100 as pourcentage_restant %}
+                                            {% with pourcentage_paye=100|add:pourcentage_restant|stringformat:"d"|add:"0" %}
+                                            <div class="progress-bar bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'partiellement_paye' %}warning{% else %}danger{% endif %}" 
+                                                 style="width: {{ 100|add:pourcentage_restant|add:"0" }}%"
+                                                 data-bs-toggle="tooltip" 
+                                                 title="{{ pourcentage_paye }}% payé">
+                                                {{ pourcentage_paye }}%
+                                            </div>
+                                            {% endwith %}
+                                            {% endwith %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if dette.statut == 'paye' %}success{% elif dette.statut == 'partiellement_paye' %}warning{% elif dette.statut == 'en_retard' %}danger{% else %}info{% endif %}">
+                                            {{ dette.get_statut_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% now "Y-m-d" as today %}
+                                        {% if dette.date_echeance|date:"Y-m-d" < today and dette.statut != 'paye' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            {{ dette.date_echeance|timesince:today }}
+                                        </span>
+                                        {% elif dette.statut != 'paye' %}
+                                        <span class="badge bg-{% if dette.jours_restants < 7 %}warning{% else %}info{% endif %}">
+                                            {{ dette.date_echeance|timeuntil:today }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-success">Réglée</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if dette.bonus_accorde %}
+                                        <span class="badge bg-success" data-bs-toggle="tooltip" title="Bonus accordé">
+                                            <i class="fas fa-gift"></i> {{ dette.nombre_produits_bonus }}
+                                        </span>
+                                        {% elif dette.eligible_bonus %}
+                                        <span class="badge bg-warning" data-bs-toggle="tooltip" title="Éligible au bonus">
+                                            <i class="fas fa-clock"></i> {{ dette.temps_restant_bonus }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Non éligible</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" 
+                                                    onclick="voirDetails({{ dette.id }})"
+                                                    data-bs-toggle="tooltip" title="Voir détails">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if dette.statut != 'paye' %}
+                                            <button class="btn btn-outline-success"
+                                                    onclick="enregistrerPaiement({{ dette.id }})"
+                                                    data-bs-toggle="tooltip" title="Enregistrer paiement">
+                                                <i class="fas fa-money-bill-wave"></i>
+                                            </button>
+                                            {% endif %}
+                                            <button class="btn btn-outline-info"
+                                                    onclick="contacterClient({{ dette.vente.client.id }})"
+                                                    data-bs-toggle="tooltip" title="Contacter client">
+                                                <i class="fas fa-phone"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="13" class="text-center py-4">
+                                        <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">Aucune dette enregistrée</h5>
+                                        <p class="text-muted">Les dettes apparaîtront ici une fois créées.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-secondary">
+                                <tr>
+                                    <th colspan="6" class="text-end">TOTAUX:</th>
+                                    <th class="text-end">
+                                        <strong>{{ total_montant_total|default:0|floatformat:0|intcomma }} FCFA</strong>
+                                    </th>
+                                    <th class="text-end text-danger">
+                                        <strong>{{ total_montant_restant|default:0|floatformat:0|intcomma }} FCFA</strong>
+                                    </th>
+                                    <th colspan="5"></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques supplémentaires -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Répartition par Statut
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartStatutDettes" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Top 5 Dettes les Plus Importantes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartTopDettes" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour détails de dette -->
+<div class="modal fade" id="modalDetails" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Détails de la Dette</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetailsBody">
+                <!-- Les détails seront chargés ici via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour enregistrement de paiement -->
+<div class="modal fade" id="modalPaiement" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Enregistrer un Paiement</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalPaiementBody">
+                <!-- Formulaire de paiement sera chargé ici -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialisation DataTable
+    $('#tableDettes').DataTable({
+        pageLength: 25,
+        order: [[2, 'asc']], // Tri par date d'échéance
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+
+    // Initialisation des tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Graphique de répartition par statut
+    var ctxStatut = document.getElementById('chartStatutDettes').getContext('2d');
+    var chartStatut = new Chart(ctxStatut, {
+        type: 'doughnut',
+        data: {
+            labels: ['En cours', 'Partiellement payé', 'Payé', 'En retard'],
+            datasets: [{
+                data: [
+                    {{ dettes_en_cours|default:0 }},
+                    {{ dettes_partiellement_payees|default:0 }},
+                    {{ dettes_payees|default:0 }},
+                    {{ dettes_en_retard|default:0 }}
+                ],
+                backgroundColor: ['#17a2b8', '#ffc107', '#28a745', '#dc3545'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                title: {
+                    display: true,
+                    text: 'Répartition des dettes par statut'
+                }
+            }
+        }
+    });
+
+    // Graphique top dettes
+    var ctxTop = document.getElementById('chartTopDettes').getContext('2d');
+    var chartTop = new Chart(ctxTop, {
+        type: 'bar',
+        data: {
+            labels: [{% for dette in top_dettes %}'{{ dette.vente__client__nom }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Montant restant (FCFA)',
+                data: [{% for dette in top_dettes %}{{ dette.montant_restant }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: '#e74c3c',
+                borderColor: '#c0392b',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Dettes les plus importantes'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString() + ' FCFA';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+
+// Fonctions de filtrage
+function appliquerFiltres() {
+    const statut = $('#filtre_statut').val();
+    const agent = $('#filtre_agent').val();
+    const delai = $('#filtre_delai').val();
+    
+    let urlParams = new URLSearchParams();
+    if (statut) urlParams.append('statut', statut);
+    if (agent) urlParams.append('agent', agent);
+    if (delai) urlParams.append('delai', delai);
+    
+    window.location.href = '?' + urlParams.toString();
+}
+
+function reinitialiserFiltres() {
+    window.location.href = '{% url "toutes_les_dettes" %}';
+}
+
+function exporterExcel() {
+    // Implémentation de l'export Excel
+    alert('Fonctionnalité d\'export Excel à implémenter');
+}
+
+function genererRapport() {
+    // Génération de rapport détaillé
+    alert('Génération du rapport détaillé');
+}
+
+function voirDetails(detteId) {
+    // Charger les détails via AJAX
+    fetch(`/api/dettes/${detteId}/`)
+        .then(response => response.json())
+        .then(data => {
+            $('#modalDetailsBody').html(`
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Informations Dette</h6>
+                        <p><strong>ID:</strong> #${data.id}</p>
+                        <p><strong>Date création:</strong> ${new Date(data.date_creation).toLocaleDateString('fr-FR')}</p>
+                        <p><strong>Échéance:</strong> ${new Date(data.date_echeance).toLocaleDateString('fr-FR')}</p>
+                        <p><strong>Client:</strong> ${data.client_nom}</p>
+                        <p><strong>Agent:</strong> ${data.agent_nom}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Détails Financiers</h6>
+                        <p><strong>Montant total:</strong> ${data.montant_total} FCFA</p>
+                        <p><strong>Montant restant:</strong> <span class="text-danger">${data.montant_restant} FCFA</span></p>
+                        <p><strong>Statut:</strong> <span class="badge bg-${data.statut_color}">${data.statut}</span></p>
+                        <p><strong>Localité:</strong> ${data.localite}</p>
+                    </div>
+                </div>
+                ${data.paiements && data.paiements.length > 0 ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Historique des Paiements</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Montant</th>
+                                        <th>Mode</th>
+                                        <th>Référence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.paiements.map(paiement => `
+                                        <tr>
+                                            <td>${new Date(paiement.date_paiement).toLocaleDateString('fr-FR')}</td>
+                                            <td>${paiement.montant} FCFA</td>
+                                            <td>${paiement.mode_paiement}</td>
+                                            <td>${paiement.reference || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `);
+            $('#modalDetails').modal('show');
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            $('#modalDetailsBody').html('<div class="alert alert-danger">Erreur lors du chargement des détails</div>');
+            $('#modalDetails').modal('show');
+        });
+}
+
+function enregistrerPaiement(detteId) {
+    // Charger le formulaire de paiement
+    $('#modalPaiementBody').html(`
+        <form id="formPaiement">
+            <input type="hidden" name="dette_id" value="${detteId}">
+            <div class="mb-3">
+                <label class="form-label">Montant du paiement (FCFA)</label>
+                <input type="number" class="form-control" name="montant" required step="0.01">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Mode de paiement</label>
+                <select class="form-select" name="mode_paiement" required>
+                    <option value="espece">Espèce</option>
+                    <option value="cheque">Chèque</option>
+                    <option value="virement">Virement</option>
+                    <option value="mobile">Paiement Mobile</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Référence (optionnel)</label>
+                <input type="text" class="form-control" name="reference" placeholder="N° chèque, référence virement...">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes (optionnel)</label>
+                <textarea class="form-control" name="notes" rows="3" placeholder="Informations supplémentaires..."></textarea>
+            </div>
+            <div class="text-end">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Enregistrer le paiement
+                </button>
+            </div>
+        </form>
+    `);
+    $('#modalPaiement').modal('show');
+}
+
+function contacterClient(clientId) {
+    // Redirection vers la page de contact du client
+    window.location.href = `/admin/clients/${clientId}/contact/`;
+}
+</script>
+
+<style>
+.avatar-sm {
+    font-size: 0.8rem;
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+.progress {
+    background-color: #e9ecef;
+    border-radius: 10px;
+    height: 20px;
+}
+.progress-bar {
+    border-radius: 10px;
+    font-size: 0.7rem;
+    line-height: 20px;
+}
+</style>
+{% endblock %}

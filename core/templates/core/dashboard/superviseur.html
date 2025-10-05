@@ -1,0 +1,230 @@
+<!-- templates/tableau_de_bord/superviseur.html -->
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Tableau de Bord Superviseur{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Tableau de Bord Superviseur</h1>
+        <div class="btn-group">
+            <a href="{% url 'liste_lots'  %}" class="btn btn-outline-primary">
+                <i class="fas fa-boxes"></i> Stock 
+            </a>
+            <a href="{% url 'distribuer_produits' %}" class="btn btn-outline-success">
+                <i class="fas fa-truck-loading"></i> Distributions
+            </a>
+        </div>
+    </div>
+
+    <!-- Alertes -->
+    {% if stocks_faibles %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Alertes Stock:</strong> {{ stocks_faibles|length }} produit(s) avec stock faible
+    </div>
+    {% endif %}
+
+    <!-- Cartes de résumé -->
+    <div class="row mb-4">
+        <!-- Carte Stock -->
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Stock Total</h5>
+                    <h2>{{ stock_total.total_quantite|default:0|intcomma }}</h2>
+                    <p class="card-text">{{ stock_total.total_valeur|default:0|floatformat:0|intcomma }} FCFA</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte Agents -->
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Agents Terrain</h5>
+                    <h2>{{ agents_terrain.count }}</h2>
+                    <p class="card-text">Actifs</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte Ventes -->
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Ventes 30j</h5>
+                    <h2>{{ ventes_30j.total_ventes|default:0|floatformat:0|intcomma }} FCFA</h2>
+                    <p class="card-text">{{ ventes_30j.nombre_ventes|default:0 }} transactions</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Carte Personnelle -->
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Mes Ventes</h5>
+                    <h2>{{ ventes_superviseur.total_ventes|default:0|floatformat:0|intcomma }} FCFA</h2>
+                    <p class="card-text">{{ ventes_superviseur.nombre_ventes|default:0 }} ventes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Colonne de gauche: Stock et Performances Agents -->
+        <div class="col-md-8">
+            <!-- Stock par produit -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-boxes"></i> Stock par Produit
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Quantité</th>
+                                    <th>Valeur</th>
+                                    <th>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for produit in produits_stock %}
+                                <tr>
+                                    <td>{{ produit.produit__nom }}</td>
+                                    <td>{{ produit.quantite_totale|intcomma }}</td>
+                                    <td>{{ produit.valeur_totale|floatformat:0|intcomma }} FCFA</td>
+                                    <td>
+                                        {% if produit.quantite_totale <= seuil_stock_faible %}
+                                        <span class="badge bg-warning">Faible</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Normal</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performances des Agents -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i> Performances des Agents (30 derniers jours)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Ventes Total</th>
+                                    <th>Nb Ventes</th>
+                                    <th>Clients</th>
+                                    <th>Produits Distribués</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for perf in performances_agents %}
+                                <tr>
+                                    <td>{{ perf.agent.full_name }}</td>
+                                    <td>{{ perf.total_ventes|floatformat:0|intcomma }} FCFA</td>
+                                    <td>{{ perf.nombre_ventes }}</td>
+                                    <td>{{ perf.clients_distincts }}</td>
+                                    <td>{{ perf.produits_distribues|default:0 }}</td>
+                                    <td>
+                                        <a href="{% url 'vue_detail_agent' perf.agent.id %}" 
+                                           class="btn btn-sm btn-outline-primary">
+                                            Détails
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonne de droite: Vue personnelle et statistiques -->
+        <div class="col-md-4">
+            <!-- Vue personnelle du superviseur -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user"></i> Mon Activité
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Ventes personnelles:</strong><br>
+                        {{ ventes_superviseur.total_ventes|default:0|floatformat:0|intcomma }} FCFA<br>
+                        <small class="text-muted">{{ ventes_superviseur.nombre_ventes|default:0 }} ventes</small>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Distributions:</strong><br>
+                        {{ distributions_superviseur }} distribution(s)
+                    </div>
+                    <div>
+                        <strong>Quantité vendue:</strong><br>
+                        {{ ventes_superviseur.quantite_vendue|default:0 }} unités
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiques ventes -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Répartition des Ventes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for vente_type in ventes_par_type %}
+                    <div class="mb-2">
+                        <strong>{{ vente_type.type_vente|title }}:</strong>
+                        {{ vente_type.total|floatformat:0|intcomma }} FCFA
+                        <small class="text-muted">({{ vente_type.count }} ventes)</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Alertes rapides -->
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bell"></i> Alertes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if stocks_faibles %}
+                    <div class="alert alert-sm alert-warning">
+                        <strong>Stock faible:</strong> {{ stocks_faibles|length }} produit(s)
+                    </div>
+                    {% endif %}
+                    
+                    {% if dettes_en_cours %}
+                    <div class="alert alert-sm alert-info">
+                        <strong>Dettes en cours:</strong> {{ dettes_en_cours }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

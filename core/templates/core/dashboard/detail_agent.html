@@ -1,0 +1,136 @@
+<!-- templates/tableau_de_bord/detail_agent.html -->
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Détail Agent - {{ agent_cible.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>{{ agent_cible.full_name }}</h1>
+            <p class="text-muted">Agent Terrain - Détail des activités</p>
+        </div>
+        <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Retour au tableau de bord
+        </a>
+    </div>
+
+    <!-- Cartes de résumé agent -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h5>Total Ventes</h5>
+                    <h3>{{ stats_ventes.total_ventes|default:0|floatformat:0|intcomma }} FCFA</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h5>Nombre de Ventes</h5>
+                    <h3>{{ stats_ventes.nombre_ventes|default:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h5>Quantité Vendue</h5>
+                    <h3>{{ stats_ventes.quantite_vendue|default:0 }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h5>Dettes en Cours</h5>
+                    <h3>{{ dettes.count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Dernières ventes -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">10 Dernières Ventes</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Client</th>
+                                    <th>Produit</th>
+                                    <th>Quantité</th>
+                                    <th>Prix Unitaire</th>
+                                    <th>Total</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vente in ventes %}
+                                <tr>
+                                    <td>{{ vente.date_vente|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ vente.client.nom }}</td>
+                                    <td>{{ vente.produit_nom }}</td>
+                                    <td>{{ vente.quantite }}</td>
+                                    <td>{{ vente.prix_vente_unitaire|floatformat:0|intcomma }} FCFA</td>
+                                    <td>{{ vente.total_vente|floatformat:0|intcomma }} FCFA</td>
+                                    <td>
+                                        <span class="badge bg-{% if vente.type_vente == 'gros' %}success{% else %}info{% endif %}">
+                                            {{ vente.get_type_vente_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dettes et informations -->
+        <div class="col-md-4">
+            <!-- Dettes en cours -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning">
+                    <h5 class="card-title mb-0 text-white">Dettes en Cours</h5>
+                </div>
+                <div class="card-body">
+                    {% if dettes %}
+                        {% for dette in dettes %}
+                        <div class="border-bottom pb-2 mb-2">
+                            <strong>{{ dette.vente.client.nom }}</strong><br>
+                            <small>Montant: {{ dette.montant_restant|floatformat:0|intcomma }}/{{ dette.montant_total|floatformat:0|intcomma }} FCFA</small><br>
+                            <small class="text-muted">Échéance: {{ dette.date_echeance|date:"d/m/Y" }}</small>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">Aucune dette en cours</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informations contact -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informations Agent</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Nom:</strong> {{ agent_cible.full_name }}</p>
+                    <p><strong>Téléphone:</strong> {{ agent_cible.telephone|default:"Non renseigné" }}</p>
+                    <p><strong>Email:</strong> {{ agent_cible.user.email }}</p>
+                    <p><strong>Période analysée:</strong> 30 derniers jours</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

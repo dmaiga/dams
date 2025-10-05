@@ -1,0 +1,633 @@
+<!-- templates/core/admin/analyse_clients.html -->
+{% extends 'base_admin.html' %}
+{% load humanize %}
+
+{% block title %}Analyse Clients - Administration{% endblock %}
+
+{% block page_title %}Analyse de la Clientèle{% endblock %}
+{% block page_subtitle %}Segmentation RFM, fidélisation et optimisation du portefeuille clients{% endblock %}
+
+{% block quick_stats %}
+<div class="container-fluid mt-4">
+    <div class="quick-stats">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ total_clients|intcomma }}</h3>
+                    <p class="mb-0">Clients Total</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-users fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ ca_total_clients|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">CA Total Clients</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-chart-line fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ clients_vip|length|intcomma }}</h3>
+                    <p class="mb-0">Clients VIP</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-crown fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ clients_inactifs|length|intcomma }}</h3>
+                    <p class="mb-0">Clients Inactifs</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-user-slash fa-2x text-danger"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Navigation entre les vues -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="#segmentation" class="btn btn-outline-primary active">Segmentation RFM</a>
+                        <a href="#performance" class="btn btn-outline-primary">Performance</a>
+                        <a href="#types" class="btn btn-outline-primary">Par Types</a>
+                        <a href="#evolution" class="btn btn-outline-primary">Évolution</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Segmentation RFM -->
+    <div id="segmentation" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Segmentation RFM des Clients
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Cartes de segmentation -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-white bg-success h-100">
+                                <div class="card-body text-center">
+                                    <h2>{{ clients_vip|length }}</h2>
+                                    <h5>Clients VIP</h5>
+                                    <small>Score RFM ≥ 13</small>
+                                    <div class="mt-2">
+                                        <i class="fas fa-crown fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-info h-100">
+                                <div class="card-body text-center">
+                                    <h2>{{ clients_fideles|length }}</h2>
+                                    <h5>Clients Fidèles</h5>
+                                    <small>Score RFM 10-12</small>
+                                    <div class="mt-2">
+                                        <i class="fas fa-heart fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-warning h-100">
+                                <div class="card-body text-center">
+                                    <h2>{{ clients_reguliers|length }}</h2>
+                                    <h5>Clients Réguliers</h5>
+                                    <small>Score RFM 7-9</small>
+                                    <div class="mt-2">
+                                        <i class="fas fa-user-check fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-white bg-secondary h-100">
+                                <div class="card-body text-center">
+                                    <h2>{{ clients_occasionnels|length }}</h2>
+                                    <h5>Clients Occasionnels</h5>
+                                    <small>Score RFM ≤ 6</small>
+                                    <div class="mt-2">
+                                        <i class="fas fa-user-clock fa-2x"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tableau détaillé segmentation -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-list"></i>
+                                        Détail de la Segmentation RFM
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover" id="tableSegmentation">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th>Client</th>
+                                                    <th>Type</th>
+                                                    <th>Segment RFM</th>
+                                                    <th>Score Total</th>
+                                                    <th>Récence</th>
+                                                    <th>Fréquence</th>
+                                                    <th>Montant</th>
+                                                    <th>CA Total</th>
+                                                    <th>Dernière Commande</th>
+                                                    <th>Jours Inactivité</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for client in clients_analyse %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ client.client.nom }}</strong>
+                                                        <br>
+                                                        <small class="text-muted">{{ client.client.contact|default:"Non renseigné" }}</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-light text-dark">
+                                                            {{ client.client.get_type_client_display }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{{ client.couleur_segment }}">
+                                                            {{ client.segment }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <strong>{{ client.score_rfm }}/15</strong>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if client.score_recence >= 4 %}success{% elif client.score_recence >= 3 %}warning{% else %}danger{% endif %}">
+                                                            {{ client.score_recence }}/5
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if client.score_frequence >= 4 %}success{% elif client.score_frequence >= 3 %}warning{% else %}danger{% endif %}">
+                                                            {{ client.score_frequence }}/5
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if client.score_montant >= 4 %}success{% elif client.score_montant >= 3 %}warning{% else %}danger{% endif %}">
+                                                            {{ client.score_montant }}/5
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-success">
+                                                        <strong>{{ client.total_achats|floatformat:0|intcomma }} FCFA</strong>
+                                                    </td>
+                                                    <td>
+                                                        {% if client.derniere_commande %}
+                                                        {{ client.derniere_commande.date_vente|date:"d/m/Y" }}
+                                                        {% else %}
+                                                        <span class="text-muted">Aucune</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if client.jours_inactivite <= 30 %}success{% elif client.jours_inactivite <= 90 %}warning{% else %}danger{% endif %}">
+                                                            {{ client.jours_inactivite }} jours
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        {% if client.segment == 'VIP' %}
+                                                        <button class="btn btn-sm btn-outline-success">
+                                                            <i class="fas fa-gift"></i> Récompenser
+                                                        </button>
+                                                        {% elif client.jours_inactivite > 90 %}
+                                                        <button class="btn btn-sm btn-outline-warning">
+                                                            <i class="fas fa-bell"></i> Relancer
+                                                        </button>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Performance Clients -->
+    <div id="performance" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy"></i> Performance par Critères
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Top Clients par CA -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-success">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                        Top 10 par CA
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for client in top_clients_ca %}
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 border-bottom">
+                                        <div>
+                                            <strong>{{ client.client.nom }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ client.client.get_type_client_display }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <strong class="text-success">{{ client.total_achats|floatformat:0|intcomma }} FCFA</strong>
+                                            <br>
+                                            <small>{{ client.nombre_commandes }} commandes</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Clients par Fréquence -->
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-info">
+                                        <i class="fas fa-redo"></i>
+                                        Top 10 par Fréquence
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for client in top_clients_frequence %}
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 border-bottom">
+                                        <div>
+                                            <strong>{{ client.client.nom }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ client.segment }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <strong class="text-info">{{ client.nombre_commandes }} cmd</strong>
+                                            <br>
+                                            <small>Tous les {{ client.frequence_achat|floatformat:0 }} jours</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Clients par Panier Moyen -->
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-warning">
+                                        <i class="fas fa-shopping-basket"></i>
+                                        Top 10 par Panier Moyen
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for client in top_clients_panier %}
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 border-bottom">
+                                        <div>
+                                            <strong>{{ client.client.nom }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ client.produits_achetes }} produits</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <strong class="text-warning">{{ client.panier_moyen|floatformat:0|intcomma }} FCFA</strong>
+                                            <br>
+                                            <small>{{ client.total_achats|floatformat:0|intcomma }} FCFA total</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clients VIP -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-crown"></i>
+                                        Clients VIP - Stratégie de Fidélisation
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% if clients_vip %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead class="table-success">
+                                                <tr>
+                                                    <th>Client VIP</th>
+                                                    <th>Type</th>
+                                                    <th>CA Total</th>
+                                                    <th>Commandes</th>
+                                                    <th>Panier Moyen</th>
+                                                    <th>Dernière Commande</th>
+                                                    <th>Produits Achetés</th>
+                                                    <th>Actions Recommandées</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for client in clients_vip %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ client.client.nom }}</strong>
+                                                        <br>
+                                                        <small>{{ client.client.contact|default:"Non renseigné" }}</small>
+                                                    </td>
+                                                    <td>{{ client.client.get_type_client_display }}</td>
+                                                    <td class="text-success">
+                                                        <strong>{{ client.total_achats|floatformat:0|intcomma }} FCFA</strong>
+                                                    </td>
+                                                    <td>{{ client.nombre_commandes }}</td>
+                                                    <td>{{ client.panier_moyen|floatformat:0|intcomma }} FCFA</td>
+                                                    <td>
+                                                        {% if client.derniere_commande %}
+                                                        {{ client.derniere_commande.date_vente|date:"d/m/Y" }}
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>{{ client.produits_achetes }}</td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-success">
+                                                                <i class="fas fa-gift"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-primary">
+                                                                <i class="fas fa-star"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-info">
+                                                                <i class="fas fa-phone"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center text-muted py-4">
+                                        <i class="fas fa-crown fa-3x mb-3"></i>
+                                        <h5>Aucun client VIP identifié</h5>
+                                        <p>Les clients VIP ont un score RFM ≥ 13</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Analyse par Types -->
+    <div id="types" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Analyse par Type de Client
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for type_client, data in analyse_par_type.items %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">{{ data.label }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <div class="border rounded p-2">
+                                                <h4 class="text-primary mb-0">{{ data.nombre_clients }}</h4>
+                                                <small>Clients</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2">
+                                                <h4 class="text-success mb-0">{{ data.ca_total|floatformat:0|intcomma }}</h4>
+                                                <small>CA Total</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2">
+                                                <h4 class="text-warning mb-0">{{ data.clients_vip }}</h4>
+                                                <small>VIP</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between">
+                                            <small>CA Moyen:</small>
+                                            <strong>{{ data.ca_moyen|floatformat:0|intcomma }} FCFA</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <small>Panier Moyen:</small>
+                                            <strong>{{ data.panier_moyen|floatformat:0|intcomma }} FCFA</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <small>Fréquence Moyenne:</small>
+                                            <strong>Tous les {{ data.frequence_moyenne|floatformat:0 }} jours</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Évolution -->
+    <div id="evolution" class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i> Évolution du Portefeuille Clients
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <canvas id="chartEvolution" height="250"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Indicateurs Clés</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <h4 class="text-success">{{ total_clients }}</h4>
+                                        <small class="text-muted">Clients Totaux</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <h4 class="text-info">{{ taux_vip|floatformat:1 }}%</h4>
+                                        <small class="text-muted">Taux de Clients VIP</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <h4 class="text-danger">{{ clients_inactifs|length }}</h4>
+                                        <small class="text-muted">Clients Inactifs (>90j)</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <h4 class="text-warning">{{ ca_total_clients|floatformat:0|intcomma }} FCFA</h4>
+                                        <small class="text-muted">CA Vie Client Total</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Navigation smooth scroll
+    $('.btn-group a').on('click', function(e) {
+        e.preventDefault();
+        $('.btn-group a').removeClass('active');
+        $(this).addClass('active');
+        
+        var target = $(this).attr('href');
+        $('html, body').animate({
+            scrollTop: $(target).offset().top - 100
+        }, 500);
+    });
+
+    // Graphique d'évolution
+    var ctxEvolution = document.getElementById('chartEvolution').getContext('2d');
+    var chartEvolution = new Chart(ctxEvolution, {
+        type: 'line',
+        data: {
+            labels: [{% for item in evolution_clients %}'{{ item.mois }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [
+                {
+                    label: 'Nouveaux Clients',
+                    data: [{% for item in evolution_clients %}{{ item.nouveaux_clients }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Clients Actifs',
+                    data: [{% for item in evolution_clients %}{{ item.clients_actifs }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Évolution du Portefeuille Clients (12 derniers mois)'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Nombre de Clients'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Mois'
+                    }
+                }
+            }
+        }
+    });
+
+    // Tri des tableaux
+    $('#tableSegmentation').DataTable({
+        pageLength: 25,
+        order: [[3, 'desc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.border-success { border-color: #28a745 !important; }
+.border-info { border-color: #17a2b8 !important; }
+.border-warning { border-color: #ffc107 !important; }
+.border-danger { border-color: #dc3545 !important; }
+</style>
+{% endblock %}

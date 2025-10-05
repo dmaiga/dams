@@ -1,0 +1,501 @@
+<!-- templates/core/admin/liste_ventes_admin.html -->
+{% extends 'base_admin.html' %}
+{% load humanize %}
+
+{% block title %}Toutes les Ventes - Administration{% endblock %}
+
+{% block page_title %}Toutes les Ventes{% endblock %}
+{% block page_subtitle %}Vue complète et analyse de toutes les transactions commerciales{% endblock %}
+
+{% block quick_stats %}
+<div class="container-fluid mt-4">
+    <div class="quick-stats">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ ventes.count|intcomma }}</h3>
+                    <p class="mb-0">Total Ventes</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-shopping-cart fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ total_ca|default:0|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Chiffre d'Affaires Total</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-money-bill-wave fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ clients_count|default:0|intcomma }}</h3>
+                    <p class="mb-0">Clients Distincts</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-users fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ agents_count|default:0|intcomma }}</h3>
+                    <p class="mb-0">Agents Actifs</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-user-tie fa-2x text-danger"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Filtres et Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3">
+                            <label for="date_debut" class="form-label">Date début</label>
+                            <input type="date" class="form-control" id="date_debut">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="date_fin" class="form-label">Date fin</label>
+                            <input type="date" class="form-control" id="date_fin">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filtre_agent" class="form-label">Agent</label>
+                            <select class="form-select" id="filtre_agent">
+                                <option value="">Tous les agents</option>
+                                {% for agent in agents_list %}
+                                <option value="{{ agent.id }}">{{ agent.full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="filtre_type" class="form-label">Type vente</label>
+                            <select class="form-select" id="filtre_type">
+                                <option value="">Tous les types</option>
+                                <option value="gros">Vente en Gros</option>
+                                <option value="detail">Vente au Détail</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12 mt-3">
+                            <div class="btn-group">
+                                <button class="btn btn-primary" onclick="appliquerFiltres()">
+                                    <i class="fas fa-filter"></i> Appliquer les filtres
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="reinitialiserFiltres()">
+                                    <i class="fas fa-redo"></i> Réinitialiser
+                                </button>
+                                <button class="btn btn-success" onclick="exporterExcel()">
+                                    <i class="fas fa-file-excel"></i> Exporter Excel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des ventes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list"></i> Liste Complète des Ventes
+                    </h5>
+                    <span class="badge bg-light text-primary fs-6">
+                        {{ ventes.count }} vente{{ ventes.count|pluralize }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="tableVentes">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="80">ID</th>
+                                    <th width="120">Date</th>
+                                    <th>Agent</th>
+                                    <th>Client</th>
+                                    <th>Produit</th>
+                                    <th width="100">Quantité</th>
+                                    <th width="120">Prix Unitaire</th>
+                                    <th width="120">Total</th>
+                                    <th width="100">Type</th>
+                                    <th width="100">Paiement</th>
+                                    <th width="120">Statut</th>
+                                    <th width="80">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vente in ventes %}
+                                <tr>
+                                    <td>
+                                        <strong>#{{ vente.id }}</strong>
+                                    </td>
+                                    <td>
+                                        <small>{{ vente.date_vente|date:"d/m/Y" }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ vente.date_vente|date:"H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                 style="width: 30px; height: 30px;">
+                                                <span class="text-white fw-bold">
+                                                    {{ vente.agent.user.first_name|first }}{{ vente.agent.user.last_name|first }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <strong>{{ vente.agent.full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ vente.agent.telephone|default:"-" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>{{ vente.client.nom }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ vente.client.get_type_client_display }}
+                                            {% if vente.client.contact %}
+                                            • {{ vente.client.contact }}
+                                            {% endif %}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ vente.detail_distribution.lot.produit.nom }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            Lot: {{ vente.detail_distribution.lot.reference_lot|default:"N/A" }}
+                                        </small>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary fs-6">{{ vente.quantite }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>{{ vente.prix_vente_unitaire|floatformat:0|intcomma }} FCFA</strong>
+                                    </td>
+                                    <td class="text-end text-success">
+                                        <strong>{{ vente.total_vente|floatformat:0|intcomma }} FCFA</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if vente.type_vente == 'gros' %}success{% else %}info{% endif %}">
+                                            {{ vente.get_type_vente_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if vente.mode_paiement == 'credit' %}
+                                        <span class="badge bg-warning" data-bs-toggle="tooltip" 
+                                              title="Dette: {{ vente.dette_associee.montant_restant|default:0|floatformat:0 }} FCFA restants">
+                                            <i class="fas fa-clock"></i> Crédit
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Comptant
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if vente.mode_paiement == 'credit' and vente.dette_associee %}
+                                        <span class="badge bg-{% if vente.dette_associee.statut == 'paye' %}success{% elif vente.dette_associee.statut == 'en_retard' %}danger{% else %}warning{% endif %}">
+                                            {{ vente.dette_associee.get_statut_display }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-success">Réglée</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" 
+                                                    onclick="voirDetails({{ vente.id }})"
+                                                    data-bs-toggle="tooltip" title="Voir détails">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            {% if vente.mode_paiement == 'credit' and vente.dette_associee %}
+                                            <button class="btn btn-outline-warning"
+                                                    onclick="gererDette({{ vente.dette_associee.id }})"
+                                                    data-bs-toggle="tooltip" title="Gérer dette">
+                                                <i class="fas fa-file-invoice-dollar"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="12" class="text-center py-4">
+                                        <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">Aucune vente enregistrée</h5>
+                                        <p class="text-muted">Les ventes apparaîtront ici une fois créées.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-secondary">
+                                <tr>
+                                    <th colspan="7" class="text-end">TOTAL GÉNÉRAL:</th>
+                                    <th class="text-end text-success">
+                                        <strong>{{ total_ca|default:0|floatformat:0|intcomma }} FCFA</strong>
+                                    </th>
+                                    <th colspan="4"></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques supplémentaires -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Répartition par Type de Vente
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartTypeVente" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Top 5 Agents par CA
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartTopAgents" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour détails de vente -->
+<div class="modal fade" id="modalDetails" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Détails de la Vente</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetailsBody">
+                <!-- Les détails seront chargés ici via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialisation DataTable
+    $('#tableVentes').DataTable({
+        pageLength: 25,
+        order: [[1, 'desc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>',
+        buttons: [
+            {
+                extend: 'excel',
+                text: '<i class="fas fa-file-excel"></i> Excel',
+                className: 'btn btn-success'
+            },
+            {
+                extend: 'pdf',
+                text: '<i class="fas fa-file-pdf"></i> PDF',
+                className: 'btn btn-danger'
+            }
+        ]
+    });
+
+    // Initialisation des tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Graphique de répartition par type de vente
+    var ctxType = document.getElementById('chartTypeVente').getContext('2d');
+    var chartType = new Chart(ctxType, {
+        type: 'doughnut',
+        data: {
+            labels: ['Vente en Gros', 'Vente au Détail'],
+            datasets: [{
+                data: [{{ ventes_gros|default:0 }}, {{ ventes_detail|default:0 }}],
+                backgroundColor: ['#28a745', '#17a2b8'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                title: {
+                    display: true,
+                    text: 'Répartition des ventes'
+                }
+            }
+        }
+    });
+
+    // Graphique top agents
+    var ctxAgents = document.getElementById('chartTopAgents').getContext('2d');
+    var chartAgents = new Chart(ctxAgents, {
+        type: 'bar',
+        data: {
+            labels: [{% for agent in top_agents %}'{{ agent.agent__user__first_name }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                label: 'CA (FCFA)',
+                data: [{% for agent in top_agents %}{{ agent.total_ca }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: '#3498db',
+                borderColor: '#2980b9',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Performance des agents'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString() + ' FCFA';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+
+// Fonctions de filtrage
+function appliquerFiltres() {
+    const dateDebut = $('#date_debut').val();
+    const dateFin = $('#date_fin').val();
+    const agent = $('#filtre_agent').val();
+    const type = $('#filtre_type').val();
+    
+    // Construire l'URL avec les paramètres
+    let urlParams = new URLSearchParams();
+    if (dateDebut) urlParams.append('date_debut', dateDebut);
+    if (dateFin) urlParams.append('date_fin', dateFin);
+    if (agent) urlParams.append('agent', agent);
+    if (type) urlParams.append('type', type);
+    
+    window.location.href = '?' + urlParams.toString();
+}
+
+function reinitialiserFiltres() {
+    window.location.href = '{% url "toutes_les_ventes" %}';
+}
+
+function exporterExcel() {
+    // Implémentation de l'export Excel
+    alert('Fonctionnalité d\'export Excel à implémenter');
+}
+
+function voirDetails(venteId) {
+    // Charger les détails via AJAX
+    fetch(`/api/ventes/${venteId}/`)
+        .then(response => response.json())
+        .then(data => {
+            $('#modalDetailsBody').html(`
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Informations Vente</h6>
+                        <p><strong>ID:</strong> #${data.id}</p>
+                        <p><strong>Date:</strong> ${new Date(data.date_vente).toLocaleString('fr-FR')}</p>
+                        <p><strong>Agent:</strong> ${data.agent_nom}</p>
+                        <p><strong>Client:</strong> ${data.client_nom}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Détails Produit</h6>
+                        <p><strong>Produit:</strong> ${data.produit_nom}</p>
+                        <p><strong>Quantité:</strong> ${data.quantite}</p>
+                        <p><strong>Prix Unitaire:</strong> ${data.prix_vente_unitaire} FCFA</p>
+                        <p><strong>Total:</strong> <span class="text-success">${data.total_vente} FCFA</span></p>
+                    </div>
+                </div>
+                ${data.mode_paiement === 'credit' ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Vente à Crédit</h6>
+                            <p>Montant restant: <strong>${data.dette_montant_restant} FCFA</strong></p>
+                            <p>Statut: <span class="badge bg-${data.dette_statut_color}">${data.dette_statut}</span></p>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `);
+            $('#modalDetails').modal('show');
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            $('#modalDetailsBody').html('<div class="alert alert-danger">Erreur lors du chargement des détails</div>');
+            $('#modalDetails').modal('show');
+        });
+}
+
+function gererDette(detteId) {
+    window.location.href = `/admin/dettes/${detteId}/`;
+}
+</script>
+
+<style>
+.avatar-sm {
+    font-size: 0.8rem;
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+.progress {
+    background-color: #e9ecef;
+    border-radius: 10px;
+}
+</style>
+{% endblock %}
