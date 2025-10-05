@@ -1,0 +1,646 @@
+<!-- templates/core/admin/tous_les_bonus_admin.html -->
+{% extends 'base_admin.html' %}
+{% load humanize %}
+
+{% block title %}Gestion des Bonus - Administration{% endblock %}
+
+{% block page_title %}Gestion des Bonus et Primes{% endblock %}
+{% block page_subtitle %}Suivi et analyse du système de récompenses des agents{% endblock %}
+
+{% block quick_stats %}
+<div class="container-fluid mt-4">
+    <div class="quick-stats">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ bonus_agents.count|intcomma }}</h3>
+                    <p class="mb-0">Agents Récompensés</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-user-tie fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ total_bonus_distribue|default:0|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Total Bonus Distribué</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-money-bill-wave fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ total_produits_recouverts|default:0|intcomma }}</h3>
+                    <p class="mb-0">Produits Recouverts</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-box fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ bonus_moyen|default:0|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Bonus Moyen par Agent</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-chart-line fa-2x text-danger"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Filtres et Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-4">
+                            <label for="filtre_periode" class="form-label">Période</label>
+                            <select class="form-select" id="filtre_periode" onchange="appliquerFiltres()">
+                                <option value="">Toutes les périodes</option>
+                                <option value="mois_cours">Mois en cours</option>
+                                <option value="trimestre">Trimestre en cours</option>
+                                <option value="annee">Année en cours</option>
+                                <option value="semaine">7 derniers jours</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filtre_seuil" class="form-label">Seuil minimum</label>
+                            <select class="form-select" id="filtre_seuil" onchange="appliquerFiltres()">
+                                <option value="">Tous les bonus</option>
+                                <option value="10000">Bonus > 10,000 FCFA</option>
+                                <option value="25000">Bonus > 25,000 FCFA</option>
+                                <option value="50000">Bonus > 50,000 FCFA</option>
+                                <option value="100000">Bonus > 100,000 FCFA</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="filtre_tri" class="form-label">Trier par</label>
+                            <select class="form-select" id="filtre_tri" onchange="appliquerFiltres()">
+                                <option value="bonus_desc">Bonus décroissant</option>
+                                <option value="bonus_asc">Bonus croissant</option>
+                                <option value="produits_desc">Produits décroissant</option>
+                                <option value="produits_asc">Produits croissant</option>
+                                <option value="nom_asc">Nom agent (A-Z)</option>
+                                <option value="nom_desc">Nom agent (Z-A)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12 mt-3">
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" onclick="reinitialiserFiltres()">
+                                    <i class="fas fa-redo"></i> Réinitialiser
+                                </button>
+                                <button class="btn btn-success" onclick="exporterExcel()">
+                                    <i class="fas fa-file-excel"></i> Exporter Excel
+                                </button>
+                                <button class="btn btn-primary" onclick="genererBulletins()">
+                                    <i class="fas fa-file-invoice"></i> Générer bulletins
+                                </button>
+                                <button class="btn btn-warning" onclick="calculerNouveauxBonus()">
+                                    <i class="fas fa-calculator"></i> Calculer nouveaux bonus
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des bonus -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-gift"></i> Répartition des Bonus par Agent
+                    </h5>
+                    <span class="badge bg-light text-primary fs-6">
+                        {{ bonus_agents.count }} agent{{ bonus_agents.count|pluralize }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped" id="tableBonus">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="60">#</th>
+                                    <th>Agent</th>
+                                    <th width="120">Produits Recouverts</th>
+                                    <th width="120">Bonus Total</th>
+                                    <th width="120">Bonus Moyen/Produit</th>
+                                    <th width="100">Performance</th>
+                                    <th width="120">Dernière Mise à Jour</th>
+                                    <th width="100">Classement</th>
+                                    <th width="120">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bonus in bonus_agents %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ forloop.counter }}</strong>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-{% if forloop.counter <= 3 %}warning{% else %}info{% endif %} rounded-circle d-flex align-items-center justify-content-center me-2"
+                                                 style="width: 40px; height: 40px;">
+                                                <span class="text-white fw-bold">
+                                                    {{ bonus.agent.user.first_name|first }}{{ bonus.agent.user.last_name|first }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <strong>{{ bonus.agent.full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ bonus.agent.telephone|default:"Tél. non renseigné" }}
+                                                    {% if bonus.agent.user.email %}
+                                                    • {{ bonus.agent.user.email }}
+                                                    {% endif %}
+                                                </small>
+                                                <br>
+                                                <small class="text-info">
+                                                    <i class="fas fa-calendar-alt"></i>
+                                                    Agent depuis {{ bonus.agent.user.date_joined|date:"d/m/Y" }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-primary fs-6" data-bs-toggle="tooltip" 
+                                              title="{{ bonus.nombre_produits_recouverts }} produits recouverts à temps">
+                                            {{ bonus.nombre_produits_recouverts|intcomma }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end text-success">
+                                        <strong>{{ bonus.total_bonus|floatformat:0|intcomma }} FCFA</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        {% with bonus_moyen=bonus.total_bonus|default:0|floatformat:0 %}
+                                        {% widthratio bonus.total_bonus bonus.nombre_produits_recouverts 1 as bonus_par_produit %}
+                                        <strong>{{ bonus_par_produit|default:0|floatformat:0|intcomma }} FCFA</strong>
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <div class="progress" style="height: 20px;">
+                                            {% with pourcentage_performance=bonus.nombre_produits_recouverts|default:0 %}
+                                            {% widthratio bonus.nombre_produits_recouverts objectif_reference 100 as pourcentage %}
+                                            <div class="progress-bar bg-{% if pourcentage > 100 %}success{% elif pourcentage > 70 %}warning{% else %}danger{% endif %}" 
+                                                 style="width: {{ pourcentage }}%"
+                                                 data-bs-toggle="tooltip" 
+                                                 title="{{ pourcentage|floatformat:1 }}% de l'objectif">
+                                                {{ pourcentage|floatformat:0 }}%
+                                            </div>
+                                            {% endwith %}
+                                        </div>
+                                        <small class="text-muted d-block text-center">
+                                            {{ bonus.nombre_produits_recouverts }}/{{ objectif_reference }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <small>{{ bonus.date_mise_a_jour|date:"d/m/Y" }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ bonus.date_mise_a_jour|date:"H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        {% if forloop.counter == 1 %}
+                                        <span class="badge bg-warning fs-6">
+                                            <i class="fas fa-crown"></i> 1er
+                                        </span>
+                                        {% elif forloop.counter == 2 %}
+                                        <span class="badge bg-secondary fs-6">
+                                            <i class="fas fa-medal"></i> 2ème
+                                        </span>
+                                        {% elif forloop.counter == 3 %}
+                                        <span class="badge bg-danger fs-6">
+                                            <i class="fas fa-award"></i> 3ème
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-info">
+                                            {{ forloop.counter }}ème
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" 
+                                                    onclick="voirDetails({{ bonus.agent.id }})"
+                                                    data-bs-toggle="tooltip" title="Voir détails">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-success"
+                                                    onclick="verserBonus({{ bonus.agent.id }})"
+                                                    data-bs-toggle="tooltip" title="Verser bonus">
+                                                <i class="fas fa-money-bill-wave"></i>
+                                            </button>
+                                            <button class="btn btn-outline-info"
+                                                    onclick="contacterAgent({{ bonus.agent.id }})"
+                                                    data-bs-toggle="tooltip" title="Contacter agent">
+                                                <i class="fas fa-phone"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-4">
+                                        <i class="fas fa-gift fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">Aucun bonus enregistré</h5>
+                                        <p class="text-muted">Les bonus apparaîtront ici une fois calculés.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-secondary">
+                                <tr>
+                                    <th colspan="2" class="text-end">TOTAUX:</th>
+                                    <th class="text-center">
+                                        <strong>{{ total_produits_recouverts|default:0|intcomma }}</strong>
+                                    </th>
+                                    <th class="text-end text-success">
+                                        <strong>{{ total_bonus_distribue|default:0|floatformat:0|intcomma }} FCFA</strong>
+                                    </th>
+                                    <th class="text-end">
+                                        <strong>{{ bonus_moyen_par_produit|default:0|floatformat:0|intcomma }} FCFA</strong>
+                                    </th>
+                                    <th colspan="4"></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistiques et graphiques -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-pie"></i> Répartition des Bonus
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartRepartitionBonus" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Top 10 des Agents par Bonus
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="chartTopBonus" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Détails supplémentaires -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> Informations sur le Système de Bonus
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center p-3 border rounded">
+                                <i class="fas fa-clock fa-2x text-info mb-2"></i>
+                                <h6>Délai Bonus</h6>
+                                <p class="mb-0">48 heures pour bénéficier du bonus après recouvrement</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3 border rounded">
+                                <i class="fas fa-box fa-2x text-success mb-2"></i>
+                                <h6>Valeur Bonus</h6>
+                                <p class="mb-0">100 FCFA par produit recouvert dans les délais</p>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3 border rounded">
+                                <i class="fas fa-trophy fa-2x text-warning mb-2"></i>
+                                <h6>Objectif Mensuel</h6>
+                                <p class="mb-0">{{ objectif_reference }} produits pour le jackpot</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour détails agent -->
+<div class="modal fade" id="modalDetails" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Détails des Bonus - <span id="modalAgentName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalDetailsBody">
+                <!-- Les détails seront chargés ici via JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour versement bonus -->
+<div class="modal fade" id="modalVersement" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Versement de Bonus</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalVersementBody">
+                <!-- Formulaire de versement sera chargé ici -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialisation DataTable
+    $('#tableBonus').DataTable({
+        pageLength: 25,
+        order: [[3, 'desc']], // Tri par bonus décroissant par défaut
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+
+    // Initialisation des tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Graphique de répartition des bonus
+    var ctxRepartition = document.getElementById('chartRepartitionBonus').getContext('2d');
+    var chartRepartition = new Chart(ctxRepartition, {
+        type: 'doughnut',
+        data: {
+            labels: [
+                'Top 3 agents',
+                'Agents performants',
+                'Agents moyens',
+                'Autres agents'
+            ],
+            datasets: [{
+                data: [
+                    {{ bonus_top3|default:0 }},
+                    {{ bonus_performants|default:0 }},
+                    {{ bonus_moyens|default:0 }},
+                    {{ bonus_autres|default:0 }}
+                ],
+                backgroundColor: ['#ffc107', '#28a745', '#17a2b8', '#6c757d'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                title: {
+                    display: true,
+                    text: 'Répartition du budget bonus'
+                }
+            }
+        }
+    });
+
+    // Graphique top bonus
+    var ctxTop = document.getElementById('chartTopBonus').getContext('2d');
+    var chartTop = new Chart(ctxTop, {
+        type: 'bar',
+        data: {
+            labels: [{% for bonus in top_10_bonus %}'{{ bonus.agent__user__first_name }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Bonus (FCFA)',
+                data: [{% for bonus in top_10_bonus %}{{ bonus.total_bonus }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                backgroundColor: '#28a745',
+                borderColor: '#1e7e34',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Top 10 des bonus'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString() + ' FCFA';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+
+// Fonctions de filtrage
+function appliquerFiltres() {
+    const periode = $('#filtre_periode').val();
+    const seuil = $('#filtre_seuil').val();
+    const tri = $('#filtre_tri').val();
+    
+    let urlParams = new URLSearchParams();
+    if (periode) urlParams.append('periode', periode);
+    if (seuil) urlParams.append('seuil', seuil);
+    if (tri) urlParams.append('tri', tri);
+    
+    window.location.href = '?' + urlParams.toString();
+}
+
+function reinitialiserFiltres() {
+    window.location.href = '{% url "tous_les_bonus" %}';
+}
+
+function exporterExcel() {
+    // Implémentation de l'export Excel
+    alert('Fonctionnalité d\'export Excel à implémenter');
+}
+
+function genererBulletins() {
+    // Génération des bulletins de paie
+    alert('Génération des bulletins de bonus');
+}
+
+function calculerNouveauxBonus() {
+    // Calcul des nouveaux bonus
+    if (confirm('Voulez-vous recalculer tous les bonus ? Cette opération peut prendre quelques minutes.')) {
+        window.location.href = '{% url "tous_les_bonus" %}?recalculer=true';
+    }
+}
+
+function voirDetails(agentId) {
+    // Charger les détails via AJAX
+    fetch(`/api/agents/${agentId}/bonus/`)
+        .then(response => response.json())
+        .then(data => {
+            $('#modalAgentName').text(data.agent_nom);
+            $('#modalDetailsBody').html(`
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Informations Agent</h6>
+                        <p><strong>Nom:</strong> ${data.agent_nom}</p>
+                        <p><strong>Téléphone:</strong> ${data.telephone || 'Non renseigné'}</p>
+                        <p><strong>Email:</strong> ${data.email || 'Non renseigné'}</p>
+                        <p><strong>Date d'embauche:</strong> ${new Date(data.date_embauche).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Statistiques Bonus</h6>
+                        <p><strong>Produits recouverts:</strong> ${data.nombre_produits}</p>
+                        <p><strong>Bonus total:</strong> <span class="text-success">${data.bonus_total} FCFA</span></p>
+                        <p><strong>Bonus moyen/produit:</strong> ${data.bonus_moyen} FCFA</p>
+                        <p><strong>Dernière mise à jour:</strong> ${new Date(data.derniere_maj).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                </div>
+                ${data.dettes_bonus && data.dettes_bonus.length > 0 ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Dettes avec Bonus</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Client</th>
+                                        <th>Date</th>
+                                        <th>Produits</th>
+                                        <th>Bonus</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.dettes_bonus.map(dette => `
+                                        <tr>
+                                            <td>${dette.client_nom}</td>
+                                            <td>${new Date(dette.date).toLocaleDateString('fr-FR')}</td>
+                                            <td>${dette.produits}</td>
+                                            <td class="text-success">${dette.bonus} FCFA</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `);
+            $('#modalDetails').modal('show');
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            $('#modalDetailsBody').html('<div class="alert alert-danger">Erreur lors du chargement des détails</div>');
+            $('#modalDetails').modal('show');
+        });
+}
+
+function verserBonus(agentId) {
+    // Charger le formulaire de versement
+    $('#modalVersementBody').html(`
+        <form id="formVersement">
+            <input type="hidden" name="agent_id" value="${agentId}">
+            <div class="mb-3">
+                <label class="form-label">Montant à verser (FCFA)</label>
+                <input type="number" class="form-control" name="montant" required step="0.01" min="0">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Mode de versement</label>
+                <select class="form-select" name="mode_versement" required>
+                    <option value="espece">Espèce</option>
+                    <option value="virement">Virement bancaire</option>
+                    <option value="mobile">Mobile Money</option>
+                    <option value="cheque">Chèque</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Référence (optionnel)</label>
+                <input type="text" class="form-control" name="reference" placeholder="N° transaction, référence...">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes (optionnel)</label>
+                <textarea class="form-control" name="notes" rows="3" placeholder="Informations supplémentaires..."></textarea>
+            </div>
+            <div class="text-end">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Confirmer le versement
+                </button>
+            </div>
+        </form>
+    `);
+    $('#modalVersement').modal('show');
+}
+
+function contacterAgent(agentId) {
+    // Redirection vers la page de contact de l'agent
+    window.location.href = `/admin/agents/${agentId}/contact/`;
+}
+</script>
+
+<style>
+.avatar-sm {
+    font-size: 0.8rem;
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+.progress {
+    background-color: #e9ecef;
+    border-radius: 10px;
+    height: 20px;
+}
+.progress-bar {
+    border-radius: 10px;
+    font-size: 0.7rem;
+    line-height: 20px;
+}
+</style>
+{% endblock %}

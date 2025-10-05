@@ -72,8 +72,8 @@
                                     <td class="text-center">{{ produit.quantite }}</td>
                                     <td class="text-end">{{ produit.prix_gros|default:"-"|floatformat:0 }} FCFA</td>
                                     <td class="text-end">{{ produit.prix_detail|default:"-"|floatformat:0 }} FCFA</td>
-                                    <td class="text-end text-warning">{{ produit.valeur_gros|floatformat:0 }} FCFA</td>
-                                    <td class="text-end text-info">{{ produit.valeur_detail|floatformat:0 }} FCFA</td>
+                                    <td class="text-end ">{{ produit.valeur_gros|floatformat:0 }} FCFA</td>
+                                    <td class="text-end ">{{ produit.valeur_detail|floatformat:0 }} FCFA</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -82,8 +82,8 @@
                                     <th colspan="2" class="text-end">Totaux:</th>
                                     <th class="text-center">{{ quantite_totale }}</th>
                                     <th colspan="2"></th>
-                                    <th class="text-end text-warning">{{ valeur_gros_totale|floatformat:0 }} FCFA</th>
-                                    <th class="text-end text-info">{{ valeur_detail_totale|floatformat:0 }} FCFA</th>
+                                    <th class="text-end ">{{ valeur_gros_totale|floatformat:0 }} FCFA</th>
+                                    <th class="text-end ">{{ valeur_detail_totale|floatformat:0 }} FCFA</th>
                                 </tr>
                             </tfoot>
                         </table>

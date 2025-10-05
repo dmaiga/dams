@@ -33,7 +33,7 @@ class Client(models.Model):
     )
     nom = models.CharField(max_length=100)
     contact = models.CharField(max_length=100, blank=True, null=True)
-    type_client = models.CharField(max_length=20, choices=TYPE_CLIENT_CHOICES)
+    type_client = models.CharField(max_length=50, choices=TYPE_CLIENT_CHOICES)
     date_creation = models.DateTimeField(default=timezone.now)  # Ajout de ce champ
 
     def __str__(self):
@@ -50,7 +50,8 @@ class LotEntrepot(models.Model):
     prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
     date_reception = models.DateTimeField(default=timezone.now)
     date_enregistrement = models.DateTimeField(auto_now_add=True)
-    reference_lot = models.CharField(max_length=50, unique=True, blank=True, null=True)  # AJOUTEZ CE CHAMP
+    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True)  # AJOUTEZ CE CHAMP
+    
     facture = models.FileField(
         upload_to='factures_entrepot/%Y/%m/',
         null=True,
@@ -78,20 +79,41 @@ class LotEntrepot(models.Model):
 
 class Agent(models.Model):
     TYPE_AGENT_CHOICES = (
+        ('direction', 'Direction'),
         ('entrepot', 'Superviseur'),
         ('terrain', 'Agent'),
     )
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    type_agent = models.CharField(max_length=10, choices=TYPE_AGENT_CHOICES)
-    telephone = models.CharField(max_length=20, blank=True, null=True)
+    type_agent = models.CharField(max_length=50, choices=TYPE_AGENT_CHOICES)
+    telephone = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
 
     @property
     def full_name(self):
-        """Retourne le nom complet de l’agent"""
+        """Retourne le nom complet de l'agent"""
         return self.user.get_full_name() or self.user.username
+
+    @property
+    def est_direction(self):
+        """Vérifie si l'agent fait partie de la direction"""
+        return self.type_agent == 'direction'
+
+    @property
+    def est_superviseur(self):
+        """Vérifie si l'agent est un superviseur"""
+        return self.type_agent == 'entrepot'
+
+    @property
+    def est_agent_terrain(self):
+        """Vérifie si l'agent est un agent terrain"""
+        return self.type_agent == 'terrain'
+
+    @property
+    def peut_acceder_admin(self):
+        """Vérifie si l'agent peut accéder à l'administration"""
+        return self.est_direction or self.est_superviseur
 
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
@@ -112,7 +134,7 @@ class DistributionAgent(models.Model):
         blank=True
     )
     type_distribution = models.CharField(
-        max_length=10, 
+        max_length=50, 
         choices=TYPE_DISTRIBUTION,
         default='TERRAIN'
     )
@@ -280,7 +302,7 @@ class MouvementStock(models.Model):
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE, null=True, blank=True)
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, null=True, blank=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, null=True, blank=True)
-    type_mouvement = models.CharField(max_length=20, choices=TYPE_MOUVEMENT)
+    type_mouvement = models.CharField(max_length=50, choices=TYPE_MOUVEMENT)
     quantite = models.PositiveIntegerField()
     date_mouvement = models.DateTimeField(default=timezone.now)
 
@@ -297,7 +319,7 @@ class JournalModificationDistribution(models.Model):
     
     distribution = models.ForeignKey(DistributionAgent, on_delete=models.CASCADE)
     utilisateur = models.ForeignKey(User, on_delete=models.CASCADE)
-    type_action = models.CharField(max_length=20, choices=TYPE_ACTION)
+    type_action = models.CharField(max_length=50, choices=TYPE_ACTION)
     date_action = models.DateTimeField(auto_now_add=True)
     details = models.TextField(blank=True)
     anciennes_valeurs = models.JSONField(null=True, blank=True)
@@ -318,7 +340,7 @@ class Facture(models.Model):
         ('depot', 'Dépôt Agent - Superviseur'),
     ]
     
-    type_facture = models.CharField(max_length=20, choices=TYPE_FACTURE_CHOICES)
+    type_facture = models.CharField(max_length=50, choices=TYPE_FACTURE_CHOICES)
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='factures_deposees')
     montant = models.DecimalField(max_digits=10, decimal_places=2)
     fichier_facture = models.FileField(upload_to='factures_depots/')
@@ -353,9 +375,9 @@ class Vente(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE)
     detail_distribution = models.ForeignKey(DetailDistribution, on_delete=models.CASCADE)
     quantite = models.PositiveIntegerField()
-    type_vente = models.CharField(max_length=10, choices=TYPE_VENTE_CHOICES, default='detail')
+    type_vente = models.CharField(max_length=50, choices=TYPE_VENTE_CHOICES, default='detail')
     prix_vente_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
-    mode_paiement = models.CharField(max_length=10, choices=MODE_PAIEMENT_CHOICES, default='comptant')
+    mode_paiement = models.CharField(max_length=50, choices=MODE_PAIEMENT_CHOICES, default='comptant')
     date_vente = models.DateTimeField(default=timezone.now)
 
     def save(self, *args, **kwargs):
@@ -416,7 +438,7 @@ class Dette(models.Model):
     date_creation = models.DateTimeField(default=timezone.now)
     date_echeance = models.DateField()
     date_reglement = models.DateField(null=True, blank=True)
-    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_cours')
+    statut = models.CharField(max_length=50, choices=STATUT_CHOICES, default='en_cours')
     
     # Informations de localisation détaillées
     nom_localite = models.CharField(max_length=100, blank=True)
@@ -514,7 +536,7 @@ class PaiementDette(models.Model):
     )
     montant = models.DecimalField(max_digits=10, decimal_places=2)
     date_paiement = models.DateTimeField(default=timezone.now)
-    mode_paiement = models.CharField(max_length=10, choices=MODE_PAIEMENT_CHOICES, default='espece')
+    mode_paiement = models.CharField(max_length=50, choices=MODE_PAIEMENT_CHOICES, default='espece')
     reference = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
     

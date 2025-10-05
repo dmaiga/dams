@@ -29,9 +29,14 @@
                         <td>{{ agent.user.last_name }}</td>
                         <td>{{ agent.telephone }}</td>
                         <td>
-                            <span class="badge {% if agent.type_agent == 'superviseur' %}bg-warning{% else %}bg-info{% endif %}">
-                                {{ agent.get_type_agent_display }}
-                            </span>
+<span class="badge 
+    {% if agent.type_agent == 'entrepot' %}bg-success
+    {% elif agent.type_agent == 'terrain' %}bg-primary
+    {% else %}bg-secondary
+    {% endif %}">
+    {{ agent.get_type_agent_display }}
+</span>
+
                         </td>
                         <td>{{ agent.date_creation|date:"d/m/Y" }}</td>
                         <td>

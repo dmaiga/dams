@@ -10,56 +10,66 @@ from django.db import models
 import os
 
 # forms.py
+# forms.py
+import os
+from django import forms
+from django.utils import timezone
+from datetime import datetime
+from .models import LotEntrepot, Produit, Fournisseur, MouvementStock
+
 class ReceptionLotForm(forms.ModelForm):
     # Champs pour nouveau fournisseur
     nouveau_fournisseur = forms.BooleanField(
         required=False, 
         initial=False, 
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label="Créer un nouveau fournisseur"
     )
     nouveau_fournisseur_nom = forms.CharField(
         max_length=100, 
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Nom du fournisseur',
-            'disabled': True
-        })
+            'placeholder': 'Nom du fournisseur'
+        }),
+        label="Nom du fournisseur"
     )
     nouveau_fournisseur_contact = forms.CharField(
         max_length=100, 
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Contact',
-            'disabled': True
-        })
+            'placeholder': 'Contact (téléphone, email...)'
+        }),
+        label="Contact"
     )
     
     # Champs pour nouveau produit
     nouveau_produit = forms.BooleanField(
         required=False, 
         initial=False, 
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label="Créer un nouveau produit"
     )
     nouveau_produit_nom = forms.CharField(
         max_length=100, 
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Nom du produit',
-            'disabled': True
-        })
+            'placeholder': 'Nom du produit'
+        }),
+        label="Nom du produit"
     )
     nouveau_produit_description = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={
             'class': 'form-control', 
             'placeholder': 'Description (optionnel)',
-            'rows': 2,
-            'disabled': True
-        })
+            'rows': 2
+        }),
+        label="Description"
     )
+    
     facture = forms.FileField(
         required=False,
         widget=forms.FileInput(attrs={
@@ -69,42 +79,59 @@ class ReceptionLotForm(forms.ModelForm):
         label="Facture (optionnel)"
     )
     
-    date_reception = forms.DateTimeField(
-    required=True,
-    widget=forms.DateTimeInput(
-        attrs={
-            'class': 'form-control',
-            'type': 'datetime-local', 
-            'value': timezone.now().strftime("%Y-%m-%dT%H:%M")
-            }
-        )
-    )
     class Meta:
         model = LotEntrepot
         fields = ['produit', 'fournisseur', 'quantite_initiale',
-                  'prix_achat_unitaire','date_reception'
-                ]
+                  'prix_achat_unitaire', 'date_reception', 'facture']
         widgets = {
-            'produit': forms.Select(attrs={'class': 'form-select'}),
-            'fournisseur': forms.Select(attrs={'class': 'form-select'}),
-            'quantite_initiale': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
-            'prix_achat_unitaire': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'produit': forms.Select(attrs={
+                'class': 'form-select',
+                'data-placeholder': 'Sélectionner un produit...'
+            }),
+            'fournisseur': forms.Select(attrs={
+                'class': 'form-select',
+                'data-placeholder': 'Sélectionner un fournisseur...'
+            }),
+            'quantite_initiale': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'min': '1',
+                'placeholder': 'Quantité'
+            }),
+            'prix_achat_unitaire': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'step': '0.01',
+                'placeholder': '0.00'
+            }),
+            'date_reception': forms.DateTimeInput(attrs={
+                'class': 'form-control',
+                'type': 'datetime-local'
+            }),
+        }
+        labels = {
+            'quantite_initiale': 'Quantité initiale',
+            'prix_achat_unitaire': 'Prix d\'achat unitaire (FCFA)',
+            'date_reception': 'Date et heure de réception'
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Rendre tous les champs non obligatoires
+        
+        # Configuration des champs requis
         self.fields['produit'].required = False
         self.fields['fournisseur'].required = False
-        self.fields['quantite_initiale'].required = False
-        self.fields['prix_achat_unitaire'].required = False
+        self.fields['quantite_initiale'].required = True
+        self.fields['prix_achat_unitaire'].required = True
+        self.fields['date_reception'].required = True
         self.fields['facture'].required = False
         
-        # Peupler les listes déroulantes
-        self.fields['produit'].queryset = Produit.objects.all()
+        # Peupler les listes déroulantes avec tri alphabétique
+        self.fields['produit'].queryset = Produit.objects.all().order_by('nom')
         self.fields['produit'].empty_label = "Sélectionner un produit..."
-        self.fields['fournisseur'].queryset = Fournisseur.objects.all()
+        self.fields['fournisseur'].queryset = Fournisseur.objects.all().order_by('nom')
         self.fields['fournisseur'].empty_label = "Sélectionner un fournisseur..."
+        
+        # Définir la date actuelle comme valeur par défaut
+        self.fields['date_reception'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
     def clean(self):
         cleaned_data = super().clean()
@@ -113,9 +140,10 @@ class ReceptionLotForm(forms.ModelForm):
         
         # Validation fournisseur
         if nouveau_fournisseur:
-            if not cleaned_data.get('nouveau_fournisseur_nom'):
-                self.add_error('nouveau_fournisseur_nom', 'Nom du fournisseur requis')
-            elif Fournisseur.objects.filter(nom=cleaned_data['nouveau_fournisseur_nom']).exists():
+            nom_fournisseur = cleaned_data.get('nouveau_fournisseur_nom')
+            if not nom_fournisseur or not nom_fournisseur.strip():
+                self.add_error('nouveau_fournisseur_nom', 'Le nom du fournisseur est requis')
+            elif Fournisseur.objects.filter(nom__iexact=nom_fournisseur.strip()).exists():
                 self.add_error('nouveau_fournisseur_nom', 'Ce fournisseur existe déjà')
         else:
             if not cleaned_data.get('fournisseur'):
@@ -123,20 +151,32 @@ class ReceptionLotForm(forms.ModelForm):
         
         # Validation produit
         if nouveau_produit:
-            if not cleaned_data.get('nouveau_produit_nom'):
-                self.add_error('nouveau_produit_nom', 'Nom du produit requis')
-            elif Produit.objects.filter(nom=cleaned_data['nouveau_produit_nom']).exists():
+            nom_produit = cleaned_data.get('nouveau_produit_nom')
+            if not nom_produit or not nom_produit.strip():
+                self.add_error('nouveau_produit_nom', 'Le nom du produit est requis')
+            elif Produit.objects.filter(nom__iexact=nom_produit.strip()).exists():
                 self.add_error('nouveau_produit_nom', 'Ce produit existe déjà')
         else:
             if not cleaned_data.get('produit'):
                 self.add_error('produit', 'Veuillez sélectionner un produit existant')
         
-        # Validation de base
-        if not cleaned_data.get('quantite_initiale') or cleaned_data.get('quantite_initiale', 0) <= 0:
-            self.add_error('quantite_initiale', 'Quantité valide requise')
-        if not cleaned_data.get('prix_achat_unitaire') or cleaned_data.get('prix_achat_unitaire', 0) <= 0:
-            self.add_error('prix_achat_unitaire', 'Prix d\'achat valide requis')
-            
+        # Validation des champs obligatoires
+        quantite = cleaned_data.get('quantite_initiale')
+        if not quantite or quantite <= 0:
+            self.add_error('quantite_initiale', 'La quantité doit être supérieure à 0')
+        
+        prix = cleaned_data.get('prix_achat_unitaire')
+        if not prix or prix <= 0:
+            self.add_error('prix_achat_unitaire', 'Le prix d\'achat doit être supérieur à 0')
+        
+        # Validation de la date de réception
+        date_reception = cleaned_data.get('date_reception')
+        if date_reception:
+            if date_reception > timezone.now():
+                self.add_error('date_reception', 'La date de réception ne peut pas être dans le futur')
+        else:
+            self.add_error('date_reception', 'La date de réception est requise')
+        
         # Validation de la facture
         facture = cleaned_data.get('facture')
         if facture:
@@ -148,7 +188,8 @@ class ReceptionLotForm(forms.ModelForm):
             extensions_autorisees = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
             extension = os.path.splitext(facture.name)[1].lower()
             if extension not in extensions_autorisees:
-                self.add_error('facture', f'Type de fichier non autorisé. Formats acceptés: {", ".join(extensions_autorisees)}')
+                self.add_error('facture', 
+                    f'Type de fichier non autorisé. Formats acceptés: {", ".join(extensions_autorisees)}')
         
         return cleaned_data
 
@@ -157,23 +198,29 @@ class ReceptionLotForm(forms.ModelForm):
 
         # Gérer le fournisseur
         if self.cleaned_data.get('nouveau_fournisseur'):
-            fournisseur = Fournisseur.objects.create(
-                nom=self.cleaned_data['nouveau_fournisseur_nom'],
-                contact=self.cleaned_data.get('nouveau_fournisseur_contact', '')
+            fournisseur_nom = self.cleaned_data['nouveau_fournisseur_nom'].strip()
+            fournisseur_contact = self.cleaned_data.get('nouveau_fournisseur_contact', '').strip()
+            
+            fournisseur, created = Fournisseur.objects.get_or_create(
+                nom=fournisseur_nom,
+                defaults={'contact': fournisseur_contact}
             )
             instance.fournisseur = fournisseur
 
         # Gérer le produit
         if self.cleaned_data.get('nouveau_produit'):
-            produit = Produit.objects.create(
-                nom=self.cleaned_data['nouveau_produit_nom'],
-                description=self.cleaned_data.get('nouveau_produit_description', '')
+            produit_nom = self.cleaned_data['nouveau_produit_nom'].strip()
+            produit_description = self.cleaned_data.get('nouveau_produit_description', '').strip()
+            
+            produit, created = Produit.objects.get_or_create(
+                nom=produit_nom,
+                defaults={'description': produit_description}
             )
             instance.produit = produit
 
         # Générer une référence de lot
         if not instance.reference_lot:
-            prefix = datetime.now().strftime("%Y%m%d")
+            prefix = timezone.now().strftime("%Y%m%d")
             dernier_lot = LotEntrepot.objects.filter(
                 reference_lot__startswith=prefix
             ).order_by('-reference_lot').first()
@@ -182,7 +229,7 @@ class ReceptionLotForm(forms.ModelForm):
                 try:
                     dernier_num = int(dernier_lot.reference_lot[-4:])
                     nouveau_num = dernier_num + 1
-                except ValueError:
+                except (ValueError, IndexError):
                     nouveau_num = 1
             else:
                 nouveau_num = 1
@@ -191,14 +238,53 @@ class ReceptionLotForm(forms.ModelForm):
 
         # Initialiser la quantité restante
         instance.quantite_restante = instance.quantite_initiale
+        
         # Gérer la facture
         if self.cleaned_data.get('facture'):
             instance.date_upload_facture = timezone.now()
 
         if commit:
             instance.save()
-        return instance
+            # Créer le mouvement de stock après sauvegarde
+            MouvementStock.objects.create(
+                produit=instance.produit,
+                lot=instance,
+                type_mouvement='RECEPTION',
+                quantite=instance.quantite_initiale,
+                date_mouvement=instance.date_reception,
 
+            )
+            
+        return instance 
+    
+    # forms.py
+
+class UploadFactureForm(forms.ModelForm):
+    class Meta:
+        model = LotEntrepot
+        fields = ['facture']
+        widgets = {
+            'facture': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+            })
+        }
+
+    def clean_facture(self):
+        facture = self.cleaned_data.get('facture')
+        if facture:
+            # Vérifier la taille du fichier (max 10MB)
+            if facture.size > 10 * 1024 * 1024:
+                raise forms.ValidationError('La facture ne doit pas dépasser 10MB')
+            
+            # Vérifier l'extension
+            extensions_autorisees = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
+            extension = os.path.splitext(facture.name)[1].lower()
+            if extension not in extensions_autorisees:
+                raise forms.ValidationError(
+                    f'Type de fichier non autorisé. Formats acceptés: {", ".join(extensions_autorisees)}'
+                )
+        return facture
 # forms.py
 class DistributionForm(forms.ModelForm):
     TYPE_DISTRIBUTION = (
@@ -341,33 +427,32 @@ class DistributionForm(forms.ModelForm):
         return stock_total - quantite_distribuee
 
     def get_lots_disponibles_a_date(self, produit_nom, date_reference):
-        """Retourne les lots disponibles à une date donnée en FIFO avec leurs quantités restantes"""
+        """Retourne les lots disponibles à une date donnée en VRAI FIFO"""
         from django.db.models import Sum
-
+    
         lots = LotEntrepot.objects.filter(
             produit__nom=produit_nom,
             date_reception__lte=date_reference
-        ).order_by('date_reception')
-
-        # Calculer la quantité restante pour chaque lot
+        ).order_by('date_reception')  # FIFO = plus ancienne date d'abord
+    
         lots_avec_stock = []
         for lot in lots:
-            # Quantité déjà distribuée pour ce lot avant la date de référence
             quantite_distribuee = DetailDistribution.objects.filter(
                 lot=lot,
                 distribution__date_distribution__lte=date_reference
             ).aggregate(total=Sum('quantite'))['total'] or 0
-
+    
             quantite_restante = lot.quantite_initiale - quantite_distribuee
-
+    
             if quantite_restante > 0:
-                # Stocker la quantité restante calculée dans l'objet lot
                 lot._quantite_restante_calculee = quantite_restante
                 lots_avec_stock.append(lot)
-
+    
         return lots_avec_stock
-
+        
     def save(self, commit=True):
+        from django.db import transaction
+    
         instance = super().save(commit=False)
 
         # Récupérer ou créer le superviseur
@@ -382,62 +467,96 @@ class DistributionForm(forms.ModelForm):
             instance.est_retroactive = True
 
         if commit:
-            instance.save()
+            try:
+                with transaction.atomic():
+                    instance.save()
 
-            produit = self.cleaned_data.get('produit')
-            quantite_demandee = self.cleaned_data.get('quantite')
+                    produit = self.cleaned_data.get('produit')
+                    quantite_demandee = self.cleaned_data.get('quantite')
 
-            if produit and quantite_demandee:
-                lots_disponibles = self.get_lots_disponibles_a_date(produit.nom, instance.date_distribution)
-                quantite_restante = quantite_demandee
+                    if produit and quantite_demandee:
+                        lots_disponibles = self.get_lots_disponibles_a_date(produit.nom, instance.date_distribution)
+                        quantite_restante = quantite_demandee
 
-                for lot in lots_disponibles:
-                    if quantite_restante <= 0:
-                        break
-                    
-                    quantite_a_prelever = min(quantite_restante, lot._quantite_restante_calculee)
+                        # VÉRIFICATION FINALE DU STOCK
+                        stock_total_disponible = sum(lot._quantite_restante_calculee for lot in lots_disponibles)
 
-                    # Créer le détail de distribution
-                    DetailDistribution.objects.create(
-                        distribution=instance,
-                        lot=lot,
-                        quantite=quantite_a_prelever,
-                        prix_gros=self.cleaned_data.get('prix_gros'),
-                        prix_detail=self.cleaned_data.get('prix_detail')
-                    )
+                        if quantite_demandee > stock_total_disponible:
+                            raise forms.ValidationError(
+                                f"Stock insuffisant pour {produit.nom}. "
+                                f"Demandé: {quantite_demandee}, Disponible: {stock_total_disponible}"
+                            )
 
-                    # Mettre à jour le stock
-                    LotEntrepot.objects.filter(id=lot.id).update(
-                        quantite_restante=models.F('quantite_restante') - quantite_a_prelever
-                    )
+                        details_creation = []
+                        mouvements_creation = []
+                        lots_a_mettre_a_jour = []
 
-                    # Recharger le lot pour avoir les valeurs à jour
-                    lot.refresh_from_db()
+                        for lot in lots_disponibles:
+                            if quantite_restante <= 0:
+                                break
+                            
+                            quantite_a_prelever = min(quantite_restante, lot._quantite_restante_calculee)
 
-                    # Mouvement de stock
-                    MouvementStock.objects.create(
-                        produit=produit,
-                        lot=lot,
-                        agent=instance.superviseur,
-                        type_mouvement='DISTRIBUTION',
-                        quantite=quantite_a_prelever,
-                        date_mouvement=instance.date_distribution
-                    )
+                            # Vérifier le stock actuel du lot
+                            lot_actuel = LotEntrepot.objects.get(id=lot.id)
+                            if quantite_a_prelever > lot_actuel.quantite_restante:
+                                quantite_a_prelever = lot_actuel.quantite_restante
 
-                    quantite_restante -= quantite_a_prelever
+                            if quantite_a_prelever <= 0:
+                                continue
 
-                if quantite_restante > 0:
-                    # Annuler la distribution si stock insuffisant
+                            # Préparer les objets à créer
+                            details_creation.append(DetailDistribution(
+                                distribution=instance,
+                                lot=lot,
+                                quantite=quantite_a_prelever,
+                                prix_gros=self.cleaned_data.get('prix_gros'),
+                                prix_detail=self.cleaned_data.get('prix_detail')
+                            ))
+
+                            # Préparer la mise à jour du lot
+                            lots_a_mettre_a_jour.append((lot.id, quantite_a_prelever))
+
+                            # Préparer le mouvement de stock
+                            mouvements_creation.append(MouvementStock(
+                                produit=produit,
+                                lot=lot,
+                                agent=instance.superviseur,
+                                type_mouvement='DISTRIBUTION',
+                                quantite=quantite_a_prelever,
+                                date_mouvement=instance.date_distribution
+                            ))
+
+                            quantite_restante -= quantite_a_prelever
+
+                        if quantite_restante > 0:
+                            raise forms.ValidationError(
+                                f"Stock insuffisant pour {produit.nom}. "
+                                f"Manquant: {quantite_restante} unités"
+                            )
+
+                        # CRÉATION EN MASSE DES DÉTAILS
+                        DetailDistribution.objects.bulk_create(details_creation)
+
+                        # MISE À JOUR DES LOTS
+                        for lot_id, quantite in lots_a_mettre_a_jour:
+                            LotEntrepot.objects.filter(id=lot_id).update(
+                                quantite_restante=models.F('quantite_restante') - quantite
+                            )
+
+                        # CRÉATION DES MOUVEMENTS DE STOCK
+                        MouvementStock.objects.bulk_create(mouvements_creation)
+
+                        # Mettre à jour les totaux
+                        instance._mettre_a_jour_totaux()
+
+            except Exception as e:
+                # En cas d'erreur, tout est annulé automatiquement par la transaction
+                if instance.pk:
                     instance.delete()
-                    raise forms.ValidationError(
-                        f"Stock insuffisant pour {produit.nom} à cette date. "
-                        f"Manquant: {quantite_restante} unités"
-                    )
-                else:
-                    # Mettre à jour les totaux immuables après création des détails
-                    instance._mettre_a_jour_totaux()
+                raise e
 
-        return instance    
+        return instance
 
 class DistributionModificationForm(forms.ModelForm):
     """Formulaire pour modifier une distribution existante"""

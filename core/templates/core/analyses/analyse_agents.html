@@ -1,0 +1,677 @@
+<!-- templates/core/admin/analyse_agents.html -->
+{% extends 'base_admin.html' %}
+{% load humanize %}
+
+{% block title %}Analyse Agents - Administration{% endblock %}
+
+{% block page_title %}Analyse des Performances Agents{% endblock %}
+{% block page_subtitle %}Évaluation complète, classement et optimisation des performances commerciales{% endblock %}
+
+{% block quick_stats %}
+<div class="container-fluid mt-4">
+    <div class="quick-stats">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ agents_analyse|length|intcomma }}</h3>
+                    <p class="mb-0">Agents Actifs</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-user-tie fa-2x text-success"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ moyenne_performance|floatformat:1 }}%</h3>
+                    <p class="mb-0">Performance Moyenne</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-chart-line fa-2x text-info"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ top_performer.agent.full_name|default:"-"|truncatechars:12 }}</h3>
+                    <p class="mb-0">Top Performer</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-trophy fa-2x text-warning"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card danger">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <h3>{{ agents_par_ca.0.ca_mois|default:0|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Meilleur CA Mois</p>
+                </div>
+                <div class="align-self-center">
+                    <i class="fas fa-money-bill-wave fa-2x text-danger"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Navigation entre les vues -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="#classement" class="btn btn-outline-primary active">Classement</a>
+                        <a href="#performance" class="btn btn-outline-primary">Performance Détaillée</a>
+                        <a href="#tendances" class="btn btn-outline-primary">Tendances</a>
+                        <a href="#conversion" class="btn btn-outline-primary">Conversion</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Classement -->
+    <div id="classement" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy"></i> Classement des Agents par Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Top 3 Performers -->
+                    <div class="row mb-4">
+                        {% for agent in agents_par_performance|slice:":3" %}
+                        <div class="col-md-4">
+                            <div class="card text-center h-100 border-{% if forloop.counter == 1 %}warning{% elif forloop.counter == 2 %}info{% else %}success{% endif %}">
+                                <div class="card-body">
+                                    <div class="position-relative">
+                                        {% if forloop.counter == 1 %}
+                                        <span class="position-absolute top-0 start-50 translate-middle badge bg-warning rounded-pill">
+                                            <i class="fas fa-crown"></i> 1er
+                                        </span>
+                                        {% elif forloop.counter == 2 %}
+                                        <span class="position-absolute top-0 start-50 translate-middle badge bg-info rounded-pill">
+                                            <i class="fas fa-medal"></i> 2ème
+                                        </span>
+                                        {% else %}
+                                        <span class="position-absolute top-0 start-50 translate-middle badge bg-success rounded-pill">
+                                            <i class="fas fa-award"></i> 3ème
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mt-4">
+                                        <h4 class="text-{% if forloop.counter == 1 %}warning{% elif forloop.counter == 2 %}info{% else %}success{% endif %}">
+                                            {{ agent.agent.full_name }}
+                                        </h4>
+                                        <div class="mb-2">
+                                            <span class="badge bg-{{ agent.couleur_grade }} fs-6">
+                                                Grade {{ agent.grade_performance }}
+                                            </span>
+                                        </div>
+                                        <div class="score-circle mx-auto mb-3" 
+                                             data-score="{{ agent.score_performance|floatformat:0 }}">
+                                        </div>
+                                        <div class="row text-center">
+                                            <div class="col-6">
+                                                <small class="text-muted">CA Mois</small>
+                                                <h6 class="mb-0 text-success">{{ agent.ca_mois|floatformat:0|intcomma }} FCFA</h6>
+                                            </div>
+                                            <div class="col-6">
+                                                <small class="text-muted">Conversion</small>
+                                                <h6 class="mb-0 text-info">{{ agent.taux_conversion|floatformat:1 }}%</h6>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Tableau de classement complet -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-list-ol"></i>
+                                        Classement Complet des Agents
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover" id="tableClassement">
+                                            <thead class="table-dark">
+                                                <tr>
+                                                    <th width="50">#</th>
+                                                    <th>Agent</th>
+                                                    <th>Grade</th>
+                                                    <th>Score Performance</th>
+                                                    <th>CA Total</th>
+                                                    <th>CA Mois</th>
+                                                    <th>CA Trimestre</th>
+                                                    <th>Ventes</th>
+                                                    <th>Clients</th>
+                                                    <th>Conversion</th>
+                                                    <th>Recouvrement</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for agent in agents_par_performance %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ forloop.counter }}</strong>
+                                                        {% if forloop.counter <= 3 %}
+                                                        <span class="badge bg-{% if forloop.counter == 1 %}warning{% elif forloop.counter == 2 %}info{% else %}success{% endif %}">
+                                                            {{ forloop.counter }}
+                                                        </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <strong>{{ agent.agent.full_name }}</strong>
+                                                        <br>
+                                                        <small class="text-muted">{{ agent.agent.telephone|default:"Tél. non renseigné" }}</small>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{{ agent.couleur_grade }} fs-6">
+                                                            {{ agent.grade_performance }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="progress" style="height: 20px;">
+                                                            <div class="progress-bar bg-{{ agent.couleur_grade }}" 
+                                                                 style="width: {{ agent.score_performance }}%">
+                                                                {{ agent.score_performance|floatformat:1 }}%
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-success">
+                                                        <strong>{{ agent.ca_total|floatformat:0|intcomma }} FCFA</strong>
+                                                    </td>
+                                                    <td>{{ agent.ca_mois|floatformat:0|intcomma }} FCFA</td>
+                                                    <td>{{ agent.ca_trimestre|floatformat:0|intcomma }} FCFA</td>
+                                                    <td>{{ agent.nombre_ventes }}</td>
+                                                    <td>
+                                                        <span class="badge bg-info">{{ agent.clients_servis }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if agent.taux_conversion > 80 %}success{% elif agent.taux_conversion > 50 %}warning{% else %}danger{% endif %}">
+                                                            {{ agent.taux_conversion|floatformat:1 }}%
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if agent.taux_recouvrement > 90 %}success{% elif agent.taux_recouvrement > 70 %}warning{% else %}danger{% endif %}">
+                                                            {{ agent.taux_recouvrement|floatformat:1 }}%
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-primary" title="Détails">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-success" title="Récompenser">
+                                                                <i class="fas fa-gift"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-info" title="Contacter">
+                                                                <i class="fas fa-phone"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Performance Détaillée -->
+    <div id="performance" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar"></i> Analyse Détaillée des Performances
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Top par Catégories -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-success">
+                                        <i class="fas fa-money-bill-wave"></i>
+                                        Top 5 par Chiffre d'Affaires Mois
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for agent in agents_par_ca|slice:":5" %}
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 border-bottom">
+                                        <div>
+                                            <strong>{{ agent.agent.full_name }}</strong>
+                                            <br>
+                                            <small class="text-muted">Grade {{ agent.grade_performance }}</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <strong class="text-success">{{ agent.ca_mois|floatformat:0|intcomma }} FCFA</strong>
+                                            <br>
+                                            <small>{{ agent.nombre_ventes }} ventes</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-info">
+                                        <i class="fas fa-users"></i>
+                                        Top 5 par Nombre de Clients
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for agent in agents_par_clients|slice:":5" %}
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 border-bottom">
+                                        <div>
+                                            <strong>{{ agent.agent.full_name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ agent.produits_vendus }} produits</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <strong class="text-info">{{ agent.clients_servis }} clients</strong>
+                                            <br>
+                                            <small>{{ agent.ventes_par_jour|floatformat:1 }}/jour</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tableau détaillé complet -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-table"></i>
+                                        Détail des Performances par Agent
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover" id="tablePerformance">
+                                            <thead class="table-success">
+                                                <tr>
+                                                    <th>Agent</th>
+                                                    <th>CA Total</th>
+                                                    <th>CA Mois</th>
+                                                    <th>Quantité Vendue</th>
+                                                    <th>Ventes Total</th>
+                                                    <th>Panier Moyen</th>
+                                                    <th>Clients Servis</th>
+                                                    <th>Produits Vendus</th>
+                                                    <th>Efficacité</th>
+                                                    <th>Ventes/Jour</th>
+                                                    <th>Dettes Actives</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for agent in agents_analyse %}
+                                                <tr>
+                                                    <td>
+                                                        <strong>{{ agent.agent.full_name }}</strong>
+                                                    </td>
+                                                    <td class="text-success">
+                                                        <strong>{{ agent.ca_total|floatformat:0|intcomma }} FCFA</strong>
+                                                    </td>
+                                                    <td>{{ agent.ca_mois|floatformat:0|intcomma }} FCFA</td>
+                                                    <td>{{ agent.quantite_total }}</td>
+                                                    <td>{{ agent.nombre_ventes }}</td>
+                                                    <td>{{ agent.panier_moyen|floatformat:0|intcomma }} FCFA</td>
+                                                    <td>
+                                                        <span class="badge bg-info">{{ agent.clients_servis }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">{{ agent.produits_vendus }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if agent.efficacite > 50000 %}success{% elif agent.efficacite > 20000 %}warning{% else %}danger{% endif %}">
+                                                            {{ agent.efficacite|floatformat:0|intcomma }} FCFA
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if agent.ventes_par_jour > 5 %}success{% elif agent.ventes_par_jour > 2 %}warning{% else %}danger{% endif %}">
+                                                            {{ agent.ventes_par_jour|floatformat:1 }}/jour
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if agent.dettes_actives == 0 %}success{% elif agent.dettes_actives < 5 %}warning{% else %}danger{% endif %}">
+                                                            {{ agent.dettes_actives }}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Tendances -->
+    <div id="tendances" class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line"></i> Analyse des Tendances
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for agent_nom, donnees in tendances_agents.items %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">{{ agent_nom }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="chart{{ forloop.counter }}" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Conversion et Recouvrement -->
+    <div id="conversion" class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exchange-alt"></i> Conversion et Recouvrement
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        
+                        <!-- Top Conversion -->
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-success">
+                                        <i class="fas fa-percentage"></i>
+                                        Top 5 par Taux de Conversion
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for agent in agents_par_conversion|slice:":5" %}
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <strong>{{ agent.agent.full_name }}</strong>
+                                            <span class="badge bg-{% if agent.taux_conversion > 80 %}success{% elif agent.taux_conversion > 50 %}warning{% else %}danger{% endif %}">
+                                                {{ agent.taux_conversion|floatformat:1 }}%
+                                            </span>
+                                        </div>
+                                        <div class="progress" style="height: 10px;">
+                                            <div class="progress-bar bg-{% if agent.taux_conversion > 80 %}success{% elif agent.taux_conversion > 50 %}warning{% else %}danger{% endif %}" 
+                                                 style="width: {{ agent.taux_conversion }}%">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ agent.quantite_total }} produits vendus
+                                        </small>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Indicateurs de Recouvrement -->
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0 text-warning">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                        Performance de Recouvrement
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for agent in agents_analyse %}
+                                    {% if agent.dettes_actives > 0 or agent.taux_recouvrement < 100 %}
+                                    <div class="mb-3 p-2 border rounded">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ agent.agent.full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ agent.dettes_actives }} dettes actives</small>
+                                            </div>
+                                            <div class="text-end">
+                                                <span class="badge bg-{% if agent.taux_recouvrement > 90 %}success{% elif agent.taux_recouvrement > 70 %}warning{% else %}danger{% endif %}">
+                                                    {{ agent.taux_recouvrement|floatformat:1 }}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {% if agent.taux_recouvrement < 80 %}
+                                        <div class="mt-2">
+                                            <button class="btn btn-sm btn-outline-warning w-100">
+                                                <i class="fas fa-exclamation-triangle"></i>
+                                                Suivi nécessaire
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Navigation smooth scroll
+    $('.btn-group a').on('click', function(e) {
+        e.preventDefault();
+        $('.btn-group a').removeClass('active');
+        $(this).addClass('active');
+        
+        var target = $(this).attr('href');
+        $('html, body').animate({
+            scrollTop: $(target).offset().top - 100
+        }, 500);
+    });
+
+    // Graphiques de tendances
+    {% for agent_nom, donnees in tendances_agents.items %}
+    {% with chart_id=forloop.counter %}
+    var ctx{{ chart_id }} = document.getElementById('chart{{ chart_id }}').getContext('2d');
+    var chart{{ chart_id }} = new Chart(ctx{{ chart_id }}, {
+        type: 'line',
+        data: {
+            labels: [{% for donnee in donnees %}'{{ donnee.mois }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            datasets: [
+                {
+                    label: 'CA (FCFA)',
+                    data: [{% for donnee in donnees %}{{ donnee.ca }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    yAxisID: 'y',
+                    tension: 0.4
+                },
+                {
+                    label: 'Clients',
+                    data: [{% for donnee in donnees %}{{ donnee.clients }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                    borderColor: '#27ae60',
+                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    yAxisID: 'y1',
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Évolution {{ agent_nom }}'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'CA (FCFA)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Clients'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+    {% endwith %}
+    {% endfor %}
+
+    // Cercles de score
+    $('.score-circle').each(function() {
+        var score = $(this).data('score');
+        var color = score >= 80 ? '#28a745' : score >= 60 ? '#ffc107' : '#dc3545';
+        
+        $(this).html(`
+            <div style="
+                width: 80px; 
+                height: 80px; 
+                border-radius: 50%; 
+                background: conic-gradient(${color} ${score}%, #e9ecef ${score}%);
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                position: relative;
+            ">
+                <div style="
+                    width: 60px; 
+                    height: 60px; 
+                    border-radius: 50%; 
+                    background: white;
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    font-weight: bold;
+                    color: ${color};
+                ">
+                    ${score}%
+                </div>
+            </div>
+        `);
+    });
+
+    // Tri des tableaux
+    $('#tableClassement').DataTable({
+        pageLength: 25,
+        order: [[3, 'desc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+
+    $('#tablePerformance').DataTable({
+        pageLength: 25,
+        order: [[1, 'desc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+.progress {
+    background-color: #e9ecef;
+    border-radius: 10px;
+}
+.progress-bar {
+    border-radius: 10px;
+    font-size: 0.8rem;
+    line-height: 20px;
+}
+.border-warning { border-color: #ffc107 !important; }
+.border-info { border-color: #17a2b8 !important; }
+.border-success { border-color: #28a745 !important; }
+</style>
+{% endblock %}

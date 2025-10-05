@@ -1,0 +1,346 @@
+<!-- templates/core/agent/mon_stock.html -->
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Mon Stock - {{ agent.full_name }}{% endblock %}
+
+{% block page_title %}Mon Stock Personnel{% endblock %}
+{% block page_subtitle %}Gestion et suivi de mon inventaire de produits{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Cartes de résumé -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>{{ total_quantite|intcomma }}</h3>
+                    <p class="mb-0">Produits en Stock</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>{{ stock_agent|length }}</h3>
+                    <p class="mb-0">Produits Différents</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h3>{{ total_valeur_stock|floatformat:0|intcomma }} FCFA</h3>
+                    <p class="mb-0">Valeur du Stock</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body text-center">
+                    <h3>{{ alertes_stock_faible|length }}</h3>
+                    <p class="mb-0">Alertes Stock</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertes stock faible -->
+    {% if alertes_stock_faible %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <h5><i class="fas fa-exclamation-triangle"></i> Alertes Stock Faible</h5>
+                <div class="row">
+                    {% for produit in alertes_stock_faible %}
+                    <div class="col-md-3 mb-2">
+                        <strong>{{ produit.produit.nom }}</strong>: 
+                        <span class="badge bg-danger">{{ produit.quantite_restante }} restant(s)</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tableau du stock -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-boxes"></i> Détail de Mon Stock
+                    </h5>
+                    <span class="badge bg-light text-primary">
+                        {{ stock_agent|length }} produit(s)
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="tableStock">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Produit</th>
+                                    <th width="120">Quantité Distribuée</th>
+                                    <th width="120">Quantité Vendue</th>
+                                    <th width="120">Stock Restant</th>
+                                    <th width="120">Prix Gros</th>
+                                    <th width="120">Prix Détail</th>
+                                    <th width="120">Valeur Stock</th>
+                                    <th width="100">Statut</th>
+                                    <th width="100">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for produit in stock_agent %}
+                                <tr class="{% if produit.quantite_restante <= produit.seuil_alerte %}table-warning{% endif %}">
+                                    <td>
+                                        <strong>{{ produit.produit.nom }}</strong>
+                                        {% if produit.produit.description %}
+                                        <br>
+                                        <small class="text-muted">{{ produit.produit.description }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-info">{{ produit.quantite_distribuee }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ produit.quantite_vendue }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-{% if produit.quantite_restante > 10 %}success{% elif produit.quantite_restante > 0 %}warning{% else %}danger{% endif %} fs-6">
+                                            {{ produit.quantite_restante }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if produit.prix_gros %}
+                                        <strong>{{ produit.prix_gros|floatformat:0|intcomma }} FCFA</strong>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if produit.prix_detail %}
+                                        <strong>{{ produit.prix_detail|floatformat:0|intcomma }} FCFA</strong>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-success">
+                                        <strong>{{ produit.valeur_totale|floatformat:0|intcomma }} FCFA</strong>
+                                    </td>
+                                    <td>
+                                        {% if produit.quantite_restante == 0 %}
+                                        <span class="badge bg-danger">Épuisé</span>
+                                        {% elif produit.quantite_restante <= produit.seuil_alerte %}
+                                        <span class="badge bg-warning">Stock faible</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Disponible</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" 
+                                                    onclick="voirHistorique({{ produit.produit.id }})"
+                                                    data-bs-toggle="tooltip" title="Voir historique">
+                                                <i class="fas fa-history"></i>
+                                            </button>
+                                            {% if produit.quantite_restante > 0 %}
+                                            <button class="btn btn-outline-success"
+                                                    onclick="vendreProduit({{ produit.produit.id }})"
+                                                    data-bs-toggle="tooltip" title="Vendre ce produit">
+                                                <i class="fas fa-cash-register"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-4">
+                                        <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">Aucun produit en stock</h5>
+                                        <p class="text-muted">Votre stock apparaîtra ici après les distributions.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distributions récentes -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-truck-loading"></i> Distributions Récentes (30 jours)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if distributions_recentes %}
+                    <div class="list-group list-group-flush">
+                        {% for distribution in distributions_recentes|slice:":5" %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ distribution.date_distribution|date:"d/m/Y" }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        Par: {{ distribution.superviseur.full_name }}
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-primary">{{ distribution.quantite_totale }} produits</span>
+                                    <br>
+                                    <small>{{ distribution.nombre_produits_differents }} type(s)</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if distributions_recentes.count > 5 %}
+                    <div class="text-center mt-3">
+                        <a href="{% url 'mes_distributions' %}" class="btn btn-outline-info btn-sm">
+                            Voir toutes les distributions
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <p class="text-muted text-center">Aucune distribution récente</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Ventes récentes -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-shopping-cart"></i> Ventes Récentes (7 jours)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if ventes_recentes %}
+                    <div class="list-group list-group-flush">
+                        {% for vente in ventes_recentes %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>{{ vente.client.nom }}</strong>
+                                    <br>
+                                    <small class="text-muted">
+                                        {{ vente.detail_distribution.lot.produit.nom }} • {{ vente.quantite }} unité(s)
+                                    </small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-success">{{ vente.total_vente|floatformat:0|intcomma }} FCFA</span>
+                                    <br>
+                                    <small>{{ vente.date_vente|date:"d/m" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Aucune vente récente</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour historique produit -->
+<div class="modal fade" id="modalHistorique" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Historique du Produit</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalHistoriqueBody">
+                <!-- Contenu chargé dynamiquement -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialisation DataTable
+    $('#tableStock').DataTable({
+        pageLength: 25,
+        order: [[3, 'desc']], // Tri par stock restant décroissant
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+        },
+        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
+    });
+});
+
+function voirHistorique(produitId) {
+    // Charger l'historique du produit via AJAX
+    fetch(`/api/produits/${produitId}/historique/`)
+        .then(response => response.json())
+        .then(data => {
+            $('#modalHistoriqueBody').html(`
+                <h6>Historique: ${data.produit_nom}</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Quantité</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.mouvements.map(mouvement => `
+                                <tr>
+                                    <td>${new Date(mouvement.date).toLocaleDateString('fr-FR')}</td>
+                                    <td><span class="badge bg-${mouvement.type_color}">${mouvement.type}</span></td>
+                                    <td>${mouvement.quantite}</td>
+                                    <td>${mouvement.description}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `);
+            $('#modalHistorique').modal('show');
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            $('#modalHistoriqueBody').html('<div class="alert alert-danger">Erreur lors du chargement de l\'historique</div>');
+            $('#modalHistorique').modal('show');
+        });
+}
+
+function vendreProduit(produitId) {
+    // Redirection vers la page de vente
+    window.location.href = `{% url 'creer_vente' %}?produit=${produitId}`;
+}
+</script>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

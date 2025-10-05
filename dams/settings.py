@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-
+import dj_database_url
+import environ
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -34,6 +35,8 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/'   # ou ton dashboard superviseur/agent
 LOGOUT_REDIRECT_URL = 'login' 
 
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 # Application definition
 
 INSTALLED_APPS = [
@@ -43,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.humanize', 
     'core',
 
 
@@ -93,6 +97,14 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+#DATABASES = {
+#    'default': dj_database_url.config(
+#        default=env("DATABASE_URL"),
+#        conn_max_age=600,
+#        ssl_require=True
+#    )
+#}
 
 
 # Password validation
