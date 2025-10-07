@@ -12,6 +12,14 @@ urlpatterns = [
     path('agents/creer/', views.creer_agent, name='creer_agent'),
     path('agents/modifier/<int:agent_id>/', views.modifier_agent, name='modifier_agent'),
     path('agents/supprimer/<int:agent_id>/', views.supprimer_agent, name='supprimer_agent'),    
+# FOURNISSEUR
+    path('fournisseurs/', views.liste_fournisseurs, name='liste_fournisseurs'),
+    path('fournisseurs/ajouter/', views.creer_fournisseur, name='creer_fournisseur'),
+    path('fournisseurs/modifier/<int:fournisseur_id>/', views.modifier_fournisseur, name='modifier_fournisseur'),
+    path('fournisseurs/supprimer/<int:fournisseur_id>/', views.supprimer_fournisseur, name='supprimer_fournisseur'),
+
+
+
 # Entrepôt
     path('entrepot/reception/', views.reception_lot, name='reception_lot'),
     path('entrepot/lots/', views.liste_lots, name='liste_lots'),

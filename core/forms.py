@@ -4,19 +4,18 @@ from django.utils import timezone
 from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
     DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
-    MouvementStock,Recouvrement
+    MouvementStock,Recouvrement,VersementBancaire,DepenseSuperviseur,Fournisseur
 )
 from django.db import models
 
-import os
 
-# forms.py
-# forms.py
-import os
-from django import forms
-from django.utils import timezone
-from datetime import datetime
-from .models import LotEntrepot, Produit, Fournisseur, MouvementStock
+
+class FournisseurForm(forms.ModelForm):
+    class Meta:
+        model = Fournisseur
+        fields = ['nom', 'contact', 'email', 'adresse']
+
+
 
 class ReceptionLotForm(forms.ModelForm):
     # Champs pour nouveau fournisseur
@@ -690,9 +689,21 @@ class VenteForm(forms.ModelForm):
         help_text="Choisissez le mode de paiement"
     )
 
+    # Date de vente rétroactive
+    date_vente = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local',
+            'id': 'date-vente'
+        }),
+        initial=timezone.now,
+        label="Date de la vente",
+        help_text="Date à laquelle la vente a été effectuée"
+    )
+
     class Meta:
         model = Vente
-        fields = ['client', 'detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire']
+        fields = ['client', 'detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire', 'date_vente']
         widgets = {
             'client': forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
             'detail_distribution': forms.Select(attrs={'class': 'form-select', 'id': 'detail-distribution'}),
@@ -717,6 +728,13 @@ class VenteForm(forms.ModelForm):
         self.fields['type_vente'].required = True
         self.fields['mode_paiement'].required = True
         self.fields['prix_vente_unitaire'].required = False
+        self.fields['date_vente'].required = True
+        
+        # Formater la date initiale pour le champ datetime-local
+        if self.instance and self.instance.pk:
+            self.fields['date_vente'].initial = self.instance.date_vente.strftime('%Y-%m-%dT%H:%M')
+        else:
+            self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
         
         # Filtrer les clients existants
         self.fields['client'].queryset = Client.objects.all()
@@ -766,6 +784,11 @@ class VenteForm(forms.ModelForm):
             if cleaned_data['quantite'] > detail.quantite:
                 self.add_error('quantite', f'Quantité insuffisante. Disponible: {detail.quantite}')
         
+        # Validation de la date de vente
+        date_vente = cleaned_data.get('date_vente')
+        if date_vente and date_vente > timezone.now():
+            self.add_error('date_vente', 'La date de vente ne peut pas être dans le futur')
+        
         return cleaned_data
 
     def save(self, commit=True):
@@ -799,7 +822,8 @@ class VenteForm(forms.ModelForm):
             detail.save()
             
         return instance
-        
+
+
 class FactureForm(forms.ModelForm):
     class Meta:
         model = Facture
@@ -1147,3 +1171,26 @@ class RecouvrementForm(forms.ModelForm):
             raise forms.ValidationError("La date ne peut pas être dans le futur.")
             
         return date_recouvrement
+    
+class DepenseSuperviseurForm(forms.ModelForm):
+    class Meta:
+        model = DepenseSuperviseur
+        fields = ['montant', 'motif', 'commentaire', 'date_depense']
+        widgets = {
+            'montant': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'motif': forms.TextInput(attrs={'class': 'form-control'}),
+            'commentaire': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'date_depense': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+        }
+
+
+class VersementBancaireForm(forms.ModelForm):
+    class Meta:
+        model = VersementBancaire
+        fields = ['montant_verse', 'preuve_versement', 'description', 'date_versement']
+        widgets = {
+            'montant_verse': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'preuve_versement': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'date_versement': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+        }

@@ -488,7 +488,10 @@
         <i class="fas fa-hand-holding-usd"></i>
         <span>Recouvrement Agents</span>
     </a>
-
+    <a class="nav-link" href="{% url 'liste_fournisseurs' %}">
+        <i class=""></i>
+        <span>Fournisseur</span>
+    </a>
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}" 
                            href="{% url 'liste_lots' %}">
                             <i class="fas fa-pallet"></i>

@@ -1,7 +1,9 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Recouvrement - {{ agent.full_name }}{% endblock %}
+{% block title %}
+    {% if est_auto_recouvrement %}Auto-Recouvrement{% else %}Recouvrement - {{ agent.full_name }}{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -9,16 +11,27 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
-                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-3">
+                    <a href="{% if est_auto_recouvrement %}{% url 'liste_agents_recouvrement' %}{% else %}{% url 'detail_agent' agent.id %}{% endif %}" 
+                       class="btn btn-secondary me-3">
                         <i class="fas fa-arrow-left"></i>
                     </a>
                     <div>
-                        <h1 class="h3 mb-1">Recouvrement - {{ agent.full_name }}</h1>
+                        <h1 class="h3 mb-1">
+                            {% if est_auto_recouvrement %}
+                                <i class="fas fa-user-circle me-2"></i>Auto-Recouvrement
+                            {% else %}
+                                <i class="fas fa-hand-holding-usd me-2"></i>Recouvrement - {{ agent.full_name }}
+                            {% endif %}
+                        </h1>
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb mb-0">
-                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
-                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
-                                <li class="breadcrumb-item active">Recouvrement</li>
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents_recouvrement' %}">Recouvrements</a></li>
+                                {% if est_auto_recouvrement %}
+                                    <li class="breadcrumb-item active">Auto-Recouvrement</li>
+                                {% else %}
+                                    <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
+                                    <li class="breadcrumb-item active">Recouvrement</li>
+                                {% endif %}
                             </ol>
                         </nav>
                     </div>
@@ -31,7 +44,8 @@
                     <div class="card">
                         <div class="card-header">
                             <h5 class="card-title mb-0">
-                                <i class="fas fa-info-circle me-2"></i>Informations Financières
+                                <i class="fas fa-info-circle me-2"></i>
+                                {% if est_auto_recouvrement %}Mes Informations Financières{% else %}Informations Financières{% endif %}
                             </h5>
                         </div>
                         <div class="card-body">
@@ -48,38 +62,50 @@
                             <div class="row mt-3">
                                 <div class="col-12">
                                     <strong>Argent en Possession:</strong><br>
-                                    <span class="h4 text-warning">{{ argent_en_possession }} FCFA</span>
+                                    <span class="h4 {% if argent_en_possession > 0 %}text-warning{% else %}text-success{% endif %}">
+                                        {{ argent_en_possession }} FCFA
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                
+                {% if est_auto_recouvrement %}
+                <div class="col-md-6">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-info-circle me-2"></i>Auto-Recouvrement
+                            </h5>
+                            <p class="mb-0">
+                                Vous effectuez un recouvrement sur vos propres ventes. 
+                                Cet argent sera considéré comme remis à l'entreprise.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Formulaire de recouvrement -->
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-hand-holding-usd me-2"></i>Nouveau Recouvrement
+                        <i class="fas fa-hand-holding-usd me-2"></i>
+                        {% if est_auto_recouvrement %}Nouvel Auto-Recouvrement{% else %}Nouveau Recouvrement{% endif %}
                     </h5>
                 </div>
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
                         
-                        <!-- Affichage des erreurs globales -->
-                        {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                        
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    {{ form.montant_recouvre.label_tag }}
+                                    <label for="montant_recouvre" class="form-label">
+                                        <strong>Montant à recouvrir *</strong>
+                                    </label>
                                     {{ form.montant_recouvre }}
                                     {% if form.montant_recouvre.errors %}
                                         <div class="text-danger small">
@@ -96,7 +122,9 @@
                             
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    {{ form.date_recouvrement.label_tag }}
+                                    <label for="date_recouvrement" class="form-label">
+                                        <strong>Date du recouvrement *</strong>
+                                    </label>
                                     {{ form.date_recouvrement }}
                                     {% if form.date_recouvrement.errors %}
                                         <div class="text-danger small">
@@ -113,7 +141,9 @@
                         </div>
 
                         <div class="mb-3">
-                            {{ form.commentaire.label_tag }}
+                            <label for="commentaire" class="form-label">
+                                <strong>Commentaire (facultatif)</strong>
+                            </label>
                             {{ form.commentaire }}
                             {% if form.commentaire.errors %}
                                 <div class="text-danger small">
@@ -122,14 +152,21 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
+                            {% if est_auto_recouvrement %}
+                            <div class="form-text">
+                                Ex: Dépôt en banque, remise en caisse, etc.
+                            </div>
+                            {% endif %}
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-md-2">
+                            <a href="{% if est_auto_recouvrement %}{% url 'liste_agents_recouvrement' %}{% else %}{% url 'detail_agent' agent.id %}{% endif %}" 
+                               class="btn btn-secondary me-md-2">
                                 <i class="fas fa-times me-1"></i>Annuler
                             </a>
                             <button type="submit" class="btn btn-success">
-                                <i class="fas fa-save me-1"></i>Enregistrer le recouvrement
+                                <i class="fas fa-save me-1"></i>
+                                {% if est_auto_recouvrement %}Enregistrer l'Auto-Recouvrement{% else %}Enregistrer le Recouvrement{% endif %}
                             </button>
                         </div>
                     </form>
@@ -138,24 +175,4 @@
         </div>
     </div>
 </div>
-
-<style>
-.card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    border: 1px solid #e3e6f0;
-}
-
-.form-control-lg {
-    font-size: 1.1rem;
-    font-weight: 500;
-}
-
-.btn {
-    min-width: 120px;
-}
-
-.text-danger small {
-    font-size: 0.875em;
-}
-</style>
 {% endblock %}
