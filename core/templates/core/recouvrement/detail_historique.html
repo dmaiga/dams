@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Historique Complet - {{ agent.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 px-md-3">
+    <!-- En-tête simplifié -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-3">
+                <a href="{% url 'historique_recouvrement' agent.id %}" class="btn btn-secondary btn-sm me-2">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <div class="flex-grow-1">
+                    <h5 class="mb-1">Historique Complet</h5>
+                    <p class="text-muted mb-0 small">{{ agent.full_name }}</p>
+                </div>
+                {% if agent.argent_en_possession > 0 %}
+                <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-plus"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes de stats en ligne pour mobile -->
+    <div class="row g-2 mb-3">
+        <div class="col-6">
+            <div class="card bg-primary text-white">
+                <div class="card-body p-2 text-center">
+                    <small class="d-block">Total Recouvré</small>
+                    <strong class="d-block">{{ total_recouvre }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card bg-success text-white">
+                <div class="card-body p-2 text-center">
+                    <small class="d-block">Opérations</small>
+                    <strong class="d-block">{{ nombre_recouvrements }}</strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card bg-info text-white">
+                <div class="card-body p-2 text-center">
+                    <small class="d-block">Taux</small>
+                    <strong class="d-block">
+                        {% if agent.total_ventes > 0 %}
+                            {% widthratio agent.total_recouvre agent.total_ventes 100 %}%
+                        {% else %}0%{% endif %}
+                    </strong>
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card bg-warning text-dark">
+                <div class="card-body p-2 text-center">
+                    <small class="d-block">Reste</small>
+                    <strong class="d-block">{{ agent.argent_en_possession }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des recouvrements optimisée mobile -->
+    <div class="card">
+        <div class="card-header bg-light py-2">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-list me-1"></i>
+                    Recouvrements ({{ recouvrements|length }})
+                </h6>
+                <span class="badge bg-primary">{{ total_recouvre }} FCFA</span>
+            </div>
+        </div>
+        
+        <div class="card-body p-0">
+            {% if recouvrements %}
+            <div class="list-group list-group-flush">
+                {% for recouvrement in recouvrements %}
+                <div class="list-group-item p-2">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="text-success">+{{ recouvrement.montant_recouvre }} FCFA</strong>
+                                <small class="text-muted">{{ recouvrement.date_recouvrement|date:"d/m/Y" }}</small>
+                            </div>
+                            
+                            <div class="d-flex align-items-center mb-1">
+                                <small class="text-muted me-2">
+                                    <i class="fas fa-user-tie me-1"></i>
+                                    {{ recouvrement.superviseur.full_name }}
+                                </small>
+                            </div>
+
+                            {% if recouvrement.commentaire %}
+                            <div class="commentaire-mobile">
+                                <small class="text-muted">{{ recouvrement.commentaire|truncatewords:10 }}</small>
+                                {% if recouvrement.commentaire|wordcount > 10 %}
+                                <button class="btn btn-link btn-sm p-0 ms-1 text-primary" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#comment{{ recouvrement.id }}">
+                                    Voir plus
+                                </button>
+                                <div class="collapse" id="comment{{ recouvrement.id }}">
+                                    <small class="text-muted d-block mt-1">{{ recouvrement.commentaire }}</small>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <small class="text-muted fst-italic">Aucun commentaire</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="fas fa-calendar me-1"></i>
+                            Enregistré: {{ recouvrement.date_creation|date:"d/m/Y" }}
+                        </small>
+                        <button type="button" 
+                                class="btn btn-outline-info btn-sm"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modalRecouvrement{{ recouvrement.id }}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal mobile optimisé -->
+                <div class="modal fade" id="modalRecouvrement{{ recouvrement.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header py-2">
+                                <h6 class="modal-title">
+                                    <i class="fas fa-hand-holding-usd me-1"></i>
+                                    Détails #{{ recouvrement.id }}
+                                </h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body py-2">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <small class="text-muted">Agent</small>
+                                        <div class="fw-bold">{{ recouvrement.agent.full_name }}</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Superviseur</small>
+                                        <div class="fw-bold">{{ recouvrement.superviseur.full_name }}</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Montant</small>
+                                        <div class="fw-bold text-success">{{ recouvrement.montant_recouvre }} FCFA</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Date recouvrement</small>
+                                        <div class="fw-bold">{{ recouvrement.date_recouvrement|date:"d/m/Y H:i" }}</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-muted">Date enregistrement</small>
+                                        <div class="fw-bold">{{ recouvrement.date_creation|date:"d/m/Y H:i" }}</div>
+                                    </div>
+                                    <div class="col-12 mt-2">
+                                        <small class="text-muted">Commentaire</small>
+                                        <div class="border rounded p-2 bg-light">
+                                            {% if recouvrement.commentaire %}
+                                                {{ recouvrement.commentaire|linebreaks }}
+                                            {% else %}
+                                                <span class="text-muted fst-italic">Aucun commentaire</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer py-2">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-hand-holding-usd fa-2x text-muted mb-3"></i>
+                <p class="text-muted mb-2">Aucun recouvrement</p>
+                {% if agent.argent_en_possession > 0 %}
+                <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success btn-sm">
+                    Premier recouvrement
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Actions rapides en bas -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="d-grid gap-2">
+                <a href="{% url 'historique_recouvrement' agent.id %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Retour à la vue résumée
+                </a>
+                <a href="{% url 'detail_agent' agent.id %}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-user me-1"></i>Profil de l'agent
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Résumé en bas -->
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body p-2">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Premier</small>
+                            <strong class="d-block">
+                                {% if premier_recouvrement %}
+                                    {{ premier_recouvrement.date_recouvrement|date:"d/m/y" }}
+                                {% else %}--{% endif %}
+                            </strong>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted d-block">Dernier</small>
+                            <strong class="d-block">
+                                {% if dernier_recouvrement %}
+                                    {{ dernier_recouvrement.date_recouvrement|date:"d/m/y" }}
+                                {% else %}--{% endif %}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Optimisations mobiles */
+.container-fluid {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.card-body {
+    padding: 0.75rem;
+}
+
+.list-group-item {
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.commentaire-mobile {
+    font-size: 0.8rem;
+    line-height: 1.3;
+}
+
+.modal-dialog {
+    margin: 0.5rem;
+    max-width: calc(100% - 1rem);
+}
+
+.modal-content {
+    border-radius: 8px;
+}
+
+/* Amélioration de la lisibilité */
+.text-success {
+    font-weight: 600;
+}
+
+.bg-primary, .bg-success, .bg-info, .bg-warning {
+    border: none;
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    h5 {
+        font-size: 1.1rem;
+    }
+    
+    .card-body {
+        padding: 0.5rem;
+    }
+}
+
+/* Animation pour les modals */
+.modal.fade .modal-dialog {
+    transform: translateY(100%);
+    transition: transform 0.3s ease-out;
+}
+
+.modal.show .modal-dialog {
+    transform: translateY(0);
+}
+</style>
+
+<script>
+// Scripts mobiles optimisés
+document.addEventListener('DOMContentLoaded', function() {
+    // Fermer les modals en tapant à l'extérieur
+    var modals = document.querySelectorAll('.modal');
+    modals.forEach(function(modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                var modalInstance = bootstrap.Modal.getInstance(modal);
+                modalInstance.hide();
+            }
+        });
+    });
+    
+    // Amélioration du scroll sur mobile
+    document.body.style.overflowX = 'hidden';
+});
+</script>
+{% endblock %}

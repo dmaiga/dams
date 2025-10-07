@@ -1,0 +1,249 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Liste des Agents - Recouvrement{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-users me-2"></i>Liste des Agents - Recouvrement
+                </h1>
+                <div class="btn-group">
+                    <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Retour
+                    </a>
+                </div>
+            </div>
+
+            <!-- Cartes de résumé -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-muted mb-1">Total Ventes</h6>
+                                    <h4 class="text-primary">{{ total_general_ventes }} FCFA</h4>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-shopping-cart fa-2x text-primary"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-success">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-muted mb-1">Total Recouvré</h6>
+                                    <h4 class="text-success">{{ total_general_recouvre }} FCFA</h4>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-money-bill-wave fa-2x text-success"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-warning">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-muted mb-1">Reste à Recouvrir</h6>
+                                    <h4 class="text-warning">{{ total_general_difference }} FCFA</h4>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-exclamation-circle fa-2x text-warning"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tableau des agents -->
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>Détail par Agent
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Téléphone</th>
+                                    <th class="text-end">Total Ventes</th>
+                                    <th class="text-end">Total Recouvré</th>
+                                    <th class="text-end">Reste à Recouvrir</th>
+                                    <th>Statut</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for data in agents_data %}
+                                <tr class="align-middle">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm me-3">
+                                                <div class="avatar-title bg-soft-{{ data.couleur }} text-{{ data.couleur }} rounded-circle">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0">{{ data.agent.full_name }}</h6>
+                                                <small class="text-muted">ID: {{ data.agent.id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if data.agent.telephone %}
+                                            <a href="tel:{{ data.agent.telephone }}" class="text-decoration-none">
+                                                <i class="fas fa-phone me-1"></i>{{ data.agent.telephone }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">Non renseigné</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>{{ data.total_ventes }} FCFA</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="text-success">
+                                            <i class="fas fa-check-circle me-1"></i>{{ data.total_recouvre }} FCFA
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="badge bg-{{ data.couleur }} fs-6">
+                                            {{ data.difference }} FCFA
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ data.couleur }}">
+                                            {% if data.couleur == 'success' %}
+                                                <i class="fas fa-check me-1"></i>
+                                            {% elif data.couleur == 'warning' %}
+                                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                            {% else %}
+                                                <i class="fas fa-exclamation-circle me-1"></i>
+                                            {% endif %}
+                                            {{ data.statut }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                            {% if data.difference > 0 %}
+                                            <a href="{% url 'creer_recouvrement' data.agent.id %}" 
+                                               class="btn btn-primary btn-sm" 
+                                               title="Effectuer un recouvrement">
+                                                <i class="fas fa-hand-holding-usd"></i>
+                                                Recouvrir
+                                            </a>
+                                            {% endif %}
+                                            <a href="{% url 'historique_recouvrement' data.agent.id %}" 
+                                               class="btn btn-info btn-sm" 
+                                               title="Voir l'historique">
+                                                <i class="fas fa-history"></i>
+                                            </a>
+                                            <a href="{% url 'detail_agent' data.agent.id %}" 
+                                               class="btn btn-secondary btn-sm" 
+                                               title="Détails de l'agent">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-users fa-3x mb-3"></i>
+                                            <h5>Aucun agent trouvé</h5>
+                                            <p>Aucun agent terrain n'est enregistré dans le système.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th colspan="2">TOTAUX GÉNÉRAUX</th>
+                                    <th class="text-end">{{ total_general_ventes }} FCFA</th>
+                                    <th class="text-end">{{ total_general_recouvre }} FCFA</th>
+                                    <th class="text-end">{{ total_general_difference }} FCFA</th>
+                                    <th colspan="2"></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Légende -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <i class="fas fa-info-circle me-2"></i>Légende des statuts
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <span class="badge bg-success me-2"><i class="fas fa-check"></i></span>
+                                    <small>Complètement recouvré</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="badge bg-warning me-2"><i class="fas fa-exclamation-triangle"></i></span>
+                                    <small>En attente de recouvrement</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="badge bg-danger me-2"><i class="fas fa-exclamation-circle"></i></span>
+                                    <small>Erreur de calcul</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid #e3e6f0;
+}
+
+.badge.fs-6 {
+    font-size: 0.85em !important;
+    padding: 0.35em 0.65em;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+</style>
+{% endblock %}

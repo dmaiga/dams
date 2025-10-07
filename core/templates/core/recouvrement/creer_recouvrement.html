@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Recouvrement - {{ agent.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-3">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div>
+                        <h1 class="h3 mb-1">Recouvrement - {{ agent.full_name }}</h1>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
+                                <li class="breadcrumb-item active">Recouvrement</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informations agent -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Informations Financières
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Total Ventes:</strong><br>
+                                    <span class="h5 text-primary">{{ total_ventes }} FCFA</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Déjà Recouvré:</strong><br>
+                                    <span class="h5 text-success">{{ total_recouvre }} FCFA</span>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <strong>Argent en Possession:</strong><br>
+                                    <span class="h4 text-warning">{{ argent_en_possession }} FCFA</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulaire de recouvrement -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-hand-holding-usd me-2"></i>Nouveau Recouvrement
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Affichage des erreurs globales -->
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.montant_recouvre.label_tag }}
+                                    {{ form.montant_recouvre }}
+                                    {% if form.montant_recouvre.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.montant_recouvre.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Maximum: {{ argent_en_possession }} FCFA
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.date_recouvrement.label_tag }}
+                                    {{ form.date_recouvrement }}
+                                    {% if form.date_recouvrement.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.date_recouvrement.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Date à laquelle l'argent a été récupéré
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.commentaire.label_tag }}
+                            {{ form.commentaire }}
+                            {% if form.commentaire.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.commentaire.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i>Annuler
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-1"></i>Enregistrer le recouvrement
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid #e3e6f0;
+}
+
+.form-control-lg {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.btn {
+    min-width: 120px;
+}
+
+.text-danger small {
+    font-size: 0.875em;
+}
+</style>
+{% endblock %}

@@ -17,6 +17,9 @@ from django.db.models import (
     Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
 )
 
+
+from django.utils import timezone
+from datetime import timedelta
 # Python stdlib
 from datetime import timedelta
 from decimal import Decimal
@@ -27,23 +30,22 @@ from .models import (
     Agent, Client, Vente, Produit, Facture,
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,
-    JournalModificationDistribution, MouvementStock
+    JournalModificationDistribution, MouvementStock,Recouvrement
 )
 
 # Project forms
 from .forms import (
     VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
-    DistributionModificationForm,UploadFactureForm
+    DistributionModificationForm,UploadFactureForm,RecouvrementForm
 )
 
-
-
-from django.shortcuts import render, redirect
-from django.contrib.auth import login
-from django.contrib.auth.forms import AuthenticationForm
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Agent
+
+
+
 
 def custom_login(request):
     if request.method == "POST":
@@ -175,6 +177,48 @@ def liste_agents(request):
     agents = Agent.objects.filter(type_agent__in=['entrepot', 'terrain'])
     return render(request, 'core/agents/liste_agents.html', {'agents': agents})
 
+
+
+@login_required
+def detail_agent(request, agent_id):
+    agent = get_object_or_404(Agent, id=agent_id)
+    
+    # Récupérer les statistiques des ventes
+    ventes = Vente.objects.filter(agent=agent).order_by('-date_vente')
+    total_ventes = agent.total_ventes
+    total_recouvre = agent.total_recouvre
+    argent_en_possession = agent.argent_en_possession
+    
+    # Statistiques par type de vente
+    ventes_gros = ventes.filter(type_vente='gros')
+    ventes_detail = ventes.filter(type_vente='detail')
+    
+    total_ventes_gros = sum(vente.total_vente for vente in ventes_gros)
+    total_ventes_detail = sum(vente.total_vente for vente in ventes_detail)
+    
+    # Derniers recouvrements
+    recouvrements = Recouvrement.objects.filter(agent=agent).order_by('-date_recouvrement')[:5]
+    
+    # Ventes récentes (30 derniers jours)
+    date_limite = timezone.now() - timedelta(days=30)
+    ventes_recentes = ventes.filter(date_vente__gte=date_limite)
+    
+    context = {
+        'agent': agent,
+        'ventes': ventes[:10],  # 10 dernières ventes
+        'ventes_total_count': ventes.count(),
+        'ventes_gros': ventes_gros,
+        'ventes_detail': ventes_detail,
+        'total_ventes_gros': total_ventes_gros,
+        'total_ventes_detail': total_ventes_detail,
+        'total_ventes': total_ventes,
+        'total_recouvre': total_recouvre,
+        'argent_en_possession': argent_en_possession,
+        'recouvrements': recouvrements,
+        'ventes_recentes_count': ventes_recentes.count(),
+    }
+    
+    return render(request, 'core/agents/detail_agent.html', context)
 
 @login_required
 def creer_agent(request):
@@ -1381,6 +1425,135 @@ def supprimer_facture(request, facture_id):
         messages.success(request, "Facture supprimée.")
         return redirect('liste_factures')
     return render(request, 'core/factures/confirm_delete.html', {'facture': facture})
+#=========
+# #RECOUVREMENT
+#=========
+
+@login_required
+def creer_recouvrement(request, agent_id):
+    agent = get_object_or_404(Agent, id=agent_id, type_agent='terrain')
+    superviseur = request.user.agent
+    
+    # Vérifier que l'utilisateur est un superviseur
+    if not superviseur.est_superviseur:
+        messages.error(request, "Seuls les superviseurs peuvent effectuer des recouvrements.")
+        return redirect('tableau_de_bord')
+    
+    if request.method == 'POST':
+        form = RecouvrementForm(request.POST, agent=agent)
+        if form.is_valid():
+            # Créer le recouvrement avec les données supplémentaires
+            recouvrement = form.save(commit=False)
+            recouvrement.agent = agent
+            recouvrement.superviseur = superviseur
+            recouvrement.save()
+            
+            messages.success(
+                request, 
+                f"Recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès!"
+            )
+            return redirect('detail_agent', agent_id=agent.id)
+    else:
+        form = RecouvrementForm(agent=agent)
+    
+    context = {
+        'agent': agent,
+        'form': form,
+        'argent_en_possession': agent.argent_en_possession,
+        'total_ventes': agent.total_ventes,
+        'total_recouvre': agent.total_recouvre,
+    }
+    
+    return render(request, 'core/recouvrement/creer_recouvrement.html', context)
+
+@login_required
+def historique_recouvrement(request, agent_id):
+    agent = get_object_or_404(Agent, id=agent_id)
+    recouvrements = Recouvrement.objects.filter(agent=agent).order_by('-date_recouvrement')
+    
+    context = {
+        'agent': agent,
+        'recouvrements': recouvrements,
+    }
+    
+    return render(request, 'core/recouvrement/historique.html', context)
+
+@login_required
+def detail_historique(request, agent_id):
+    agent = get_object_or_404(Agent, id=agent_id)
+    
+    # Récupérer TOUS les recouvrements
+    recouvrements = Recouvrement.objects.filter(agent=agent).order_by('-date_recouvrement')
+    
+    # Statistiques détaillées
+    total_recouvre = agent.total_recouvre
+    nombre_recouvrements = recouvrements.count()
+    
+    # Premier et dernier recouvrement
+    premier_recouvrement = recouvrements.last()
+    dernier_recouvrement = recouvrements.first()
+    
+    context = {
+        'agent': agent,
+        'recouvrements': recouvrements,
+        'total_recouvre': total_recouvre,
+        'nombre_recouvrements': nombre_recouvrements,
+        'premier_recouvrement': premier_recouvrement,
+        'dernier_recouvrement': dernier_recouvrement,
+    }
+    
+    return render(request, 'core/recouvrement/detail_historique.html', context)
+
+@login_required
+def liste_agents_recouvrement(request):
+    # Récupérer tous les agents terrain
+    agents = Agent.objects.filter(type_agent='terrain').prefetch_related(
+        'vente_set', 
+        'recouvrements'
+    )
+    
+    agents_data = []
+    for agent in agents:
+        # CALCUL CORRECT : Utiliser la propriété total_ventes de l'agent
+        total_ventes = agent.total_ventes
+        
+        # CALCUL CORRECT : Utiliser la propriété total_recouvre de l'agent
+        total_recouvre = agent.total_recouvre
+        
+        # Calculer la différence
+        difference = total_ventes - total_recouvre
+        
+        # Déterminer la couleur en fonction de la différence
+        if difference == 0:
+            couleur = 'success'  # Vert - tout est recouvré
+            statut = 'Complètement recouvré'
+        elif difference > 0:
+            couleur = 'warning'  # Orange - partiellement recouvré
+            statut = f'{difference} FCFA à recouvrir'
+        else:
+            couleur = 'danger'   # Rouge - problème (recouvrement > ventes)
+            statut = 'Erreur de calcul'
+        
+        agents_data.append({
+            'agent': agent,
+            'total_ventes': total_ventes,
+            'total_recouvre': total_recouvre,
+            'difference': difference,
+            'couleur': couleur,
+            'statut': statut
+        })
+    
+    # Trier par différence décroissante (ceux qui ont le plus à recouvrir en premier)
+    agents_data.sort(key=lambda x: x['difference'], reverse=True)
+    
+    context = {
+        'agents_data': agents_data,
+        'total_general_ventes': sum(item['total_ventes'] for item in agents_data),
+        'total_general_recouvre': sum(item['total_recouvre'] for item in agents_data),
+        'total_general_difference': sum(item['difference'] for item in agents_data),
+    }
+    
+    return render(request, 'core/recouvrement/liste_agents.html', context)
 
 #=====
 #CLIENT
@@ -1668,6 +1841,8 @@ def vue_detail_agent(request, agent_id):
 # #ADMIN
 #=========
     
+
+
 #=========
 #DASHBOARD
 #========

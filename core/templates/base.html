@@ -483,6 +483,11 @@
                             <i class="fas fa-users"></i>
                             <span>Gestion Agents</span>
                         </a>
+                       
+    <a class="nav-link" href="{% url 'liste_agents_recouvrement' %}">
+        <i class="fas fa-hand-holding-usd"></i>
+        <span>Recouvrement Agents</span>
+    </a>
 
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}" 
                            href="{% url 'liste_lots' %}">
