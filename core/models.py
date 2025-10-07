@@ -109,7 +109,28 @@ class Agent(models.Model):
     def est_agent_terrain(self):
         """Vérifie si l'agent est un agent terrain"""
         return self.type_agent == 'terrain'
-
+    @property
+    def total_ventes(self):
+        """Total de toutes les ventes de l'agent"""
+        ventes = Vente.objects.filter(agent=self)
+        return sum(vente.total_vente for vente in ventes)
+    
+    @property
+    def total_recouvre(self):
+        """Total déjà recouvré auprès de l'agent"""
+        recouvrements = Recouvrement.objects.filter(agent=self)
+        return sum(recouvrement.montant_recouvre for recouvrement in recouvrements)
+    
+    @property
+    def argent_en_possession(self):
+        """Argent que l'agent a encore en sa possession"""
+        return self.total_ventes - self.total_recouvre
+    
+    @property
+    def peut_etre_recouvre(self):
+        """Vérifie s'il reste de l'argent à recouvrir"""
+        return self.argent_en_possession > 0
+    
     @property
     def peut_acceder_admin(self):
         """Vérifie si l'agent peut accéder à l'administration"""
@@ -419,6 +440,13 @@ class Vente(models.Model):
         if hasattr(self, 'dette'):
             return self.dette
         return None
+    
+    @property
+    def est_recouverte(self):
+        """Vérifie si cette vente a été recouverte"""
+        # Une vente est considérée recouverte si le total recouvré 
+        # est supérieur ou égal au total des ventes
+        return self.agent.total_recouvre >= self.agent.total_ventes
 
 class Dette(models.Model):
     STATUT_CHOICES = (
@@ -521,6 +549,7 @@ class Dette(models.Model):
         return self.nombre_produits_bonus * 100
 
 
+
 class PaiementDette(models.Model):
     MODE_PAIEMENT_CHOICES = (
         ('espece', 'Espèce'),
@@ -621,3 +650,36 @@ class BonusAgent(models.Model):
             total_produits += dette.vente.quantite
             
         return total_produits
+
+class Recouvrement(models.Model):
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'terrain'},
+        related_name='recouvrements'
+    )
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'superviseur'},
+        related_name='recouvrements_effectues'
+    )
+    
+    # Montant recouvré
+    montant_recouvre = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name="Montant recouvré"
+    )
+    
+    commentaire = models.TextField(blank=True)
+    date_recouvrement = models.DateTimeField(default=timezone.now)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
+
+    class Meta:
+        ordering = ['-date_recouvrement']
+        verbose_name = "Recouvrement"
+        verbose_name_plural = "Recouvrements"

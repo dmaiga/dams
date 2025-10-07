@@ -3,7 +3,8 @@ from datetime import datetime
 from django.utils import timezone
 from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
-    DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,MouvementStock
+    DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
+    MouvementStock,Recouvrement
 )
 from django.db import models
 
@@ -1087,3 +1088,62 @@ class RapportDettesForm(forms.Form):
             
         return cleaned_data
 
+# === FORMULAIRE RECOUVREMENT ===
+
+
+class RecouvrementForm(forms.ModelForm):
+    date_recouvrement = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Date du recouvrement",
+        initial=timezone.now().date()
+    )
+    
+    class Meta:
+        model = Recouvrement
+        fields = ['montant_recouvre', 'date_recouvrement', 'commentaire']
+        widgets = {
+            'montant_recouvre': forms.NumberInput(attrs={
+                'class': 'form-control form-control-lg',
+                'step': '0.01',
+                'placeholder': '0.00'
+            }),
+            'commentaire': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Ex: Recouvrement partiel, paiement en espèces...'
+            }),
+        }
+        labels = {
+            'montant_recouvre': 'Montant à recouvrir',
+            'commentaire': 'Commentaire (facultatif)',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.agent = kwargs.pop('agent', None)
+        super().__init__(*args, **kwargs)
+        
+        if self.agent:
+            # Ajouter une validation dynamique du montant maximum
+            self.fields['montant_recouvre'].widget.attrs['max'] = self.agent.argent_en_possession
+
+    def clean_montant_recouvre(self):
+        montant = self.cleaned_data.get('montant_recouvre')
+        
+        if self.agent and montant > self.agent.argent_en_possession:
+            raise forms.ValidationError(
+                f"L'agent n'a que {self.agent.argent_en_possession} FCFA en sa possession."
+            )
+        
+        if montant <= 0:
+            raise forms.ValidationError("Le montant doit être supérieur à 0.")
+            
+        return montant
+
+    def clean_date_recouvrement(self):
+        date_recouvrement = self.cleaned_data.get('date_recouvrement')
+        
+        # Empêcher les dates futures
+        if date_recouvrement > timezone.now().date():
+            raise forms.ValidationError("La date ne peut pas être dans le futur.")
+            
+        return date_recouvrement

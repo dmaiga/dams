@@ -1,0 +1,318 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Détail Agent - {{ agent.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'liste_agents' %}" class="btn btn-secondary me-3">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div>
+                        <h1 class="h3 mb-1">{{ agent.full_name }}</h1>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
+                                <li class="breadcrumb-item active">{{ agent.full_name }}</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit me-1"></i>Modifier
+                    </a>
+                    {% if agent.argent_en_possession > 0 %}
+                    <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success">
+                        <i class="fas fa-hand-holding-usd me-1"></i>Recouvrir
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes de statistiques -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title text-muted mb-1">Total Ventes</h6>
+                            <h4 class="text-primary">{{ total_ventes }} FCFA</h4>
+                            <small class="text-muted">{{ ventes_total_count }} vente{{ ventes_total_count|pluralize }}</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-shopping-cart fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            Gros: {{ total_ventes_gros }} FCFA<br>
+                            Détail: {{ total_ventes_detail }} FCFA
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title text-muted mb-1">Total Recouvré</h6>
+                            <h4 class="text-success">{{ total_recouvre }} FCFA</h4>
+                            <small class="text-muted">{{ recouvrements|length }} recouvrement{{ recouvrements|length|pluralize }}</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-money-bill-wave fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title text-muted mb-1">Argent en Possession</h6>
+                            <h4 class="text-warning">{{ argent_en_possession }} FCFA</h4>
+                            <small class="text-muted">Non recouvré</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-wallet fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="card-title text-muted mb-1">Ventes 30 jours</h6>
+                            <h4 class="text-info">{{ ventes_recentes_count }}</h4>
+                            <small class="text-muted">Dernier mois</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-line fa-2x text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informations agent -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user me-2"></i>Informations Agent
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Nom complet:</strong><br>
+                        {{ agent.full_name }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Type d'agent:</strong><br>
+                        <span class="badge 
+                            {% if agent.type_agent == 'entrepot' %}bg-success
+                            {% elif agent.type_agent == 'terrain' %}bg-primary
+                            {% else %}bg-secondary
+                            {% endif %}">
+                            {{ agent.get_type_agent_display }}
+                        </span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Téléphone:</strong><br>
+                        {% if agent.telephone %}
+                            <a href="tel:{{ agent.telephone }}" class="text-decoration-none">
+                                <i class="fas fa-phone me-1"></i>{{ agent.telephone }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Non renseigné</span>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Nom d'utilisateur:</strong><br>
+                        {{ agent.user.username }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Email:</strong><br>
+                        {% if agent.user.email %}
+                            <a href="mailto:{{ agent.user.email }}" class="text-decoration-none">
+                                {{ agent.user.email }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">Non renseigné</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions rapides -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bolt me-2"></i>Actions Rapides
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'creer_recouvrement' agent.id %}" 
+                           class="btn btn-success {% if agent.argent_en_possession <= 0 %}disabled{% endif %}">
+                            <i class="fas fa-hand-holding-usd me-1"></i>
+                            Effectuer un recouvrement
+                        </a>
+                        <a href="{% url 'historique_recouvrement' agent.id %}" class="btn btn-info">
+                            <i class="fas fa-history me-1"></i>
+                            Historique des recouvrements
+                        </a>
+                        <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-edit me-1"></i>
+                            Modifier l'agent
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dernières ventes et recouvrements -->
+        <div class="col-lg-8">
+            <!-- Dernières ventes -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-receipt me-2"></i>Dernières Ventes
+                    </h5>
+                    <a href="#" class="btn btn-sm btn-outline-primary">Voir tout</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if ventes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produit</th>
+                                    <th>Type</th>
+                                    <th class="text-end">Quantité</th>
+                                    <th class="text-end">Prix Unitaire</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vente in ventes %}
+                                <tr>
+                                    <td>{{ vente.date_vente|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ vente.produit_nom }}</td>
+                                    <td>
+                                        <span class="badge {% if vente.type_vente == 'gros' %}bg-warning{% else %}bg-info{% endif %}">
+                                            {{ vente.get_type_vente_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ vente.quantite }}</td>
+                                    <td class="text-end">{{ vente.prix_vente_unitaire }} FCFA</td>
+                                    <td class="text-end"><strong>{{ vente.total_vente }} FCFA</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">Aucune vente enregistrée</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Derniers recouvrements -->
+            <div class="card mt-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-hand-holding-usd me-2"></i>Derniers Recouvrements
+                    </h5>
+                    <a href="{% url 'historique_recouvrement' agent.id %}" class="btn btn-sm btn-outline-primary">Voir tout</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recouvrements %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Superviseur</th>
+                                    <th class="text-end">Montant</th>
+                                    <th>Commentaire</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for recouvrement in recouvrements %}
+                                <tr>
+                                    <td>{{ recouvrement.date_recouvrement|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ recouvrement.superviseur.full_name }}</td>
+                                    <td class="text-end text-success">
+                                        <strong>+{{ recouvrement.montant_recouvre }} FCFA</strong>
+                                    </td>
+                                    <td>
+                                        {% if recouvrement.commentaire %}
+                                            {{ recouvrement.commentaire|truncatewords:5 }}
+                                        {% else %}
+                                            <span class="text-muted">Aucun commentaire</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-hand-holding-usd fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">Aucun recouvrement effectué</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid #e3e6f0;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.breadcrumb {
+    background: transparent;
+    padding: 0;
+}
+
+.btn-group .btn {
+    margin-left: 0.5rem;
+}
+</style>
+{% endblock %}

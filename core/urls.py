@@ -8,6 +8,7 @@ urlpatterns = [
     path('dashboard/agent/', views.dashboard_agent, name='dashboard_agent'),
     # Agents
     path('agents/', views.liste_agents, name='liste_agents'),
+    path('agents/<int:agent_id>/', views.detail_agent, name='detail_agent'),
     path('agents/creer/', views.creer_agent, name='creer_agent'),
     path('agents/modifier/<int:agent_id>/', views.modifier_agent, name='modifier_agent'),
     path('agents/supprimer/<int:agent_id>/', views.supprimer_agent, name='supprimer_agent'),    
@@ -51,7 +52,7 @@ urlpatterns = [
 #factures
     path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
     path('factures/depots/', views.liste_factures, name='liste_factures'),
-        path('lots/<int:lot_id>/', views.detail_lot, name='detail_lot'),
+    path('lots/<int:lot_id>/', views.detail_lot, name='detail_lot'),
     path('factures/creer/', views.creer_facture, name='creer_facture'),
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
     path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),
@@ -64,7 +65,11 @@ urlpatterns = [
 #tableau_de_bord
    path('tableau-de-bord/superviseur/', views.tableau_de_bord_superviseur, name='tableau_de_bord_superviseur'),
    path('tableau-de-bord/agent/<int:agent_id>/', views.vue_detail_agent, name='vue_detail_agent'),
-
+#RECOUVREMENT
+    path('recouvrement/agents/', views.liste_agents_recouvrement, name='liste_agents_recouvrement'),
+    path('agent/<int:agent_id>/recouvrement/creer/', views.creer_recouvrement, name='creer_recouvrement'),
+    path('agent/<int:agent_id>/recouvrement/historique/', views.historique_recouvrement, name='historique_recouvrement'),
+path('agent/<int:agent_id>/recouvrement/historique/complet/', views.detail_historique, name='detail_historique'),
 #ADMIN
     path('', DashboardView.as_view(), name='dashboard'),
     path('analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 

@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Historique Recouvrement - {{ agent.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- En-tête avec navigation -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-3">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div>
+                        <h1 class="h3 mb-1">Historique des Recouvrements</h1>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
+                                <li class="breadcrumb-item active">Historique Recouvrement</li>
+                            </ol>
+                        </nav>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    {% if agent.argent_en_possession > 0 %}
+                    <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success">
+                        <i class="fas fa-hand-holding-usd me-1"></i>Nouveau Recouvrement
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-outline-primary">
+                        <i class="fas fa-user me-1"></i>Retour au Profil
+                    </a>
+                </div>
+            </div>
+
+            <!-- Cartes de statistiques -->
+            <div class="row mb-4">
+                <div class="col-xl-4 col-md-6">
+                    <div class="card border-primary">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-muted mb-1">Total Ventes</h6>
+                                    <h4 class="text-primary">{{ agent.total_ventes }} FCFA</h4>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-shopping-cart fa-2x text-primary"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-4 col-md-6">
+                    <div class="card border-success">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-muted mb-1">Total Recouvré</h6>
+                                    <h4 class="text-success">{{ agent.total_recouvre }} FCFA</h4>
+                                    <small class="text-muted">{{ recouvrements|length }} recouvrement{{ recouvrements|length|pluralize }}</small>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-money-bill-wave fa-2x text-success"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-4 col-md-6">
+                    <div class="card border-warning">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h6 class="card-title text-muted mb-1">Argent Restant</h6>
+                                    <h4 class="text-warning">{{ agent.argent_en_possession }} FCFA</h4>
+                                    <small class="text-muted">Non recouvré</small>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-wallet fa-2x text-warning"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tableau des recouvrements -->
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Historique des Recouvrements - {{ agent.full_name }}
+                    </h5>
+                    <span class="badge bg-primary fs-6">
+                        {{ recouvrements|length }} enregistrement{{ recouvrements|length|pluralize }}
+                    </span>
+                </div>
+                <div class="card-body p-0">
+                    {% if recouvrements %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Date & Heure</th>
+                                    <th>Superviseur</th>
+                                    <th class="text-end">Montant Recouvré</th>
+                                    <th>Commentaire</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for recouvrement in recouvrements %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <strong>{{ recouvrement.date_recouvrement|date:"d/m/Y" }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ recouvrement.date_recouvrement|date:"H:i" }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm me-2">
+                                                <div class="avatar-title bg-soft-success text-success rounded-circle">
+                                                    <i class="fas fa-user-tie"></i>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                {{ recouvrement.superviseur.full_name }}
+                                                <br>
+                                                <small class="text-muted">Enregistré le {{ recouvrement.date_creation|date:"d/m/Y" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="h5 text-success">+{{ recouvrement.montant_recouvre }} FCFA</span>
+                                    </td>
+                                    <td>
+                                        {% if recouvrement.commentaire %}
+                                            <span class="text-truncate" title="{{ recouvrement.commentaire }}">
+                                                {{ recouvrement.commentaire }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted fst-italic">Aucun commentaire</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm">
+                                           <a href="{% url 'detail_historique' agent.id %}" class="btn btn-outline-info">
+    <i class="fas fa-expand me-1"></i>Voir Détail Complet
+</a>
+                                           
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-dark">
+                                <tr>
+                                    <th colspan="2">TOTAUX</th>
+                                    <th class="text-end">{{ agent.total_recouvre }} FCFA</th>
+                                    <th colspan="2"></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-hand-holding-usd fa-4x text-muted"></i>
+                        </div>
+                        <h5 class="text-muted">Aucun recouvrement effectué</h5>
+                        <p class="text-muted mb-4">Aucun recouvrement n'a été enregistré pour cet agent.</p>
+                        {% if agent.argent_en_possession > 0 %}
+                        <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success">
+                            <i class="fas fa-hand-holding-usd me-1"></i>Effectuer le premier recouvrement
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informations supplémentaires -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Résumé Financier
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <strong>Taux de recouvrement:</strong><br>
+                                {% if agent.total_ventes > 0 %}
+                                    {% widthratio agent.total_recouvre agent.total_ventes 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Statut:</strong><br>
+                                {% if agent.argent_en_possession == 0 %}
+                                    <span class="badge bg-success">Complètement recouvré</span>
+                                {% elif agent.argent_en_possession > 0 %}
+                                    <span class="badge bg-warning">En cours de recouvrement</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Erreur de calcul</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <strong>Dernier recouvrement:</strong><br>
+                                {% if recouvrements %}
+                                    {{ recouvrements.0.date_recouvrement|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-muted">Aucun</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-chart-bar me-2"></i>Actions Rapides
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                {% if agent.argent_en_possession > 0 %}
+                                <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success">
+                                    <i class="fas fa-hand-holding-usd me-1"></i>
+                                    Nouveau Recouvrement
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'detail_agent' agent.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-user me-1"></i>
+                                    Retour au Profil
+                                </a>
+                                <a href="{% url 'liste_agents_recouvrement' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-list me-1"></i>
+                                    Liste des Agents
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid #e3e6f0;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.badge.fs-6 {
+    font-size: 0.85em !important;
+    padding: 0.35em 0.65em;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.text-truncate {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+}
+</style>
+
+<script>
+// Activation des tooltips Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+});
+</script>
+{% endblock %}
