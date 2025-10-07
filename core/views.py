@@ -29,7 +29,7 @@ import json
 from .models import (
     Agent, Client, Vente, Produit, Facture,
     LotEntrepot, DetailDistribution, DistributionAgent,
-    Dette, PaiementDette, BonusAgent,
+    Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,Recouvrement
 )
 
@@ -37,7 +37,8 @@ from .models import (
 from .forms import (
     VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
-    DistributionModificationForm,UploadFactureForm,RecouvrementForm
+    DistributionModificationForm,UploadFactureForm,RecouvrementForm,
+    FournisseurForm
 )
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -277,6 +278,48 @@ def supprimer_agent(request, agent_id):
         return redirect('liste_agents')
     
     return render(request, 'core/agents/supprimer_agent.html', {'agent': agent})
+
+#=========
+#FOURNISSEUR
+#========
+
+@login_required
+def liste_fournisseurs(request):
+    fournisseurs = Fournisseur.objects.all()
+    return render(request, 'core/fournisseur/liste_fournisseurs.html', {'fournisseurs': fournisseurs})
+
+@login_required
+def creer_fournisseur(request):
+    if request.method == 'POST':
+        form = FournisseurForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Fournisseur ajouté avec succès.")
+            return redirect('liste_fournisseurs')
+    else:
+        form = FournisseurForm()
+    return render(request, 'core/fournisseur/creer_fournisseur.html', {'form': form})
+
+@login_required
+def modifier_fournisseur(request, fournisseur_id):
+    fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
+    if request.method == 'POST':
+        form = FournisseurForm(request.POST, instance=fournisseur)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Fournisseur modifié avec succès.")
+            return redirect('liste_fournisseurs')
+    else:
+        form = FournisseurForm(instance=fournisseur)
+    return render(request, 'core/fournisseur/modifier_fournisseur.html', {'form': form})
+
+@login_required
+def supprimer_fournisseur(request, fournisseur_id):
+    fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
+    fournisseur.delete()
+    messages.success(request, "Fournisseur supprimé avec succès.")
+    return redirect('liste_fournisseurs')
+
 
 #========
 #ENTREPOT
@@ -1428,16 +1471,28 @@ def supprimer_facture(request, facture_id):
 #=========
 # #RECOUVREMENT
 #=========
-
 @login_required
 def creer_recouvrement(request, agent_id):
-    agent = get_object_or_404(Agent, id=agent_id, type_agent='terrain')
-    superviseur = request.user.agent
+    # Récupérer l'agent cible (peut être terrain OU superviseur)
+    agent = get_object_or_404(Agent, id=agent_id)
+    agent_connecte = request.user.agent
     
-    # Vérifier que l'utilisateur est un superviseur
-    if not superviseur.est_superviseur:
-        messages.error(request, "Seuls les superviseurs peuvent effectuer des recouvrements.")
+    # Vérifications de sécurité
+    if agent_connecte.est_agent_terrain:
+        messages.error(request, "Les agents terrain ne peuvent pas effectuer de recouvrements.")
         return redirect('tableau_de_bord')
+    
+    # Un superviseur peut recouvrir ses propres ventes OU celles des agents terrain
+    if agent_connecte.est_superviseur:
+        if not (agent.est_agent_terrain or agent.id == agent_connecte.id):
+            messages.error(request, "Vous ne pouvez recouvrir que vos propres ventes ou celles de vos agents terrain.")
+            return redirect('tableau_de_bord')
+    
+    # Un directeur peut recouvrir tout le monde
+    if agent_connecte.est_direction:
+        if not (agent.est_agent_terrain or agent.est_superviseur):
+            messages.error(request, "Vous ne pouvez recouvrir que les agents terrain et superviseurs.")
+            return redirect('tableau_de_bord')
     
     if request.method == 'POST':
         form = RecouvrementForm(request.POST, agent=agent)
@@ -1445,14 +1500,22 @@ def creer_recouvrement(request, agent_id):
             # Créer le recouvrement avec les données supplémentaires
             recouvrement = form.save(commit=False)
             recouvrement.agent = agent
-            recouvrement.superviseur = superviseur
+            recouvrement.superviseur = agent_connecte
             recouvrement.save()
             
-            messages.success(
-                request, 
-                f"Recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès!"
-            )
-            return redirect('detail_agent', agent_id=agent.id)
+            # Message personnalisé selon le type d'agent
+            if agent.est_agent_terrain:
+                message = f"Recouvrement de {recouvrement.montant_recouvre} FCFA effectué auprès de {agent.full_name} avec succès!"
+            else:  # Auto-recouvrement
+                message = f"Auto-recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès!"
+            
+            messages.success(request, message)
+            
+            # Redirection appropriée
+            if agent.est_agent_terrain:
+                return redirect('detail_agent', agent_id=agent.id)
+            else:
+                return redirect('liste_agents_recouvrement')
     else:
         form = RecouvrementForm(agent=agent)
     
@@ -1462,9 +1525,11 @@ def creer_recouvrement(request, agent_id):
         'argent_en_possession': agent.argent_en_possession,
         'total_ventes': agent.total_ventes,
         'total_recouvre': agent.total_recouvre,
+        'est_auto_recouvrement': agent.id == agent_connecte.id,
     }
     
     return render(request, 'core/recouvrement/creer_recouvrement.html', context)
+
 
 @login_required
 def historique_recouvrement(request, agent_id):
@@ -1506,32 +1571,42 @@ def detail_historique(request, agent_id):
 
 @login_required
 def liste_agents_recouvrement(request):
-    # Récupérer tous les agents terrain
-    agents = Agent.objects.filter(type_agent='terrain').prefetch_related(
-        'vente_set', 
-        'recouvrements'
-    )
+    agent_connecte = request.user.agent
+    
+    # Déterminer quels agents afficher selon le type
+    if agent_connecte.est_direction:
+        # Direction voit tous les agents terrain ET superviseurs
+        agents = Agent.objects.filter(type_agent__in=['terrain', 'superviseur'])
+    elif agent_connecte.est_superviseur:
+        # Superviseur voit ses agents terrain + lui-même
+        agents_terrain = Agent.objects.filter(type_agent='terrain')
+        agents = list(agents_terrain) + [agent_connecte]
+    else:
+        # Agent terrain ne voit personne
+        agents = []
     
     agents_data = []
+    agent_ids_deja_vus = []  # Liste pour suivre les IDs déjà traités
+    
     for agent in agents:
-        # CALCUL CORRECT : Utiliser la propriété total_ventes de l'agent
+        # Éviter les doublons en utilisant les IDs
+        if agent.id in agent_ids_deja_vus:
+            continue
+        agent_ids_deja_vus.append(agent.id)
+            
         total_ventes = agent.total_ventes
-        
-        # CALCUL CORRECT : Utiliser la propriété total_recouvre de l'agent
         total_recouvre = agent.total_recouvre
-        
-        # Calculer la différence
         difference = total_ventes - total_recouvre
         
         # Déterminer la couleur en fonction de la différence
         if difference == 0:
-            couleur = 'success'  # Vert - tout est recouvré
+            couleur = 'success'
             statut = 'Complètement recouvré'
         elif difference > 0:
-            couleur = 'warning'  # Orange - partiellement recouvré
+            couleur = 'warning'
             statut = f'{difference} FCFA à recouvrir'
         else:
-            couleur = 'danger'   # Rouge - problème (recouvrement > ventes)
+            couleur = 'danger'
             statut = 'Erreur de calcul'
         
         agents_data.append({
@@ -1540,10 +1615,11 @@ def liste_agents_recouvrement(request):
             'total_recouvre': total_recouvre,
             'difference': difference,
             'couleur': couleur,
-            'statut': statut
+            'statut': statut,
+            'est_auto_recouvrement': agent.id == agent_connecte.id,
         })
     
-    # Trier par différence décroissante (ceux qui ont le plus à recouvrir en premier)
+    # Trier par différence décroissante
     agents_data.sort(key=lambda x: x['difference'], reverse=True)
     
     context = {
@@ -1551,6 +1627,7 @@ def liste_agents_recouvrement(request):
         'total_general_ventes': sum(item['total_ventes'] for item in agents_data),
         'total_general_recouvre': sum(item['total_recouvre'] for item in agents_data),
         'total_general_difference': sum(item['difference'] for item in agents_data),
+        'agent_connecte': agent_connecte,
     }
     
     return render(request, 'core/recouvrement/liste_agents.html', context)

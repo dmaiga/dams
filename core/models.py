@@ -21,9 +21,16 @@ class Produit(models.Model):
 class Fournisseur(models.Model):
     nom = models.CharField(max_length=100, unique=True)
     contact = models.CharField(max_length=100, blank=True, null=True)
+    adresse = models.CharField(max_length=200, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    date_ajout = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.nom
+
+    class Meta:
+        ordering = ['nom']
+
 
 class Client(models.Model):
     TYPE_CLIENT_CHOICES = (
@@ -109,6 +116,7 @@ class Agent(models.Model):
     def est_agent_terrain(self):
         """Vérifie si l'agent est un agent terrain"""
         return self.type_agent == 'terrain'
+
     @property
     def total_ventes(self):
         """Total de toutes les ventes de l'agent"""
@@ -135,6 +143,54 @@ class Agent(models.Model):
     def peut_acceder_admin(self):
         """Vérifie si l'agent peut accéder à l'administration"""
         return self.est_direction or self.est_superviseur
+
+    # NOUVELLES PROPERTIES POUR SUPERVISEUR SEULEMENT
+    @property
+    def total_recouvrements_supervises(self):
+        """Total des recouvrements effectués par ce superviseur"""
+        if self.est_superviseur:
+            recouvrements = Recouvrement.objects.filter(superviseur=self)
+            return sum(recouvrement.montant_recouvre for recouvrement in recouvrements)
+        return 0
+    
+    @property
+    def total_depenses_superviseur(self):
+        """Total des dépenses effectuées par ce superviseur"""
+        if self.est_superviseur:
+            depenses = DepenseSuperviseur.objects.filter(superviseur=self)
+            return sum(depense.montant for depense in depenses)
+        return 0
+    
+    @property
+    def total_versements_bancaires(self):
+        """Total des versements bancaires effectués par ce superviseur"""
+        if self.est_superviseur:
+            versements = VersementBancaire.objects.filter(superviseur=self)
+            return sum(versement.montant_verse for versement in versements)
+        return 0
+    
+    @property
+    def solde_superviseur(self):
+        """Solde actuel en possession du superviseur"""
+        if self.est_superviseur:
+            return (self.total_recouvrements_supervises - 
+                   self.total_depenses_superviseur - 
+                   self.total_versements_bancaires)
+        return 0
+    
+    @property
+    def dernier_versement_superviseur(self):
+        """Dernier versement effectué par le superviseur"""
+        if self.est_superviseur:
+            return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement').first()
+        return None
+    
+    @property
+    def depenses_recentes_superviseur(self):
+        """Dépenses récentes du superviseur (5 dernières)"""
+        if self.est_superviseur:
+            return DepenseSuperviseur.objects.filter(superviseur=self).order_by('-date_depense')[:5]
+        return DepenseSuperviseur.objects.none()
 
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
@@ -357,8 +413,8 @@ class JournalModificationDistribution(models.Model):
 class Facture(models.Model):
 
     TYPE_FACTURE_CHOICES = [
-        ('entree', 'Facture Entrée - Entrepôt'),
-        ('depot', 'Dépôt Agent - Superviseur'),
+        ('entree', 'Facture Entrée - Fournisseur'),
+        ('depot', 'Dépôt Banque - Versement'),
     ]
     
     type_facture = models.CharField(max_length=50, choices=TYPE_FACTURE_CHOICES)
@@ -375,7 +431,6 @@ class Facture(models.Model):
     class Meta:
         verbose_name = "Facture"
         verbose_name_plural = "Factures"
-
 
 class Vente(models.Model):
     TYPE_VENTE_CHOICES = (
@@ -399,7 +454,18 @@ class Vente(models.Model):
     type_vente = models.CharField(max_length=50, choices=TYPE_VENTE_CHOICES, default='detail')
     prix_vente_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
     mode_paiement = models.CharField(max_length=50, choices=MODE_PAIEMENT_CHOICES, default='comptant')
-    date_vente = models.DateTimeField(default=timezone.now)
+    
+    # Date de la vente (peut être rétroactive)
+    date_vente = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Date de la vente"
+    )
+    
+    # Date d'enregistrement dans le système
+    date_creation = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date d'enregistrement"
+    )
 
     def save(self, *args, **kwargs):
         # Déterminer automatiquement le prix en fonction du type de vente choisi
@@ -417,7 +483,7 @@ class Vente(models.Model):
                 vente=self,
                 montant_total=self.total_vente,
                 montant_restant=self.total_vente,
-                date_echeance=timezone.now().date() + timedelta(days=30)
+                date_echeance=self.date_vente.date() + timedelta(days=30)  # Basé sur date_vente
             )
 
     @property
@@ -444,9 +510,17 @@ class Vente(models.Model):
     @property
     def est_recouverte(self):
         """Vérifie si cette vente a été recouverte"""
-        # Une vente est considérée recouverte si le total recouvré 
-        # est supérieur ou égal au total des ventes
         return self.agent.total_recouvre >= self.agent.total_ventes
+
+    @property
+    def est_retroactive(self):
+        """Vérifie si c'est une vente rétroactive"""
+        return self.date_vente.date() < self.date_creation.date()
+
+    class Meta:
+        ordering = ['-date_vente']
+        verbose_name = "Vente"
+        verbose_name_plural = "Ventes"
 
 class Dette(models.Model):
     STATUT_CHOICES = (
@@ -665,7 +739,6 @@ class Recouvrement(models.Model):
         related_name='recouvrements_effectues'
     )
     
-    # Montant recouvré
     montant_recouvre = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
@@ -683,3 +756,97 @@ class Recouvrement(models.Model):
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
+
+
+class DepenseSuperviseur(models.Model):
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'superviseur'},
+        related_name='depenses'
+    )
+    
+    montant = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name="Montant de la dépense"
+    )
+    
+    motif = models.CharField(
+        max_length=255,
+        verbose_name="Motif de la dépense"
+    )
+    
+    commentaire = models.TextField(blank=True)
+    date_depense = models.DateTimeField(default=timezone.now)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Dépense {self.id} - {self.superviseur} - {self.montant} FCFA"
+
+    class Meta:
+        ordering = ['-date_depense']
+        verbose_name = "Dépense Superviseur"
+        verbose_name_plural = "Dépenses Superviseur"
+
+
+class VersementBancaire(models.Model):
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'superviseur'},
+        related_name='versements_bancaires'
+    )
+    
+    montant_verse = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name="Montant versé à la banque"
+    )
+    
+    preuve_versement = models.FileField(
+        upload_to='versements_bancaires/',
+        verbose_name="Photo du versement bancaire"
+    )
+    
+    description = models.TextField(
+        blank=True,
+        verbose_name="Description (facultatif)"
+    )
+    
+    date_versement = models.DateTimeField(default=timezone.now)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Versement {self.id} - {self.superviseur} - {self.montant_verse} FCFA"
+
+    @property
+    def total_recouvrements_superviseur(self):
+        """Total des recouvrements effectués par ce superviseur jusqu'à la date du versement"""
+        return Recouvrement.objects.filter(
+            superviseur=self.superviseur,
+            date_recouvrement__lte=self.date_versement
+        ).aggregate(total=models.Sum('montant_recouvre'))['total'] or 0
+
+    @property
+    def total_depenses_superviseur(self):
+        """Total des dépenses effectuées par ce superviseur jusqu'à la date du versement"""
+        return DepenseSuperviseur.objects.filter(
+            superviseur=self.superviseur,
+            date_depense__lte=self.date_versement
+        ).aggregate(total=models.Sum('montant'))['total'] or 0
+
+    @property
+    def solde_attendu(self):
+        """Solde théorique que le superviseur devrait avoir avant versement"""
+        return self.total_recouvrements_superviseur - self.total_depenses_superviseur
+
+    @property
+    def difference_solde(self):
+        """Différence entre le solde attendu et le montant versé"""
+        return self.solde_attendu - self.montant_verse
+
+    class Meta:
+        ordering = ['-date_versement']
+        verbose_name = "Versement Bancaire"
+        verbose_name_plural = "Versements Bancaires"

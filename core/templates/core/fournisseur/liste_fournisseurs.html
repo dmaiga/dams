@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h3>Liste des Fournisseurs</h3>
+  <a href="{% url 'creer_fournisseur' %}" class="btn btn-primary mb-3">Ajouter un fournisseur</a>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Contact</th>
+        <th>Email</th>
+        <th>Adresse</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in fournisseurs %}
+      <tr>
+        <td>{{ f.nom }}</td>
+        <td>{{ f.contact }}</td>
+        <td>{{ f.email }}</td>
+        <td>{{ f.adresse }}</td>
+        <td>
+          <a href="{% url 'modifier_fournisseur' f.id %}" class="btn btn-sm btn-warning">Modifier</a>
+          <a href="{% url 'supprimer_fournisseur' f.id %}" class="btn btn-sm btn-danger"
+             onclick="return confirm('Supprimer ce fournisseur ?')">Supprimer</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-center">Aucun fournisseur enregistré.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

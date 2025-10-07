@@ -170,7 +170,36 @@
                                 </div>
                             </div>
                         </div>
-
+<!-- Section Date de vente -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Date de la Vente</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label">Date et heure de la vente *</label>
+                {{ form.date_vente }}
+                {% if form.date_vente.errors %}
+                <div class="text-danger small">{{ form.date_vente.errors }}</div>
+                {% endif %}
+                <div class="form-text">
+                    Date à laquelle la vente a été effectuée chez le client
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="alert alert-info">
+                    <small>
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Information :</strong><br>
+                       
+                        • Pour une vente rétroactives indique la date de la vente
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
                         <div class="d-flex gap-2">
                             <a href="{% url 'liste_ventes' %}" class="btn btn-secondary">Annuler</a>
                             <button type="submit" class="btn btn-success">Enregistrer la Vente</button>
