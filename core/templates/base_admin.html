@@ -1,4 +1,4 @@
-<!-- templates/base.html -->
+<!-- templates/base_amin.html -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -246,7 +246,7 @@
             <!-- Navigation sidebar -->
             <div class="sidebar-nav">
                 <!-- ===== MENU DIRECTION ===== -->
-                {% if request.user.agent.type_agent == 'direction' or request.user.agent.type_agent == 'entrepot' %}
+                {% if request.user.agent.type_agent == 'direction'  %}
                 
                 <!-- Tableau de Bord -->
                 <div class="nav-group">
@@ -331,7 +331,7 @@
                     <small class="text-muted">
                         {% if request.user.agent.type_agent == 'direction' %}
                             Direction
-                        {% elif request.user.agent.type_agent == 'entrepot' %}
+                        {% elif request.user.agent.type_agent == 'superviseur' %}
                             Superviseur
                         {% else %}
                             Agent Terrain

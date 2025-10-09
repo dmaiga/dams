@@ -1,7 +1,7 @@
 <!-- core/distribution/detail_distribution.html -->
 {% extends 'base.html' %}
 {% load static %}
-
+{% load custom_filters %}
 {% block title %}Détail Distribution #{{ distribution.id }}{% endblock %}
 
 {% block content %}
@@ -65,27 +65,20 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for produit in produits_distribues %}
+                                {% for detail in produits_distribues %}
                                 <tr>
-                                    <td>{{ produit.produit.nom }}</td>
-                                    <td>{{ produit.lot.reference_lot|default:"Lot#" }}{{ produit.lot.id }}</td>
-                                    <td class="text-center">{{ produit.quantite }}</td>
-                                    <td class="text-end">{{ produit.prix_gros|default:"-"|floatformat:0 }} FCFA</td>
-                                    <td class="text-end">{{ produit.prix_detail|default:"-"|floatformat:0 }} FCFA</td>
-                                    <td class="text-end ">{{ produit.valeur_gros|floatformat:0 }} FCFA</td>
-                                    <td class="text-end ">{{ produit.valeur_detail|floatformat:0 }} FCFA</td>
+
+                                                                    <td>{{ detail.lot.produit.nom }}</td>
+                                    <td>{{ detail.lot.reference_lot|default:"Lot#" }}{{ detail.lot.id }}</td>
+                                    <td class="text-center">{{ distribution.quantite_totale }}</td>
+                                    <td class="text-end">{{ detail.prix_gros|default:"-" }} FCFA</td>
+                                    <td class="text-end">{{ detail.prix_detail|default:"-" }} FCFA</td>
+                                    <td class="text-end ">{{ distribution.valeur_gros_totale|floatformat:0 }} FCFA</td>
+                                    <td class="text-end">{{ distribution.valeur_detail_totale|floatformat:0}} FCFA</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
-                            <tfoot class="table-light">
-                                <tr>
-                                    <th colspan="2" class="text-end">Totaux:</th>
-                                    <th class="text-center">{{ quantite_totale }}</th>
-                                    <th colspan="2"></th>
-                                    <th class="text-end ">{{ valeur_gros_totale|floatformat:0 }} FCFA</th>
-                                    <th class="text-end ">{{ valeur_detail_totale|floatformat:0 }} FCFA</th>
-                                </tr>
-                            </tfoot>
+
                         </table>
                     </div>
                 </div>

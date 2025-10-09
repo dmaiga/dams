@@ -3,7 +3,7 @@ from django.contrib import admin
 from .models import (
     Agent, Produit, Client, LotEntrepot, Fournisseur,
     DistributionAgent, DetailDistribution, Vente, 
-    MouvementStock, Facture,Recouvrement,DepenseSuperviseur,VersementBancaire
+    MouvementStock, Facture,Recouvrement,VersementBancaire
 )
 
 from .models import Fournisseur
@@ -68,57 +68,6 @@ class RecouvrementAdmin(admin.ModelAdmin):
     readonly_fields = ('date_creation',)
 
 
-@admin.register(DepenseSuperviseur)
-class DepenseSuperviseurAdmin(admin.ModelAdmin):
-    list_display = [
-        'id', 
-        'superviseur', 
-        'montant', 
-        'motif', 
-        'date_depense'
-    ]
-    
-    list_filter = [
-        'superviseur',
-        'date_depense'
-    ]
-    
-    search_fields = [
-        'superviseur__nom',
-        'superviseur__prenom',
-        'motif',
-        'commentaire'
-    ]
-
-
-@admin.register(VersementBancaire)
-class VersementBancaireAdmin(admin.ModelAdmin):
-    list_display = [
-        'id', 
-        'superviseur', 
-        'montant_verse', 
-        'solde_attendu',
-        'difference_solde',
-        'date_versement'
-    ]
-    
-    list_filter = [
-        'superviseur',
-        'date_versement'
-    ]
-    
-    search_fields = [
-        'superviseur__nom',
-        'superviseur__prenom',
-        'description'
-    ]
-    
-    readonly_fields = [
-        'solde_attendu', 
-        'difference_solde',
-        'total_recouvrements_superviseur',
-        'total_depenses_superviseur'
-    ]
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     list_display = [

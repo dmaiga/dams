@@ -144,7 +144,7 @@ class Agent(models.Model):
         """Vérifie si l'agent peut accéder à l'administration"""
         return self.est_direction or self.est_superviseur
 
-    # NOUVELLES PROPERTIES POUR SUPERVISEUR SEULEMENT
+    # NOUVELLES PROPERTIES POUR SUPERVISEUR SEULEMENT - CORRIGÉES
     @property
     def total_recouvrements_supervises(self):
         """Total des recouvrements effectués par ce superviseur"""
@@ -155,10 +155,10 @@ class Agent(models.Model):
     
     @property
     def total_depenses_superviseur(self):
-        """Total des dépenses effectuées par ce superviseur"""
+        """Total des dépenses effectuées par ce superviseur (depuis VersementBancaire)"""
         if self.est_superviseur:
-            depenses = DepenseSuperviseur.objects.filter(superviseur=self)
-            return sum(depense.montant for depense in depenses)
+            versements = VersementBancaire.objects.filter(superviseur=self)
+            return sum(versement.montant_depenses for versement in versements)
         return 0
     
     @property
@@ -182,15 +182,16 @@ class Agent(models.Model):
     def dernier_versement_superviseur(self):
         """Dernier versement effectué par le superviseur"""
         if self.est_superviseur:
-            return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement').first()
+            return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle').first()
         return None
     
+    # Supprimer la propriété depenses_recentes_superviseur ou la remplacer par :
     @property
-    def depenses_recentes_superviseur(self):
-        """Dépenses récentes du superviseur (5 dernières)"""
+    def versements_recents_superviseur(self):
+        """Versements récents du superviseur (5 derniers)"""
         if self.est_superviseur:
-            return DepenseSuperviseur.objects.filter(superviseur=self).order_by('-date_depense')[:5]
-        return DepenseSuperviseur.objects.none()
+            return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle')[:5]
+        return VersementBancaire.objects.none()
 
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
@@ -757,40 +758,14 @@ class Recouvrement(models.Model):
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
 
-
-class DepenseSuperviseur(models.Model):
-    superviseur = models.ForeignKey(
-        Agent,
-        on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'superviseur'},
-        related_name='depenses'
-    )
-    
-    montant = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2,
-        verbose_name="Montant de la dépense"
-    )
-    
-    motif = models.CharField(
-        max_length=255,
-        verbose_name="Motif de la dépense"
-    )
-    
-    commentaire = models.TextField(blank=True)
-    date_depense = models.DateTimeField(default=timezone.now)
-    date_creation = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Dépense {self.id} - {self.superviseur} - {self.montant} FCFA"
-
-    class Meta:
-        ordering = ['-date_depense']
-        verbose_name = "Dépense Superviseur"
-        verbose_name_plural = "Dépenses Superviseur"
-
-
 class VersementBancaire(models.Model):
+    facture = models.OneToOneField(
+        Facture,
+        on_delete=models.CASCADE,
+        related_name='versement_associe',
+        verbose_name="Facture associée"
+    )
+    
     superviseur = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
@@ -798,55 +773,75 @@ class VersementBancaire(models.Model):
         related_name='versements_bancaires'
     )
     
-    montant_verse = models.DecimalField(
+    # Montant total recouvré
+    montant_total_recouvre = models.DecimalField(
         max_digits=10, 
         decimal_places=2,
-        verbose_name="Montant versé à la banque"
+        verbose_name="Total recouvré"
     )
     
-    preuve_versement = models.FileField(
-        upload_to='versements_bancaires/',
-        verbose_name="Photo du versement bancaire"
+    # Montant des dépenses effectuées
+    montant_depenses = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name="Total des dépenses",
+        default=0
     )
     
-    description = models.TextField(
+    # Fichiers preuves supplémentaires pour les dépenses
+    preuve_depenses = models.FileField(
+        upload_to='preuves_depenses/',
+        verbose_name="Justificatifs des dépenses",
         blank=True,
-        verbose_name="Description (facultatif)"
+        null=True
     )
     
-    date_versement = models.DateTimeField(default=timezone.now)
+    # Détails des dépenses
+    details_depenses = models.TextField(
+        blank=True,
+        verbose_name="Détail des dépenses effectuées"
+    )
+    
+    date_debut_periode = models.DateTimeField(
+        verbose_name="Début de la période"
+    )
+    
+    date_fin_periode = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Fin de la période (date du versement)"
+    )
+    
+    # Nouveau champ pour date rétroactive
+    date_versement_reelle = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Date réelle du versement",
+        help_text="Date à laquelle le versement a été effectué (peut être différente de la date d'enregistrement)"
+    )
+    
     date_creation = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def montant_verse(self):
+        return self.facture.montant
+
+    @property
+    def solde_theorique(self):
+        return self.montant_total_recouvre - self.montant_depenses
+
+    @property
+    def difference(self):
+        return self.solde_theorique - self.montant_verse
+
+    @property
+    def est_retroactif(self):
+        """Vérifie si c'est un versement rétroactif"""
+        return self.date_versement_reelle.date() < self.date_creation.date()
+
     def __str__(self):
-        return f"Versement {self.id} - {self.superviseur} - {self.montant_verse} FCFA"
-
-    @property
-    def total_recouvrements_superviseur(self):
-        """Total des recouvrements effectués par ce superviseur jusqu'à la date du versement"""
-        return Recouvrement.objects.filter(
-            superviseur=self.superviseur,
-            date_recouvrement__lte=self.date_versement
-        ).aggregate(total=models.Sum('montant_recouvre'))['total'] or 0
-
-    @property
-    def total_depenses_superviseur(self):
-        """Total des dépenses effectuées par ce superviseur jusqu'à la date du versement"""
-        return DepenseSuperviseur.objects.filter(
-            superviseur=self.superviseur,
-            date_depense__lte=self.date_versement
-        ).aggregate(total=models.Sum('montant'))['total'] or 0
-
-    @property
-    def solde_attendu(self):
-        """Solde théorique que le superviseur devrait avoir avant versement"""
-        return self.total_recouvrements_superviseur - self.total_depenses_superviseur
-
-    @property
-    def difference_solde(self):
-        """Différence entre le solde attendu et le montant versé"""
-        return self.solde_attendu - self.montant_verse
+        retroactive = " (Rétroactif)" if self.est_retroactif else ""
+        return f"Versement {self.id} - {self.superviseur} - {self.montant_verse} FCFA{retroactive}"
 
     class Meta:
-        ordering = ['-date_versement']
+        ordering = ['-date_versement_reelle']
         verbose_name = "Versement Bancaire"
         verbose_name_plural = "Versements Bancaires"
