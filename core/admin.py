@@ -92,3 +92,17 @@ class AgentAdmin(admin.ModelAdmin):
         return "Direction"
     statistiques_agent.short_description = "Statistiques"
 
+from django.contrib import admin
+from .models import BonusAgent
+
+
+
+@admin.register(BonusAgent)
+class BonusAgentAdmin(admin.ModelAdmin):
+    list_display = ['agent', 'nombre_produits_recouverts', 'total_bonus', 'date_mise_a_jour']
+    list_filter = ['agent']
+    readonly_fields = ['nombre_produits_recouverts', 'total_bonus', 'date_mise_a_jour']
+    
+    # Empêcher l'ajout manuel (se crée automatiquement)
+    def has_add_permission(self, request):
+        return False

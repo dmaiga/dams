@@ -1,35 +1,100 @@
 {% extends 'base.html' %}
+{% load humanize %}
+
 {% block content %}
-<div class="container mt-4">
-  <h3>Liste des Fournisseurs</h3>
-  <a href="{% url 'creer_fournisseur' %}" class="btn btn-primary mb-3">Ajouter un fournisseur</a>
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Nom</th>
-        <th>Contact</th>
-        <th>Email</th>
-        <th>Adresse</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for f in fournisseurs %}
-      <tr>
-        <td>{{ f.nom }}</td>
-        <td>{{ f.contact }}</td>
-        <td>{{ f.email }}</td>
-        <td>{{ f.adresse }}</td>
-        <td>
-          <a href="{% url 'modifier_fournisseur' f.id %}" class="btn btn-sm btn-warning">Modifier</a>
-          <a href="{% url 'supprimer_fournisseur' f.id %}" class="btn btn-sm btn-danger"
-             onclick="return confirm('Supprimer ce fournisseur ?')">Supprimer</a>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5" class="text-center">Aucun fournisseur enregistré.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>👥 Liste des Fournisseurs</h2>
+        <a href="{% url 'creer_fournisseur' %}" class="btn btn-primary">+ Nouveau Fournisseur</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Fournisseur</th>
+                    <th>Contact</th>
+                    <th>KPI Financiers</th>
+                    <th>KPI Stocks</th>
+                    <th>Activité</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in fournisseurs %}
+                <tr>
+                    <!-- Colonne Fournisseur -->
+                    <td>
+                        <strong>{{ f.nom }}</strong>
+                        {% if f.email %}
+                        <br><small class="text-muted">{{ f.email }}</small>
+                        {% endif %}
+                        {% if f.adresse %}
+                        <br><small class="text-muted">{{ f.adresse|truncatewords:3 }}</small>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Contact -->
+                    <td>{{ f.contact|default:"-" }}</td>
+                    
+                    <!-- KPI Financiers -->
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="badge bg-success mb-1">
+                                💰 {{ f.total_achats|default:0|floatformat:0|intcomma }} FCFA
+                            </span>
+                            <small>Stock: {{ f.total_achats_restants|default:0|floatformat:0|intcomma }} FCFA</small>
+                        </div>
+                    </td>
+                    
+                    <!-- KPI Stocks -->
+                    <td>
+                        <div class="d-flex flex-column">
+                            <span class="badge bg-info mb-1">
+                                📦 {{ f.nb_lots_total }} lots
+                            </span>
+                            <small>Actifs: {{ f.nb_lots_actifs }}</small>
+                        </div>
+                    </td>
+                    
+                    <!-- Activité -->
+                    <td>
+                        <div class="d-flex flex-column">
+                            {% if f.dernier_lot %}
+                            <small>Dernier: {{ f.dernier_lot|date:"d/m/y" }}</small>
+                            {% if f.premier_lot %}
+                            <small>Depuis: {{ f.premier_lot|date:"m/Y" }}</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="badge bg-secondary">Aucune activité</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    
+                    <!-- Actions -->
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'detail_fournisseur' f.id %}" 
+                               class="btn btn-outline-primary" title="Détail">
+                                📊
+                            </a>
+                            <a href="{% url 'modifier_fournisseur' f.id %}" 
+                               class="btn btn-outline-secondary" title="Modifier">
+                                ✏️
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        Aucun fournisseur enregistré.
+                        <a href="{% url 'creer_fournisseur' %}">Créer le premier</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
