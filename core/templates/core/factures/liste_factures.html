@@ -8,11 +8,11 @@
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-2">💰 Factures Dépôts</h1>
+            <h1 class="h3 mb-2">Versement Facture</h1>
             <p class="text-muted">Factures des dépôts d'agents</p>
         </div>
         <div>
-            <a href="{% url 'creer_facture' %}" class="btn btn-success">
+            <a href="{% url 'creer_versement_avec_facture' %}" class="btn btn-success">
                 <i class="fas fa-plus"></i> Nouvelle Facture
             </a>
             <a href="{% url 'liste_factures_entrepot' %}" class="btn btn-outline-primary">
@@ -79,7 +79,7 @@
                 <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
                 <h5 class="text-muted">Aucune facture de dépôt</h5>
                 <p class="text-muted">Créez votre première facture de dépôt</p>
-                <a href="{% url 'creer_facture' %}" class="btn btn-success">
+                <a href="{% url 'creer_versement_avec_facture' %}" class="btn btn-success">
                     <i class="fas fa-plus"></i> Créer une facture
                 </a>
             </div>

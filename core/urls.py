@@ -14,6 +14,7 @@ urlpatterns = [
     path('agents/supprimer/<int:agent_id>/', views.supprimer_agent, name='supprimer_agent'),    
 # FOURNISSEUR
     path('fournisseurs/', views.liste_fournisseurs, name='liste_fournisseurs'),
+    path('fournisseur/<int:fournisseur_id>/', views.detail_fournisseur, name='detail_fournisseur'),
     path('fournisseurs/ajouter/', views.creer_fournisseur, name='creer_fournisseur'),
     path('fournisseurs/modifier/<int:fournisseur_id>/', views.modifier_fournisseur, name='modifier_fournisseur'),
     path('fournisseurs/supprimer/<int:fournisseur_id>/', views.supprimer_fournisseur, name='supprimer_fournisseur'),

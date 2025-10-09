@@ -70,7 +70,7 @@ def custom_login(request):
                 if user.is_staff or user.is_superuser:
                     return redirect("admin:index")  # Admin Django
                 else:
-                    return redirect("dashboard")  # Tableau de bord générique
+                    return redirect("login")  # Tableau de bord générique
         else:
             messages.error(request, "Nom d'utilisateur ou mot de passe incorrect.")
     else:
@@ -286,10 +286,81 @@ def supprimer_agent(request, agent_id):
 #FOURNISSEUR
 #========
 
+from django.db.models import Sum, Count, Avg, F, Max, Min
+
+
 @login_required
 def liste_fournisseurs(request):
-    fournisseurs = Fournisseur.objects.all()
-    return render(request, 'core/fournisseur/liste_fournisseurs.html', {'fournisseurs': fournisseurs})
+    fournisseurs = Fournisseur.objects.annotate(
+        # KPI financiers
+        total_achats=Sum(F('lotentrepot__quantite_initiale') * F('lotentrepot__prix_achat_unitaire')),
+        total_achats_restants=Sum(F('lotentrepot__quantite_restante') * F('lotentrepot__prix_achat_unitaire')),
+        
+        # KPI quantitatifs
+        nb_lots_total=Count('lotentrepot'),
+        nb_lots_actifs=Count('lotentrepot', filter=Q(lotentrepot__quantite_restante__gt=0)),
+        
+        # KPI temporels
+        dernier_lot=Max('lotentrepot__date_reception'),
+        premier_lot=Min('lotentrepot__date_reception'),
+    ).order_by('-total_achats')  # Tri par CA décroissant
+    
+    return render(request, 'core/fournisseur/liste_fournisseurs.html', {
+        'fournisseurs': fournisseurs
+    })
+
+@login_required
+def detail_fournisseur(request, fournisseur_id):
+    fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
+    
+    # Lots du fournisseur
+    lots = LotEntrepot.objects.filter(fournisseur=fournisseur).select_related('produit').order_by('-date_reception')
+    
+    # KPI détaillés
+    kpi = {
+        'total_achats': lots.aggregate(
+            total=Sum(F('quantite_initiale') * F('prix_achat_unitaire'))
+        )['total'] or 0,
+        
+        'stock_actuel_valeur': lots.filter(quantite_restante__gt=0).aggregate(
+            total=Sum(F('quantite_restante') * F('prix_achat_unitaire'))
+        )['total'] or 0,
+        
+        'nb_lots_total': lots.count(),
+        'nb_lots_actifs': lots.filter(quantite_restante__gt=0).count(),
+        'nb_produits_différents': lots.values('produit').distinct().count(),
+        
+        'moyenne_commande': lots.aggregate(
+            moyenne=Avg(F('quantite_initiale') * F('prix_achat_unitaire'))
+        )['moyenne'] or 0,
+        
+        'derniere_activite': lots.aggregate(
+            dernier=Max('date_reception')
+        )['dernier'],
+        
+        'jours_sans_activite': (timezone.now() - lots.aggregate(
+            dernier=Max('date_reception')
+        )['dernier']).days if lots.exists() else None,
+    }
+    
+    # Produits les plus achetés
+    produits_populaires = lots.values('produit__nom').annotate(
+        total_achete=Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
+        nb_lots=Count('id')
+    ).order_by('-total_achete')[:5]
+    
+    # Évolution des achats (3 derniers mois)
+    date_limite = timezone.now() - timedelta(days=90)
+    recent_lots = lots.filter(date_reception__gte=date_limite)
+    
+    context = {
+        'fournisseur': fournisseur,
+        'lots': lots,
+        'kpi': kpi,
+        'produits_populaires': produits_populaires,
+        'recent_lots': recent_lots,
+    }
+    return render(request, 'core/fournisseur/detail_fournisseur.html', context)
 
 @login_required
 def creer_fournisseur(request):

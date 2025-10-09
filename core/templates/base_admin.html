@@ -235,7 +235,7 @@
         <div class="sidebar d-flex flex-column">
             <!-- En-tête du sidebar -->
             <div class="sidebar-header">
-                <a href="{% if request.user.agent.type_agent == 'terrain' %}{% url 'dashboard_agent' %}{% else %}{% url 'dashboard' %}{% endif %}" 
+                <a href="{% if request.user.agent.type_agent == 'terrain' %}{% url 'dashboard_agent' %}{% else %}{% url 'tableau_de_bord_superviseur' %}{% endif %}" 
                    class="sidebar-brand">
                     <i class="fas fa-warehouse"></i>
                     <span>DAMS</span>

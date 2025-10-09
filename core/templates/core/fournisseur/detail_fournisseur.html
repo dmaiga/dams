@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2>📊 {{ fournisseur.nom }}</h2>
+            <div class="text-muted">
+                {% if fournisseur.contact %}<span class="me-3">📞 {{ fournisseur.contact }}</span>{% endif %}
+                {% if fournisseur.email %}<span class="me-3">📧 {{ fournisseur.email }}</span>{% endif %}
+                {% if fournisseur.adresse %}<span>📍 {{ fournisseur.adresse }}</span>{% endif %}
+            </div>
+        </div>
+        <div class="btn-group">
+            <a href="{% url 'modifier_fournisseur' fournisseur.id %}" class="btn btn-outline-secondary">✏️ Modifier</a>
+            <a href="{% url 'liste_fournisseurs' %}" class="btn btn-outline-primary">← Retour</a>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h4>{{ kpi.total_achats|floatformat:0|intcomma }} FCFA</h4>
+                    <small>CA Total</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h4>{{ kpi.stock_actuel_valeur|floatformat:0|intcomma }} FCFA</h4>
+                    <small>Stock Actuel</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <h4>{{ kpi.nb_lots_total }}</h4>
+                    <small>Total Lots</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h4>{{ kpi.nb_lots_actifs }}</h4>
+                    <small>Lots Actifs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-white bg-secondary">
+                <div class="card-body text-center">
+                    <h4>{{ kpi.nb_produits_différents }}</h4>
+                    <small>Produits</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card {% if kpi.jours_sans_activite and kpi.jours_sans_activite > 30 %}bg-danger{% else %}bg-dark{% endif %} text-white">
+                <div class="card-body text-center">
+                    <h4>{% if kpi.derniere_activite %}{{ kpi.derniere_activite|date:"d/m/y" }}{% else %}--{% endif %}</h4>
+                    <small>Dernière réception</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Produits populaires -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>🏆 Produits les plus achetés</h5>
+                </div>
+                <div class="card-body">
+                    {% for produit in produits_populaires %}
+                    <div class="d-flex justify-content-between border-bottom py-2">
+                        <span>{{ produit.produit__nom }}</span>
+                        <strong>{{ produit.total_achete|floatformat:0|intcomma }} FCFA</strong>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">Aucun produit acheté</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Dernières réceptions -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>📦 Historique des lots</h5>
+                    <span class="badge bg-primary">{{ lots.count }} lots au total</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Référence</th>
+                                    <th>Quantité</th>
+                                    <th>Prix unitaire</th>
+                                    <th>Total</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lot in lots|slice:":10" %}
+                                <tr>
+                                    <td>{{ lot.produit.nom }}</td>
+                                    <td><code>{{ lot.reference_lot|default:"-" }}</code></td>
+                                    <td>
+                                        {{ lot.quantite_restante }}/{{ lot.quantite_initiale }}
+                                        {% if lot.quantite_restante == 0 %}
+                                        <span class="badge bg-secondary">Épuisé</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ lot.prix_achat_unitaire }} FCFA</td>
+                                    <td>{{ lot.montant_total }} FCFA</td>
+                                    <td>{{ lot.date_reception|date:"d/m/Y" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Aucun lot enregistré</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if lots.count > 10 %}
+                    <div class="text-center mt-2">
+                        <small class="text-muted">... et {{ lots.count|add:"-10" }} autres lots</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
