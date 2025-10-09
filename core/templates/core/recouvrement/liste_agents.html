@@ -1,7 +1,7 @@
+
 {% extends 'base.html' %}
 {% load static %}
-
-{% block title %}Liste des Agents - Recouvrement{% endblock %}
+{% load humanize %}
 
 {% block content %}
 <div class="container-fluid">
@@ -9,59 +9,109 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">
-                    <i class="fas fa-users me-2"></i>Liste des Agents - Recouvrement
+                    <i class="fas fa-users me-2"></i>Gestion du Recouvrement
                 </h1>
                 <div class="btn-group">
                     <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left me-1"></i>Retour
                     </a>
+                    {% if agent_connecte.est_superviseur %}
+                    <a href="{% url 'creer_versement_avec_facture' %}" class="btn btn-success">
+                        <i class="fas fa-money-bill-wave me-1"></i>Nouveau Versement
+                    </a>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- Cartes de résumé -->
+            <!-- État du superviseur connecté -->
+            {% if etat_superviseur %}
+            <div class="card border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-shield me-2"></i>
+                        Mon État Financier - {{ agent_connecte.full_name }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2 col-6 mb-3">
+                            <div class="border rounded p-3">
+                                <h6 class="text-muted mb-1">Mes Ventes</h6>
+                                <h4 class="text-primary">{{ etat_superviseur.total_ventes_personnelles|intcomma }} FCFA</h4>
+                                <small class="text-muted">Auto-recouvrées</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6 mb-3">
+                            <div class="border rounded p-3">
+                                <h6 class="text-muted mb-1">Dépenses</h6>
+                                <h4 class="text-warning">{{ etat_superviseur.total_depenses|intcomma }} FCFA</h4>
+                                <small class="text-muted">Engagées</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6 mb-3">
+                            <div class="border rounded p-3">
+                                <h6 class="text-muted mb-1">Versé à la Banque</h6>
+                                <h4 class="text-success">{{ etat_superviseur.total_versements_bancaires|intcomma }} FCFA</h4>
+                                <small class="text-muted">Total versé</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2 col-6 mb-3">
+                            <div class="border rounded p-3">
+                                <h6 class="text-muted mb-1">Solde Actuel</h6>
+                                <h4 class="{% if etat_superviseur.solde_actuel > 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                    {{ etat_superviseur.solde_actuel|intcomma }} FCFA
+                                </h4>
+                                <small class="text-muted">En ma possession</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4 col-12 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="text-muted mb-1">Dernier Versement</h6>
+                                {% if etat_superviseur.dernier_versement %}
+                                <h4 class="text-info">{{ etat_superviseur.dernier_versement.montant_verse|intcomma }} FCFA</h4>
+                                <small class="text-muted">
+                                    Le {{ etat_superviseur.dernier_versement.date_versement_reelle|date:"d/m/Y" }}
+                                </small>
+                                {% else %}
+                                <h4 class="text-muted">Aucun</h4>
+                                <small class="text-muted">Aucun versement effectué</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Vue d'ensemble simplifiée -->
             <div class="row mb-4">
                 <div class="col-md-4">
                     <div class="card border-primary">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h6 class="card-title text-muted mb-1">Total Ventes</h6>
-                                    <h4 class="text-primary">{{ total_general_ventes }} FCFA</h4>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-shopping-cart fa-2x text-primary"></i>
-                                </div>
-                            </div>
+                        <div class="card-body text-center">
+                            <i class="fas fa-chart-line fa-2x text-primary mb-2"></i>
+                            <h6 class="text-muted mb-1">Total des Ventes</h6>
+                            <h3 class="text-primary">{{ total_ventes_tous_agents|intcomma }} FCFA</h3>
+                            <small class="text-muted">Agents + Superviseur</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card border-success">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h6 class="card-title text-muted mb-1">Total Recouvré</h6>
-                                    <h4 class="text-success">{{ total_general_recouvre }} FCFA</h4>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-money-bill-wave fa-2x text-success"></i>
-                                </div>
-                            </div>
+                        <div class="card-body text-center">
+                            <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                            <h6 class="text-muted mb-1">Total Recouvré</h6>
+                            <h3 class="text-success">{{ total_recouvre_tous_agents|intcomma }} FCFA</h3>
+                            <small class="text-muted">Déjà récupéré</small>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card border-warning">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <h6 class="card-title text-muted mb-1">Reste à Recouvrir</h6>
-                                    <h4 class="text-warning">{{ total_general_difference }} FCFA</h4>
-                                </div>
-                                <div class="align-self-center">
-                                    <i class="fas fa-exclamation-circle fa-2x text-warning"></i>
-                                </div>
-                            </div>
+                        <div class="card-body text-center">
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                            <h6 class="text-muted mb-1">Reste à Recouvrir</h6>
+                            <h3 class="text-warning">{{ reste_a_recouvrir|intcomma }} FCFA</h3>
+                            <small class="text-muted">En attente de recouvrement</small>
                         </div>
                     </div>
                 </div>
@@ -80,10 +130,10 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th>Agent</th>
-                                    <th>Téléphone</th>
-                                    <th class="text-end">Total Ventes</th>
-                                    <th class="text-end">Total Recouvré</th>
-                                    <th class="text-end">Reste à Recouvrir</th>
+                                    <th>Type</th>
+                                    <th class="text-end">Ventes Total</th>
+                                    <th class="text-end">Déjà Recouvré</th>
+                                    <th class="text-end">Solde</th>
                                     <th>Statut</th>
                                     <th class="text-center">Actions</th>
                                 </tr>
@@ -105,59 +155,45 @@
                                         </div>
                                     </td>
                                     <td>
-                                        {% if data.agent.telephone %}
-                                            <a href="tel:{{ data.agent.telephone }}" class="text-decoration-none">
-                                                <i class="fas fa-phone me-1"></i>{{ data.agent.telephone }}
-                                            </a>
-                                        {% else %}
-                                            <span class="text-muted">Non renseigné</span>
-                                        {% endif %}
+                                        <span class="badge {% if data.est_superviseur %}bg-info{% else %}bg-secondary{% endif %}">
+                                            {% if data.est_superviseur %}
+                                                <i class="fas fa-user-shield me-1"></i>Superviseur
+                                            {% else %}
+                                                <i class="fas fa-user me-1"></i>Agent Terrain
+                                            {% endif %}
+                                        </span>
                                     </td>
                                     <td class="text-end">
-                                        <strong>{{ data.total_ventes }} FCFA</strong>
+                                        <strong>{{ data.total_ventes|intcomma }} FCFA</strong>
                                     </td>
                                     <td class="text-end">
                                         <span class="text-success">
-                                            <i class="fas fa-check-circle me-1"></i>{{ data.total_recouvre }} FCFA
+                                            <i class="fas fa-check-circle me-1"></i>{{ data.total_recouvre|intcomma }} FCFA
                                         </span>
                                     </td>
                                     <td class="text-end">
                                         <span class="badge bg-{{ data.couleur }} fs-6">
-                                            {{ data.difference }} FCFA
+                                            {{ data.difference|intcomma }} FCFA
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge bg-{{ data.couleur }}">
-                                            {% if data.couleur == 'success' %}
-                                                <i class="fas fa-check me-1"></i>
-                                            {% elif data.couleur == 'warning' %}
-                                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                            {% else %}
-                                                <i class="fas fa-exclamation-circle me-1"></i>
-                                            {% endif %}
                                             {{ data.statut }}
                                         </span>
                                     </td>
                                     <td class="text-center">
                                         <div class="btn-group btn-group-sm">
-                                            {% if data.difference > 0 %}
+                                            {% if data.difference > 0 and not data.est_superviseur %}
                                             <a href="{% url 'creer_recouvrement' data.agent.id %}" 
-                                               class="btn btn-primary btn-sm" 
-                                               title="Effectuer un recouvrement">
-                                                <i class="fas fa-hand-holding-usd"></i>
-                                                Recouvrir
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-hand-holding-usd"></i> Recouvrir
+                                            </a>
+                                            {% elif data.est_superviseur and agent_connecte.id == data.agent.id %}
+                                            <a href="{% url 'creer_versement_avec_facture' %}" 
+                                               class="btn btn-success btn-sm">
+                                                <i class="fas fa-money-bill-wave"></i> Verser
                                             </a>
                                             {% endif %}
-                                            <a href="{% url 'historique_recouvrement' data.agent.id %}" 
-                                               class="btn btn-info btn-sm" 
-                                               title="Voir l'historique">
-                                                <i class="fas fa-history"></i>
-                                            </a>
-                                            <a href="{% url 'detail_agent' data.agent.id %}" 
-                                               class="btn btn-secondary btn-sm" 
-                                               title="Détails de l'agent">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
                                         </div>
                                     </td>
                                 </tr>
@@ -167,83 +203,16 @@
                                         <div class="text-muted">
                                             <i class="fas fa-users fa-3x mb-3"></i>
                                             <h5>Aucun agent trouvé</h5>
-                                            <p>Aucun agent terrain n'est enregistré dans le système.</p>
                                         </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
-                            <tfoot class="table-dark">
-                                <tr>
-                                    <th colspan="2">TOTAUX GÉNÉRAUX</th>
-                                    <th class="text-end">{{ total_general_ventes }} FCFA</th>
-                                    <th class="text-end">{{ total_general_recouvre }} FCFA</th>
-                                    <th class="text-end">{{ total_general_difference }} FCFA</th>
-                                    <th colspan="2"></th>
-                                </tr>
-                            </tfoot>
                         </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Légende -->
-            <div class="row mt-3">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <h6 class="card-title">
-                                <i class="fas fa-info-circle me-2"></i>Légende des statuts
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <span class="badge bg-success me-2"><i class="fas fa-check"></i></span>
-                                    <small>Complètement recouvré</small>
-                                </div>
-                                <div class="col-md-4">
-                                    <span class="badge bg-warning me-2"><i class="fas fa-exclamation-triangle"></i></span>
-                                    <small>En attente de recouvrement</small>
-                                </div>
-                                <div class="col-md-4">
-                                    <span class="badge bg-danger me-2"><i class="fas fa-exclamation-circle"></i></span>
-                                    <small>Erreur de calcul</small>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-.avatar-sm {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.table th {
-    border-top: none;
-    font-weight: 600;
-}
-
-.card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    border: 1px solid #e3e6f0;
-}
-
-.badge.fs-6 {
-    font-size: 0.85em !important;
-    padding: 0.35em 0.65em;
-}
-
-.btn-group-sm > .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-}
-</style>
 {% endblock %}

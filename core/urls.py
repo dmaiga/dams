@@ -62,6 +62,7 @@ urlpatterns = [
     path('factures/depots/', views.liste_factures, name='liste_factures'),
     path('lots/<int:lot_id>/', views.detail_lot, name='detail_lot'),
     path('factures/creer/', views.creer_facture, name='creer_facture'),
+    path('factures/versement/', views.creer_versement_avec_facture, name='creer_versement_avec_facture'),
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
     path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),
 #Clients

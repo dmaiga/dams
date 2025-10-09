@@ -528,8 +528,8 @@
                                 <span>Factures</span>
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'liste_factures_entrepot' %}">📦 Factures Entrepôt</a></li>
-                                <li><a class="dropdown-item" href="{% url 'liste_factures' %}">💰 Factures Dépôts</a></li>
+                                <li><a class="dropdown-item" href="{% url 'liste_factures_entrepot' %}">Fournisseur</a></li>
+                                <li><a class="dropdown-item" href="{% url 'liste_factures' %}">Versement</a></li>
                             </ul>
                         </div>
 
@@ -554,7 +554,7 @@
                         <small class="text-muted">
                             {% if request.user.agent.type_agent == 'direction' %}
                                 Direction
-                            {% elif request.user.agent.type_agent == 'entrepot' %}
+                            {% elif request.user.agent.type_agent == 'superviseur' %}
                                 Superviseur
                             {% else %}
                                 Agent Terrain

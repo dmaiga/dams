@@ -4,10 +4,10 @@ from django.utils import timezone
 from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
     DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
-    MouvementStock,Recouvrement,VersementBancaire,DepenseSuperviseur,Fournisseur
+    MouvementStock,Recouvrement,VersementBancaire,Fournisseur
 )
 from django.db import models
-
+import os
 
 
 class FournisseurForm(forms.ModelForm):
@@ -286,6 +286,7 @@ class UploadFactureForm(forms.ModelForm):
                 )
         return facture
 # forms.py
+
 class DistributionForm(forms.ModelForm):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent '),
@@ -452,7 +453,7 @@ class DistributionForm(forms.ModelForm):
         
     def save(self, commit=True):
         from django.db import transaction
-    
+
         instance = super().save(commit=False)
 
         # Récupérer ou créer le superviseur
@@ -473,6 +474,8 @@ class DistributionForm(forms.ModelForm):
 
                     produit = self.cleaned_data.get('produit')
                     quantite_demandee = self.cleaned_data.get('quantite')
+                    prix_gros = self.cleaned_data.get('prix_gros')
+                    prix_detail = self.cleaned_data.get('prix_detail')
 
                     if produit and quantite_demandee:
                         lots_disponibles = self.get_lots_disponibles_a_date(produit.nom, instance.date_distribution)
@@ -505,13 +508,14 @@ class DistributionForm(forms.ModelForm):
                             if quantite_a_prelever <= 0:
                                 continue
 
-                            # Préparer les objets à créer
+                            # ✅ CORRECTION : Créer UN SEUL DetailDistribution avec la quantité totale
+                            # Mais répartir sur les mouvements de stock par lot
                             details_creation.append(DetailDistribution(
                                 distribution=instance,
                                 lot=lot,
-                                quantite=quantite_a_prelever,
-                                prix_gros=self.cleaned_data.get('prix_gros'),
-                                prix_detail=self.cleaned_data.get('prix_detail')
+                                quantite=quantite_a_prelever,  # ✅ Quantité pour ce lot spécifique
+                                prix_gros=prix_gros,           # ✅ Même prix pour tous les lots du même produit
+                                prix_detail=prix_detail        # ✅ Même prix pour tous les lots du même produit
                             ))
 
                             # Préparer la mise à jour du lot
@@ -822,18 +826,6 @@ class VenteForm(forms.ModelForm):
             detail.save()
             
         return instance
-
-
-class FactureForm(forms.ModelForm):
-    class Meta:
-        model = Facture
-        fields = ['type_facture', 'montant', 'fichier_facture', 'description'] 
-        widgets = {
-            'type_facture': forms.Select(attrs={'class': 'form-select'}),
-            'montant': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'fichier_facture': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-        }
 
 # === FORMULAIRE DETTE (pour vente à crédit) ===
 class DetteForm(forms.ModelForm):
@@ -1171,26 +1163,67 @@ class RecouvrementForm(forms.ModelForm):
             raise forms.ValidationError("La date ne peut pas être dans le futur.")
             
         return date_recouvrement
-    
-class DepenseSuperviseurForm(forms.ModelForm):
-    class Meta:
-        model = DepenseSuperviseur
-        fields = ['montant', 'motif', 'commentaire', 'date_depense']
-        widgets = {
-            'montant': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'motif': forms.TextInput(attrs={'class': 'form-control'}),
-            'commentaire': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'date_depense': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-        }
-
-
+   
 class VersementBancaireForm(forms.ModelForm):
+    date_versement_reelle = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local'
+        }),
+        label="Date réelle du versement",
+        help_text="Laisser vide pour utiliser la date actuelle"
+    )
+    
     class Meta:
         model = VersementBancaire
-        fields = ['montant_verse', 'preuve_versement', 'description', 'date_versement']
+        fields = [
+            'montant_depenses', 
+            'details_depenses', 
+            'preuve_depenses',
+            'date_versement_reelle'
+        ]
         widgets = {
-            'montant_verse': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'preuve_versement': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'date_versement': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'montant_depenses': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'step': '0.01',
+                'placeholder': 'Total des dépenses'
+            }),
+            'details_depenses': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 4,
+                'placeholder': 'Détail des dépenses...'
+            }),
+            'preuve_depenses': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*,.pdf'
+            }),
+        }
+    
+    def clean_date_versement_reelle(self):
+        date_versement = self.cleaned_data.get('date_versement_reelle')
+        if not date_versement:
+            date_versement = timezone.now()
+        return date_versement
+    
+
+class FactureForm(forms.ModelForm):
+    class Meta:
+        model = Facture
+        fields = ['montant', 'fichier_facture', 'description']
+        widgets = {
+            'montant': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'step': '0.01',
+                'placeholder': 'Montant versé à la banque'
+            }),
+            'fichier_facture': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*,.pdf'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 3,
+                'placeholder': 'Description du versement'
+            }),
         }

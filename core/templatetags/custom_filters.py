@@ -26,3 +26,11 @@ def div(value, arg):
         return float(value) / float(arg)
     except (ValueError, ZeroDivisionError, TypeError):
         return 0
+    
+@register.filter
+def mul(value, arg):
+    """Multiplie la valeur par l'argument"""
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0

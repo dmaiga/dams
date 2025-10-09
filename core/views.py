@@ -30,7 +30,8 @@ from .models import (
     Agent, Client, Vente, Produit, Facture,
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
-    JournalModificationDistribution, MouvementStock,Recouvrement
+    JournalModificationDistribution, MouvementStock,
+    Recouvrement,VersementBancaire
 )
 
 # Project forms
@@ -38,7 +39,7 @@ from .forms import (
     VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
     DistributionModificationForm,UploadFactureForm,RecouvrementForm,
-    FournisseurForm
+    FournisseurForm,VersementBancaireForm
 )
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -81,6 +82,8 @@ def logout_user(request):
     logout(request)  
     return redirect('login') 
 
+def custom_403(request, exception=None):
+    return render(request, 'core/errors/403.html', status=403)
 #=========
 #AGENT
 #========
@@ -732,46 +735,25 @@ def liste_distributions(request):
     return render(request, 'core/distribution/liste_distributions.html', context)
 
 
-
 @login_required
 def detail_distribution(request, distribution_id):
-    """Détail d'une distribution spécifique - Données immuables"""
+    """Détail d'une distribution spécifique"""
     distribution = get_object_or_404(
         DistributionAgent.objects.select_related('superviseur', 'agent_terrain')
         .prefetch_related('detaildistribution_set__lot__produit'), 
         id=distribution_id
     )
     
-    # Récupérer les détails figés
-    details = distribution.detaildistribution_set.all()
-    
-    # Données immuables
-    produits_distribues = []
-    for detail in details:
-        produits_distribues.append({
-            'produit': detail.lot.produit,
-            'lot': detail.lot,
-            'quantite': detail.quantite,
-            'prix_gros': detail.prix_gros,
-            'prix_detail': detail.prix_detail,
-            'valeur_gros': (detail.prix_gros or 0) * detail.quantite,
-            'valeur_detail': (detail.prix_detail or 0) * detail.quantite,
-        })
-    
-    # Totaux immuables
-    quantite_totale = sum(detail.quantite for detail in details)
-    valeur_gros_totale = sum((detail.prix_gros or 0) * detail.quantite for detail in details)
-    valeur_detail_totale = sum((detail.prix_detail or 0) * detail.quantite for detail in details)
+    # Récupérer les détails
+    produits_distribues = distribution.detaildistribution_set.select_related('lot__produit')
     
     context = {
         'distribution': distribution,
         'produits_distribues': produits_distribues,
-        'quantite_totale': quantite_totale,
-        'valeur_gros_totale': valeur_gros_totale,
-        'valeur_detail_totale': valeur_detail_totale,
     }
     
     return render(request, 'core/distribution/detail_distribution.html', context)
+
 
 def get_stock_produit_a_date(request):
     """API pour récupérer le stock d'un produit à une date donnée (AJAX)"""
@@ -1368,11 +1350,91 @@ def creer_dette(request):
 #=====
 #FACTURE
 #=====
+@login_required
+def creer_versement_avec_facture(request):
+    """Créer un versement bancaire avec facture associée"""
+    agent_connecte = request.user.agent
+    
+    if not agent_connecte.est_superviseur:
+        messages.error(request, "Accès réservé aux superviseurs")
+        return redirect('tableau_de_bord')
+    
+    # Calculer le total recouvré depuis le dernier versement
+    dernier_versement = VersementBancaire.objects.filter(
+        superviseur=agent_connecte
+    ).order_by('-date_fin_periode').first()
+    
+    date_debut = dernier_versement.date_fin_periode if dernier_versement else timezone.now() - timedelta(days=365)
+    
+    total_recouvre = Recouvrement.objects.filter(
+        superviseur=agent_connecte,
+        date_recouvrement__gt=date_debut,
+        date_recouvrement__lte=timezone.now()  # Jusqu'à aujourd'hui par défaut
+    ).aggregate(total=Sum('montant_recouvre'))['total'] or 0
+    
+    if request.method == 'POST':
+        form_versement = VersementBancaireForm(request.POST, request.FILES)
+        form_facture = FactureForm(request.POST, request.FILES)
+        
+        if form_versement.is_valid() and form_facture.is_valid():
+            with transaction.atomic():
+                # Créer la facture d'abord
+                facture = form_facture.save(commit=False)
+                facture.agent = agent_connecte
+                facture.type_facture = 'versement_bancaire'
+                
+                # Utiliser la date rétroactive pour la facture aussi si fournie
+                if form_versement.cleaned_data.get('date_versement_reelle'):
+                    facture.date_depot = form_versement.cleaned_data['date_versement_reelle']
+                
+                facture.save()
+                
+                # Créer le versement bancaire
+                versement = form_versement.save(commit=False)
+                versement.facture = facture
+                versement.superviseur = agent_connecte
+                versement.montant_total_recouvre = total_recouvre
+                versement.date_debut_periode = date_debut
+                versement.save()
+            
+            # Message avec indication rétroactive
+            message = (
+                f"Versement enregistré! Recouvré: {total_recouvre} FCFA - "
+                f"Dépenses: {versement.montant_depenses} FCFA - "
+                f"Versé: {facture.montant} FCFA"
+            )
+            if versement.est_retroactif:
+                message += f" (Versement rétroactif du {versement.date_versement_reelle.strftime('%d/%m/%Y')})"
+            
+            messages.success(request, message)
+            return redirect('liste_factures')
+    
+    else:
+        form_versement = VersementBancaireForm(initial={
+            'montant_total_recouvre': total_recouvre,
+        })
+        form_facture = FactureForm(initial={
+            'montant': total_recouvre,
+            'description': f"Versement bancaire - Période du {date_debut.strftime('%d/%m/%Y')} au {timezone.now().strftime('%d/%m/%Y')}"
+        })
+    
+    context = {
+        'form_versement': form_versement,
+        'form_facture': form_facture,
+        'total_recouvre': total_recouvre,
+        'date_debut': date_debut,
+        'superviseur': agent_connecte,
+    }
+    return render(request, 'core/factures/creer_versement_facture.html', context)
 
-# Liste des factures
+
+@login_required
 def liste_factures(request):
     factures = Facture.objects.all().order_by('-date_depot')
-    return render(request, 'core/factures/liste_factures.html', {'factures': factures})
+    
+    return render(request, 'core/factures/liste_factures.html', {
+        'factures': factures
+    })
 
 # views.py
 @login_required
@@ -1575,59 +1637,82 @@ def liste_agents_recouvrement(request):
     
     # Déterminer quels agents afficher selon le type
     if agent_connecte.est_direction:
-        # Direction voit tous les agents terrain ET superviseurs
-        agents = Agent.objects.filter(type_agent__in=['terrain', 'superviseur'])
+        agents = Agent.objects.filter(type_agent__in=['terrain', 'entrepot'])
     elif agent_connecte.est_superviseur:
-        # Superviseur voit ses agents terrain + lui-même
         agents_terrain = Agent.objects.filter(type_agent='terrain')
         agents = list(agents_terrain) + [agent_connecte]
     else:
-        # Agent terrain ne voit personne
         agents = []
     
     agents_data = []
-    agent_ids_deja_vus = []  # Liste pour suivre les IDs déjà traités
+    
+    # TOTAUX SIMPLIFIÉS
+    total_ventes_tous_agents = 0
+    total_recouvre_tous_agents = 0
     
     for agent in agents:
-        # Éviter les doublons en utilisant les IDs
-        if agent.id in agent_ids_deja_vus:
-            continue
-        agent_ids_deja_vus.append(agent.id)
+        if agent.est_superviseur:
+            # SUPERVISEUR : ses ventes sont déjà recouvrées (auto-recouvrement)
+            total_ventes = agent.total_ventes  # Ventes directes du superviseur
+            total_recouvre = agent.total_ventes  # Auto-recouvré immédiatement
+            difference = 0  # Toujours à jour car auto-recouvré
+            depenses = agent.total_depenses_superviseur
             
-        total_ventes = agent.total_ventes
-        total_recouvre = agent.total_recouvre
-        difference = total_ventes - total_recouvre
-        
-        # Déterminer la couleur en fonction de la différence
-        if difference == 0:
-            couleur = 'success'
-            statut = 'Complètement recouvré'
-        elif difference > 0:
-            couleur = 'warning'
-            statut = f'{difference} FCFA à recouvrir'
+            # Statut superviseur
+            couleur, statut = 'success', 'À jour (auto-recouvré)'
+                
         else:
-            couleur = 'danger'
-            statut = 'Erreur de calcul'
+            # AGENT TERRAIN : logique normale
+            total_ventes = agent.total_ventes
+            total_recouvre = agent.total_recouvre
+            difference = total_ventes - total_recouvre
+            depenses = 0
+            
+            # Statut agent terrain
+            if difference == 0:
+                couleur, statut = 'success', 'Complètement recouvré'
+            elif difference > 0:
+                couleur, statut = 'warning', f'{difference:,.0f} FCFA à recouvrir'
+            else:
+                couleur, statut = 'danger', 'Erreur de calcul'
+        
+        # Accumuler les totaux
+        total_ventes_tous_agents += total_ventes
+        total_recouvre_tous_agents += total_recouvre
         
         agents_data.append({
             'agent': agent,
             'total_ventes': total_ventes,
             'total_recouvre': total_recouvre,
+            'depenses': depenses,
             'difference': difference,
             'couleur': couleur,
             'statut': statut,
             'est_auto_recouvrement': agent.id == agent_connecte.id,
+            'est_superviseur': agent.est_superviseur,
         })
     
-    # Trier par différence décroissante
-    agents_data.sort(key=lambda x: x['difference'], reverse=True)
+    # TOTAUX GÉNÉRAUX CLAIRS
+    reste_a_recouvrir = total_ventes_tous_agents - total_recouvre_tous_agents
+    
+    # État du superviseur connecté (si c'est un superviseur)
+    etat_superviseur = None
+    if agent_connecte.est_superviseur:
+        etat_superviseur = {
+            'total_ventes_personnelles': agent_connecte.total_ventes,
+            'total_depenses': agent_connecte.total_depenses_superviseur,
+            'total_versements_bancaires': agent_connecte.total_versements_bancaires,
+            'solde_actuel': agent_connecte.solde_superviseur,
+            'dernier_versement': agent_connecte.dernier_versement_superviseur,
+        }
     
     context = {
         'agents_data': agents_data,
-        'total_general_ventes': sum(item['total_ventes'] for item in agents_data),
-        'total_general_recouvre': sum(item['total_recouvre'] for item in agents_data),
-        'total_general_difference': sum(item['difference'] for item in agents_data),
+        'total_ventes_tous_agents': total_ventes_tous_agents,
+        'total_recouvre_tous_agents': total_recouvre_tous_agents,
+        'reste_a_recouvrir': reste_a_recouvrir,
         'agent_connecte': agent_connecte,
+        'etat_superviseur': etat_superviseur,
     }
     
     return render(request, 'core/recouvrement/liste_agents.html', context)
@@ -1740,7 +1825,6 @@ class ClientDeleteView(LoginRequiredMixin, DeleteView):
 #=====
 #   Superviseur
 #=====
-
 @login_required
 def tableau_de_bord_superviseur(request):
     # Vérifier que l'utilisateur est un superviseur
@@ -1749,8 +1833,8 @@ def tableau_de_bord_superviseur(request):
     except Agent.DoesNotExist:
         return render(request, 'errors/403.html', status=403)
     
-    # Période pour les statistiques (30 derniers jours)
-    date_debut = timezone.now() - timedelta(days=30)
+    # SUPPRIMER le filtre de date - TOUTES LES PÉRIODES
+    # date_debut = timezone.now() - timedelta(days=30)  # ← SUPPRIMÉ
     
     # Vue Stock
     stock_total = LotEntrepot.objects.filter(quantite_restante__gt=0).aggregate(
@@ -1760,83 +1844,159 @@ def tableau_de_bord_superviseur(request):
     
     produits_stock = LotEntrepot.objects.filter(
         quantite_restante__gt=0
-    ).values(
+    ).select_related('produit').values(
         'produit__nom'
     ).annotate(
         quantite_totale=Sum('quantite_restante'),
         valeur_totale=Sum(F('quantite_restante') * F('prix_achat_unitaire'))
     ).order_by('-quantite_totale')
     
-    # Vue Agents
-    agents_terrain = Agent.objects.filter(type_agent='terrain')
+    # Vue Agents - TOUTES LES PÉRIODES
+    agents_terrain = Agent.objects.filter(type_agent='terrain').select_related('user')
     
-    # Performances des agents (ventes des 30 derniers jours)
     performances_agents = []
     for agent in agents_terrain:
-        ventes_agent = Vente.objects.filter(
-            agent=agent,
-            date_vente__gte=date_debut
-        ).aggregate(
+        # SUPPRIMER le filtre de date - TOUTES LES VENTES
+        ventes_agent_toutes = Vente.objects.filter(agent=agent)  # ← Pas de filtre date
+        
+        # Utiliser aggregate() pour toutes les ventes
+        stats_ventes = ventes_agent_toutes.aggregate(
             total_ventes=Sum(F('quantite') * F('prix_vente_unitaire')),
             nombre_ventes=Count('id'),
-            clients_distincts=Count('client', distinct=True)
+            clients_distincts=Count('client', distinct=True),
+            quantite_vendue=Sum('quantite'),
+            ventes_gros=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='gros')),
+            ventes_detail=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='detail'))
         )
         
-        distributions_agent = DistributionAgent.objects.filter(
+        # Distributions récentes (garder 30j pour info récente)
+        date_debut_recent = timezone.now() - timedelta(days=30)
+        distributions_recentes = DistributionAgent.objects.filter(
             agent_terrain=agent,
-            date_distribution__gte=date_debut
+            date_distribution__gte=date_debut_recent
         ).aggregate(
             total_produits=Sum('quantite_totale')
         )
         
         performances_agents.append({
             'agent': agent,
-            'total_ventes': ventes_agent['total_ventes'] or 0,
-            'nombre_ventes': ventes_agent['nombre_ventes'] or 0,
-            'clients_distincts': ventes_agent['clients_distincts'] or 0,
-            'produits_distribues': distributions_agent['total_produits'] or 0
+            'total_ventes': stats_ventes['total_ventes'] or 0,  # ← Renommé sans "_periode"
+            'ventes_gros': stats_ventes['ventes_gros'] or 0,
+            'ventes_detail': stats_ventes['ventes_detail'] or 0,
+            'nombre_ventes': stats_ventes['nombre_ventes'] or 0,
+            'clients_distincts': stats_ventes['clients_distincts'] or 0,
+            'quantite_vendue': stats_ventes['quantite_vendue'] or 0,
+            'produits_distribues_recent': distributions_recentes['total_produits'] or 0,  # ← Récent seulement
+            
+            # Propriétés historiques de l'agent
+            'total_ventes_historique': agent.total_ventes,
+            'total_recouvre': agent.total_recouvre,
+            'argent_en_possession': agent.argent_en_possession,
+            'peut_etre_recouvre': agent.peut_etre_recouvre,
         })
     
-    # Vue Ventes globales
-    ventes_30j = Vente.objects.filter(date_vente__gte=date_debut).aggregate(
+    # VUE VENTES GLOBALES - TOUTES LES PÉRIODES
+    ventes_toutes_queryset = Vente.objects.all()  # ← Pas de filtre date
+    
+    stats_ventes_global = ventes_toutes_queryset.aggregate(
         total_ventes=Sum(F('quantite') * F('prix_vente_unitaire')),
         nombre_ventes=Count('id'),
-        quantite_vendue=Sum('quantite')
+        quantite_vendue=Sum('quantite'),
+        ventes_gros=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='gros')),
+        ventes_detail=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='detail')),
+        ventes_credit=Count('id', filter=Q(mode_paiement='credit')),
+        ventes_comptant=Count('id', filter=Q(mode_paiement='comptant'))
     )
     
-    ventes_par_type = Vente.objects.filter(
-        date_vente__gte=date_debut
-    ).values(
+    ventes_global = {  # ← Renommé de ventes_30j à ventes_global
+        'total_ventes': stats_ventes_global['total_ventes'] or 0,
+        'ventes_gros': stats_ventes_global['ventes_gros'] or 0,
+        'ventes_detail': stats_ventes_global['ventes_detail'] or 0,
+        'nombre_ventes': stats_ventes_global['nombre_ventes'] or 0,
+        'quantite_vendue': stats_ventes_global['quantite_vendue'] or 0,
+        'ventes_credit': stats_ventes_global['ventes_credit'] or 0,
+        'ventes_comptant': stats_ventes_global['ventes_comptant'] or 0,
+    }
+    
+    # Ventes par type - TOUTES LES PÉRIODES
+    ventes_par_type = Vente.objects.all().values(  # ← Pas de filtre date
         'type_vente'
     ).annotate(
         total=Sum(F('quantite') * F('prix_vente_unitaire')),
-        count=Count('id')
+        count=Count('id'),
+        quantite=Sum('quantite')
     )
     
-    # Vue personnelle du superviseur (en tant qu'agent vendeur)
-    ventes_superviseur = Vente.objects.filter(
-        agent=superviseur,
-        date_vente__gte=date_debut
-    ).aggregate(
+    # VUE PERSONNELLE SUPERVISEUR - TOUTES LES PÉRIODES
+    ventes_superviseur_queryset = Vente.objects.filter(agent=superviseur)  # ← Pas de filtre date
+    
+    stats_ventes_superviseur = ventes_superviseur_queryset.aggregate(
         total_ventes=Sum(F('quantite') * F('prix_vente_unitaire')),
         nombre_ventes=Count('id'),
-        quantite_vendue=Sum('quantite')
+        quantite_vendue=Sum('quantite'),
+        ventes_gros=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='gros')),
+        ventes_detail=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='detail'))
     )
     
+    ventes_superviseur = {
+        'total_ventes': stats_ventes_superviseur['total_ventes'] or 0,
+        'ventes_gros': stats_ventes_superviseur['ventes_gros'] or 0,
+        'ventes_detail': stats_ventes_superviseur['ventes_detail'] or 0,
+        'nombre_ventes': stats_ventes_superviseur['nombre_ventes'] or 0,
+        'quantite_vendue': stats_ventes_superviseur['quantite_vendue'] or 0,
+    }
+    
+    # Distributions récentes seulement (30j) pour info
     distributions_superviseur = DistributionAgent.objects.filter(
         Q(superviseur=superviseur) | Q(agent_terrain=superviseur),
-        date_distribution__gte=date_debut
+        date_distribution__gte=date_debut_recent
     ).count()
+    
+    # STATISTIQUES SUPERVISEUR
+    stats_superviseur = {
+        'total_recouvrements': superviseur.total_recouvrements_supervises,
+        'total_depenses': superviseur.total_depenses_superviseur,
+        'total_versements': superviseur.total_versements_bancaires,
+        'solde_actuel': superviseur.solde_superviseur,
+        'dernier_versement': superviseur.dernier_versement_superviseur,
+        'versements_recents': superviseur.versements_recents_superviseur,
+    }
     
     # Alertes stock faible
     seuil_stock_faible = 10
     stocks_faibles = LotEntrepot.objects.filter(
         quantite_restante__lte=seuil_stock_faible,
         quantite_restante__gt=0
-    )
+    ).select_related('produit')
     
     # Dettes en cours
-    dettes_en_cours = Dette.objects.filter(statut__in=['en_cours', 'partiellement_paye']).count()
+    dettes_en_cours = Dette.objects.filter(
+        statut__in=['en_cours', 'partiellement_paye']
+    ).count()
+    
+    # RÉCAPITULATIF FINANCIER - TOUTES PÉRIODES
+    total_ventes_agents = sum(agent['total_ventes'] for agent in performances_agents)
+    total_ventes_superviseur_calc = ventes_superviseur['total_ventes']
+    total_ventes_global_calc = total_ventes_agents + total_ventes_superviseur_calc
+    
+    # Vérification que les totaux correspondent
+    ecart = abs(total_ventes_global_calc - ventes_global['total_ventes'])
+    correspond = ecart < 0.01  # Tolérance de 0.01 FCFA
+    
+    recapitulatif_financier = {
+        'valeur_stock_total': stock_total['total_valeur'] or 0,
+        'ventes_total': ventes_global['total_ventes'],  # ← Renommé
+        'total_a_recouvrer': sum(agent['argent_en_possession'] for agent in performances_agents),
+        'dettes_en_cours_count': dettes_en_cours,
+        'verification_ventes': {
+            'total_agents': total_ventes_agents,
+            'total_superviseur': total_ventes_superviseur_calc,
+            'total_global_calc': total_ventes_global_calc,
+            'total_global_direct': ventes_global['total_ventes'],
+            'ecart': ecart,
+            'correspond': correspond
+        }
+    }
     
     context = {
         'superviseur': superviseur,
@@ -1851,17 +2011,21 @@ def tableau_de_bord_superviseur(request):
         'agents_terrain': agents_terrain,
         'performances_agents': performances_agents,
         
-        # Données ventes globales
-        'ventes_30j': ventes_30j,
+        # Données ventes globales - TOUTES PÉRIODES
+        'ventes_global': ventes_global,  # ← Renommé
         'ventes_par_type': ventes_par_type,
-        'date_debut': date_debut,
+        # 'date_debut': date_debut,  # ← SUPPRIMÉ
         
         # Données personnelles superviseur
         'ventes_superviseur': ventes_superviseur,
         'distributions_superviseur': distributions_superviseur,
+        'stats_superviseur': stats_superviseur,
         
         # Alertes
         'dettes_en_cours': dettes_en_cours,
+        
+        # Récapitulatif
+        'recapitulatif_financier': recapitulatif_financier,
     }
     
     return render(request, 'core/dashboard/superviseur.html', context)
