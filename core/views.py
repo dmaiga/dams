@@ -39,14 +39,13 @@ from .forms import (
     VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
     DistributionModificationForm,UploadFactureForm,RecouvrementForm,
-    FournisseurForm,VersementBancaireForm
+    FournisseurForm,VersementBancaireForm,AgentCreationForm, AgentModificationForm
+
 )
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-
-
 
 
 def custom_login(request):
@@ -56,27 +55,51 @@ def custom_login(request):
             user = form.get_user()
             login(request, user)
 
-            # Vérifier si l'utilisateur est un agent
             try:
                 agent = Agent.objects.get(user=user)
-                if agent.type_agent == "direction": 
-                    return redirect("dashboard")  # Tableau de bord admin
-                elif agent.type_agent == "entrepot": 
+
+                # 🔹 Cas des stagiaires
+                if agent.type_agent == "stagiaire":
+                    # Si la date d'expiration est dépassée
+                    if agent.est_expire:
+                        user.is_active = False
+                        user.save(update_fields=["is_active"])
+                        messages.error(request, "⏳ Votre période de stage est expirée. Contactez votre superviseur.")
+                        return redirect("login")
+
+                    # Sinon stagiaire valide → accès limité au dashboard agent
+                    else:
+                        return redirect("dashboard_agent")
+
+                # 🔹 Cas des agents classiques
+                elif agent.type_agent == "direction":
+                    return redirect("dashboard")
+
+                elif agent.type_agent == "entrepot":
                     return redirect("tableau_de_bord_superviseur")
-                elif agent.type_agent == "terrain":  
+
+                elif agent.type_agent == "terrain":
                     return redirect("dashboard_agent")
-            except Agent.DoesNotExist:
-                # Pas un agent → tableau générique ou admin Django
-                if user.is_staff or user.is_superuser:
-                    return redirect("admin:index")  # Admin Django
+
                 else:
-                    return redirect("login")  # Tableau de bord générique
+                    # Par défaut, on redirige vers le dashboard agent
+                    return redirect("dashboard_agent")
+
+            except Agent.DoesNotExist:
+                # 🔹 Pas un agent connu, mais utilisateur du staff
+                if user.is_staff or user.is_superuser:
+                    return redirect("admin:index")
+
+                messages.warning(request, "Aucun profil d’agent associé à ce compte.")
+                return redirect("login")
+
         else:
             messages.error(request, "Nom d'utilisateur ou mot de passe incorrect.")
     else:
         form = AuthenticationForm()
 
     return render(request, "registration/login.html", {"form": form})
+
 
 def logout_user(request):
     logout(request)  
@@ -178,7 +201,7 @@ def dashboard_agent(request):
 @login_required
 def liste_agents(request):
     """Liste uniquement les agents terrain et superviseurs"""
-    agents = Agent.objects.filter(type_agent__in=['entrepot', 'terrain'])
+    agents = Agent.objects.filter(type_agent__in=['entrepot', 'terrain','stagiaire'])
     return render(request, 'core/agents/liste_agents.html', {'agents': agents})
 
 
@@ -224,51 +247,61 @@ def detail_agent(request, agent_id):
     
     return render(request, 'core/agents/detail_agent.html', context)
 
+
 @login_required
 def creer_agent(request):
-    """Créer un nouvel agent"""
-    if request.method == 'POST':
-        nom = request.POST.get('nom')
-        prenom = request.POST.get('prenom')
-        telephone = request.POST.get('telephone')
-        type_agent = request.POST.get('type_agent', 'terrain')
-        
-        # Créer l'utilisateur
-        user = User.objects.create_user(
-            username=telephone,
-            password='temp123',  
-            first_name=nom,
-            last_name=prenom
-        )
-        
-        # Créer l'agent
-        agent = Agent.objects.create(
-            user=user,
-            telephone=telephone,
-            type_agent=type_agent
-        )
-        
-        return redirect('liste_agents')
+    """Uniquement pour les superviseurs - créer agent terrain ou stagiaire"""
+    # Vérifier que c'est un superviseur
+    try:
+        superviseur = request.user.agent
+        if not superviseur.est_superviseur:
+            messages.error(request, "❌ Seuls les superviseurs peuvent créer des agents.")
+            return redirect('dashboard')
+    except:
+        messages.error(request, "❌ Accès non autorisé.")
+        return redirect('dashboard')
     
-    return render(request, 'core/agents/creer_agent.html')
+    if request.method == 'POST':
+        form = AgentCreationForm(request.POST)
+        if form.is_valid():
+            agent = form.save()
+            
+            if agent.est_stagiaire:
+                messages.success(request, f"✅ Stagiaire créé ! Test de 15 jours.")
+            else:
+                messages.success(request, f"✅ Agent terrain créé !")
+                
+            return redirect('liste_agents')
+    else:
+        form = AgentCreationForm()
+    
+    return render(request, 'core/agents/creer_agent.html', {'form': form})
 
 @login_required
 def modifier_agent(request, agent_id):
-    """Modifier un agent existant"""
+    """Modifier un agent - promotion simple"""
     agent = get_object_or_404(Agent, id=agent_id)
     
     if request.method == 'POST':
-        agent.user.first_name = request.POST.get('nom')
-        agent.user.last_name = request.POST.get('prenom')
-        agent.telephone = request.POST.get('telephone')
-        agent.type_agent = request.POST.get('type_agent')
-        
-        agent.user.save()
-        agent.save()
-        
-        return redirect('liste_agents')
+        form = AgentModificationForm(request.POST, instance=agent)
+        if form.is_valid():
+            ancien_type = agent.type_agent
+            agent_modifie = form.save()
+            
+            # Message simple si promotion de stagiaire
+            if ancien_type == 'stagiaire' and not agent_modifie.est_stagiaire:
+                messages.success(request, f"✅ {agent_modifie.full_name} promu {agent_modifie.get_type_agent_display()} !")
+            else:
+                messages.success(request, f"✅ Agent modifié avec succès !")
+                
+            return redirect('liste_agents')
+    else:
+        form = AgentModificationForm(instance=agent)
     
-    return render(request, 'core/agents/modifier_agent.html', {'agent': agent})
+    return render(request, 'core/agents/modifier_agent.html', {
+        'form': form, 
+        'agent': agent
+    })
 
 @login_required
 def supprimer_agent(request, agent_id):
@@ -486,7 +519,7 @@ def mon_stock(request):
         return redirect('access_denied')
     
     # Vérifier que l'utilisateur est un agent terrain
-    if agent.type_agent not in ['terrain', 'entrepot']:
+    if agent.type_agent not in ['terrain', 'entrepot','stagiaire']:
         return redirect('access_denied')
     
     # Calcul du stock actuel de l'agent
@@ -598,9 +631,11 @@ def distribuer_produits_agent(request):
                 
                 # Message personnalisé selon le type de distribution
                 if distribution.type_distribution == 'AUTO':
-                    messages.success(request, f"✅ Auto-distribution #{distribution.id} créée avec succès! Vous pouvez maintenant vendre ces produits.")
+                    messages.success(request, f"✅ Auto-distribution #{distribution.id} créée avec succès !")
+                elif distribution.type_distribution == 'STAGIAIRE':
+                    messages.success(request, f"✅ Distribution #{distribution.id} envoyée à un stagiaire ({distribution.agent_terrain}) avec succès !")
                 else:
-                    messages.success(request, f"✅ Distribution #{distribution.id} vers {distribution.agent_terrain} créée avec succès!")
+                    messages.success(request, f"✅ Distribution #{distribution.id} vers {distribution.agent_terrain} créée avec succès !")
                 
                 return redirect('liste_distributions')
                 
@@ -1613,13 +1648,13 @@ def creer_recouvrement(request, agent_id):
     # Vérifications de sécurité
     if agent_connecte.est_agent_terrain:
         messages.error(request, "Les agents terrain ne peuvent pas effectuer de recouvrements.")
-        return redirect('tableau_de_bord')
+        return redirect('dashboard_agent')
     
     # Un superviseur peut recouvrir ses propres ventes OU celles des agents terrain
     if agent_connecte.est_superviseur:
         if not (agent.est_agent_terrain or agent.id == agent_connecte.id):
             messages.error(request, "Vous ne pouvez recouvrir que vos propres ventes ou celles de vos agents terrain.")
-            return redirect('tableau_de_bord')
+            return redirect('tableau_de_bord_superviseur')
     
     # Un directeur peut recouvrir tout le monde
     if agent_connecte.est_direction:
@@ -2025,7 +2060,7 @@ def tableau_de_bord_superviseur(request):
     
     # STATISTIQUES SUPERVISEUR
     stats_superviseur = {
-        'total_recouvrements': superviseur.total_recouvrements_supervises,
+        'total_recouvrements': superviseur.total_argent_recouvre_et_ventes,
         'total_depenses': superviseur.total_depenses_superviseur,
         'total_versements': superviseur.total_versements_bancaires,
         'solde_actuel': superviseur.solde_superviseur,

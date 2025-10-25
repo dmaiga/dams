@@ -1,52 +1,119 @@
-<!-- templates/agents/modifier_agent.html -->
+<!-- core/agents/modifier_agent.html -->
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Modifier l'Agent</h1>
-    <a href="{% url 'liste_agents' %}" class="btn btn-secondary">← Retour</a>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-            
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="nom" class="form-label">Nom *</label>
-                    <input type="text" class="form-control" id="nom" name="nom" 
-                           value="{{ agent.user.first_name }}" required>
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Modifier {{ agent.full_name }}</h4>
                 </div>
-                <div class="col-md-6">
-                    <label for="prenom" class="form-label">Prénom *</label>
-                    <input type="text" class="form-control" id="prenom" name="prenom" 
-                           value="{{ agent.user.last_name }}" required>
+                <div class="card-body">
+                    <!-- Messages d'erreur/succès -->
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Affichage des erreurs non-field -->
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Statut actuel -->
+                    {% if agent.est_stagiaire %}
+                    <div class="alert alert-info">
+                        <strong><i class="fas fa-user-graduate"></i> Statut Stagiaire Actuel</strong><br>
+                        {% if agent.est_expire %}
+                            <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> COMPTE EXPIRÉ</span><br>
+                            <small>L'agent ne peut plus se connecter</small>
+                        {% else %}
+                            <span class="text-success"><i class="fas fa-check-circle"></i> Stage en cours</span><br>
+                            <small>Expire dans {{ agent.jours_restants }} jours (le {{ agent.date_expiration|date:"d/m/Y" }})</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nom</label>
+                            {{ form.nom }}
+                            {% if form.nom.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.nom.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Prénom</label>
+                            {{ form.prenom }}
+                            {% if form.prenom.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.prenom.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Téléphone</label>
+                            {{ form.telephone }}
+                            {% if form.telephone.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.telephone.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            {{ form.type_agent }}
+                            {% if form.type_agent.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.type_agent.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if agent.est_stagiaire %}
+                            <div class="form-text text-success">
+                                <i class="fas fa-arrow-up"></i> Promotion possible vers Agent Terrain
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-primary me-md-2">
+                                <i class="fas fa-save"></i> 
+                                {% if agent.est_stagiaire %}Promouvoir{% else %}Modifier{% endif %}
+                            </button>
+                            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
                 </div>
             </div>
-
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="telephone" class="form-label">Téléphone *</label>
-                    <input type="tel" class="form-control" id="telephone" name="telephone" 
-                           value="{{ agent.telephone }}" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="type_agent" class="form-label">Type d'Agent *</label>
-                    <select class="form-select" id="type_agent" name="type_agent" required>
-                        <option value="terrain" {% if agent.type_agent == 'terrain' %}selected{% endif %}>
-                            Agent Terrain
-                        </option>
-                        <option value="superviseur" {% if agent.type_agent == 'superviseur' %}selected{% endif %}>
-                            Superviseur
-                        </option>
-                    </select>
-                </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
-            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">Annuler</a>
-        </form>
+        </div>
     </div>
 </div>
 {% endblock %}

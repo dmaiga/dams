@@ -1,240 +1,135 @@
-<!-- creer_versement_facture.html -->
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Nouveau Versement Bancaire - {{ block.super }}{% endblock %}
+{% block title %}Recouvrement - {{ agent.full_name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-money-bill-wave me-2"></i>
-                        Nouveau Versement Bancaire
-                    </h5>
-                    <a href="{% url 'liste_factures' %}" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i> Retour aux factures
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-3">
+                        <i class="fas fa-arrow-left"></i>
                     </a>
+                    <div>
+                        <h1 class="h3 mb-1">Recouvrement - {{ agent.full_name }}</h1>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-0">
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
+                                <li class="breadcrumb-item active">Recouvrement</li>
+                            </ol>
+                        </nav>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <!-- Résumé de la période -->
-                    <div class="alert alert-info">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="alert-heading mb-2">
-                                    <i class="fas fa-calendar me-2"></i>
-                                    Période du {{ date_debut|date:"d/m/Y" }} au {% now "d/m/Y" %}
-                                </h6>
-                                <p class="mb-0">
-                                    <strong>Total recouvré:</strong> 
-                                    <span class="badge bg-primary fs-6">{{ total_recouvre }} FCFA</span>
-                                </p>
+            </div>
+
+            <!-- Informations agent -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Informations Financières
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <strong>Total Ventes:</strong><br>
+                                    <span class="h5 text-primary">{{ total_ventes }} FCFA</span>
+                                </div>
+                                <div class="col-6">
+                                    <strong>Déjà Recouvré:</strong><br>
+                                    <span class="h5 text-success">{{ total_recouvre }} FCFA</span>
+                                </div>
                             </div>
-                            <div class="text-end">
-                                <small class="text-muted">
-                                    Superviseur: <strong>{{ superviseur.full_name }}</strong>
-                                </small>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <strong>Argent en Possession:</strong><br>
+                                    <span class="h4 text-warning">{{ argent_en_possession }} FCFA</span>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <form method="post" enctype="multipart/form-data" novalidate>
+            <!-- Formulaire de recouvrement -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-hand-holding-usd me-2"></i>Nouveau Recouvrement
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
                         {% csrf_token %}
                         
+                        <!-- Affichage des erreurs globales -->
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
                         <div class="row">
-                            <!-- Colonne Facture -->
                             <div class="col-md-6">
-                                <div class="card border-primary">
-                                    <div class="card-header bg-primary text-white">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-file-invoice me-2"></i>
-                                            Informations du Versement
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <!-- Date rétroactive -->
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Date réelle du versement</label>
-                                            {{ form_versement.date_versement_reelle }}
-                                            {% if form_versement.date_versement_reelle.errors %}
-                                                <div class="text-danger small mt-1">
-                                                    {{ form_versement.date_versement_reelle.errors }}
-                                                </div>
-                                            {% endif %}
-                                            <div class="form-text">
-                                                Date à laquelle le versement a été effectué à la banque. 
-                                                Laisser vide pour la date actuelle.
-                                            </div>
+                                <div class="mb-3">
+                                    {{ form.montant_recouvre.label_tag }}
+                                    {{ form.montant_recouvre }}
+                                    {% if form.montant_recouvre.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.montant_recouvre.errors %}
+                                                {{ error }}
+                                            {% endfor %}
                                         </div>
-
-                                        <!-- Montant versé -->
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Montant versé à la banque *</label>
-                                            {{ form_facture.montant }}
-                                            {% if form_facture.montant.errors %}
-                                                <div class="text-danger small mt-1">
-                                                    {{ form_facture.montant.errors }}
-                                                </div>
-                                            {% endif %}
-                                            <div class="form-text">
-                                                Montant effectivement déposé à la banque
-                                            </div>
-                                        </div>
-
-                                        <!-- Preuve versement -->
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Photo du reçu de versement *</label>
-                                            {{ form_facture.fichier_facture }}
-                                            {% if form_facture.fichier_facture.errors %}
-                                                <div class="text-danger small mt-1">
-                                                    {{ form_facture.fichier_facture.errors }}
-                                                </div>
-                                            {% endif %}
-                                            <div class="form-text">
-                                                Photo du reçu bancaire ou ticket de dépôt
-                                            </div>
-                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Maximum: {{ argent_en_possession }} FCFA
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Colonne Dépenses -->
+                            
                             <div class="col-md-6">
-                                <div class="card border-warning">
-                                    <div class="card-header bg-warning text-dark">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-receipt me-2"></i>
-                                            Dépenses Effectuées
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <!-- Montant dépenses -->
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Total des dépenses</label>
-                                            {{ form_versement.montant_depenses }}
-                                            {% if form_versement.montant_depenses.errors %}
-                                                <div class="text-danger small mt-1">
-                                                    {{ form_versement.montant_depenses.errors }}
-                                                </div>
-                                            {% endif %}
-                                            <div class="form-text">
-                                                Somme totale des dépenses pour la société
-                                            </div>
+                                <div class="mb-3">
+                                    {{ form.date_recouvrement.label_tag }}
+                                    {{ form.date_recouvrement }}
+                                    {% if form.date_recouvrement.errors %}
+                                        <div class="text-danger small">
+                                            {% for error in form.date_recouvrement.errors %}
+                                                {{ error }}
+                                            {% endfor %}
                                         </div>
-
-                                        <!-- Détail dépenses -->
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Détail des dépenses</label>
-                                            {{ form_versement.details_depenses }}
-                                            {% if form_versement.details_depenses.errors %}
-                                                <div class="text-danger small mt-1">
-                                                    {{ form_versement.details_depenses.errors }}
-                                                </div>
-                                            {% endif %}
-                                            <div class="form-text">
-                                                Ex: Carburant,Communication,Fournitures etc..
-                                            </div>
-                                        </div>
-
-                                        <!-- Preuves dépenses -->
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Justificatifs des dépenses</label>
-                                            {{ form_versement.preuve_depenses }}
-                                            {% if form_versement.preuve_depenses.errors %}
-                                                <div class="text-danger small mt-1">
-                                                    {{ form_versement.preuve_depenses.errors }}
-                                                </div>
-                                            {% endif %}
-                                            <div class="form-text">
-                                                Photos des reçus ou factures des dépenses (facultatif)
-                                            </div>
-                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Date à laquelle l'argent a été récupéré
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Description -->
-                        <div class="card border-info mt-3">
-                            <div class="card-header bg-info text-white">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-comment me-2"></i>
-                                    Description
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                {{ form_facture.description }}
-                                {% if form_facture.description.errors %}
-                                    <div class="text-danger small mt-1">
-                                        {{ form_facture.description.errors }}
-                                    </div>
-                                {% endif %}
-                                <div class="form-text">
-                                    Description détaillée du versement et des dépenses
+                        <div class="mb-3">
+                            {{ form.commentaire.label_tag }}
+                            {{ form.commentaire }}
+                            {% if form.commentaire.errors %}
+                                <div class="text-danger small">
+                                    {% for error in form.commentaire.errors %}
+                                        {{ error }}
+                                    {% endfor %}
                                 </div>
-                            </div>
+                            {% endif %}
                         </div>
 
-                        <!-- Résumé calculé -->
-                        <div class="card border-success mt-3">
-                            <div class="card-header bg-success text-white">
-                                <h6 class="mb-0">
-                                    <i class="fas fa-calculator me-2"></i>
-                                    Récapitulatif
-                                </h6>
-                            </div>
-                            <div class="card-body">
-                                <div class="row text-center">
-                                    <div class="col-md-3">
-                                        <div class="border-end">
-                                            <h5 class="text-primary">{{ total_recouvre }} FCFA</h5>
-                                            <small class="text-muted">Total Recouvré</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="border-end">
-                                            <h5 class="text-warning" id="display-depenses">0 FCFA</h5>
-                                            <small class="text-muted">Dépenses</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div class="border-end">
-                                            <h5 class="text-info" id="display-solde">{{ total_recouvre }} FCFA</h5>
-                                            <small class="text-muted">Solde Théorique</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <div>
-                                            <h5 class="text-success" id="display-verse">{{ total_recouvre }} FCFA</h5>
-                                            <small class="text-muted">À Verser</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Alerte de vérification -->
-                                <div class="alert alert-light border mt-3" id="verification-alert">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-info-circle text-info me-2"></i>
-                                        <div>
-                                            <strong>Vérification:</strong> 
-                                            <span id="verification-text">
-                                                Le montant versé correspond au solde théorique
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Boutons d'action -->
-                        <div class="d-flex justify-content-between mt-4">
-                            <a href="{% url 'liste_factures' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-1"></i> Annuler
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i>Annuler
                             </a>
                             <button type="submit" class="btn btn-success">
-                                <i class="fas fa-check me-1"></i> Enregistrer le Versement
+                                <i class="fas fa-save me-1"></i>Enregistrer le recouvrement
                             </button>
                         </div>
                     </form>
@@ -243,71 +138,24 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const montantDepenses = document.querySelector('#id_montant_depenses');
-    const montantVerse = document.querySelector('#id_montant');
-    const displayDepenses = document.querySelector('#display-depenses');
-    const displaySolde = document.querySelector('#display-solde');
-    const displayVerse = document.querySelector('#display-verse');
-    const verificationText = document.querySelector('#verification-text');
-    const verificationAlert = document.querySelector('#verification-alert');
-    
-    const totalRecouvre = {{ total_recouvre }};
-    
-    function updateCalculs() {
-        const depenses = parseFloat(montantDepenses.value) || 0;
-        const verse = parseFloat(montantVerse.value) || 0;
-        const soldeTheorique = totalRecouvre - depenses;
-        
-        // Mettre à jour les affichages
-        displayDepenses.textContent = depenses.toLocaleString('fr-FR') + ' FCFA';
-        displaySolde.textContent = soldeTheorique.toLocaleString('fr-FR') + ' FCFA';
-        displayVerse.textContent = verse.toLocaleString('fr-FR') + ' FCFA';
-        
-        // Vérification de cohérence
-        if (verse === soldeTheorique) {
-            verificationText.textContent = 'Le montant versé correspond parfaitement au solde théorique';
-            verificationAlert.className = 'alert alert-success border mt-3';
-        } else if (verse < soldeTheorique) {
-            const difference = soldeTheorique - verse;
-            verificationText.textContent = `Attention: Il reste ${difference.toLocaleString('fr-FR')} FCFA non versés`;
-            verificationAlert.className = 'alert alert-warning border mt-3';
-        } else {
-            const difference = verse - soldeTheorique;
-            verificationText.textContent = `Erreur: Le montant versé dépasse le solde théorique de ${difference.toLocaleString('fr-FR')} FCFA`;
-            verificationAlert.className = 'alert alert-danger border mt-3';
-        }
-        
-        // Mettre à jour le montant versé par défaut si vide
-        if (!montantVerse.value && depenses === 0) {
-            montantVerse.value = totalRecouvre;
-            updateCalculs(); // Rappeler pour mettre à jour l'affichage
-        }
-    }
-    
-    // Événements de changement
-    montantDepenses.addEventListener('input', updateCalculs);
-    montantVerse.addEventListener('input', updateCalculs);
-    
-    // Initialisation
-    updateCalculs();
-    
-    // Validation avant soumission
-    document.querySelector('form').addEventListener('submit', function(e) {
-        const depenses = parseFloat(montantDepenses.value) || 0;
-        const verse = parseFloat(montantVerse.value) || 0;
-        const soldeTheorique = totalRecouvre - depenses;
-        
-        if (verse > soldeTheorique) {
-            e.preventDefault();
-            alert('Erreur: Le montant versé ne peut pas être supérieur au solde théorique. Veuillez corriger le montant.');
-            montantVerse.focus();
-        }
-    });
-});
-</script>
+<style>
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid #e3e6f0;
+}
+
+.form-control-lg {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.btn {
+    min-width: 120px;
+}
+
+.text-danger small {
+    font-size: 0.875em;
+}
+</style>
 {% endblock %}

@@ -28,7 +28,6 @@ class Client(models.Model):
         ordering = ['nom'] 
 
 
-
 class Produit(models.Model):
     nom = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -90,14 +89,79 @@ class Agent(models.Model):
         ('direction', 'Direction'),
         ('entrepot', 'Superviseur'),
         ('terrain', 'Agent'),
+        ('stagiaire', 'Stagiaire'), 
     )
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     type_agent = models.CharField(max_length=50, choices=TYPE_AGENT_CHOICES)
     telephone = models.CharField(max_length=50, blank=True, null=True)
+    ajustement_solde = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="Ajustement manuel du solde (+/- FCFA)"
+    )
+
+    # 🕒 champs pour la gestion automatique de l’expiration
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_expiration = models.DateTimeField(
+    "Date d’expiration (stagiaire)",
+    blank=True, null=True
+    )
+   
+    def save(self, *args, **kwargs):
+        # 🔹 Si c’est un stagiaire nouvellement créé, on fixe la date d’expiration
+        if self.type_agent == 'stagiaire' and not self.date_expiration:
+            self.date_expiration = timezone.now() + timedelta(days=15)
+
+        # 🔹 Si l’agent change de rôle (n’est plus stagiaire)
+        elif self.type_agent != 'stagiaire':
+            # On réactive le compte au besoin
+            if not self.user.is_active:
+                self.user.is_active = True
+                self.user.save(update_fields=['is_active'])
+            # On efface la date d’expiration pour éviter toute confusion
+            self.date_expiration = None
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
+    
+    @property
+    def est_expire(self):
+        """Vérifie si le stagiaire a dépassé sa date d’expiration"""
+        if self.type_agent == 'stagiaire' and self.date_expiration:
+            return timezone.now() > self.date_expiration
+        return False
 
+    @property
+    def a_acces_plateforme(self):
+        """Renvoie True si l'agent a droit d'accéder à la plateforme"""
+        if self.type_agent == 'stagiaire':
+            return not self.est_expire
+        return True
+    @property
+    def est_stagiaire(self):
+        """Vérifie si l'agent est un stagiaire"""
+        return self.type_agent == 'stagiaire'
+    
+    @property
+    def jours_restants(self):
+        """Retourne le nombre de jours restants avant expiration"""
+        if self.est_stagiaire and self.date_expiration:
+            delta = self.date_expiration - timezone.now()
+            return max(delta.days, 0)
+        return None
+    
+    @property
+    def statut_stagiaire(self):
+        """Retourne le statut du stagiaire"""
+        if not self.est_stagiaire:
+            return "Non applicable"
+        if self.est_expire:
+            return "Expiré"
+        return f"Valide ({self.jours_restants} jours restants)"
+    
     @property
     def full_name(self):
         """Retourne le nom complet de l'agent"""
@@ -147,16 +211,25 @@ class Agent(models.Model):
 
     # NOUVELLES PROPERTIES POUR SUPERVISEUR SEULEMENT - CORRIGÉES
     @property
-    def total_recouvrements_supervises(self):
-        """Total des recouvrements effectués par ce superviseur"""
+    def total_argent_recouvre_et_ventes(self):
+        """
+        TOTAL de l'argent recouvré + ventes personnelles AVANT déductions
+        C'est l'argent qui est passé entre ses mains
+        """
         if self.est_superviseur:
-            recouvrements = Recouvrement.objects.filter(superviseur=self)
-            return sum(recouvrement.montant_recouvre for recouvrement in recouvrements)
+            # 1. Recouvrements sur les agents terrain
+            recouvrements_agents = Recouvrement.objects.filter(superviseur=self)
+            total_recouvrements_agents = sum(recouvrement.montant_recouvre for recouvrement in recouvrements_agents)
+            
+            # 2. Ventes personnelles du superviseur
+            total_ventes_personnelles = self.total_ventes
+            
+            return total_recouvrements_agents + total_ventes_personnelles
         return 0
     
     @property
     def total_depenses_superviseur(self):
-        """Total des dépenses effectuées par ce superviseur (depuis VersementBancaire)"""
+        """Total des dépenses déclarées par le superviseur"""
         if self.est_superviseur:
             versements = VersementBancaire.objects.filter(superviseur=self)
             return sum(versement.montant_depenses for versement in versements)
@@ -164,7 +237,7 @@ class Agent(models.Model):
     
     @property
     def total_versements_bancaires(self):
-        """Total des versements bancaires effectués par ce superviseur"""
+        """Total des versements à la banque effectués par le superviseur"""
         if self.est_superviseur:
             versements = VersementBancaire.objects.filter(superviseur=self)
             return sum(versement.montant_verse for versement in versements)
@@ -172,12 +245,39 @@ class Agent(models.Model):
     
     @property
     def solde_superviseur(self):
-        """Solde actuel en possession du superviseur"""
+        """Solde réel actuel en possession du superviseur"""
         if self.est_superviseur:
-            return (self.total_recouvrements_supervises - 
-                   self.total_depenses_superviseur - 
-                   self.total_versements_bancaires)
+            total_entrees = self.total_argent_recouvre_et_ventes
+            total_sorties = self.total_depenses_superviseur + self.total_versements_bancaires
+            # 🔹 Ajout de l’ajustement manuel
+            return total_entrees - total_sorties + self.ajustement_solde
         return 0
+    
+    @property
+    def detail_solde_superviseur(self):
+        """Détail complet du solde du superviseur"""
+        if not self.est_superviseur:
+            return {}
+        
+        total_entrees = self.total_argent_recouvre_et_ventes
+        total_sorties = self.total_depenses_superviseur + self.total_versements_bancaires
+        
+        return {
+            'total_ventes_personnelles': self.total_ventes,
+            'total_recouvrements_agents': total_entrees - self.total_ventes,
+            'total_entrees': total_entrees,
+            'total_depenses': self.total_depenses_superviseur,
+            'total_versements': self.total_versements_bancaires,
+            'total_sorties': total_sorties,
+            'solde_actuel': self.solde_superviseur,
+        }
+    
+    @property
+    def argent_disponible_pour_versement(self):
+        """Argent réellement disponible pour un nouveau versement"""
+        if not self.est_superviseur:
+            return 0
+        return max(self.solde_superviseur, 0)
     
     @property
     def dernier_versement_superviseur(self):
@@ -212,6 +312,7 @@ class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent '),
         ('AUTO', 'Auto-distribution '),
+        ('STAGIAIRE', 'Distribution à un stagiaire'),
     )
     
     superviseur = models.ForeignKey(
@@ -281,14 +382,22 @@ class DistributionAgent(models.Model):
             return f"Distribution {self.id} de {self.superviseur} → {self.agent_terrain}"
 
     def save(self, *args, **kwargs):
-        # Si c'est une auto-distribution, l'agent_terrain est le superviseur lui-même
-        if self.type_distribution == 'AUTO':
-            self.agent_terrain = self.superviseur
-        
-        # Marquer comme modifié si c'est une mise à jour
+        # ✅ Détermination automatique du type de distribution
+        if self.agent_terrain:
+            if self.agent_terrain.type_agent == 'stagiaire':
+                self.type_distribution = 'STAGIAIRE'
+            elif self.agent_terrain == self.superviseur:
+                self.type_distribution = 'AUTO'
+            else:
+                self.type_distribution = 'TERRAIN'
+        else:
+            if self.type_distribution == 'AUTO':
+                self.agent_terrain = self.superviseur
+
+        # Compte les modifications
         if self.pk:
             self.nombre_modifications += 1
-        
+
         super().save(*args, **kwargs)
 
     def soft_delete(self, user=None, raison=""):
@@ -657,7 +766,6 @@ class Dette(models.Model):
     def montant_bonus(self):
         """Calcule le montant du bonus pour cette dette"""
         return self.nombre_produits_bonus * 100
-
 
 class PaiementDette(models.Model):
     MODE_PAIEMENT_CHOICES = (

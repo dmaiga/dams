@@ -392,18 +392,16 @@
             <div class="sidebar d-flex flex-column" id="sidebar">
                 <!-- En-tête du sidebar -->
                 <div class="sidebar-header">
-                    <a href="{% if request.user.agent.type_agent == 'terrain' %}{% url 'dashboard_agent' %}{% else %} {% url 'tableau_de_bord_superviseur' %} {% endif %}" 
-                       class="sidebar-brand">
                         <i class="fas fa-warehouse"></i>
                         <span>DAMS</span>
-                    </a>
+                   
                     <small class="text-muted mt-2 d-block">Distribution & Ventes</small>
                 </div>
 
                 <!-- Navigation sidebar -->
                 <div class="sidebar-nav">
                     <!-- ===== MENU AGENT TERRAIN ===== -->
-                    {% if request.user.agent.type_agent == 'terrain' %}
+                     {% if agent.type_agent == 'terrain' or agent.type_agent == 'stagiaire' %}
                     
                     <div class="nav flex-column">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_agent' %}active{% endif %}" 
