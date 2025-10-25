@@ -71,26 +71,58 @@ class RecouvrementAdmin(admin.ModelAdmin):
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     list_display = [
-        'nom_complet', 
-        'type_agent', 
+        'nom_complet',
+        'type_agent',
         'telephone',
-        'statistiques_agent'
+        'ajustement_solde',
+        'statistiques_agent',
     ]
-    
+    list_editable = ['ajustement_solde']
     list_filter = ['type_agent']
-    search_fields = ['user__first_name', 'user__last_name', 'user__username', 'telephone']
-    
+    search_fields = [
+        'user__first_name',
+        'user__last_name',
+        'user__username',
+        'telephone',
+    ]
+
     def nom_complet(self, obj):
         return obj.full_name
-    nom_complet.short_description = "Nom Complet"
-    
+    nom_complet.short_description = "Nom complet"
+
     def statistiques_agent(self, obj):
+        """
+        Affiche les principales statistiques selon le type d'agent.
+        """
         if obj.est_superviseur:
-            return f"Recouv: {obj.total_recouvrements_supervises} FCFA | Solde: {obj.solde_superviseur} FCFA"
+            # Récupération des données détaillées
+            details = obj.detail_solde_superviseur
+            solde = details['solde_actuel']
+            total_recouvrements_agents = details['total_recouvrements_agents']
+            total_ventes_personnelles = details['total_ventes_personnelles']
+            total_versements = details['total_versements']
+            total_depenses = details['total_depenses']
+
+            return (
+                f"🧾 Recouvrements: {total_recouvrements_agents:,} FCFA | "
+                f"Ventes pers.: {total_ventes_personnelles:,} FCFA | "
+                f"Versements: {total_versements:,} FCFA | "
+                f"Dépenses: {total_depenses:,} FCFA | "
+                f"💰 Solde: {solde:,} FCFA"
+            )
+
         elif obj.est_agent_terrain:
-            return f"Ventes: {obj.total_ventes} FCFA | À recouvrir: {obj.argent_en_possession} FCFA"
-        return "Direction"
-    statistiques_agent.short_description = "Statistiques"
+            return (
+                f"Ventes: {obj.total_ventes:,} FCFA | "
+                f"Recouvré: {obj.total_recouvre:,} FCFA | "
+                f"À recouvrir: {obj.argent_en_possession:,} FCFA"
+            )
+
+        elif obj.est_direction:
+            return "👔 Membre de la direction"
+
+        return "—"
+    statistiques_agent.short_description = "📊 Statistiques"
 
 from django.contrib import admin
 from .models import BonusAgent

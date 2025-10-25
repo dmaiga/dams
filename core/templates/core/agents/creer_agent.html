@@ -1,49 +1,168 @@
-<!-- templates/agents/creer_agent.html -->
+<!-- core/agents/creer_agent.html -->
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Créer un Nouvel Agent</h1>
-    <a href="{% url 'liste_agents' %}" class="btn btn-secondary">← Retour</a>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-            
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="nom" class="form-label">Nom *</label>
-                    <input type="text" class="form-control" id="nom" name="nom" required>
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Nouvel Agent</h4>
                 </div>
-                <div class="col-md-6">
-                    <label for="prenom" class="form-label">Prénom *</label>
-                    <input type="text" class="form-control" id="prenom" name="prenom" required>
+                <div class="card-body">
+                    <!-- Messages d'erreur/succès -->
+                    {% if messages %}
+                    <div class="messages">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Affichage des erreurs non-field -->
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nom</label>
+                            {{ form.nom }}
+                            {% if form.nom.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.nom.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Prénom</label>
+                            {{ form.prenom }}
+                            {% if form.prenom.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.prenom.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Téléphone</label>
+                            {{ form.telephone }}
+                            {% if form.telephone.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.telephone.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">Le téléphone sera utilisé comme identifiant de connexion</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            {{ form.type_agent }}
+                            {% if form.type_agent.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.type_agent.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <strong>Stagiaire:</strong> Test de 15 jours<br>
+                                <strong>Agent Terrain:</strong> Accès permanent
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="submit" class="btn btn-success me-md-2">
+                                <i class="fas fa-plus"></i> Créer l'Agent
+                            </button>
+                            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                        </div>
+                    </form>
                 </div>
             </div>
-
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="telephone" class="form-label">Téléphone *</label>
-                    <input type="tel" class="form-control" id="telephone" name="telephone" required>
-                </div>
-                <div class="col-md-6">
-                    <label for="type_agent" class="form-label">Type d'Agent *</label>
-                    <select class="form-select" id="type_agent" name="type_agent" required>
-                        <option value="terrain">Agent Terrain</option>
-                        <option value="superviseur">Superviseur</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="alert alert-info">
-                <small>Le mot de passe temporaire sera "temp123". L'agent pourra le changer après sa première connexion.</small>
-            </div>
-
-            <button type="submit" class="btn btn-success">Créer l'Agent</button>
-            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">Annuler</a>
-        </form>
+        </div>
     </div>
 </div>
+
+<!-- JavaScript pour afficher les infos stagiaire -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const typeAgentSelect = document.getElementById('id_type_agent');
+    const telephoneField = document.getElementById('id_telephone');
+    
+    // Auto-format du téléphone
+    if (telephoneField) {
+        telephoneField.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 0) {
+                value = value.match(/.{1,2}/g).join(' ');
+            }
+            e.target.value = value;
+        });
+    }
+    
+    // Info contextuelle pour stagiaire
+    function showStagiaireInfo() {
+        // Supprimer l'ancienne info si elle existe
+        const oldInfo = document.getElementById('stagiaire-info');
+        if (oldInfo) {
+            oldInfo.remove();
+        }
+        
+        if (typeAgentSelect && typeAgentSelect.value === 'stagiaire') {
+            const infoDiv = document.createElement('div');
+            infoDiv.id = 'stagiaire-info';
+            infoDiv.className = 'alert alert-warning mt-3';
+            infoDiv.innerHTML = `
+                <strong><i class="fas fa-info-circle"></i> Information Stagiaire</strong><br>
+                • Compte valable 15 jours<br>
+                • Accès limité à la plateforme<br>
+                • Mot de passe temporaire: <code>temp123</code>
+            `;
+            typeAgentSelect.closest('.mb-3').appendChild(infoDiv);
+        }
+    }
+    
+    if (typeAgentSelect) {
+        typeAgentSelect.addEventListener('change', showStagiaireInfo);
+        showStagiaireInfo(); // Afficher au chargement
+    }
+});
+</script>
+
+<style>
+.text-danger small {
+    font-size: 0.875em;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.form-text {
+    font-size: 0.875em;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.alert {
+    margin-bottom: 1rem;
+}
+</style>
 {% endblock %}

@@ -9,6 +9,130 @@ from .models import (
 from django.db import models
 import os
 
+# forms.py
+from django import forms
+from django.contrib.auth.models import User
+from .models import Agent
+from django.core.exceptions import ValidationError
+
+# forms.py
+from django import forms
+from django.contrib.auth.models import User
+from .models import Agent
+from django.core.exceptions import ValidationError
+
+class AgentCreationForm(forms.ModelForm):
+    nom = forms.CharField(
+        max_length=30,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nom'})
+    )
+    prenom = forms.CharField(
+        max_length=30,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Prénom'})
+    )
+    telephone = forms.CharField(
+        max_length=50,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Téléphone'})
+    )
+    type_agent = forms.ChoiceField(
+        choices=[
+            ('stagiaire', 'Stagiaire (Test - 15 jours)'),
+            ('terrain', 'Agent Terrain'),
+        ],  # Uniquement stagiaire et terrain pour les superviseurs
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        initial='stagiaire'
+    )
+
+    class Meta:
+        model = Agent
+        fields = ['telephone', 'type_agent']
+
+    def clean_telephone(self):
+        telephone = self.cleaned_data.get('telephone')
+        if Agent.objects.filter(telephone=telephone).exists():
+            raise ValidationError("Ce numéro de téléphone est déjà utilisé.")
+        return telephone
+
+    def save(self, commit=True):
+        # Créer l'utilisateur
+        user = User.objects.create_user(
+            username=self.cleaned_data['telephone'],
+            password='temp123',
+            first_name=self.cleaned_data['nom'],
+            last_name=self.cleaned_data['prenom'],
+            is_active=True
+        )
+        
+        # Créer l'agent
+        agent = super().save(commit=False)
+        agent.user = user
+        
+        if commit:
+            agent.save()
+            
+        return agent
+
+# forms.py
+class AgentModificationForm(forms.ModelForm):
+    nom = forms.CharField(
+        max_length=30,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    prenom = forms.CharField(
+        max_length=30,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    telephone = forms.CharField(
+        max_length=50,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    type_agent = forms.ChoiceField(
+        choices=[
+            ('stagiaire', 'Stagiaire'),  
+            ('terrain', 'Agent Terrain'),
+            ('entrepot', 'Superviseur'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = Agent
+        fields = ['telephone', 'type_agent']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user:
+            self.fields['nom'].initial = self.instance.user.first_name
+            self.fields['prenom'].initial = self.instance.user.last_name
+        
+        # ✅ CORRECTION : Montrer le type RÉEL de l'agent
+        if self.instance and self.instance.pk:
+            # Si c'est un stagiaire, on garde 'terrain' comme suggestion
+            if self.instance.est_stagiaire:
+                self.fields['type_agent'].initial = 'terrain'
+            else:
+                # Pour les autres types, on montre leur type actuel
+                self.fields['type_agent'].initial = self.instance.type_agent
+
+    def clean_telephone(self):
+        telephone = self.cleaned_data.get('telephone')
+        if Agent.objects.filter(telephone=telephone).exclude(pk=self.instance.pk).exists():
+            raise ValidationError("Ce numéro de téléphone est déjà utilisé.")
+        return telephone
+
+    def save(self, commit=True):
+        if self.instance and self.instance.user:
+            self.instance.user.first_name = self.cleaned_data['nom']
+            self.instance.user.last_name = self.cleaned_data['prenom']
+            self.instance.user.save()
+        
+        return super().save(commit=commit)
 
 class FournisseurForm(forms.ModelForm):
     class Meta:
@@ -291,6 +415,7 @@ class DistributionForm(forms.ModelForm):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent '),
         ('AUTO', 'Auto-distribution'),
+        ('STAGIAIRE', 'Distribution à un stagiaire'),
     )
     
     type_distribution = forms.ChoiceField(
@@ -344,8 +469,8 @@ class DistributionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # Limiter aux agents terrain (sauf pour l'auto-distribution)
-        self.fields['agent_terrain'].queryset = Agent.objects.filter(type_agent='terrain')
-        self.fields['agent_terrain'].empty_label = "Sélectionner un agent terrain"
+        self.fields['agent_terrain'].queryset = Agent.objects.filter(type_agent__in=['terrain', 'stagiaire'])
+        self.fields['agent_terrain'].empty_label = "Sélectionner un agent (terrain ou stagiaire)"
         self.fields['agent_terrain'].required = False
         
         # Filtrer les produits qui ont du stock disponible
@@ -366,13 +491,18 @@ class DistributionForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        
         type_distribution = cleaned_data.get('type_distribution')
-        
-        # Validation selon le type de distribution
-        if type_distribution == 'TERRAIN':
-            if not cleaned_data.get('agent_terrain'):
-                self.add_error('agent_terrain', 'Agent terrain requis pour une distribution terrain')
+        agent = cleaned_data.get('agent_terrain')
+    
+        if type_distribution in ['TERRAIN', 'STAGIAIRE'] and not agent:
+            self.add_error('agent_terrain', 'Un agent est requis pour ce type de distribution.')
+    
+        if type_distribution == 'STAGIAIRE' and agent:
+            if agent.type_agent != 'stagiaire':
+                self.add_error('agent_terrain', 'Vous devez sélectionner un stagiaire pour ce type de distribution.')
+            elif hasattr(agent, 'date_fin_stage') and agent.date_fin_stage < timezone.now().date():
+                self.add_error('agent_terrain', 'Ce stagiaire est expiré.')
+    
         elif type_distribution == 'AUTO':
             # Pour l'auto-distribution, pas besoin d'agent_terrain
             cleaned_data['agent_terrain'] = None
