@@ -1,0 +1,57 @@
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# -----------------------------
+# Django
+# -----------------------------
+# Base de données SQLite
+db.sqlite3
+
+# Dossier media (uploads)
+media/
+factures_depots/
+
+# Fichiers statiques générés
+staticfiles/
+*.log
+
+# -----------------------------
+# Environnements virtuels
+# -----------------------------
+venv/
+env/
+.venv/
+.env/
+
+# -----------------------------
+# IDEs & OS
+# -----------------------------
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# -----------------------------
+# Coverage & Tests
+# -----------------------------
+.coverage
+htmlcov/
+*.cover
+*.py,cover
+nosetests.xml
+coverage.xml
+*.pytest_cache/
+
