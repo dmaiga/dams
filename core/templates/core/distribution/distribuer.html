@@ -126,10 +126,22 @@
                                 </div>
                                 
                                 <!-- Informations sur les lots disponibles -->
-                                <div id="lots-info" class="mt-3" style="display: none;">
-                                    <h6>Lots disponibles :</h6>
-                                    <div id="lots-list" class="small text-muted"></div>
-                                </div>
+<!-- Informations sur les lots disponibles -->
+<div id="lots-info" class="mt-3" style="display: none;">
+    <div class="alert alert-info py-2">
+        <h6 class="mb-2">
+            <i class="fas fa-boxes me-2"></i>Lots disponibles (FIFO) :
+            <span id="total-lots-disponibles" class="badge bg-primary ms-2">0</span>
+        </h6>
+        <div id="lots-list" class="small">
+            <!-- Les lots seront affichés ici -->
+        </div>
+        <div class="mt-2 text-warning small">
+            <i class="fas fa-info-circle me-1"></i>
+            Les lots sont consommés dans l'ordre de réception (plus ancien d'abord)
+        </div>
+    </div>
+</div>
                             </div>
                         </div>
 
@@ -257,7 +269,6 @@ document.addEventListener('DOMContentLoaded', function() {
             updateResumeAgent();
         }
     }
-
     // Mettre à jour les informations de stock
     async function updateStockInfo() {
         const produitId = produitSelect.value;
@@ -272,39 +283,76 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(data.error);
                 }
                 
-                stockDisponibleSpan.textContent = data.stock;
-                stockDisponibleSpan.className = data.stock > 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
+                // ✅ CORRECTION : Le stock sera calculé à partir des lots disponibles
+                // On initialise avec la valeur de l'API
+                let stockCalculé = data.stock;
                 
                 // Info sur la date de référence
                 stockDateInfoSpan.textContent = `(au ${data.date_reference})`;
                 
+                // ✅ CORRECTION : Afficher uniquement les lots qui ont du stock disponible
+                if (data.lots_disponibles && data.lots_disponibles.length > 0) {
+                    let lotsHTML = '';
+                    let totalLotsDisponibles = 0;
+                    
+                    // Filtrer uniquement les lots qui ont du stock disponible
+                    const lotsAvecStock = data.lots_disponibles.filter(lot => lot.quantite_restante > 0);
+                    
+                    if (lotsAvecStock.length > 0) {
+                        lotsAvecStock.forEach((lot, index) => {
+                            const isPremierLot = index === 0;
+                            const badgeFifo = isPremierLot ? '<span class="badge bg-success ms-1">PROCHAIN</span>' : '';
+                            
+                            lotsHTML += `
+                                <div class="lot-item ${isPremierLot ? 'border-start border-3 border-success ps-2' : 'border-bottom pb-1 mb-1'}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>${lot.reference}</strong> ${badgeFifo}
+                                            <br>
+                                            <span class="text-success fw-bold">${lot.quantite_restante} unités</span> - 
+                                            Reçu le ${lot.date_reception}
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted">Prix d'achat:<br>${lot.prix_achat.toLocaleString('fr-FR')} FCFA</small>
+                                        </div>
+                                    </div>
+                                </div>`;
+                        });
+                        
+                        totalLotsDisponibles = lotsAvecStock.reduce((total, lot) => total + lot.quantite_restante, 0);
+                        stockCalculé = totalLotsDisponibles; // ✅ Utiliser le total des lots disponibles
+                        
+                        lotsListDiv.innerHTML = lotsHTML;
+                        document.getElementById('total-lots-disponibles').textContent = totalLotsDisponibles;
+                        lotsInfoDiv.style.display = 'block';
+                        
+                    } else {
+                        // Aucun lot n'a de stock disponible
+                        lotsHTML = '<div class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Aucun lot disponible</div>';
+                        lotsListDiv.innerHTML = lotsHTML;
+                        lotsInfoDiv.style.display = 'block';
+                        document.getElementById('total-lots-disponibles').textContent = '0';
+                        stockCalculé = 0;
+                    }
+                } else {
+                    lotsInfoDiv.style.display = 'none';
+                    document.getElementById('total-lots-disponibles').textContent = '0';
+                    stockCalculé = 0;
+                }
+                
+                // ✅ Mettre à jour le stock disponible affiché
+                stockDisponibleSpan.textContent = stockCalculé;
+                stockDisponibleSpan.className = stockCalculé > 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
+                
                 // Mettre à jour le max de la quantité
                 if (quantiteInput) {
-                    quantiteInput.max = data.stock;
-                    if (parseInt(quantiteInput.value) > data.stock) {
-                        quantiteInput.value = data.stock;
+                    quantiteInput.max = stockCalculé;
+                    if (parseInt(quantiteInput.value) > stockCalculé) {
+                        quantiteInput.value = Math.max(0, stockCalculé);
+                        updateValeursTotales();
                     }
                 }
                 
-                // Afficher les lots disponibles
-                // Dans votre template, mettez à jour la partie d'affichage des lots
-                if (data.lots_disponibles && data.lots_disponibles.length > 0) {
-                    let lotsHTML = '';
-                    data.lots_disponibles.forEach(lot => {
-                        lotsHTML += `
-                            <div class="border-bottom pb-1 mb-1">
-                                <strong>${lot.reference}</strong> - 
-                                ${lot.quantite_restante} unités - 
-                                Reçu le ${lot.date_reception} - 
-                                Prix d'achat: ${lot.prix_achat.toLocaleString('fr-FR')} FCFA
-                            </div>`;
-                    });
-                    lotsListDiv.innerHTML = lotsHTML;
-                    lotsInfoDiv.style.display = 'block';
-                } else {
-                    lotsInfoDiv.style.display = 'none';
-                }
-                                
                 updateResume();
                 updateValeursTotales();
                 
@@ -314,16 +362,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 stockDisponibleSpan.className = 'fw-bold text-danger';
                 stockDateInfoSpan.textContent = '';
                 lotsInfoDiv.style.display = 'none';
+                document.getElementById('total-lots-disponibles').textContent = '0';
             }
         } else {
             stockDisponibleSpan.textContent = '-';
             stockDisponibleSpan.className = 'fw-bold';
             stockDateInfoSpan.textContent = '';
             lotsInfoDiv.style.display = 'none';
+            document.getElementById('total-lots-disponibles').textContent = '0';
             updateResume();
         }
     }
-
     // Mettre à jour l'unité du produit
     function updateUniteProduit() {
         const produitText = produitSelect.options[produitSelect.selectedIndex]?.text || '';
@@ -437,26 +486,36 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-.form-check-inline {
-    margin-right: 2rem;
-}
-
-.form-check-input:checked {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-
-#agent-terrain-field {
-    transition: all 0.3s ease;
-}
-
-.card-header {
+.lot-item {
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
     background-color: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
 }
 
-.bg-light {
-    background-color: #f8f9fa !important;
+.lot-item:last-child {
+    margin-bottom: 0;
+}
+
+.border-success {
+    border-left-color: #198754 !important;
+}
+
+#total-lots-disponibles {
+    font-size: 0.8em;
+}
+
+/* Style pour le résumé */
+#resume-quantite {
+    font-size: 1.5rem;
+    color: #198754;
+}
+
+/* Alert personnalisé */
+.alert-info {
+    background-color: #f0f9ff;
+    border-color: #b6e0fe;
 }
 </style>
+
 {% endblock %}

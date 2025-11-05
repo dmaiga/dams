@@ -48,55 +48,53 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
 
+from django.contrib.auth import authenticate, login
+from django.contrib import messages
+from core.forms import TelephoneOrUsernameLoginForm
+from core.models import Agent
+
 def custom_login(request):
     if request.method == "POST":
-        form = AuthenticationForm(request, data=request.POST)
+        form = TelephoneOrUsernameLoginForm(request, data=request.POST)
         if form.is_valid():
-            user = form.get_user()
-            login(request, user)
+            username = form.cleaned_data.get("username")
+            password = form.cleaned_data.get("password")
 
-            try:
-                agent = Agent.objects.get(user=user)
+            # ✅ Tente d’abord une connexion classique, puis par téléphone
+            user = authenticate(request, username=username, password=password)
+            if not user:
+                user = authenticate(request, username=username, password=password)
 
-                # 🔹 Cas des stagiaires
-                if agent.type_agent == "stagiaire":
-                    # Si la date d'expiration est dépassée
-                    if agent.est_expire:
-                        user.is_active = False
-                        user.save(update_fields=["is_active"])
-                        messages.error(request, "⏳ Votre période de stage est expirée. Contactez votre superviseur.")
-                        return redirect("login")
+            if user:
+                login(request, user)
+                try:
+                    agent = Agent.objects.get(user=user)
 
-                    # Sinon stagiaire valide → accès limité au dashboard agent
+                       # 🔹 Cas direction
+                    if agent.type_agent == "direction":
+                        return redirect("dashboard")
+
+                    # 🔹 Cas superviseur
+                    elif agent.type_agent == "entrepot":
+                        return redirect("tableau_de_bord_superviseur")
+
+                    # 🔹 Cas terrain
+                    elif agent.type_agent == "terrain":
+                        return redirect("dashboard_agent")
+
                     else:
                         return redirect("dashboard_agent")
 
-                # 🔹 Cas des agents classiques
-                elif agent.type_agent == "direction":
-                    return redirect("dashboard")
+                except Agent.DoesNotExist:
+                    if user.is_staff or user.is_superuser:
+                        return redirect("admin:index")
+                    messages.warning(request, "Aucun profil d’agent associé à ce compte.")
+                    return redirect("login")
 
-                elif agent.type_agent == "entrepot":
-                    return redirect("tableau_de_bord_superviseur")
-
-                elif agent.type_agent == "terrain":
-                    return redirect("dashboard_agent")
-
-                else:
-                    # Par défaut, on redirige vers le dashboard agent
-                    return redirect("dashboard_agent")
-
-            except Agent.DoesNotExist:
-                # 🔹 Pas un agent connu, mais utilisateur du staff
-                if user.is_staff or user.is_superuser:
-                    return redirect("admin:index")
-
-                messages.warning(request, "Aucun profil d’agent associé à ce compte.")
-                return redirect("login")
-
-        else:
-            messages.error(request, "Nom d'utilisateur ou mot de passe incorrect.")
+            else:
+                messages.error(request, "Numéro de téléphone ou mot de passe incorrect.")
     else:
-        form = AuthenticationForm()
+        form = TelephoneOrUsernameLoginForm()
 
     return render(request, "registration/login.html", {"form": form})
 
@@ -250,7 +248,7 @@ def detail_agent(request, agent_id):
 
 @login_required
 def creer_agent(request):
-    """Uniquement pour les superviseurs - créer agent terrain ou stagiaire"""
+    """Uniquement pour les superviseurs - créer agent terrain, stagiaire OU superviseur"""
     # Vérifier que c'est un superviseur
     try:
         superviseur = request.user.agent
@@ -264,14 +262,21 @@ def creer_agent(request):
     if request.method == 'POST':
         form = AgentCreationForm(request.POST)
         if form.is_valid():
-            agent = form.save()
-            
-            if agent.est_stagiaire:
-                messages.success(request, f"✅ Stagiaire créé ! Test de 15 jours.")
-            else:
-                messages.success(request, f"✅ Agent terrain créé !")
+            try:
+                agent = form.save()
                 
-            return redirect('liste_agents')
+                # ✅ Messages personnalisés selon le type
+                if agent.est_stagiaire:
+                    messages.success(request, f"✅ Stagiaire {agent.full_name} créé ! Test de 15 jours. ")
+                elif agent.est_superviseur:
+                    messages.success(request, f"✅ Superviseur {agent.full_name} créé ! ")
+                else:
+                    messages.success(request, f"✅ Agent terrain {agent.full_name} créé ! ")
+                
+                return redirect('liste_agents')
+                
+            except Exception as e:
+                messages.error(request, f"❌ Erreur lors de la création: {str(e)}")
     else:
         form = AgentCreationForm()
     
@@ -861,6 +866,7 @@ def detail_distribution(request, distribution_id):
     return render(request, 'core/distribution/detail_distribution.html', context)
 
 
+@login_required
 def get_stock_produit_a_date(request):
     """API pour récupérer le stock d'un produit à une date donnée (AJAX)"""
     try:
@@ -871,10 +877,17 @@ def get_stock_produit_a_date(request):
             return JsonResponse({'error': 'Paramètres manquants'}, status=400)
         
         produit = Produit.objects.get(id=produit_id)
-        date_reference = timezone.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        
+        # ✅ CORRECTION : Gérer correctement le timezone
+        if 'T' in date_str:
+            date_reference = timezone.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        else:
+            date_reference = timezone.datetime.strptime(date_str, '%Y-%m-%dT%H:%M')
         
         # Créer une instance de formulaire pour utiliser ses méthodes
         form = DistributionForm(current_user=request.user)
+        
+        # ✅ CORRECTION : Utiliser la méthode corrigée
         stock_disponible = form.get_stock_a_date(produit.nom, date_reference)
         
         # Récupérer les vrais lots avec leurs quantités restantes
@@ -885,7 +898,7 @@ def get_stock_produit_a_date(request):
             lots_info.append({
                 'lot_id': lot.id,
                 'reference': lot.reference_lot or f"Lot#{lot.id}",
-                'quantite_restante': getattr(lot, '_quantite_restante_calculee', lot.quantite_restante),
+                'quantite_restante': getattr(lot, '_quantite_restante_calculee', 0),
                 'date_reception': lot.date_reception.strftime('%d/%m/%Y'),
                 'prix_achat': float(lot.prix_achat_unitaire)
             })
@@ -1939,8 +1952,8 @@ def tableau_de_bord_superviseur(request):
     except Agent.DoesNotExist:
         return render(request, 'errors/403.html', status=403)
     
-    # SUPPRIMER le filtre de date - TOUTES LES PÉRIODES
-    # date_debut = timezone.now() - timedelta(days=30)  # ← SUPPRIMÉ
+    # ✅ CORRECTION : Définir date_debut_recent AU DÉBUT de la fonction
+    date_debut_recent = timezone.now() - timedelta(days=30)
     
     # Vue Stock
     stock_total = LotEntrepot.objects.filter(quantite_restante__gt=0).aggregate(
@@ -1975,8 +1988,7 @@ def tableau_de_bord_superviseur(request):
             ventes_detail=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='detail'))
         )
         
-        # Distributions récentes (garder 30j pour info récente)
-        date_debut_recent = timezone.now() - timedelta(days=30)
+        # ✅ CORRECTION : date_debut_recent est maintenant définie au début
         distributions_recentes = DistributionAgent.objects.filter(
             agent_terrain=agent,
             date_distribution__gte=date_debut_recent
@@ -1986,13 +1998,13 @@ def tableau_de_bord_superviseur(request):
         
         performances_agents.append({
             'agent': agent,
-            'total_ventes': stats_ventes['total_ventes'] or 0,  # ← Renommé sans "_periode"
+            'total_ventes': stats_ventes['total_ventes'] or 0,
             'ventes_gros': stats_ventes['ventes_gros'] or 0,
             'ventes_detail': stats_ventes['ventes_detail'] or 0,
             'nombre_ventes': stats_ventes['nombre_ventes'] or 0,
             'clients_distincts': stats_ventes['clients_distincts'] or 0,
             'quantite_vendue': stats_ventes['quantite_vendue'] or 0,
-            'produits_distribues_recent': distributions_recentes['total_produits'] or 0,  # ← Récent seulement
+            'produits_distribues_recent': distributions_recentes['total_produits'] or 0,
             
             # Propriétés historiques de l'agent
             'total_ventes_historique': agent.total_ventes,
@@ -2014,7 +2026,7 @@ def tableau_de_bord_superviseur(request):
         ventes_comptant=Count('id', filter=Q(mode_paiement='comptant'))
     )
     
-    ventes_global = {  # ← Renommé de ventes_30j à ventes_global
+    ventes_global = {
         'total_ventes': stats_ventes_global['total_ventes'] or 0,
         'ventes_gros': stats_ventes_global['ventes_gros'] or 0,
         'ventes_detail': stats_ventes_global['ventes_detail'] or 0,
@@ -2025,7 +2037,7 @@ def tableau_de_bord_superviseur(request):
     }
     
     # Ventes par type - TOUTES LES PÉRIODES
-    ventes_par_type = Vente.objects.all().values(  # ← Pas de filtre date
+    ventes_par_type = Vente.objects.all().values(
         'type_vente'
     ).annotate(
         total=Sum(F('quantite') * F('prix_vente_unitaire')),
@@ -2034,7 +2046,7 @@ def tableau_de_bord_superviseur(request):
     )
     
     # VUE PERSONNELLE SUPERVISEUR - TOUTES LES PÉRIODES
-    ventes_superviseur_queryset = Vente.objects.filter(agent=superviseur)  # ← Pas de filtre date
+    ventes_superviseur_queryset = Vente.objects.filter(agent=superviseur)
     
     stats_ventes_superviseur = ventes_superviseur_queryset.aggregate(
         total_ventes=Sum(F('quantite') * F('prix_vente_unitaire')),
@@ -2052,7 +2064,7 @@ def tableau_de_bord_superviseur(request):
         'quantite_vendue': stats_ventes_superviseur['quantite_vendue'] or 0,
     }
     
-    # Distributions récentes seulement (30j) pour info
+    # ✅ CORRECTION : date_debut_recent est maintenant disponible
     distributions_superviseur = DistributionAgent.objects.filter(
         Q(superviseur=superviseur) | Q(agent_terrain=superviseur),
         date_distribution__gte=date_debut_recent
@@ -2091,7 +2103,7 @@ def tableau_de_bord_superviseur(request):
     
     recapitulatif_financier = {
         'valeur_stock_total': stock_total['total_valeur'] or 0,
-        'ventes_total': ventes_global['total_ventes'],  # ← Renommé
+        'ventes_total': ventes_global['total_ventes'],
         'total_a_recouvrer': sum(agent['argent_en_possession'] for agent in performances_agents),
         'dettes_en_cours_count': dettes_en_cours,
         'verification_ventes': {
@@ -2118,9 +2130,8 @@ def tableau_de_bord_superviseur(request):
         'performances_agents': performances_agents,
         
         # Données ventes globales - TOUTES PÉRIODES
-        'ventes_global': ventes_global,  # ← Renommé
+        'ventes_global': ventes_global,
         'ventes_par_type': ventes_par_type,
-        # 'date_debut': date_debut,  # ← SUPPRIMÉ
         
         # Données personnelles superviseur
         'ventes_superviseur': ventes_superviseur,
@@ -2132,6 +2143,9 @@ def tableau_de_bord_superviseur(request):
         
         # Récapitulatif
         'recapitulatif_financier': recapitulatif_financier,
+        
+        # ✅ CORRECTION : Ajouter la date pour le template si nécessaire
+        'date_debut_recent': date_debut_recent,
     }
     
     return render(request, 'core/dashboard/superviseur.html', context)

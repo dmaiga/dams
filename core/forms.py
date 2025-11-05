@@ -41,7 +41,8 @@ class AgentCreationForm(forms.ModelForm):
         choices=[
             ('stagiaire', 'Stagiaire (Test - 15 jours)'),
             ('terrain', 'Agent Terrain'),
-        ],  # Uniquement stagiaire et terrain pour les superviseurs
+            ('entrepot', 'Superviseur'),  # ✅ Maintenant les superviseurs peuvent créer d'autres superviseurs
+        ], 
         widget=forms.Select(attrs={'class': 'form-select'}),
         initial='stagiaire'
     )
@@ -52,28 +53,82 @@ class AgentCreationForm(forms.ModelForm):
 
     def clean_telephone(self):
         telephone = self.cleaned_data.get('telephone')
+        # ✅ Nettoyer le numéro
+        telephone = telephone.strip().replace(' ', '').replace('-', '')
+        
+        if not telephone.isdigit():
+            raise ValidationError("Le numéro de téléphone ne doit contenir que des chiffres.")
+            
         if Agent.objects.filter(telephone=telephone).exists():
             raise ValidationError("Ce numéro de téléphone est déjà utilisé.")
+            
         return telephone
 
+    def generate_unique_username(self, nom, prenom):
+        """
+        Génère un username unique basé sur prenom+nom
+        En cas de doublon, ajoute un chiffre incrémental
+        """
+        base_username = f"{prenom.lower()}.{nom.lower()}"
+        username = base_username
+        
+        # ✅ Nettoyer les caractères spéciaux
+        username = username.replace(' ', '').replace('-', '').replace("'", "")
+        
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+            
+        return username
+
     def save(self, commit=True):
-        # Créer l'utilisateur
+        nom = self.cleaned_data['nom']
+        prenom = self.cleaned_data['prenom']
+        telephone = self.cleaned_data['telephone']
+        type_agent = self.cleaned_data['type_agent']
+        
+        # ✅ Générer un username unique
+        username = self.generate_unique_username(nom, prenom)
+        
+        # ✅ Créer l'utilisateur avec mot de passe par défaut
         user = User.objects.create_user(
-            username=self.cleaned_data['telephone'],
-            password='temp123',
-            first_name=self.cleaned_data['nom'],
-            last_name=self.cleaned_data['prenom'],
+            username=username,  # ✅ prenom.nom (unique)
+            password='temp123',  # ✅ Mot de passe par défaut
+            first_name=prenom,   # ✅ CORRECTION: first_name = prénom
+            last_name=nom,       # ✅ CORRECTION: last_name = nom
+            email=f"{username}@example.com",  # Email optionnel
             is_active=True
         )
         
-        # Créer l'agent
+        # ✅ Créer l'agent
         agent = super().save(commit=False)
         agent.user = user
+        agent.telephone = telephone
         
         if commit:
             agent.save()
             
         return agent
+
+from django import forms
+from django.contrib.auth.forms import AuthenticationForm
+
+class TelephoneOrUsernameLoginForm(AuthenticationForm):
+    username = forms.CharField(
+        label="Téléphone ou Nom d'utilisateur",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Téléphone ou Nom d’utilisateur'
+        })
+    )
+    password = forms.CharField(
+        label="Mot de passe",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mot de passe'
+        })
+    )
 
 # forms.py
 class AgentModificationForm(forms.ModelForm):
@@ -270,9 +325,10 @@ class ReceptionLotForm(forms.ModelForm):
             elif Fournisseur.objects.filter(nom__iexact=nom_fournisseur.strip()).exists():
                 self.add_error('nouveau_fournisseur_nom', 'Ce fournisseur existe déjà')
         else:
+            # Si aucun fournisseur sélectionné, on laisse vide (sera remplacé par défaut plus tard)
             if not cleaned_data.get('fournisseur'):
-                self.add_error('fournisseur', 'Veuillez sélectionner un fournisseur existant')
-        
+                cleaned_data['fournisseur'] = None
+
         # Validation produit
         if nouveau_produit:
             nom_produit = cleaned_data.get('nouveau_produit_nom')
@@ -319,7 +375,7 @@ class ReceptionLotForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-
+    
         # Gérer le fournisseur
         if self.cleaned_data.get('nouveau_fournisseur'):
             fournisseur_nom = self.cleaned_data['nouveau_fournisseur_nom'].strip()
@@ -330,7 +386,14 @@ class ReceptionLotForm(forms.ModelForm):
                 defaults={'contact': fournisseur_contact}
             )
             instance.fournisseur = fournisseur
-
+        elif not self.cleaned_data.get('fournisseur'):
+            # Fournisseur par défaut si rien n’est renseigné
+            fournisseur_defaut, _ = Fournisseur.objects.get_or_create(
+                nom="Fournisseur Inconnu",
+                defaults={'contact': 'N/A', 'adresse': 'Non renseignée'}
+            )
+            instance.fournisseur = fournisseur_defaut
+    
         # Gérer le produit
         if self.cleaned_data.get('nouveau_produit'):
             produit_nom = self.cleaned_data['nouveau_produit_nom'].strip()
@@ -532,60 +595,60 @@ class DistributionForm(forms.ModelForm):
 
     def get_stock_a_date(self, produit_nom, date_reference):
         """
-        Calcule le stock disponible à une date donnée en tenant compte
-        des distributions antérieures à cette date
+        Calcule le stock disponible à une date donnée - version optimisée
         """
         from django.db.models import Sum
         
-        # Stock initial (lots reçus avant la date de référence)
-        lots_initial = LotEntrepot.objects.filter(
+        # Stock total initial (lots reçus avant la date de référence)
+        stock_total_initial = LotEntrepot.objects.filter(
             produit__nom=produit_nom,
             date_reception__lte=date_reference
-        )
+        ).aggregate(total=Sum('quantite_initiale'))['total'] or 0
         
-        stock_total = sum(lot.quantite_initiale for lot in lots_initial)
-        
-        # Soustraire les distributions antérieures à cette date
-        distributions_anterieures = DetailDistribution.objects.filter(
+        # Quantité déjà distribuée avant cette date
+        quantite_deja_distribuee = DetailDistribution.objects.filter(
+            lot__produit__nom=produit_nom,
             distribution__date_distribution__lte=date_reference,
-            lot__produit__nom=produit_nom
-        )
+            distribution__est_supprime=False,
+            est_supprime=False
+        ).aggregate(total=Sum('quantite'))['total'] or 0
         
-        quantite_distribuee = distributions_anterieures.aggregate(
-            total=Sum('quantite')
-        )['total'] or 0
-        
-        return stock_total - quantite_distribuee
+        return stock_total_initial - quantite_deja_distribuee
+    
 
     def get_lots_disponibles_a_date(self, produit_nom, date_reference):
         """Retourne les lots disponibles à une date donnée en VRAI FIFO"""
         from django.db.models import Sum
-    
+
         lots = LotEntrepot.objects.filter(
             produit__nom=produit_nom,
             date_reception__lte=date_reference
-        ).order_by('date_reception')  # FIFO = plus ancienne date d'abord
-    
+        ).order_by('date_reception', 'id')  # FIFO = plus ancienne date d'abord
+
         lots_avec_stock = []
         for lot in lots:
+            # ✅ CORRECTION : Calculer la quantité déjà distribuée de CE LOT avant la date de référence
             quantite_distribuee = DetailDistribution.objects.filter(
-                lot=lot,
-                distribution__date_distribution__lte=date_reference
+                lot=lot,  # ✅ Important : filtrer par LOT spécifique
+                distribution__date_distribution__lte=date_reference,
+                distribution__est_supprime=False,  # ✅ Ignorer les distributions supprimées
+                est_supprime=False  # ✅ Ignorer les détails supprimés
             ).aggregate(total=Sum('quantite'))['total'] or 0
-    
+
             quantite_restante = lot.quantite_initiale - quantite_distribuee
-    
+
+            # ✅ CORRECTION : Ne garder que les lots qui ont encore du stock
             if quantite_restante > 0:
                 lot._quantite_restante_calculee = quantite_restante
                 lots_avec_stock.append(lot)
-    
+
         return lots_avec_stock
-        
+    
     def save(self, commit=True):
         from django.db import transaction
-
+    
         instance = super().save(commit=False)
-
+    
         # Récupérer ou créer le superviseur
         superviseur, created = Agent.objects.get_or_create(
             user=self.current_user,
@@ -593,64 +656,63 @@ class DistributionForm(forms.ModelForm):
         )
         instance.superviseur = superviseur
         instance.type_distribution = self.cleaned_data['type_distribution']
-
+    
         if instance.date_distribution < timezone.now():
             instance.est_retroactive = True
-
+    
         if commit:
             try:
                 with transaction.atomic():
                     instance.save()
-
+    
                     produit = self.cleaned_data.get('produit')
                     quantite_demandee = self.cleaned_data.get('quantite')
                     prix_gros = self.cleaned_data.get('prix_gros')
                     prix_detail = self.cleaned_data.get('prix_detail')
-
+    
                     if produit and quantite_demandee:
                         lots_disponibles = self.get_lots_disponibles_a_date(produit.nom, instance.date_distribution)
                         quantite_restante = quantite_demandee
-
+    
                         # VÉRIFICATION FINALE DU STOCK
                         stock_total_disponible = sum(lot._quantite_restante_calculee for lot in lots_disponibles)
-
+    
                         if quantite_demandee > stock_total_disponible:
                             raise forms.ValidationError(
                                 f"Stock insuffisant pour {produit.nom}. "
                                 f"Demandé: {quantite_demandee}, Disponible: {stock_total_disponible}"
                             )
-
+    
                         details_creation = []
                         mouvements_creation = []
                         lots_a_mettre_a_jour = []
-
+    
                         for lot in lots_disponibles:
                             if quantite_restante <= 0:
                                 break
                             
                             quantite_a_prelever = min(quantite_restante, lot._quantite_restante_calculee)
-
+    
                             # Vérifier le stock actuel du lot
                             lot_actuel = LotEntrepot.objects.get(id=lot.id)
                             if quantite_a_prelever > lot_actuel.quantite_restante:
                                 quantite_a_prelever = lot_actuel.quantite_restante
-
+    
                             if quantite_a_prelever <= 0:
                                 continue
-
-                            # ✅ CORRECTION : Créer UN SEUL DetailDistribution avec la quantité totale
-                            # Mais répartir sur les mouvements de stock par lot
+                            
+                            # ✅ CORRECTION : Créer un DetailDistribution POUR CHAQUE LOT
                             details_creation.append(DetailDistribution(
                                 distribution=instance,
                                 lot=lot,
-                                quantite=quantite_a_prelever,  # ✅ Quantité pour ce lot spécifique
-                                prix_gros=prix_gros,           # ✅ Même prix pour tous les lots du même produit
-                                prix_detail=prix_detail        # ✅ Même prix pour tous les lots du même produit
+                                quantite=quantite_a_prelever,  # Quantité spécifique à ce lot
+                                prix_gros=prix_gros,           # Même prix pour tous les lots du même produit
+                                prix_detail=prix_detail        # Même prix pour tous les lots du même produit
                             ))
-
+    
                             # Préparer la mise à jour du lot
                             lots_a_mettre_a_jour.append((lot.id, quantite_a_prelever))
-
+    
                             # Préparer le mouvement de stock
                             mouvements_creation.append(MouvementStock(
                                 produit=produit,
@@ -660,37 +722,38 @@ class DistributionForm(forms.ModelForm):
                                 quantite=quantite_a_prelever,
                                 date_mouvement=instance.date_distribution
                             ))
-
+    
                             quantite_restante -= quantite_a_prelever
-
+    
                         if quantite_restante > 0:
                             raise forms.ValidationError(
                                 f"Stock insuffisant pour {produit.nom}. "
                                 f"Manquant: {quantite_restante} unités"
                             )
-
+    
                         # CRÉATION EN MASSE DES DÉTAILS
                         DetailDistribution.objects.bulk_create(details_creation)
-
+    
                         # MISE À JOUR DES LOTS
                         for lot_id, quantite in lots_a_mettre_a_jour:
                             LotEntrepot.objects.filter(id=lot_id).update(
                                 quantite_restante=models.F('quantite_restante') - quantite
                             )
-
+    
                         # CRÉATION DES MOUVEMENTS DE STOCK
                         MouvementStock.objects.bulk_create(mouvements_creation)
-
+    
                         # Mettre à jour les totaux
                         instance._mettre_a_jour_totaux()
-
+    
             except Exception as e:
                 # En cas d'erreur, tout est annulé automatiquement par la transaction
                 if instance.pk:
                     instance.delete()
                 raise e
-
+    
         return instance
+    
 
 class DistributionModificationForm(forms.ModelForm):
     """Formulaire pour modifier une distribution existante"""

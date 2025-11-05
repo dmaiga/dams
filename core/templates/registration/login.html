@@ -17,6 +17,10 @@
             background: white;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 2rem;
+        }
+        .form-label {
+            font-weight: 500;
         }
     </style>
 </head>
@@ -24,40 +28,59 @@
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-md-6 col-lg-4">
-                <div class="login-container p-4">
+                <div class="login-container">
                     <div class="text-center mb-4">
                         <h2>🔐 Connexion</h2>
-                        <p class="text-muted">Suivi des Ventes Terrain</p>
+                        <p class="text-muted mb-0">Suivi des Ventes Terrain</p>
                     </div>
 
-                    {% if form.errors %}
-                    <div class="alert alert-danger">
-                        Nom d'utilisateur ou mot de passe incorrect.
-                    </div>
+                    <!-- Messages Django -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
                     {% endif %}
 
-                    <form method="post">
+                    <!-- Formulaire -->
+                    <form method="post" novalidate>
                         {% csrf_token %}
                         
                         <div class="mb-3">
-                            <label for="id_username" class="form-label">Nom d'utilisateur</label>
-                            <input type="text" class="form-control" id="id_username" name="username" 
-                                   placeholder="Votre téléphone" required autofocus>
+                            <label for="id_username" class="form-label">Téléphone ou nom d'utilisateur</label>
+                            <input type="text" 
+                                   class="form-control {% if form.username.errors %}is-invalid{% endif %}" 
+                                   id="id_username" 
+                                   name="username" 
+                                   placeholder="Ex : XXXXXXXX" 
+                                   required autofocus>
+                            {% for error in form.username.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
                         </div>
 
                         <div class="mb-3">
                             <label for="id_password" class="form-label">Mot de passe</label>
-                            <input type="password" class="form-control" id="id_password" name="password" 
-                                   placeholder="Votre mot de passe" required>
+                            <input type="password" 
+                                   class="form-control {% if form.password.errors %}is-invalid{% endif %}" 
+                                   id="id_password" 
+                                   name="password" 
+                                   placeholder="Votre mot de passe" 
+                                   required>
+                            {% for error in form.password.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
                         </div>
 
                         <input type="hidden" name="next" value="{{ next }}">
 
                         <button type="submit" class="btn btn-primary w-100 mb-3">Se connecter</button>
-                        
+
                         <div class="text-center">
                             <small class="text-muted">
-                                Premier accès ? Mot de passe : <strong>temp123</strong>
+                                Premier accès ? Utilisez le mot de passe : <strong>temp123</strong>
                             </small>
                         </div>
                     </form>

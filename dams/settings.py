@@ -53,6 +53,10 @@ INSTALLED_APPS = [
 
 
 ]
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # l’authentification classique
+    'core.backends.TelephoneBackend',             # ✅ ton backend téléphone
+]
 
 
 MIDDLEWARE = [

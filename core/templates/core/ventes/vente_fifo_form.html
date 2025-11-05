@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nouvelle Vente FIFO{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header pb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4>📦 Nouvelle Vente FIFO</h4>
+                        <a href="{% url 'liste_ventes' %}" class="btn btn-outline-secondary">
+                            ← Retour aux ventes
+                        </a>
+                    </div>
+                    <p class="text-sm mb-0">Système de vente First-In-First-Out (FIFO) automatique</p>
+                </div>
+                
+                <div class="card-body">
+                    <form method="post" id="vente-fifo-form" novalidate>
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Section Client -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">👤 Informations Client</h6>
+                            </div>
+                            
+                            <!-- Option Nouveau Client -->
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    {{ form.nouveau_client }}
+                                    <label class="form-check-label" for="{{ form.nouveau_client.id_for_label }}">
+                                        Nouveau client
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    Cochez si c'est un nouveau client
+                                </small>
+                            </div>
+
+                            <!-- Client Existant -->
+                            <div class="col-md-6" id="client-existant-group">
+                                <div class="form-group">
+                                    <label for="{{ form.client.id_for_label }}" class="form-label">
+                                        Client existant *
+                                    </label>
+                                    {{ form.client }}
+                                    {% if form.client.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.client.errors.0 }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Nouveau Client Fields -->
+                            <div class="col-12" id="nouveau-client-fields" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="{{ form.client_nom.id_for_label }}" class="form-label">
+                                                Nom du client *
+                                            </label>
+                                            {{ form.client_nom }}
+                                            {% if form.client_nom.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ form.client_nom.errors.0 }}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="{{ form.client_contact.id_for_label }}" class="form-label">
+                                                Contact
+                                            </label>
+                                            {{ form.client_contact }}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="{{ form.client_type.id_for_label }}" class="form-label">
+                                                Type de client
+                                            </label>
+                                            {{ form.client_type }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Section Produit & Quantité -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">📊 Détails de la Vente</h6>
+                            </div>
+                            
+                            <!-- Sélection Produit -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.produit.id_for_label }}" class="form-label">
+                                        Produit *
+                                    </label>
+                                    {{ form.produit }}
+                                    {% if form.produit.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.produit.errors.0 }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Quantité -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="{{ form.quantite_demandee.id_for_label }}" class="form-label">
+                                        Quantité demandée *
+                                    </label>
+                                    {{ form.quantite_demandee }}
+                                    <small class="form-text text-muted">
+                                        La quantité sera prélevée automatiquement des plus anciens lots
+                                    </small>
+                                    {% if form.quantite_demandee.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.quantite_demandee.errors.0 }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Informations Stock FIFO -->
+                        <div class="row mb-4" id="stock-info" style="display: none;">
+                            <div class="col-12">
+                                <div class="card bg-light">
+                                    <div class="card-body py-3">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <h6 class="mb-1">📦 Stock Total</h6>
+                                                <p class="mb-0 fs-5" id="stock-total">0 unités</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6 class="mb-1">💰 Prix Gros</h6>
+                                                <p class="mb-0 fs-5" id="prix-gros">0 FCFA</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6 class="mb-1">🏷️ Prix Détail</h6>
+                                                <p class="mb-0 fs-5" id="prix-detail">0 FCFA</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Détails des Lots FIFO -->
+                        <div class="row mb-4" id="lots-fifo" style="display: none;">
+                            <div class="col-12">
+                                <h6 class="text-info mb-3">🎯 Lots disponibles (ordre FIFO)</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped" id="table-lots">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Référence Lot</th>
+                                                <th>Date Distribution</th>
+                                                <th>Quantité Disponible</th>
+                                                <th>Prix Gros</th>
+                                                <th>Prix Détail</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tbody-lots">
+                                            <!-- Rempli dynamiquement -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    Les lots sont utilisés dans cet ordre (premier entré, premier sorti)
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Section Configuration Vente -->
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.type_vente.id_for_label }}" class="form-label">
+                                        Type de vente *
+                                    </label>
+                                    {{ form.type_vente }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.mode_paiement.id_for_label }}" class="form-label">
+                                        Mode de paiement *
+                                    </label>
+                                    {{ form.mode_paiement }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="{{ form.date_vente.id_for_label }}" class="form-label">
+                                        Date de vente *
+                                    </label>
+                                    {{ form.date_vente }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Simulation FIFO -->
+                        <div class="row mb-4" id="simulation-fifo" style="display: none;">
+                            <div class="col-12">
+                                <div class="card border-warning">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h6 class="mb-0">🔍 Simulation FIFO</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="simulation-content">
+                                            <!-- Contenu de simulation dynamique -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button type="button" class="btn btn-outline-info" id="btn-simuler">
+                                        <i class="fas fa-calculator"></i> Simuler FIFO
+                                    </button>
+                                    
+                                    <div>
+                                        <button type="reset" class="btn btn-outline-secondary me-2">
+                                            <i class="fas fa-undo"></i> Réinitialiser
+                                        </button>
+                                        <button type="submit" class="btn btn-success" id="btn-submit">
+                                            <i class="fas fa-cash-register"></i> Confirmer la Vente FIFO
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    
+    .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-bottom: none;
+    }
+    
+    .card-header h4 {
+        color: white;
+        margin: 0;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    #stock-info .card {
+        border-left: 4px solid #28a745;
+    }
+    
+    #simulation-fifo .card {
+        border-left: 4px solid #ffc107;
+    }
+    
+    .lot-fifo-used {
+        background-color: #d4edda !important;
+    }
+    
+    .lot-fifo-partial {
+        background-color: #fff3cd !important;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const nouveauClientCheckbox = document.getElementById('{{ form.nouveau_client.id_for_label }}');
+        const clientExistantGroup = document.getElementById('client-existant-group');
+        const nouveauClientFields = document.getElementById('nouveau-client-fields');
+        const produitSelect = document.getElementById('{{ form.produit.id_for_label }}');
+        const quantiteInput = document.getElementById('{{ form.quantite_demandee.id_for_label }}');
+        const stockInfo = document.getElementById('stock-info');
+        const lotsFifo = document.getElementById('lots-fifo');
+        const simulationFifo = document.getElementById('simulation-fifo');
+        const btnSimuler = document.getElementById('btn-simuler');
+        
+        // Gestion nouveau client
+        function toggleClientFields() {
+            if (nouveauClientCheckbox.checked) {
+                clientExistantGroup.style.display = 'none';
+                nouveauClientFields.style.display = 'block';
+                
+                // Activer les champs
+                document.getElementById('{{ form.client_nom.id_for_label }}').disabled = false;
+                document.getElementById('{{ form.client_contact.id_for_label }}').disabled = false;
+                document.getElementById('{{ form.client_type.id_for_label }}').disabled = false;
+            } else {
+                clientExistantGroup.style.display = 'block';
+                nouveauClientFields.style.display = 'none';
+                
+                // Désactiver les champs
+                document.getElementById('{{ form.client_nom.id_for_label }}').disabled = true;
+                document.getElementById('{{ form.client_contact.id_for_label }}').disabled = true;
+                document.getElementById('{{ form.client_type.id_for_label }}').disabled = true;
+            }
+        }
+        
+        nouveauClientCheckbox.addEventListener('change', toggleClientFields);
+        toggleClientFields(); // Initialisation
+        
+        // Gestion changement produit
+        produitSelect.addEventListener('change', function() {
+            const produitId = this.value;
+            
+            if (produitId) {
+                fetchStockInfo(produitId);
+            } else {
+                stockInfo.style.display = 'none';
+                lotsFifo.style.display = 'none';
+                simulationFifo.style.display = 'none';
+            }
+        });
+        
+        // Simulation FIFO
+        btnSimuler.addEventListener('click', function() {
+            const produitId = produitSelect.value;
+            const quantite = quantiteInput.value;
+            
+            if (produitId && quantite > 0) {
+                simulerFIFO(produitId, quantite);
+            } else {
+                alert('Veuillez sélectionner un produit et une quantité');
+            }
+        });
+        
+        // Fonction pour récupérer les infos stock
+        function fetchStockInfo(produitId) {
+            fetch(`/api/stock-agent/${produitId}/`)
+                .then(response => response.json())
+                .then(data => {
+                    // Mettre à jour les infos générales
+                    document.getElementById('stock-total').textContent = `${data.stock_total} unités`;
+                    document.getElementById('prix-gros').textContent = `${data.prix_gros_moyen || 0} FCFA`;
+                    document.getElementById('prix-detail').textContent = `${data.prix_detail_moyen || 0} FCFA`;
+                    
+                    // Afficher la section stock
+                    stockInfo.style.display = 'block';
+                    
+                    // Mettre à jour la table des lots
+                    updateLotsTable(data.lots_disponibles);
+                    
+                    // Afficher la section lots
+                    lotsFifo.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors du chargement des informations stock');
+                });
+        }
+        
+        // Mettre à jour la table des lots
+        function updateLotsTable(lots) {
+            const tbody = document.getElementById('tbody-lots');
+            tbody.innerHTML = '';
+            
+            lots.forEach((lot, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${lot.lot}</td>
+                    <td>${lot.date_distribution}</td>
+                    <td><strong>${lot.quantite}</strong> unités</td>
+                    <td>${lot.prix_gros} FCFA</td>
+                    <td>${lot.prix_detail} FCFA</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+        
+        // Simuler le FIFO
+        function simulerFIFO(produitId, quantite) {
+            fetch(`/api/simuler-fifo/${produitId}/${quantite}/`)
+                .then(response => response.json())
+                .then(data => {
+                    let html = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Quantité demandée: <strong>${data.quantite_demandee}</strong></h6>
+                                <h6>Quantité couverte: <strong class="text-success">${data.quantite_couverte}</strong></h6>
+                                <h6>Prix moyen estimé: <strong>${data.prix_moyen_estime} FCFA</strong></h6>
+                                <h6>Montant total: <strong class="text-primary">${data.montant_total} FCFA</strong></h6>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Lots utilisés:</h6>
+                                <ul class="list-group list-group-flush">
+                    `;
+                    
+                    data.lots_utilises.forEach(lot => {
+                        html += `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${lot.reference_lot}
+                                <span class="badge bg-primary rounded-pill">${lot.quantite_utilisee} unités</span>
+                            </li>
+                        `;
+                    });
+                    
+                    html += `
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('simulation-content').innerHTML = html;
+                    simulationFifo.style.display = 'block';
+                    
+                    // Mettre en évidence les lots utilisés dans le tableau
+                    highlightUsedLots(data.lots_utilises);
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors de la simulation FIFO');
+                });
+        }
+        
+        // Mettre en évidence les lots utilisés
+        function highlightUsedLots(lotsUtilises) {
+            const rows = document.querySelectorAll('#tbody-lots tr');
+            
+            rows.forEach(row => {
+                row.classList.remove('lot-fifo-used', 'lot-fifo-partial');
+                
+                const referenceLot = row.cells[1].textContent.trim();
+                const lotUtilise = lotsUtilises.find(lot => lot.reference_lot === referenceLot);
+                
+                if (lotUtilise) {
+                    row.classList.add('lot-fifo-used');
+                }
+            });
+        }
+        
+        // Validation avant soumission
+        document.getElementById('vente-fifo-form').addEventListener('submit', function(e) {
+            const quantite = quantiteInput.value;
+            const stockTotal = parseInt(document.getElementById('stock-total').textContent) || 0;
+            
+            if (quantite > stockTotal) {
+                e.preventDefault();
+                alert(`Quantité insuffisante! Stock disponible: ${stockTotal} unités`);
+                return false;
+            }
+            
+            // Afficher un loader sur le bouton
+            const submitBtn = document.getElementById('btn-submit');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Traitement en cours...';
+        });
+        
+        // Auto-simulation quand la quantité change
+        quantiteInput.addEventListener('change', function() {
+            const produitId = produitSelect.value;
+            const quantite = this.value;
+            
+            if (produitId && quantite > 0) {
+                simulerFIFO(produitId, quantite);
+            }
+        });
+    });
+</script>
+{% endblock %}

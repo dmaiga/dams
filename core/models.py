@@ -51,7 +51,14 @@ class Fournisseur(models.Model):
 
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
-    fournisseur = models.ForeignKey(Fournisseur, on_delete=models.CASCADE)
+    fournisseur = models.ForeignKey(
+        Fournisseur,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name="Fournisseur (optionnel)"
+    )
     quantite_initiale = models.PositiveIntegerField()
     quantite_restante = models.PositiveIntegerField()
     prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
@@ -140,6 +147,8 @@ class Agent(models.Model):
         if self.type_agent == 'stagiaire':
             return not self.est_expire
         return True
+    
+
     @property
     def est_stagiaire(self):
         """Vérifie si l'agent est un stagiaire"""
@@ -657,6 +666,7 @@ class Vente(models.Model):
         ordering = ['-date_vente']
         verbose_name = "Vente"
         verbose_name_plural = "Ventes"
+
 
 class Dette(models.Model):
     STATUT_CHOICES = (

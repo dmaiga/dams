@@ -258,37 +258,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Fonction pour basculer les groupes fournisseur
-    function toggleFournisseurFields() {
-        if (nouveauFournisseurCheckbox.checked) {
-            fournisseurExistantGroup.style.display = 'none';
-            nouveauFournisseurGroup.style.display = 'block';
-            if (selectFournisseur) {
-                selectFournisseur.disabled = true;
-                selectFournisseur.required = false;
-            }
-            if (inputNouveauFournisseur) {
-                inputNouveauFournisseur.disabled = false;
-                inputNouveauFournisseur.required = true;
-            }
-            if (inputContactFournisseur) {
-                inputContactFournisseur.disabled = false;
-            }
-        } else {
-            fournisseurExistantGroup.style.display = 'block';
-            nouveauFournisseurGroup.style.display = 'none';
-            if (selectFournisseur) {
-                selectFournisseur.disabled = false;
-                selectFournisseur.required = true;
-            }
-            if (inputNouveauFournisseur) {
-                inputNouveauFournisseur.disabled = true;
-                inputNouveauFournisseur.required = false;
-            }
-            if (inputContactFournisseur) {
-                inputContactFournisseur.disabled = true;
-            }
+   function toggleFournisseurFields() {
+    if (nouveauFournisseurCheckbox.checked) {
+        fournisseurExistantGroup.style.display = 'none';
+        nouveauFournisseurGroup.style.display = 'block';
+        if (selectFournisseur) {
+            selectFournisseur.disabled = true;
+            selectFournisseur.required = false;
+        }
+        if (inputNouveauFournisseur) {
+            inputNouveauFournisseur.disabled = false;
+            inputNouveauFournisseur.required = true;
+        }
+        if (inputContactFournisseur) {
+            inputContactFournisseur.disabled = false;
+        }
+    } else {
+        fournisseurExistantGroup.style.display = 'block';
+        nouveauFournisseurGroup.style.display = 'none';
+        if (selectFournisseur) {
+            selectFournisseur.disabled = false;
+            selectFournisseur.required = false; // ✅ désormais optionnel
+        }
+        if (inputNouveauFournisseur) {
+            inputNouveauFournisseur.disabled = true;
+            inputNouveauFournisseur.required = false;
+        }
+        if (inputContactFournisseur) {
+            inputContactFournisseur.disabled = true;
         }
     }
+}
+
 
     // Fonction pour l'aperçu de la facture
     function toggleFacturePreview() {
