@@ -1,4 +1,5 @@
-<!-- core/ventes/enregistrer_vente.html -->
+<!-- core/ventes/enregistrer_
+ html -->
 {% extends 'base.html' %}
 {% load static %}
 
@@ -26,27 +27,35 @@
                     <form method="post" id="vente-form">
                         {% csrf_token %}
                         
-                        <!-- Section Client -->
+                        <!-- Section Client (OPTIONNELLE) -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Client</h5>
+                                <h5 class="mb-0">Client (Optionnel)</h5>
                             </div>
                             <div class="card-body">
+                                <div class="alert alert-info">
+                                    <small>
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Information :</strong> 
+                                        Le client est optionnel. Si aucun client n'est spécifié, "Inconnu" sera automatiquement enregistré.
+                                    </small>
+                                </div>
+
                                 <div class="row mb-3">
                                     <div class="col-12">
                                         <div class="form-check form-switch">
                                             {{ form.nouveau_client }}
                                             <label class="form-check-label" for="{{ form.nouveau_client.id_for_label }}">
-                                                Nouveau client
+                                                Créer un nouveau client
                                             </label>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Client existant -->
+                                <!-- Client existant (optionnel) -->
                                 <div id="client-existant-group" class="row">
                                     <div class="col-md-6">
-                                        <label class="form-label">Client existant</label>
+                                        <label class="form-label">Client existant (optionnel)</label>
                                         {{ form.client }}
                                         {% if form.client.errors %}
                                         <div class="text-danger small">{{ form.client.errors }}</div>
@@ -54,28 +63,28 @@
                                     </div>
                                 </div>
 
-                                <!-- Nouveau client -->
+                                <!-- Nouveau client (optionnel) -->
                                 <div id="nouveau-client-group" class="row" style="display: none;">
                                     <div class="col-md-4">
-                                        <label class="form-label">Nom du client *</label>
+                                        <label class="form-label">Nom du client (optionnel)</label>
                                         {{ form.client_nom }}
                                         {% if form.client_nom.errors %}
                                         <div class="text-danger small">{{ form.client_nom.errors }}</div>
                                         {% endif %}
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label">Contact</label>
+                                        <label class="form-label">Contact (optionnel)</label>
                                         {{ form.client_contact }}
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label">Type de client</label>
+                                        <label class="form-label">Type de client (optionnel)</label>
                                         {{ form.client_type }}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Section Produit -->
+                        <!-- Section Produit (OBLIGATOIRE) -->
                         <div class="card mb-4">
                             <div class="card-header">
                                 <h5 class="mb-0">Produit à Vendre</h5>
@@ -152,7 +161,7 @@
                                 <h6>Résumé de la Vente</h6>
                                 <div class="row text-center">
                                     <div class="col-3">
-                                        <div class="h5" id="resume-client">-</div>
+                                        <div class="h5" id="resume-client">Inconnu</div>
                                         <small>Client</small>
                                     </div>
                                     <div class="col-3">
@@ -170,36 +179,37 @@
                                 </div>
                             </div>
                         </div>
-<!-- Section Date de vente -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">Date de la Vente</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <label class="form-label">Date et heure de la vente *</label>
-                {{ form.date_vente }}
-                {% if form.date_vente.errors %}
-                <div class="text-danger small">{{ form.date_vente.errors }}</div>
-                {% endif %}
-                <div class="form-text">
-                    Date à laquelle la vente a été effectuée chez le client
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="alert alert-info">
-                    <small>
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Information :</strong><br>
-                       
-                        • Pour une vente rétroactives indique la date de la vente
-                    </small>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+
+                        <!-- Section Date de vente -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Date de la Vente</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Date et heure de la vente *</label>
+                                        {{ form.date_vente }}
+                                        {% if form.date_vente.errors %}
+                                        <div class="text-danger small">{{ form.date_vente.errors }}</div>
+                                        {% endif %}
+                                        <div class="form-text">
+                                            Date à laquelle la vente a été effectuée chez le client
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <small>
+                                                <i class="fas fa-info-circle"></i>
+                                                <strong>Information :</strong><br>
+                                                • Pour une vente rétroactive, indique la date de la vente
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="d-flex gap-2">
                             <a href="{% url 'liste_ventes' %}" class="btn btn-secondary">Annuler</a>
                             <button type="submit" class="btn btn-success">Enregistrer la Vente</button>
@@ -249,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (inputClientNom) {
                 inputClientNom.disabled = false;
-                inputClientNom.required = true;
+                inputClientNom.required = false; // Rendre optionnel
             }
             if (inputClientContact) inputClientContact.disabled = false;
             if (selectClientType) selectClientType.disabled = false;
@@ -258,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nouveauClientGroup.style.display = 'none';
             if (selectClient) {
                 selectClient.disabled = false;
-                selectClient.required = true;
+                selectClient.required = false; // Rendre optionnel
             }
             if (inputClientNom) {
                 inputClientNom.disabled = true;
@@ -358,13 +368,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fonction pour mettre à jour le résumé
     function updateResume() {
-        // Client
-        if (nouveauClientCheckbox.checked) {
-            resumeClient.textContent = inputClientNom.value || 'Nouveau client';
-        } else {
-            const clientText = selectClient.options[selectClient.selectedIndex]?.text || '-';
-            resumeClient.textContent = clientText.includes('Sélectionner') ? '-' : clientText.split(' - ')[0];
+        // Client - "Inconnu" par défaut
+        let clientName = 'Inconnu';
+        
+        if (nouveauClientCheckbox.checked && inputClientNom.value) {
+            clientName = inputClientNom.value;
+        } else if (!nouveauClientCheckbox.checked && selectClient.value) {
+            const clientText = selectClient.options[selectClient.selectedIndex]?.text || 'Inconnu';
+            clientName = clientText.includes('Sélectionner') ? 'Inconnu' : clientText.split(' - ')[0];
         }
+        
+        resumeClient.textContent = clientName;
         
         // Produit
         const distributionText = selectDistribution.options[selectDistribution.selectedIndex]?.text || '-';

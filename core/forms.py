@@ -835,7 +835,9 @@ class DistributionSuppressionForm(forms.Form):
 
 # === FORMULAIRE VENTE ===
 class VenteForm(forms.ModelForm):
-    # Nouveau client
+    # Supprimer le choix de type client et rendre le client complètement optionnel
+    
+    # Nouveau client (optionnel)
     nouveau_client = forms.BooleanField(
         required=False, 
         initial=False, 
@@ -846,7 +848,7 @@ class VenteForm(forms.ModelForm):
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Nom du client'
+            'placeholder': 'Nom du client (optionnel)'
         })
     )
     client_contact = forms.CharField(
@@ -854,7 +856,7 @@ class VenteForm(forms.ModelForm):
         required=False, 
         widget=forms.TextInput(attrs={
             'class': 'form-control', 
-            'placeholder': 'Contact (téléphone)'
+            'placeholder': 'Contact (téléphone, optionnel)'
         })
     )
     client_type = forms.ChoiceField(
@@ -900,7 +902,7 @@ class VenteForm(forms.ModelForm):
 
     class Meta:
         model = Vente
-        fields = ['client', 'detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire', 'date_vente']
+        fields = ['detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire', 'date_vente']
         widgets = {
             'client': forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
             'detail_distribution': forms.Select(attrs={'class': 'form-select', 'id': 'detail-distribution'}),
@@ -919,7 +921,6 @@ class VenteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # Rendre tous les champs non obligatoires sauf ceux nécessaires
-        self.fields['client'].required = False
         self.fields['detail_distribution'].required = False
         self.fields['quantite'].required = False
         self.fields['type_vente'].required = True
@@ -934,8 +935,12 @@ class VenteForm(forms.ModelForm):
             self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
         
         # Filtrer les clients existants
-        self.fields['client'].queryset = Client.objects.all()
-        self.fields['client'].empty_label = "Sélectionner un client existant..."
+        self.fields['client'] = forms.ModelChoiceField(
+            queryset=Client.objects.all(),
+            required=False,
+            widget=forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
+            empty_label="Sélectionner un client existant (optionnel)..."
+        )
         
         # Filtrer les détails de distribution disponibles pour cet agent
         if self.agent:
@@ -952,7 +957,8 @@ class VenteForm(forms.ModelForm):
                 f"Prix détail: {obj.prix_detail or 'N/D'} FCFA"
             )
 
-        # Initialiser les champs nouveau client comme désactivés
+        # Initialiser les champs comme désactivés
+        self.fields['client'].widget.attrs['disabled'] = True
         self.fields['client_nom'].widget.attrs['disabled'] = True
         self.fields['client_contact'].widget.attrs['disabled'] = True
         self.fields['client_type'].widget.attrs['disabled'] = True
@@ -960,15 +966,16 @@ class VenteForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         
-        # Validation client
+        # Validation client - TOUT EST OPTIONNEL
+        # Si nouveau client est coché, valider les champs correspondants
         if cleaned_data.get('nouveau_client'):
-            if not cleaned_data.get('client_nom'):
-                self.add_error('client_nom', 'Nom requis pour un nouveau client')
-        else:
-            if not cleaned_data.get('client'):
-                self.add_error('client', 'Veuillez sélectionner un client existant')
-                
-        # Validation de base
+            if cleaned_data.get('client_nom'):
+                # Valider seulement si un nom est saisi
+                if not cleaned_data.get('client_nom'):
+                    self.add_error('client_nom', 'Nom requis si vous créez un nouveau client')
+        # Aucune validation pour les clients existants ou inconnus
+        
+        # Validation de base (produit et quantité)
         if not cleaned_data.get('detail_distribution'):
             self.add_error('detail_distribution', 'Produit à vendre requis')
         
@@ -994,14 +1001,21 @@ class VenteForm(forms.ModelForm):
         # Associer l'agent
         instance.agent = self.agent
 
-        # Si nouveau client → créer et l'associer
-        if self.cleaned_data.get('nouveau_client'):
+        # Gérer le client - TOUT EST OPTIONNEL
+        if self.cleaned_data.get('nouveau_client') and self.cleaned_data.get('client_nom'):
+            # Créer un nouveau client seulement si le nom est fourni
             client = Client.objects.create(
                 nom=self.cleaned_data['client_nom'],
                 contact=self.cleaned_data.get('client_contact', ''),
                 type_client=self.cleaned_data.get('client_type', 'detail')
             )
             instance.client = client
+        elif self.cleaned_data.get('client'):
+            # Utiliser le client existant sélectionné
+            instance.client = self.cleaned_data.get('client')
+        else:
+            # Aucun client associé → sera "Inconnu"
+            instance.client = None
 
         # Déterminer automatiquement le prix si non fourni
         if not instance.prix_vente_unitaire and instance.detail_distribution:
@@ -1019,79 +1033,7 @@ class VenteForm(forms.ModelForm):
             detail.save()
             
         return instance
-
-# === FORMULAIRE DETTE (pour vente à crédit) ===
-class DetteForm(forms.ModelForm):
-    # Informations de localisation
-    nom_localite = forms.CharField(
-        max_length=100,
-        required=True,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ex: Grand Marché Central, Boutique XYZ...'
-        }),
-        help_text="Nom du lieu où la dette a été contractée"
-    )
     
-    date_echeance = forms.DateField(
-        required=True,
-        widget=forms.DateInput(attrs={
-            'class': 'form-control',
-            'type': 'date',
-            'min': timezone.now().date().isoformat()
-        }),
-        help_text="Date d'échéance pour le remboursement"
-    )
-    
-    delai_bonus_heures = forms.IntegerField(
-        required=False,
-        initial=48,
-        min_value=1,
-        max_value=168,  # 7 jours max
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': '48'
-        }),
-        help_text="Délai en heures pour bénéficier du bonus (défaut: 48h)"
-    )
-
-    class Meta:
-        model = Dette
-        fields = ['nom_localite', 'date_echeance', 'delai_bonus_heures', 'notes']
-        widgets = {
-            'notes': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Notes supplémentaires...'
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        self.vente = kwargs.pop('vente', None)
-        super().__init__(*args, **kwargs)
-        
-        # Définir la date d'échéance par défaut à 30 jours
-        if not self.instance.pk:
-            self.fields['date_echeance'].initial = timezone.now().date() + timedelta(days=30)
-
-    def clean_date_echeance(self):
-        date_echeance = self.cleaned_data['date_echeance']
-        if date_echeance < timezone.now().date():
-            raise forms.ValidationError("La date d'échéance ne peut pas être dans le passé")
-        return date_echeance
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        
-        if self.vente:
-            instance.vente = self.vente
-            instance.montant_total = self.vente.total_vente
-            instance.montant_restant = self.vente.total_vente
-        
-        if commit:
-            instance.save()
-            
-        return instance
 
 # === FORMULAIRE DETTE (pour vente à crédit) ===
 class DetteForm(forms.ModelForm):

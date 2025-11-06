@@ -582,7 +582,10 @@ class Vente(models.Model):
         on_delete=models.CASCADE,
         limit_choices_to={'type_agent__in': ['terrain', 'entrepot']}
     )
-    client = models.ForeignKey(Client, on_delete=models.CASCADE)
+    client = models.ForeignKey(Client,
+                                on_delete=models.SET_NULL,
+                                null=True,
+                                blank=True)
     detail_distribution = models.ForeignKey(DetailDistribution, on_delete=models.CASCADE)
     quantite = models.PositiveIntegerField()
     type_vente = models.CharField(max_length=50, choices=TYPE_VENTE_CHOICES, default='detail')
@@ -619,7 +622,13 @@ class Vente(models.Model):
                 montant_restant=self.total_vente,
                 date_echeance=self.date_vente.date() + timedelta(days=30)  # Basé sur date_vente
             )
-
+    @property
+    def nom_client(self):
+        """Retourne le nom du client ou 'Inconnu' si non spécifié"""
+        if self.client and self.client.nom:
+            return self.client.nom
+        return "Inconnu"
+    
     @property
     def produit_nom(self):
         return self.detail_distribution.lot.produit.nom
@@ -661,7 +670,10 @@ class Vente(models.Model):
     def est_retroactive(self):
         """Vérifie si c'est une vente rétroactive"""
         return self.date_vente.date() < self.date_creation.date()
-
+    
+    def __str__(self):
+        return f"Vente #{self.id} - {self.nom_client} - {self.total_vente} FCFA"
+    
     class Meta:
         ordering = ['-date_vente']
         verbose_name = "Vente"
@@ -951,7 +963,7 @@ class Recouvrement(models.Model):
     superviseur = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'superviseur'},
+        limit_choices_to={'type_agent': 'entrepot'},
         related_name='recouvrements_effectues'
     )
     

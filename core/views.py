@@ -1094,20 +1094,23 @@ def enregistrer_vente(request):
                 with transaction.atomic():  # Transaction pour garantir l'intégrité
                     vente = form.save()
                     
+                    # Récupérer le nom du client en utilisant la propriété nom_client
+                    nom_client_affichage = vente.nom_client
+                    
                     # Si c'est une vente à crédit, créer la dette
                     if vente.mode_paiement == 'credit':
                         # Rediriger vers le formulaire de création de dette
                         request.session['vente_pending_dette'] = vente.id
                         messages.success(request, 
                             f"Vente à crédit enregistrée ! {vente.quantite} {vente.produit_nom} "
-                            f"vendu à {vente.client.nom}. Veuillez compléter les informations de la dette."
+                            f"vendu à {nom_client_affichage}. Veuillez compléter les informations de la dette."
                         )
                         return redirect('creer_dette')
                     
                     else:  # Vente comptant
                         messages.success(request, 
                             f"Vente comptant enregistrée ! {vente.quantite} {vente.produit_nom} "
-                            f"vendu à {vente.client.nom} pour {vente.total_vente} FCFA"
+                            f"vendu à {nom_client_affichage} pour {vente.total_vente} FCFA"
                         )
                         return redirect('liste_ventes')
                         
@@ -1466,6 +1469,7 @@ def creer_dette(request):
         'form': form,
         'vente': vente
     })
+
 #=====
 #FACTURE
 #=====
