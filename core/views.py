@@ -2342,7 +2342,6 @@ def tous_les_bonus(request):
     
     return render(request, 'core/analyses/tous_les_bonus_admin.html', context)
 
-
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/dashboard.html'
     
@@ -2415,17 +2414,22 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # === PRODUITS VENDUS ===
         produits_vendus_data = {}
         for vente in Vente.objects.all():
-            produit_nom = vente.detail_distribution.lot.produit.nom
-            if produit_nom not in produits_vendus_data:
-                produits_vendus_data[produit_nom] = {
-                    'total_quantite': 0,
-                    'total_ca': 0,
-                    'ventes_count': 0
-                }
-            
-            produits_vendus_data[produit_nom]['total_quantite'] += vente.quantite
-            produits_vendus_data[produit_nom]['total_ca'] += float(vente.quantite * vente.prix_vente_unitaire)
-            produits_vendus_data[produit_nom]['ventes_count'] += 1
+            # Vérifier que la relation existe
+            if (vente.detail_distribution and 
+                vente.detail_distribution.lot and 
+                vente.detail_distribution.lot.produit):
+                
+                produit_nom = vente.detail_distribution.lot.produit.nom
+                if produit_nom not in produits_vendus_data:
+                    produits_vendus_data[produit_nom] = {
+                        'total_quantite': 0,
+                        'total_ca': 0,
+                        'ventes_count': 0
+                    }
+                
+                produits_vendus_data[produit_nom]['total_quantite'] += vente.quantite
+                produits_vendus_data[produit_nom]['total_ca'] += float(vente.quantite * vente.prix_vente_unitaire)
+                produits_vendus_data[produit_nom]['ventes_count'] += 1
         
         # Convertir en liste et trier
         produits_vendus = [
@@ -2461,21 +2465,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # === TOP CLIENTS RENTABLES ===
         clients_data = {}
         for vente in Vente.objects.all():
-            client_nom = vente.client.nom
-            client_type = vente.client.type_client
-            
-            if client_nom not in clients_data:
-                clients_data[client_nom] = {
-                    'type_client': client_type,
-                    'total_achats': 0,
-                    'nombre_commandes': 0,
-                    'montants_commandes': []
-                }
-            
-            montant_commande = float(vente.quantite * vente.prix_vente_unitaire)
-            clients_data[client_nom]['total_achats'] += montant_commande
-            clients_data[client_nom]['nombre_commandes'] += 1
-            clients_data[client_nom]['montants_commandes'].append(montant_commande)
+            # CORRECTION : Vérifier que le client existe
+            if vente.client is not None:
+                client_nom = vente.client.nom
+                client_type = vente.client.type_client
+                
+                if client_nom not in clients_data:
+                    clients_data[client_nom] = {
+                        'type_client': client_type,
+                        'total_achats': 0,
+                        'nombre_commandes': 0,
+                        'montants_commandes': []
+                    }
+                
+                montant_commande = float(vente.quantite * vente.prix_vente_unitaire)
+                clients_data[client_nom]['total_achats'] += montant_commande
+                clients_data[client_nom]['nombre_commandes'] += 1
+                clients_data[client_nom]['montants_commandes'].append(montant_commande)
         
         # Calculer le panier moyen et créer la liste
         top_clients = []
@@ -2541,7 +2547,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         })
         
         return context
-    
 class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/stat_agents.html'
     

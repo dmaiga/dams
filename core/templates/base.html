@@ -392,16 +392,15 @@
             <div class="sidebar d-flex flex-column" id="sidebar">
                 <!-- En-tête du sidebar -->
                 <div class="sidebar-header">
-                        <i class="fas fa-warehouse"></i>
-                        <span>DAMS</span>
-                   
+                    <i class="fas fa-warehouse"></i>
+                    <span>DAMS</span>
                     <small class="text-muted mt-2 d-block">Distribution & Ventes</small>
                 </div>
 
                 <!-- Navigation sidebar -->
                 <div class="sidebar-nav">
                     <!-- ===== MENU AGENT TERRAIN ===== -->
-                     {% if agent.type_agent == 'terrain' or agent.type_agent == 'stagiaire' %}
+                    {% if request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}
                     
                     <div class="nav flex-column">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_agent' %}active{% endif %}" 
@@ -482,14 +481,18 @@
                             <span>Gestion Agents</span>
                         </a>
                        
-    <a class="nav-link" href="{% url 'liste_agents_recouvrement' %}">
-        <i class="fas fa-hand-holding-usd"></i>
-        <span>Recouvrement Agents</span>
-    </a>
-    <a class="nav-link" href="{% url 'liste_fournisseurs' %}">
-        <i class=""></i>
-        <span>Fournisseur</span>
-    </a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
+                           href="{% url 'liste_agents_recouvrement' %}">
+                            <i class="fas fa-hand-holding-usd"></i>
+                            <span>Recouvrement Agents</span>
+                        </a>
+                        
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_fournisseurs' %}active{% endif %}" 
+                           href="{% url 'liste_fournisseurs' %}">
+                            <i class="fas fa-truck"></i>
+                            <span>Fournisseurs</span>
+                        </a>
+                        
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}" 
                            href="{% url 'liste_lots' %}">
                             <i class="fas fa-pallet"></i>
@@ -502,22 +505,16 @@
                             <span>Distributions</span>
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_ventes,detail_vente' %}active{% endif %}" 
                            href="{% url 'liste_ventes' %}">
                             <i class="fas fa-cash-register"></i>
-                            <span>Mes Ventes</span>
-                            {% if mes_ventes_count %}
-                            <span class="nav-badge">{{ mes_ventes_count }}</span>
-                            {% endif %}
+                            <span>Ventes</span>
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_dettes,detail_dette,enregistrer_paiement_dette,creer_dette' %}active{% endif %}" 
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_dettes,detail_dette' %}active{% endif %}" 
                            href="{% url 'liste_dettes' %}">
                             <i class="fas fa-file-invoice-dollar"></i>
-                            <span>Mes Dettes</span>
-                            {% if mes_dettes_count %}
-                            <span class="nav-badge">{{ mes_dettes_count }}</span>
-                            {% endif %}
+                            <span>Dettes</span>
                         </a>
 
                         <div class="nav-item dropdown">
@@ -526,8 +523,14 @@
                                 <span>Factures</span>
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'liste_factures_entrepot' %}">Fournisseur</a></li>
-                                <li><a class="dropdown-item" href="{% url 'liste_factures' %}">Versement</a></li>
+                                <li>
+                                    <a class="dropdown-item {% if request.resolver_match.url_name == 'liste_factures_entrepot' %}active{% endif %}" 
+                                       href="{% url 'liste_factures_entrepot' %}">Fournisseur</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {% if request.resolver_match.url_name == 'liste_factures' %}active{% endif %}" 
+                                       href="{% url 'liste_factures' %}">Versement</a>
+                                </li>
                             </ul>
                         </div>
 
@@ -550,15 +553,17 @@
                         </small>
                         <br>
                         <small class="text-muted">
-                            {% if request.user.agent.type_agent == 'direction' %}
+                            {% if request.user.agent and request.user.agent.type_agent == 'direction' %}
                                 Direction
-                            {% elif request.user.agent.type_agent == 'superviseur' %}
+                            {% elif request.user.agent and request.user.agent.type_agent == 'superviseur' %}
                                 Superviseur
-                            {% else %}
+                            {% elif request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}
                                 Agent Terrain
+                            {% else %}
+                                Utilisateur
                             {% endif %}
                         </small>
-                        {% if request.user.agent and request.user.agent.type_agent == 'terrain' %}
+                        {% if request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}
                         <br>
                         <small class="text-success">
                             <i class="fas fa-gift"></i>
@@ -585,7 +590,7 @@
                                     {% else %}fa-map-marker-alt{% endif %} 
                                     me-2"></i>
                                 {% block page_title %}
-                                    {% if request.user.agent.type_agent == 'terrain' %}
+                                    {% if request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}
                                         Tableau de Bord Agent
                                     {% else %}
                                         Tableau de Bord
@@ -594,7 +599,7 @@
                             </span>
                             
                             <!-- Indicateurs rapides pour les agents terrain -->
-                            {% if request.user.agent.type_agent == 'terrain' %}
+                            {% if request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}
                             <div class="d-flex gap-3 flex-wrap">
                                 <small class="text-muted">
                                     <i class="fas fa-gift me-1"></i>
@@ -617,7 +622,7 @@
                                         type="button" 
                                         data-bs-toggle="dropdown">
                                     <i class="fas fa-user-circle me-2"></i>
-                                    {{ request.user.first_name }}
+                                    {{ request.user.first_name|default:request.user.username }}
                                     <i class="fas fa-chevron-down ms-2"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
@@ -704,30 +709,6 @@
                     }
                 });
             });
-            
-            // Animation pour les liens actifs
-            const currentPath = window.location.pathname;
-            navLinks.forEach(link => {
-                if (link.getAttribute('href') === currentPath) {
-                    link.classList.add('active');
-                }
-            });
-            
-            // Tooltips pour les icônes
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
-            });
-            
-            // Ajuster la hauteur du contenu
-            function adjustContentHeight() {
-                const navbarHeight = document.querySelector('.navbar-custom').offsetHeight;
-                const contentWrapper = document.querySelector('.content-wrapper');
-                contentWrapper.style.minHeight = `calc(100vh - ${navbarHeight}px - 4rem)`;
-            }
-            
-            window.addEventListener('resize', adjustContentHeight);
-            adjustContentHeight();
         });
     </script>
 </body>
