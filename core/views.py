@@ -1076,10 +1076,9 @@ def mes_distributions(request):
 #=====
 #VENTE
 #=====
-
 @login_required
 def enregistrer_vente(request):
-    """Enregistrer une vente avec gestion des dettes"""
+    """Enregistrer une vente avec gestion des dettes et stagiaires"""
     # Récupérer l'agent connecté (sans restriction de type)
     try:
         agent = Agent.objects.get(user=request.user)
@@ -1098,27 +1097,34 @@ def enregistrer_vente(request):
                     # Récupérer le nom du client en utilisant la propriété nom_client
                     nom_client_affichage = vente.nom_client
                     
+                    # ✅ NOUVEAU : Message personnalisé selon le type de vente
+                    if vente.stagiaire:
+                        message_success = (
+                            f"✅ Vente stagiaire enregistrée ! {vente.quantite} {vente.produit_nom} "
+                            f"vendu par {vente.stagiaire.full_name} à {nom_client_affichage} "
+                            f"pour {vente.total_vente} FCFA"
+                        )
+                    else:
+                        message_success = (
+                            f"✅ Vente enregistrée ! {vente.quantite} {vente.produit_nom} "
+                            f"vendu à {nom_client_affichage} pour {vente.total_vente} FCFA"
+                        )
+                    
                     # Si c'est une vente à crédit, créer la dette
                     if vente.mode_paiement == 'credit':
                         # Rediriger vers le formulaire de création de dette
                         request.session['vente_pending_dette'] = vente.id
-                        messages.success(request, 
-                            f"Vente à crédit enregistrée ! {vente.quantite} {vente.produit_nom} "
-                            f"vendu à {nom_client_affichage}. Veuillez compléter les informations de la dette."
-                        )
+                        messages.success(request, f"{message_success} - Veuillez compléter les informations de la dette.")
                         return redirect('creer_dette')
                     
                     else:  # Vente comptant
-                        messages.success(request, 
-                            f"Vente comptant enregistrée ! {vente.quantite} {vente.produit_nom} "
-                            f"vendu à {nom_client_affichage} pour {vente.total_vente} FCFA"
-                        )
+                        messages.success(request, message_success)
                         return redirect('liste_ventes')
                         
             except Exception as e:
-                messages.error(request, f"Erreur lors de l'enregistrement: {str(e)}")
+                messages.error(request, f"❌ Erreur lors de l'enregistrement: {str(e)}")
         else:
-            messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+            messages.error(request, "❌ Veuillez corriger les erreurs ci-dessous.")
     else:
         form = VenteForm(agent=agent)
     
@@ -2253,6 +2259,133 @@ def vue_detail_agent(request, agent_id):
     
     return render(request, 'core/dashboard/detail_agent.html', context)
 
+from django.db.models import DecimalField
+from django.db.models.functions import Coalesce
+
+@login_required
+def detail_stagiaire(request, stagiaire_id):
+    """Vue détaillée d'un stagiaire avec ses statistiques de vente"""
+    try:
+        # Récupérer le superviseur connecté
+        superviseur = Agent.objects.get(user=request.user, type_agent='entrepot')
+    except Agent.DoesNotExist:
+        messages.error(request, "Accès réservé aux superviseurs.")
+        return redirect('dashboard')
+    
+    # Récupérer le stagiaire
+    stagiaire = get_object_or_404(Agent, id=stagiaire_id, type_agent='stagiaire')
+    
+    # Récupérer toutes les ventes attribuées à ce stagiaire
+    ventes_stagiaire = Vente.objects.filter(
+        stagiaire=stagiaire
+    ).select_related(
+        'client', 'detail_distribution__lot__produit', 'agent'
+    ).order_by('-date_vente')
+    
+    # ✅ APPROCHE SIMPLE : Calcul manuel des totaux
+    total_ventes = sum(vente.total_vente for vente in ventes_stagiaire)
+    quantite_vendue = sum(vente.quantite for vente in ventes_stagiaire)
+    nombre_ventes = ventes_stagiaire.count()
+    nombre_clients = ventes_stagiaire.values('client').distinct().count()
+    
+    stats_ventes = {
+        'total_ventes': total_ventes,
+        'nombre_ventes': nombre_ventes,
+        'quantite_vendue': quantite_vendue,
+        'nombre_clients': nombre_clients,
+    }
+    
+    # ✅ APPROCHE SIMPLE : Filtrage manuel par type
+    ventes_gros = [v for v in ventes_stagiaire if v.type_vente == 'gros']
+    ventes_detail = [v for v in ventes_stagiaire if v.type_vente == 'detail']
+    
+    stats_gros = {
+        'total': sum(v.total_vente for v in ventes_gros),
+        'quantite': sum(v.quantite for v in ventes_gros),
+        'nombre': len(ventes_gros),
+    }
+    
+    stats_detail = {
+        'total': sum(v.total_vente for v in ventes_detail),
+        'quantite': sum(v.quantite for v in ventes_detail),
+        'nombre': len(ventes_detail),
+    }
+    
+    # ✅ APPROCHE SIMPLE : Mode de paiement
+    ventes_comptant = [v for v in ventes_stagiaire if v.mode_paiement == 'comptant']
+    ventes_credit = [v for v in ventes_stagiaire if v.mode_paiement == 'credit']
+    
+    stats_comptant = {
+        'total': sum(v.total_vente for v in ventes_comptant),
+        'nombre': len(ventes_comptant),
+    }
+    
+    stats_credit = {
+        'total': sum(v.total_vente for v in ventes_credit),
+        'nombre': len(ventes_credit),
+    }
+    
+    # ✅ APPROCHE SIMPLE : Produits les plus vendus
+    from collections import defaultdict
+    produits_dict = defaultdict(lambda: {'quantite_vendue': 0, 'chiffre_affaire': 0, 'nombre_ventes': 0})
+    
+    for vente in ventes_stagiaire:
+        produit_nom = vente.produit_nom
+        produits_dict[produit_nom]['quantite_vendue'] += vente.quantite
+        produits_dict[produit_nom]['chiffre_affaire'] += vente.total_vente
+        produits_dict[produit_nom]['nombre_ventes'] += 1
+    
+    produits_vendus = [
+        {
+            'detail_distribution__lot__produit__nom': nom,
+            'quantite_vendue': data['quantite_vendue'],
+            'chiffre_affaire': data['chiffre_affaire'],
+            'nombre_ventes': data['nombre_ventes']
+        }
+        for nom, data in produits_dict.items()
+    ]
+    produits_vendus.sort(key=lambda x: x['quantite_vendue'], reverse=True)
+    produits_vendus = produits_vendus[:5]
+    
+    # ✅ APPROCHE SIMPLE : Tuteurs
+    tuteurs_dict = defaultdict(lambda: {'nombre_ventes': 0, 'total_ventes': 0})
+    
+    for vente in ventes_stagiaire:
+        tuteur_nom = f"{vente.agent.user.first_name} {vente.agent.user.last_name}"
+        tuteurs_dict[tuteur_nom]['nombre_ventes'] += 1
+        tuteurs_dict[tuteur_nom]['total_ventes'] += vente.total_vente
+    
+    tuteurs = [
+        {
+            'agent__user__first_name': vente.agent.user.first_name,
+            'agent__user__last_name': vente.agent.user.last_name,
+            'agent__type_agent': vente.agent.type_agent,
+            'nombre_ventes': data['nombre_ventes'],
+            'total_ventes': data['total_ventes']
+        }
+        for vente in ventes_stagiaire  # Pour récupérer les infos agent
+        for nom, data in tuteurs_dict.items()
+        if f"{vente.agent.user.first_name} {vente.agent.user.last_name}" == nom
+    ]
+    # Éliminer les doublons
+    tuteurs = list({t['agent__user__first_name'] + t['agent__user__last_name']: t for t in tuteurs}.values())
+    tuteurs.sort(key=lambda x: x['nombre_ventes'], reverse=True)
+    
+    context = {
+        'superviseur': superviseur,
+        'stagiaire': stagiaire,
+        'ventes': ventes_stagiaire[:10],
+        'stats_ventes': stats_ventes,
+        'stats_gros': stats_gros,
+        'stats_detail': stats_detail,
+        'stats_comptant': stats_comptant,
+        'stats_credit': stats_credit,
+        'produits_vendus': produits_vendus,
+        'tuteurs': tuteurs,
+        'total_tuteurs': len(tuteurs),
+    }
+    
+    return render(request, 'core/dashboard/detail_stagiaire.html', context)
 #=========
 # #ADMIN
 #=========

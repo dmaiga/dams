@@ -1,63 +1,320 @@
 <!-- templates/agents/liste_agents.html -->
 {% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Gestion des Agents{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Gestion des Agents</h1>
-    <a href="{% url 'creer_agent' %}" class="btn btn-success">➕ Nouvel Agent</a>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        {% if agents %}
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Nom</th>
-                        <th>Prénom</th>
-                        <th>Téléphone</th>
-                        <th>Type</th>
-                        <th>Date création</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for agent in agents %}
-                    <tr>
-                        <td>{{ agent.user.first_name }}</td>
-                        <td>{{ agent.user.last_name }}</td>
-                        <td>{{ agent.telephone }}</td>
-                        <td>
-<span class="badge 
-    {% if agent.type_agent == 'entrepot' %}bg-success
-    {% elif agent.type_agent == 'terrain' %}bg-primary
-    {% else %}bg-secondary
-    {% endif %}">
-    {{ agent.get_type_agent_display }}
-</span>
-
-                        </td>
-                        <td>{{ agent.date_creation|date:"d/m/Y" }}</td>
-<!-- Dans la colonne Actions de liste_agents.html -->
-<td>
-    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-sm btn-outline-info" title="Voir détails">
-        <i class="fas fa-eye"></i>
-    </a>
-    <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-sm btn-outline-primary">✏️</a>
-    <a href="{% url 'supprimer_agent' agent.id %}" class="btn btn-sm btn-outline-danger">🗑️</a>
-</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div class="container-fluid py-4">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                <div>
+                    <h1 class="h3 mb-2">
+                        <i class="fas fa-users me-2 text-primary"></i>Gestion des Agents
+                    </h1>
+                    <p class="text-muted mb-0">Liste de tous les agents du système</p>
+                </div>
+                <div class="mt-3 mt-md-0">
+                    <a href="{% url 'creer_agent' %}" class="btn btn-success">
+                        <i class="fas fa-user-plus me-2"></i>Nouvel Agent
+                    </a>
+                </div>
+            </div>
         </div>
-        {% else %}
-        <div class="text-center py-4">
-            <p class="text-muted">Aucun agent enregistré</p>
-            <a href="{% url 'creer_agent' %}" class="btn btn-primary">Créer le premier agent</a>
+    </div>
+
+    <!-- Carte principale -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                <h5 class="card-title mb-2 mb-md-0">
+                    <i class="fas fa-list me-2"></i>Liste des Agents
+                </h5>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-primary">{{ agents.count }} agent(s)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            {% if agents %}
+            <!-- Tableau responsive -->
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Nom Complet</th>
+                            <th scope="col" class="d-none d-md-table-cell">Téléphone</th>
+                            <th scope="col">Type</th>
+                            <th scope="col" class="d-none d-lg-table-cell">Date création</th>
+                            <th scope="col" class="d-none d-sm-table-cell">Statut</th>
+                            <th scope="col" class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for agent in agents %}
+                        <tr>
+                            <!-- Nom complet -->
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    
+                                    
+                                    <div>
+                                        <strong class="text-primary">{{ agent.full_name }}</strong>
+                                        <div class="text-muted small d-md-none">{{ agent.telephone }}</div>
+                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- Téléphone (caché sur mobile) -->
+                            <td class="d-none d-md-table-cell">
+                                {{ agent.telephone|default:"-" }}
+                            </td>
+                            
+                            <!-- Type d'agent -->
+                            <td>
+                                <span class="badge 
+                                    {% if agent.type_agent == 'entrepot' %}bg-success
+                                    {% elif agent.type_agent == 'terrain' %}bg-primary
+                                    {% elif agent.type_agent == 'stagiaire' %}bg-warning
+                                    {% else %}bg-secondary
+                                    {% endif %}">
+                                    {{ agent.get_type_agent_display }}
+                                </span>
+                                {% if agent.est_stagiaire %}
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        {{ agent.jours_restants }}j restants
+                                    </small>
+                                </div>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Date création (caché sur tablette) -->
+                            <td class="d-none d-lg-table-cell">
+                                {{ agent.date_creation|date:"d/m/Y" }}
+                            </td>
+                            
+                            <!-- Statut (caché sur mobile) -->
+                            <td class="d-none d-sm-table-cell">
+                                {% if agent.est_stagiaire %}
+                                    <span class="badge bg-{% if agent.est_expire %}danger{% else %}success{% endif %}">
+                                        {{ agent.statut_stagiaire }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">Actif</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Actions -->
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <!-- ✅ LIEN CONDITIONNEL : Détail Agent ou Stagiaire -->
+                                    {% if agent.est_stagiaire %}
+                                        <a href="{% url 'detail_stagiaire' agent.id %}" 
+                                           class="btn btn-sm btn-outline-warning" 
+                                           title="Détail stagiaire">
+                                            <i class="fas fa-user-graduate"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'detail_agent' agent.id %}" 
+                                           class="btn btn-sm btn-outline-info" 
+                                           title="Détail agent">
+                                            <i class="fas fa-chart-line"></i>
+                                        </a>
+                                    {% endif %}
+                                    
+                                    <!-- Modification -->
+                                    <a href="{% url 'modifier_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    
+                                    <!-- Suppression -->
+                                    {% if not agent.est_stagiaire or agent.est_expire %}
+                                    <a href="{% url 'supprimer_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-danger" 
+                                       title="Supprimer"
+                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-outline-secondary" 
+                                            disabled 
+                                            title="Impossible de supprimer un stagiaire actif">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- État vide -->
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">Aucun agent enregistré</h4>
+                    <p class="text-muted">Commencez par créer votre premier agent</p>
+                </div>
+                <a href="{% url 'creer_agent' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-user-plus me-2"></i>Créer le premier agent
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Pied de tableau (statistiques) -->
+        {% if agents %}
+        <div class="card-footer bg-light">
+            <div class="row text-center">
+                <div class="col-6 col-sm-3">
+                    <small class="text-muted">Superviseurs</small>
+                    <div class="h6 mb-0 text-success">
+                        {{ agents|length|default:0 }}
+                    </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                    <small class="text-muted">Agents Terrain</small>
+                    <div class="h6 mb-0 text-primary">
+                        {{ agents|length|default:0 }}
+                    </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                    <small class="text-muted">Stagiaires Actifs</small>
+                    <div class="h6 mb-0 text-warning">
+                        {{ agents|length|default:0 }}
+                    </div>
+                </div>
+                <div class="col-6 col-sm-3">
+                    <small class="text-muted">Stagiaires Expirés</small>
+                    <div class="h6 mb-0 text-danger">
+                        {{ agents|length|default:0 }}
+                    </div>
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
 </div>
+
+<style>
+/* Styles responsives et améliorations UX */
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Adaptation mobile */
+@media (max-width: 768px) {
+    .card-header h5 {
+        font-size: 1.1rem;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .avatar-sm {
+        width: 35px;
+        height: 35px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+}
+
+/* Effets hover pour une meilleure UX */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.btn-outline-info:hover {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+}
+
+.btn-outline-warning:hover {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+
+/* Badges avec meilleure lisibilité */
+.badge {
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
+/* Animation légère pour les boutons */
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+</style>
+
+<script>
+// Script pour améliorer l'UX sur mobile
+document.addEventListener('DOMContentLoaded', function() {
+    // Tooltip pour les boutons d'action sur mobile
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            trigger: 'hover'
+        });
+    });
+    
+    // Adaptation des boutons sur très petits écrans
+    function adaptButtonsForMobile() {
+        const buttons = document.querySelectorAll('.btn-sm');
+        if (window.innerWidth < 400) {
+            buttons.forEach(btn => {
+                btn.classList.add('btn-xs');
+            });
+        } else {
+            buttons.forEach(btn => {
+                btn.classList.remove('btn-xs');
+            });
+        }
+    }
+    
+    // Écouter le redimensionnement
+    window.addEventListener('resize', adaptButtonsForMobile);
+    adaptButtonsForMobile(); // Initialisation
+});
+</script>
 {% endblock %}

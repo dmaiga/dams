@@ -1,0 +1,258 @@
+<!-- core/stagiaires/detail_stagiaire.html -->
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Détail Stagiaire - {{ stagiaire.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- En-tête -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="fas fa-user-graduate text-warning me-2"></i>
+                        {{ stagiaire.full_name }}
+                    </h1>
+                    <p class="text-muted mb-0">
+                        Stagiaire - Période du {{ stagiaire.date_mise_service|date:"d/m/Y" }} au {{ stagiaire.date_expiration|date:"d/m/Y" }}
+                    </p>
+                    <p class="mb-0">
+                        <span class="badge bg-{% if stagiaire.est_expire %}danger{% else %}success{% endif %}">
+                            {{ stagiaire.statut_stagiaire }}
+                        </span>
+                    </p>
+                </div>
+                <div class="text-end">
+                    <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Retour
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cartes de statistiques principales -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Chiffre d'Affaire</h6>
+                    <h4 class="mb-0">{{ stats_ventes.total_ventes|floatformat:0|intcomma }} FCFA</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Nombre de Ventes</h6>
+                    <h4 class="mb-0">{{ stats_ventes.nombre_ventes }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Quantité Vendue</h6>
+                    <h4 class="mb-0">{{ stats_ventes.quantite_vendue }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Ventes en Gros</h6>
+                    <h4 class="mb-0">{{ stats_gros.nombre|default:0 }}</h4>
+                    <small>{{ stats_gros.total|default:0|floatformat:0|intcomma }} FCFA</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+            <div class="card bg-secondary text-white h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Ventes Détail</h6>
+                    <h4 class="mb-0">{{ stats_detail.nombre|default:0 }}</h4>
+                    <small>{{ stats_detail.total|default:0|floatformat:0|intcomma }} FCFA</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+            <div class="card bg-dark text-white h-100">
+                <div class="card-body text-center">
+                    <h6 class="card-title">Clients Servis</h6>
+                    <h4 class="mb-0">{{ stats_ventes.nombre_clients }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Dernières ventes -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-receipt me-2"></i>
+                        10 Dernières Ventes
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Client</th>
+                                    <th>Produit</th>
+                                    <th>Quantité</th>
+                                    <th>Prix Unitaire</th>
+                                    <th>Total</th>
+                                    <th>Type</th>
+                                    <th>Tuteur</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vente in ventes %}
+                                <tr>
+                                    <td>{{ vente.date_vente|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ vente.nom_client }}</td>
+                                    <td>{{ vente.produit_nom }}</td>
+                                    <td>{{ vente.quantite }}</td>
+                                    <td>{{ vente.prix_vente_unitaire|floatformat:0|intcomma }} FCFA</td>
+                                    <td>{{ vente.total_vente|floatformat:0|intcomma }} FCFA</td>
+                                    <td>
+                                        <span class="badge bg-{% if vente.type_vente == 'gros' %}success{% else %}info{% endif %}">
+                                            {{ vente.get_type_vente_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small>{{ vente.agent.full_name }}</small>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-3">
+                                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                                        Aucune vente enregistrée pour ce stagiaire
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informations et statistiques détaillées -->
+        <div class="col-lg-4">
+            <!-- Informations personnelles -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Informations Stagiaire
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Nom complet:</strong> {{ stagiaire.full_name }}</p>
+                    <p><strong>Téléphone:</strong> {{ stagiaire.telephone|default:"Non renseigné" }}</p>
+                    <p><strong>Date de début:</strong> {{ stagiaire.date_mise_service|date:"d/m/Y" }}</p>
+                    <p><strong>Date de fin:</strong> {{ stagiaire.date_expiration|date:"d/m/Y" }}</p>
+                    <p><strong>Jours restants:</strong> {{ stagiaire.jours_restants }} jours</p>
+                    <p><strong>Progression stage:</strong> 
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-{% if stagiaire.periode_stage_ecoulee > 80 %}warning{% else %}success{% endif %}" 
+                                 style="width: {{ stagiaire.periode_stage_ecoulee }}%">
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ stagiaire.periode_stage_ecoulee }}% écoulé</small>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Statistiques détaillées -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Statistiques Détaillées
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Par type de vente -->
+                    <h6 class="text-primary">Par Type de Vente</h6>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Ventes en Gros:</span>
+                            <strong>{{ stats_gros.nombre|default:0 }} ({{ stats_gros.total|default:0|floatformat:0|intcomma }} FCFA)</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Ventes Détail:</span>
+                            <strong>{{ stats_detail.nombre|default:0 }} ({{ stats_detail.total|default:0|floatformat:0|intcomma }} FCFA)</strong>
+                        </div>
+                    </div>
+
+                    <!-- Par mode de paiement -->
+                    <h6 class="text-success">Par Mode de Paiement</h6>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Paiements Comptant:</span>
+                            <strong>{{ stats_comptant.nombre|default:0 }} ({{ stats_comptant.total|default:0|floatformat:0|intcomma }} FCFA)</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Paiements Crédit:</span>
+                            <strong>{{ stats_credit.nombre|default:0 }} ({{ stats_credit.total|default:0|floatformat:0|intcomma }} FCFA)</strong>
+                        </div>
+                    </div>
+
+                    <!-- Tuteurs impliqués -->
+                    <h6 class="text-info">Tuteurs Impliqués</h6>
+                    <div>
+                        {% for tuteur in tuteurs|slice:":3" %}
+                        <div class="d-flex justify-content-between small">
+                            <span>{{ tuteur.agent__user__first_name }} {{ tuteur.agent__user__last_name }}</span>
+                            <strong>{{ tuteur.nombre_ventes }} ventes</strong>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted small">Aucun tuteur</p>
+                        {% endfor %}
+                        {% if total_tuteurs > 3 %}
+                        <div class="text-center mt-2">
+                            <small class="text-muted">+ {{ total_tuteurs|add:"-3" }} autres tuteurs</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top produits -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-star me-2"></i>
+                        Top Produits Vendus
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for produit in produits_vendus %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong class="text-sm">{{ produit.detail_distribution__lot__produit__nom }}</strong>
+                            <br>
+                            <small class="text-muted">{{ produit.quantite_vendue }} unités</small>
+                        </div>
+                        <div class="text-end">
+                            <strong class="text-success">{{ produit.chiffre_affaire|floatformat:0|intcomma }} FCFA</strong>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted text-center">Aucun produit vendu</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -75,6 +75,7 @@ urlpatterns = [
 #tableau_de_bord
    path('tableau-de-bord/superviseur/', views.tableau_de_bord_superviseur, name='tableau_de_bord_superviseur'),
    path('tableau-de-bord/agent/<int:agent_id>/', views.vue_detail_agent, name='vue_detail_agent'),
+   path('tableau-de-bord/stagiare/<int:stagiaire_id>/', views.detail_stagiaire, name='detail_stagiaire'),
 #RECOUVREMENT
     path('recouvrement/agents/', views.liste_agents_recouvrement, name='liste_agents_recouvrement'),
     path('agent/<int:agent_id>/recouvrement/creer/', views.creer_recouvrement, name='creer_recouvrement'),

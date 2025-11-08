@@ -111,11 +111,22 @@ class Agent(models.Model):
     "Date d’expiration (stagiaire)",
     blank=True, null=True
     )
+    date_mise_service = models.DateTimeField(
+        "Date de mise en service",
+        blank=True, null=True,
+        help_text="Date à laquelle le stagiaire a commencé son activité"
+    )
    
     def save(self, *args, **kwargs):
         # 🔹 Si c’est un stagiaire nouvellement créé, on fixe la date d’expiration
-        if self.type_agent == 'stagiaire' and not self.date_expiration:
-            self.date_expiration = timezone.now() + timedelta(days=15)
+       
+        if self.type_agent == 'stagiaire':
+            if not self.date_mise_service:
+                self.date_mise_service = timezone.now()
+            
+            #  Calculer l'expiration à partir de la date de mise en service
+            if not self.date_expiration:
+                self.date_expiration = self.date_mise_service + timedelta(days=14)
 
         # 🔹 Si l’agent change de rôle (n’est plus stagiaire)
         elif self.type_agent != 'stagiaire':
@@ -123,8 +134,9 @@ class Agent(models.Model):
             if not self.user.is_active:
                 self.user.is_active = True
                 self.user.save(update_fields=['is_active'])
-            # On efface la date d’expiration pour éviter toute confusion
+            # On efface les dates spécifiques stagiaire
             self.date_expiration = None
+            self.date_mise_service = None
 
         super().save(*args, **kwargs)
 
@@ -185,7 +197,16 @@ class Agent(models.Model):
     def est_stagiaire(self):
         """Vérifie si l'agent est un stagiaire"""
         return self.type_agent == 'stagiaire'
-    
+
+    @property
+    def statut_stagiaire(self):
+        """Retourne le statut du stagiaire"""
+        if not self.est_stagiaire:
+            return "Non applicable"
+        if self.est_expire:
+            return "Expiré"
+        return f"Valide ({self.jours_restants} jours restants)"
+
     @property
     def jours_restants(self):
         """Retourne le nombre de jours restants avant expiration"""
@@ -195,14 +216,39 @@ class Agent(models.Model):
         return None
     
     @property
+    def duree_service(self):
+        """Retourne la durée de service depuis la mise en service"""
+        if self.est_stagiaire and self.date_mise_service:
+            delta = timezone.now() - self.date_mise_service
+            return delta.days
+        return None
+    
+    @property
+    def periode_stage_ecoulee(self):
+        """Pourcentage de la période de stage écoulée"""
+        if (self.est_stagiaire and self.date_mise_service and self.date_expiration and
+            self.date_expiration > self.date_mise_service):
+            
+            duree_totale = (self.date_expiration - self.date_mise_service).days
+            duree_ecoulee = (timezone.now() - self.date_mise_service).days
+            
+            # Éviter les divisions par zéro et les pourcentages > 100%
+            if duree_totale > 0:
+                pourcentage = min(100, int((duree_ecoulee / duree_totale) * 100))
+                return pourcentage
+        return 0
+    
+    @property
     def statut_stagiaire(self):
-        """Retourne le statut du stagiaire"""
+        """Retourne le statut du stagiaire avec plus de détails"""
         if not self.est_stagiaire:
             return "Non applicable"
+        
         if self.est_expire:
-            return "Expiré"
-        return f"Valide ({self.jours_restants} jours restants)"
-    
+            return f"Expiré le {self.date_expiration.strftime('%d/%m/%Y')}"
+        
+        return (f"En cours ({self.jours_restants}j restants, "
+                f"débuté le {self.date_mise_service.strftime('%d/%m/%Y')})")
     @property
     def full_name(self):
         """Retourne le nom complet de l'agent"""
@@ -614,6 +660,13 @@ class Vente(models.Model):
         on_delete=models.CASCADE,
         limit_choices_to={'type_agent__in': ['terrain', 'entrepot']}
     )
+    stagiaire = models.ForeignKey(
+        Agent, 
+        on_delete=models.SET_NULL, 
+        null=True, blank=True,
+        limit_choices_to={'type_agent': 'stagiaire'},  # Uniquement les stagiaires
+        related_name='ventes_realisees'
+    )
     client = models.ForeignKey(Client,
                                 on_delete=models.SET_NULL,
                                 null=True,
@@ -703,8 +756,28 @@ class Vente(models.Model):
         """Vérifie si c'est une vente rétroactive"""
         return self.date_vente.date() < self.date_creation.date()
     
+    @property
+    def vendeur_reel(self):
+        """Retourne le vendeur réel (stagiaire ou agent)"""
+        return self.stagiaire if self.stagiaire else self.agent
+    
+    @property
+    def est_vente_stagiaire(self):
+        """Vérifie si c'est une vente réalisée par un stagiaire"""
+        return self.stagiaire is not None
+    
+    @property
+    def nom_vendeur_complet(self):
+        """Retourne le nom complet du vendeur avec indication stagiaire"""
+        if self.stagiaire:
+            return f"{self.stagiaire.full_name} (Stagiaire)"
+        return self.agent.full_name
+    
     def __str__(self):
-        return f"Vente #{self.id} - {self.nom_client} - {self.total_vente} FCFA"
+        base_str = f"Vente #{self.id} - {self.nom_client} - {self.total_vente} FCFA"
+        if self.stagiaire:
+            return f"{base_str} [Stagiaire: {self.stagiaire.full_name}]"
+        return base_str
     
     class Meta:
         ordering = ['-date_vente']

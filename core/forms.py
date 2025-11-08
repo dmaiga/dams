@@ -46,10 +46,20 @@ class AgentCreationForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         initial='stagiaire'
     )
+    # Champ optionnel pour la date de mise en service
+    date_mise_service = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'form-control',
+            'type': 'datetime-local'
+        }),
+        label="Date de mise en service (optionnel)",
+        help_text="Laisser vide pour utiliser la date actuelle"
+    )
 
     class Meta:
         model = Agent
-        fields = ['telephone', 'type_agent']
+        fields = ['telephone', 'type_agent','date_mise_service']
 
     def clean_telephone(self):
         telephone = self.cleaned_data.get('telephone')
@@ -87,6 +97,7 @@ class AgentCreationForm(forms.ModelForm):
         prenom = self.cleaned_data['prenom']
         telephone = self.cleaned_data['telephone']
         type_agent = self.cleaned_data['type_agent']
+        date_mise_service = self.cleaned_data.get('date_mise_service')
         
         # ✅ Générer un username unique
         username = self.generate_unique_username(nom, prenom)
@@ -105,7 +116,10 @@ class AgentCreationForm(forms.ModelForm):
         agent = super().save(commit=False)
         agent.user = user
         agent.telephone = telephone
-        
+
+        # ✅ Si date de mise en service fournie manuellement
+        if date_mise_service and type_agent == 'stagiaire':
+            agent.date_mise_service = date_mise_service
         if commit:
             agent.save()
             
@@ -834,6 +848,7 @@ class DistributionSuppressionForm(forms.Form):
         return cleaned_data
 
 # === FORMULAIRE VENTE ===
+# === FORMULAIRE VENTE ===
 class VenteForm(forms.ModelForm):
     # Supprimer le choix de type client et rendre le client complètement optionnel
     
@@ -900,9 +915,21 @@ class VenteForm(forms.ModelForm):
         help_text="Date à laquelle la vente a été effectuée"
     )
 
+    # ✅ NOUVEAU : Champ stagiaire optionnel
+    stagiaire = forms.ModelChoiceField(
+        queryset=Agent.objects.none(),  # Sera rempli dans __init__
+        required=False,
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'stagiaire-select'
+        }),
+        label="Stagiaire (optionnel)",
+        help_text="Si cette vente a été réalisée par un stagiaire"
+    )
+
     class Meta:
         model = Vente
-        fields = ['detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire', 'date_vente']
+        fields = ['detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire', 'date_vente', 'stagiaire']
         widgets = {
             'client': forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
             'detail_distribution': forms.Select(attrs={'class': 'form-select', 'id': 'detail-distribution'}),
@@ -927,12 +954,28 @@ class VenteForm(forms.ModelForm):
         self.fields['mode_paiement'].required = True
         self.fields['prix_vente_unitaire'].required = False
         self.fields['date_vente'].required = True
+        self.fields['stagiaire'].required = False
         
         # Formater la date initiale pour le champ datetime-local
         if self.instance and self.instance.pk:
             self.fields['date_vente'].initial = self.instance.date_vente.strftime('%Y-%m-%dT%H:%M')
         else:
             self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
+        
+        # ✅ FILTRER LES STAGIAIRES ACTIFS
+        if self.agent:
+            # Seulement les stagiaires non expirés
+            stagiaires_actifs = Agent.objects.filter(
+                type_agent='stagiaire',
+                date_expiration__gte=timezone.now()  # Stagiaires non expirés
+            ).select_related('user')
+            
+            self.fields['stagiaire'].queryset = stagiaires_actifs
+            
+            # Formater l'affichage des stagiaires
+            self.fields['stagiaire'].label_from_instance = lambda obj: (
+                f"{obj.full_name} (Expire le {obj.date_expiration.strftime('%d/%m/%Y')})"
+            )
         
         # Filtrer les clients existants
         self.fields['client'] = forms.ModelChoiceField(
@@ -993,13 +1036,26 @@ class VenteForm(forms.ModelForm):
         if date_vente and date_vente > timezone.now():
             self.add_error('date_vente', 'La date de vente ne peut pas être dans le futur')
         
+        # ✅ VALIDATION STAGIAIRE
+        stagiaire = cleaned_data.get('stagiaire')
+        if stagiaire:
+            if stagiaire.type_agent != 'stagiaire':
+                self.add_error('stagiaire', "L'agent sélectionné doit être un stagiaire")
+            elif stagiaire.est_expire:
+                self.add_error('stagiaire', f"Ce stagiaire a expiré le {stagiaire.date_expiration.strftime('%d/%m/%Y')}")
+        
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
 
-        # Associer l'agent
+        # Associer l'agent (tuteur situationnel)
         instance.agent = self.agent
+
+        # ✅ ASSOCIER LE STAGIAIRE SI SELECTIONNE
+        stagiaire = self.cleaned_data.get('stagiaire')
+        if stagiaire:
+            instance.stagiaire = stagiaire
 
         # Gérer le client - TOUT EST OPTIONNEL
         if self.cleaned_data.get('nouveau_client') and self.cleaned_data.get('client_nom'):
@@ -1032,8 +1088,7 @@ class VenteForm(forms.ModelForm):
             detail.quantite -= instance.quantite
             detail.save()
             
-        return instance
-    
+        return instance    
 
 # === FORMULAIRE DETTE (pour vente à crédit) ===
 class DetteForm(forms.ModelForm):

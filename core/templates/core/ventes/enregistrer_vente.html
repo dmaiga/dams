@@ -1,18 +1,31 @@
-<!-- core/ventes/enregistrer_
- html -->
+<!-- core/ventes/enregistrer_vente.html -->
 {% extends 'base.html' %}
 {% load static %}
 
 {% block title %}Enregistrer une Vente{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container-fluid py-3">
     <div class="row">
         <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">Enregistrer une Vente</h4>
-                    <p class="text-sm mb-0">Agent: {{ agent.user.get_full_name|default:agent.user.username }}</p>
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+                        <div>
+                            <h4 class="mb-1">
+                                <i class="fas fa-cash-register me-2"></i>Enregistrer une Vente
+                            </h4>
+                            <p class="mb-0 text-white-50 small">
+                                Agent: <strong>{{ agent.user.get_full_name|default:agent.user.username }}</strong>
+                            </p>
+                        </div>
+                        <div class="mt-2 mt-md-0">
+                            <span class="badge bg-light text-dark">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Tous les champs marqués * sont obligatoires
+                            </span>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% if messages %}
@@ -27,15 +40,52 @@
                     <form method="post" id="vente-form">
                         {% csrf_token %}
                         
+                        <!-- ✅ NOUVELLE SECTION : Attribution Stagiaire -->
+                        <div class="card mb-4 border-warning">
+                            <div class="card-header bg-warning bg-opacity-10">
+                                <h5 class="mb-0 text-warning">
+                                    <i class="fas fa-user-graduate me-2"></i>Attribution Stagiaire (Optionnel)
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-lg-8">
+                                        <label class="form-label">Stagiaire concerné</label>
+                                        {{ form.stagiaire }}
+                                        {% if form.stagiaire.errors %}
+                                        <div class="text-danger small">{{ form.stagiaire.errors }}</div>
+                                        {% endif %}
+                                        <div class="form-text text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Si cette vente a été réalisée par un stagiaire. 
+                                            L'argent sera comptabilisé dans votre solde.
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <div class="alert alert-info mt-3 mt-lg-0">
+                                            <small>
+                                                <i class="fas fa-lightbulb me-1"></i>
+                                                <strong>Information :</strong><br>
+                                                • Seuls les stagiaires actifs sont affichés<br>
+                                                • Vous restez responsable financièrement
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Section Client (OPTIONNELLE) -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Client (Optionnel)</h5>
+                                <h5 class="mb-0">
+                                    <i class="fas fa-users me-2"></i>Client (Optionnel)
+                                </h5>
                             </div>
                             <div class="card-body">
-                                <div class="alert alert-info">
+                                <div class="alert alert-info mb-3">
                                     <small>
-                                        <i class="fas fa-info-circle"></i>
+                                        <i class="fas fa-info-circle me-1"></i>
                                         <strong>Information :</strong> 
                                         Le client est optionnel. Si aucun client n'est spécifié, "Inconnu" sera automatiquement enregistré.
                                     </small>
@@ -53,8 +103,8 @@
                                 </div>
 
                                 <!-- Client existant (optionnel) -->
-                                <div id="client-existant-group" class="row">
-                                    <div class="col-md-6">
+                                <div id="client-existant-group" class="row g-2">
+                                    <div class="col-md-6 col-lg-4">
                                         <label class="form-label">Client existant (optionnel)</label>
                                         {{ form.client }}
                                         {% if form.client.errors %}
@@ -64,20 +114,20 @@
                                 </div>
 
                                 <!-- Nouveau client (optionnel) -->
-                                <div id="nouveau-client-group" class="row" style="display: none;">
-                                    <div class="col-md-4">
-                                        <label class="form-label">Nom du client (optionnel)</label>
+                                <div id="nouveau-client-group" class="row g-2" style="display: none;">
+                                    <div class="col-sm-6 col-md-4 col-lg-3">
+                                        <label class="form-label">Nom du client</label>
                                         {{ form.client_nom }}
                                         {% if form.client_nom.errors %}
                                         <div class="text-danger small">{{ form.client_nom.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Contact (optionnel)</label>
+                                    <div class="col-sm-6 col-md-4 col-lg-3">
+                                        <label class="form-label">Contact</label>
                                         {{ form.client_contact }}
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Type de client (optionnel)</label>
+                                    <div class="col-sm-6 col-md-4 col-lg-3">
+                                        <label class="form-label">Type de client</label>
                                         {{ form.client_type }}
                                     </div>
                                 </div>
@@ -87,48 +137,61 @@
                         <!-- Section Produit (OBLIGATOIRE) -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Produit à Vendre</h5>
+                                <h5 class="mb-0">
+                                    <i class="fas fa-box me-2"></i>Produit à Vendre
+                                </h5>
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-4">
+                                <div class="row g-3">
+                                    <!-- Produit disponible -->
+                                    <div class="col-md-6 col-lg-4">
                                         <label class="form-label">Produit disponible *</label>
                                         {{ form.detail_distribution }}
                                         {% if form.detail_distribution.errors %}
                                         <div class="text-danger small">{{ form.detail_distribution.errors }}</div>
                                         {% endif %}
                                         <div class="form-text">
+                                            <i class="fas fa-cubes me-1"></i>
                                             Quantité disponible: <span id="quantite-disponible" class="fw-bold">-</span>
                                         </div>
                                     </div>
-                                    <div class="col-md-2">
+                                    
+                                    <!-- Type de vente -->
+                                    <div class="col-md-6 col-lg-2">
                                         <label class="form-label">Type de vente *</label>
                                         {{ form.type_vente }}
                                         {% if form.type_vente.errors %}
                                         <div class="text-danger small">{{ form.type_vente.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-2">
+                                    
+                                    <!-- Mode paiement -->
+                                    <div class="col-md-6 col-lg-2">
                                         <label class="form-label">Mode paiement *</label>
                                         {{ form.mode_paiement }}
                                         {% if form.mode_paiement.errors %}
                                         <div class="text-danger small">{{ form.mode_paiement.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-2">
+                                    
+                                    <!-- Quantité -->
+                                    <div class="col-md-6 col-lg-2">
                                         <label class="form-label">Quantité *</label>
                                         {{ form.quantite }}
                                         {% if form.quantite.errors %}
                                         <div class="text-danger small">{{ form.quantite.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-2">
+                                    
+                                    <!-- Prix unitaire -->
+                                    <div class="col-md-6 col-lg-2">
                                         <label class="form-label">Prix unitaire (FCFA) *</label>
                                         {{ form.prix_vente_unitaire }}
                                         {% if form.prix_vente_unitaire.errors %}
                                         <div class="text-danger small">{{ form.prix_vente_unitaire.errors }}</div>
                                         {% endif %}
                                         <div class="form-text">
+                                            <i class="fas fa-tag me-1"></i>
                                             <span id="info-prix-applique">Prix déterminé automatiquement</span>
                                         </div>
                                     </div>
@@ -136,45 +199,63 @@
                                 
                                 <!-- Informations sur le produit sélectionné -->
                                 <div id="produit-info" class="mt-3 p-3 bg-light rounded" style="display: none;">
-                                    <h6>Informations du produit :</h6>
-                                    <div class="row">
-                                        <div class="col-md-3">
-                                            <strong>Produit:</strong> <span id="info-produit">-</span>
+                                    <h6 class="mb-2">
+                                        <i class="fas fa-info-circle me-1 text-primary"></i>
+                                        Informations du produit sélectionné
+                                    </h6>
+                                    <div class="row g-3">
+                                        <div class="col-sm-6 col-md-3">
+                                            <strong>Produit:</strong> <span id="info-produit" class="text-primary">-</span>
                                         </div>
-                                        <div class="col-md-3">
-                                            <strong>Lot:</strong> <span id="info-lot">-</span>
+                                        <div class="col-sm-6 col-md-3">
+                                            <strong>Lot:</strong> <span id="info-lot" class="text-secondary">-</span>
                                         </div>
-                                        <div class="col-md-3">
-                                            <strong>Prix gros:</strong> <span id="info-prix-gros">-</span>
+                                        <div class="col-sm-6 col-md-3">
+                                            <strong>Prix gros:</strong> <span id="info-prix-gros" class="text-success">-</span>
                                         </div>
-                                        <div class="col-md-3">
-                                            <strong>Prix détail:</strong> <span id="info-prix-detail">-</span>
+                                        <div class="col-sm-6 col-md-3">
+                                            <strong>Prix détail:</strong> <span id="info-prix-detail" class="text-info">-</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Résumé -->
+                        <!-- ✅ NOUVEAU : Résumé amélioré avec stagiaire -->
                         <div class="card bg-primary text-white mb-4">
-                            <div class="card-body">
-                                <h6>Résumé de la Vente</h6>
-                                <div class="row text-center">
-                                    <div class="col-3">
-                                        <div class="h5" id="resume-client">Inconnu</div>
-                                        <small>Client</small>
+                            <div class="card-body py-3">
+                                <h6 class="mb-3">
+                                    <i class="fas fa-chart-bar me-2"></i>Résumé de la Vente
+                                </h6>
+                                <div class="row text-center g-3">
+                                    <div class="col-6 col-sm-3">
+                                        <div class="h5 mb-1" id="resume-vendeur">{{ agent.user.get_full_name|default:agent.user.username }}</div>
+                                        <small class="opacity-75">Vendeur</small>
                                     </div>
-                                    <div class="col-3">
-                                        <div class="h5" id="resume-produit">-</div>
-                                        <small>Produit</small>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="h5 mb-1" id="resume-client">Inconnu</div>
+                                        <small class="opacity-75">Client</small>
                                     </div>
-                                    <div class="col-3">
-                                        <div class="h5" id="resume-quantite">0</div>
-                                        <small>Unités</small>
+                                    <div class="col-6 col-sm-2">
+                                        <div class="h5 mb-1" id="resume-produit">-</div>
+                                        <small class="opacity-75">Produit</small>
                                     </div>
-                                    <div class="col-3">
-                                        <div class="h5" id="resume-total">0</div>
-                                        <small>FCFA</small>
+                                    <div class="col-6 col-sm-2">
+                                        <div class="h5 mb-1" id="resume-quantite">0</div>
+                                        <small class="opacity-75">Unités</small>
+                                    </div>
+                                    <div class="col-6 col-sm-2">
+                                        <div class="h5 mb-1" id="resume-total">0</div>
+                                        <small class="opacity-75">FCFA</small>
+                                    </div>
+                                </div>
+                                <!-- Ligne stagiaire -->
+                                <div class="row mt-2">
+                                    <div class="col-12">
+                                        <small class="opacity-75">
+                                            <i class="fas fa-user-graduate me-1"></i>
+                                            Stagiaire: <span id="resume-stagiaire" class="fw-bold">Aucun</span>
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -183,10 +264,12 @@
                         <!-- Section Date de vente -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Date de la Vente</h5>
+                                <h5 class="mb-0">
+                                    <i class="fas fa-calendar me-2"></i>Date de la Vente
+                                </h5>
                             </div>
                             <div class="card-body">
-                                <div class="row">
+                                <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label">Date et heure de la vente *</label>
                                         {{ form.date_vente }}
@@ -194,15 +277,17 @@
                                         <div class="text-danger small">{{ form.date_vente.errors }}</div>
                                         {% endif %}
                                         <div class="form-text">
+                                            <i class="fas fa-clock me-1"></i>
                                             Date à laquelle la vente a été effectuée chez le client
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="alert alert-info">
+                                        <div class="alert alert-info h-100">
                                             <small>
-                                                <i class="fas fa-info-circle"></i>
+                                                <i class="fas fa-info-circle me-1"></i>
                                                 <strong>Information :</strong><br>
-                                                • Pour une vente rétroactive, indique la date de la vente
+                                                • Pour une vente rétroactive, indique la date réelle<br>
+                                                • La date d'enregistrement est automatique
                                             </small>
                                         </div>
                                     </div>
@@ -210,9 +295,14 @@
                             </div>
                         </div>
 
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'liste_ventes' %}" class="btn btn-secondary">Annuler</a>
-                            <button type="submit" class="btn btn-success">Enregistrer la Vente</button>
+                        <!-- Boutons d'action -->
+                        <div class="d-flex flex-column flex-sm-row gap-2 justify-content-end">
+                            <a href="{% url 'liste_ventes' %}" class="btn btn-secondary order-2 order-sm-1">
+                                <i class="fas fa-arrow-left me-1"></i> Annuler
+                            </a>
+                            <button type="submit" class="btn btn-success order-1 order-sm-2">
+                                <i class="fas fa-check me-1"></i> Enregistrer la Vente
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -223,6 +313,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ✅ NOUVEAU : Élément pour le stagiaire
+    const selectStagiaire = document.getElementById('{{ form.stagiaire.id_for_label }}');
+    
     // Éléments pour les clients
     const nouveauClientCheckbox = document.getElementById('{{ form.nouveau_client.id_for_label }}');
     const clientExistantGroup = document.getElementById('client-existant-group');
@@ -242,11 +335,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const produitInfoDiv = document.getElementById('produit-info');
     const infoPrixApplique = document.getElementById('info-prix-applique');
 
-    // Éléments du résumé
+    // ✅ NOUVEAU : Éléments du résumé amélioré
+    const resumeVendeur = document.getElementById('resume-vendeur');
     const resumeClient = document.getElementById('resume-client');
     const resumeProduit = document.getElementById('resume-produit');
     const resumeQuantite = document.getElementById('resume-quantite');
     const resumeTotal = document.getElementById('resume-total');
+    const resumeStagiaire = document.getElementById('resume-stagiaire');
+
+    // ✅ NOUVEAU : Fonction pour mettre à jour le résumé stagiaire
+    function updateResumeStagiaire() {
+        if (selectStagiaire && selectStagiaire.value) {
+            const stagiaireText = selectStagiaire.options[selectStagiaire.selectedIndex]?.text || '';
+            const nomStagiaire = stagiaireText.split(' (Expire le')[0]; // Enlever la date d'expiration
+            resumeStagiaire.textContent = nomStagiaire;
+            resumeStagiaire.className = 'fw-bold text-warning';
+        } else {
+            resumeStagiaire.textContent = 'Aucun';
+            resumeStagiaire.className = 'fw-bold opacity-50';
+        }
+    }
 
     // Fonction pour basculer les groupes client
     function toggleClientFields() {
@@ -259,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (inputClientNom) {
                 inputClientNom.disabled = false;
-                inputClientNom.required = false; // Rendre optionnel
+                inputClientNom.required = false;
             }
             if (inputClientContact) inputClientContact.disabled = false;
             if (selectClientType) selectClientType.disabled = false;
@@ -268,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nouveauClientGroup.style.display = 'none';
             if (selectClient) {
                 selectClient.disabled = false;
-                selectClient.required = false; // Rendre optionnel
+                selectClient.required = false;
             }
             if (inputClientNom) {
                 inputClientNom.disabled = true;
@@ -290,7 +398,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch(`/api/info-distribution/${distributionId}/`);
                 const data = await response.json();
                 
-                // Déterminer le prix en fonction du type de vente choisi
                 let prix = 0;
                 let prixText = '';
                 
@@ -304,7 +411,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     prixText = 'Prix non défini';
                 }
                 
-                // Mettre à jour le champ prix et l'information
                 if (prix > 0) {
                     prixInput.value = prix;
                     infoPrixApplique.textContent = prixText;
@@ -341,12 +447,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 quantiteDisponibleSpan.textContent = data.quantite_disponible;
                 quantiteDisponibleSpan.className = data.quantite_disponible > 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
                 
-                // Mettre à jour le max de la quantité
                 if (quantiteInput) {
                     quantiteInput.max = data.quantite_disponible;
                 }
                 
-                // Afficher les informations du produit
                 document.getElementById('info-produit').textContent = data.produit;
                 document.getElementById('info-lot').textContent = data.reference_lot;
                 document.getElementById('info-prix-gros').textContent = data.prix_gros ? data.prix_gros + ' FCFA' : 'N/D';
@@ -395,9 +499,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         resumeQuantite.textContent = quantite;
         resumeTotal.textContent = total.toLocaleString();
+        
+        // ✅ NOUVEAU : Mettre à jour le stagiaire dans le résumé
+        updateResumeStagiaire();
     }
 
-    // Événements
+    // ✅ NOUVEAU : Événements pour le stagiaire
+    if (selectStagiaire) {
+        selectStagiaire.addEventListener('change', updateResumeStagiaire);
+    }
+
+    // Événements existants
     if (nouveauClientCheckbox) {
         nouveauClientCheckbox.addEventListener('change', toggleClientFields);
     }
@@ -424,6 +536,49 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleClientFields();
     updateProduitInfo();
     updateResume();
+    updateResumeStagiaire(); // ✅ NOUVEAU
 });
 </script>
+
+<style>
+/* Améliorations responsive */
+@media (max-width: 768px) {
+    .card-header h4 {
+        font-size: 1.25rem;
+    }
+    .card-header h5 {
+        font-size: 1.1rem;
+    }
+    .form-label {
+        font-size: 0.9rem;
+    }
+    .form-text {
+        font-size: 0.8rem;
+    }
+}
+
+/* Amélioration de l'apparence */
+.card {
+    border: 1px solid #e3e6f0;
+}
+
+.card-header {
+    border-bottom: 1px solid #e3e6f0;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+/* Animation pour les changements */
+#resume-total, #resume-quantite {
+    transition: all 0.3s ease;
+}
+
+/* Style pour les badges d'information */
+.badge {
+    font-size: 0.75em;
+}
+</style>
 {% endblock %}
