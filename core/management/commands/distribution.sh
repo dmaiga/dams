@@ -20,75 +20,58 @@ def creer_distributions_multiple():
             
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES
             distributions_config = [
-                {
-                    'date': '18/09/2025',
-                    'produit': 'ail',
-                    'prix_gros': 9500,
-                    'prix_detail': 10000,
-                    'distributions': [
-                        (mankoulako, 25, "Mankoulako"),
-                    ]
-                },
-                 {
-                    'date': '18/09/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 10000,
-                    'distributions': [
-                        (fatoumata, 4, "Fatoumata"),
-                        (abdoulaye, 2, "Abdoulaye (auto)"),                               
-                        (alpha, 1, "Alpha"),                  
-                       
-
-                    ]
-                },
-                {
-                    'date': '19/09/2025',
-                    'produit': 'ail',
-                    'prix_gros': 9500,
-                    'prix_detail': 10000,
-                    'distributions': [
-                        (abdoulaye, 6, "Abdoulaye (auto)"), 
-                        (mankoulako, 10, "Mankoulako"),
-                    ]
-                },
-               
-                 {
-                    'date': '19/09/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 10000,
-                    'distributions': [
-                        (koniba, 1, "Koniba"),
-                        (alpha, 1, "Alpha"),                      
-                        (fatoumata, 2, "Fatoumata"),
-                       
-                    ]
-                },
-                {
-                    'date': '20/09/2025',
-                    'produit': 'ail',
-                    'prix_gros': 9500,
-                    'prix_detail': 10000,
-                    'distributions': [
-                        (koniba, 2, "Koniba"),
-                                          
-                     
-                    ]
-                }, 
-                {
-                    'date': '20/09/2025',
-                    'produit': 'ail',
-                    'prix_gros': 4875,
-                    'prix_detail': 10000,
-                    'distributions': [
-                        (fatoumata, 6, "Fatoumata"),
-                                          
-                     
-                    ]
-                }
                 
+                 {
+                    'date': '29/08/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 11000,
+                    'prix_detail': 12500,
+                    'distributions': [                                                   
+                        (alpha, 1, "Alpha"),                     
+                        (abdoulaye, 7, "Abdoulaye(Auto)"), 
 
+                    ]
+                },
+                 {
+                    'date': '30/08/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 11000,
+                    'prix_detail': 12500,
+                    'distributions': [
+
+                       
+                        (fatoumata, 2, "Fatoumata"),                                                    
+                        (alpha, 1, "Alpha"),  
+                        (abdoulaye, 2, "Abdoulaye(Auto)"), 
+
+                    ]
+                },
+                                 {
+                    'date': '01/09/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 11000,
+                    'prix_detail': 12500,
+                    'distributions': [
+
+                        
+                        (fatoumata, 2, "Fatoumata"),                                                    
+                        (alpha, 1, "Alpha"),  
+                        (abdoulaye, 1, "Abdoulaye(Auto)"), 
+
+                    ]
+                },
+                                 {
+                    'date': '02/09/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 11000,
+                    'prix_detail': 12500,
+                    'distributions': [
+                        (fatoumata, 1, "Fatoumata"),                                                    
+                        (alpha, 1, "Alpha"),   
+                        (abdoulaye, 1, "Abdoulaye(Auto)"), 
+
+                    ]
+                },
                
             
             ]

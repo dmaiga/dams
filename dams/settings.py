@@ -32,7 +32,7 @@ import os
 
 # URLs de redirection
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = '/'   # ou ton dashboard superviseur/agent
+LOGIN_REDIRECT_URL = 'login'
 LOGOUT_REDIRECT_URL = 'login' 
 
 env = environ.Env()

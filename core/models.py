@@ -27,7 +27,6 @@ class Client(models.Model):
     class Meta:
         ordering = ['nom'] 
 
-
 class Produit(models.Model):
     nom = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -47,7 +46,6 @@ class Fournisseur(models.Model):
 
     class Meta:
         ordering = ['nom']
-
 
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
@@ -678,7 +676,6 @@ class Vente(models.Model):
         ordering = ['-date_vente']
         verbose_name = "Vente"
         verbose_name_plural = "Ventes"
-
 
 class Dette(models.Model):
     STATUT_CHOICES = (
