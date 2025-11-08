@@ -16,6 +16,7 @@ from django.db import models, transaction
 from django.db.models import (
     Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
 )
+from django.db.models.functions import Coalesce
 
 
 from django.utils import timezone
@@ -2165,27 +2166,75 @@ def vue_detail_agent(request, agent_id):
     # Distributions reçues
     distributions = DistributionAgent.objects.filter(
         agent_terrain=agent,
-        date_distribution__gte=date_debut
+      
     ).order_by('-date_distribution')
     
-    # Ventes de l'agent
+    # Ventes de l'agent avec filtrage par période
     ventes = Vente.objects.filter(
         agent=agent,
-        date_vente__gte=date_debut
+        
     ).select_related('client', 'detail_distribution__lot__produit').order_by('-date_vente')
     
-    # Statistiques ventes
-    stats_ventes = ventes.aggregate(
+    # Statistiques générales (sans Coalesce)
+    stats_ventes_raw = ventes.aggregate(
         total_ventes=Sum(F('quantite') * F('prix_vente_unitaire')),
         nombre_ventes=Count('id'),
         quantite_vendue=Sum('quantite')
     )
     
+    # Convertir les None en 0
+    stats_ventes = {
+        'total_ventes': stats_ventes_raw['total_ventes'] or 0,
+        'nombre_ventes': stats_ventes_raw['nombre_ventes'] or 0,
+        'quantite_vendue': stats_ventes_raw['quantite_vendue'] or 0,
+    }
+    
+    # Statistiques détaillées par type de vente
+    ventes_gros = ventes.filter(type_vente='gros')
+    ventes_detail = ventes.filter(type_vente='detail')
+    
+    stats_gros_raw = ventes_gros.aggregate(
+        total=Sum(F('quantite') * F('prix_vente_unitaire')),
+        quantite=Sum('quantite'),
+        nombre=Count('id')
+    )
+    
+    stats_detail_raw = ventes_detail.aggregate(
+        total=Sum(F('quantite') * F('prix_vente_unitaire')),
+        quantite=Sum('quantite'),
+        nombre=Count('id')
+    )
+    
+    stats_gros = {
+        'total': stats_gros_raw['total'] or 0,
+        'quantite': stats_gros_raw['quantite'] or 0,
+        'nombre': stats_gros_raw['nombre'] or 0,
+    }
+    
+    stats_detail = {
+        'total': stats_detail_raw['total'] or 0,
+        'quantite': stats_detail_raw['quantite'] or 0,
+        'nombre': stats_detail_raw['nombre'] or 0,
+    }
+    
     # Dettes de l'agent
     dettes = Dette.objects.filter(
         vente__agent=agent,
-        statut__in=['en_cours', 'partiellement_paye']
+        statut__in=['en_cours', 'partiellement_paye', 'en_retard']
     ).select_related('vente__client')
+    
+    # Recouvrements pour cet agent
+    recouvrements = Recouvrement.objects.filter(
+        agent=agent,
+      
+    ).order_by('-date_recouvrement')
+    
+    total_recouvre_raw = recouvrements.aggregate(total=Sum('montant_recouvre'))
+    total_recouvre = total_recouvre_raw['total'] or 0
+    
+    # Calculer le solde à recouvrer pour cette période
+    total_ventes_periode = stats_ventes['total_ventes']
+    solde_a_recouvrer_periode = total_ventes_periode - total_recouvre
     
     context = {
         'superviseur': superviseur,
@@ -2193,14 +2242,16 @@ def vue_detail_agent(request, agent_id):
         'distributions': distributions,
         'ventes': ventes[:10],  # 10 dernières ventes
         'stats_ventes': stats_ventes,
+        'stats_gros': stats_gros,
+        'stats_detail': stats_detail,
         'dettes': dettes,
+        'recouvrements': recouvrements,
+        'total_recouvre': total_recouvre,
+        'solde_a_recouvrer_periode': solde_a_recouvrer_periode,
         'date_debut': date_debut,
     }
     
     return render(request, 'core/dashboard/detail_agent.html', context)
-
-
-
 
 #=========
 # #ADMIN

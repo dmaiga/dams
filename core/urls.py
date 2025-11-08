@@ -81,7 +81,7 @@ urlpatterns = [
     path('agent/<int:agent_id>/recouvrement/historique/', views.historique_recouvrement, name='historique_recouvrement'),
 path('agent/<int:agent_id>/recouvrement/historique/complet/', views.detail_historique, name='detail_historique'),
 #ADMIN
-    path('', DashboardView.as_view(), name='dashboard'),
+    path('direction/', DashboardView.as_view(), name='dashboard'),
     path('analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
     path('analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
     path('analyses/ventes', views.toutes_les_ventes, name='toutes_les_ventes'),  

@@ -22,58 +22,25 @@ def creer_distributions_multiple():
             distributions_config = [
                 
                  {
-                    'date': '29/08/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 11000,
-                    'prix_detail': 12500,
+                    'date': '12/09/2025', 
+                    'produit': 'laurier',
+                    'prix_gros': 3000,
+                    'prix_detail': 3400,
                     'distributions': [                                                   
-                        (alpha, 1, "Alpha"),                     
-                        (abdoulaye, 7, "Abdoulaye(Auto)"), 
-
+                        (mankoulako, 14, "Mankoulako"),                     
+                        
                     ]
                 },
                  {
-                    'date': '30/08/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 11000,
-                    'prix_detail': 12500,
+                    'date': '16/10/2025', 
+                    'produit': 'laurier',
+                    'prix_gros': 3000,
+                    'prix_detail': 3250,
                     'distributions': [
-
-                       
-                        (fatoumata, 2, "Fatoumata"),                                                    
-                        (alpha, 1, "Alpha"),  
-                        (abdoulaye, 2, "Abdoulaye(Auto)"), 
-
-                    ]
-                },
-                                 {
-                    'date': '01/09/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 11000,
-                    'prix_detail': 12500,
-                    'distributions': [
-
+                        (mankoulako, 5, "Mankoulako"),                     
                         
-                        (fatoumata, 2, "Fatoumata"),                                                    
-                        (alpha, 1, "Alpha"),  
-                        (abdoulaye, 1, "Abdoulaye(Auto)"), 
-
                     ]
-                },
-                                 {
-                    'date': '02/09/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 11000,
-                    'prix_detail': 12500,
-                    'distributions': [
-                        (fatoumata, 1, "Fatoumata"),                                                    
-                        (alpha, 1, "Alpha"),   
-                        (abdoulaye, 1, "Abdoulaye(Auto)"), 
-
-                    ]
-                },
-               
-            
+                }
             ]
             
             toutes_distributions = []

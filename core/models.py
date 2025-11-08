@@ -2,13 +2,12 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from django.utils import timezone
 from datetime import timedelta
-from django.db import models
-from django.utils import timezone
-from datetime import timedelta
-from django.db import models
 
+from django.db.models import (
+    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
+)
+from django.db.models.functions import Coalesce
 
 class Client(models.Model):
     TYPE_CLIENT_CHOICES = (
@@ -129,9 +128,44 @@ class Agent(models.Model):
 
         super().save(*args, **kwargs)
 
+    def get_stats_ventes_periode(self, jours=30):
+        """Retourne les statistiques de vente pour une période donnée"""
+        date_debut = timezone.now() - timedelta(days=jours)
+        ventes = Vente.objects.filter(agent=self, date_vente__gte=date_debut)
+        
+        stats = ventes.aggregate(
+            total_ventes=Sum(F('quantite') * F('prix_vente_unitaire')),
+            nombre_ventes=Count('id'),
+            quantite_vendue=Sum('quantite')
+        )
+        
+        # Stats par type de vente
+        ventes_gros = ventes.filter(type_vente='gros')
+        ventes_detail = ventes.filter(type_vente='detail')
+        
+        stats_gros = ventes_gros.aggregate(
+            total=Sum(F('quantite') * F('prix_vente_unitaire')),
+            quantite=Sum('quantite'),
+            nombre=Count('id')
+        )
+        
+        stats_detail = ventes_detail.aggregate(
+            total=Sum(F('quantite') * F('prix_vente_unitaire')),
+            quantite=Sum('quantite'),
+            nombre=Count('id')
+        )
+        
+        return {
+            'general': stats,
+            'gros': stats_gros,
+            'detail': stats_detail,
+            'periode_jours': jours
+        }
+
+
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
-    
+
     @property
     def est_expire(self):
         """Vérifie si le stagiaire a dépassé sa date d’expiration"""
