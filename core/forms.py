@@ -4,7 +4,7 @@ from django.utils import timezone
 from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
     DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
-    MouvementStock,Recouvrement,VersementBancaire,Fournisseur
+    MouvementStock,Recouvrement,VersementBancaire,Fournisseur,Depense
 )
 from django.db import models
 import os
@@ -20,6 +20,14 @@ from django import forms
 from django.contrib.auth.models import User
 from .models import Agent
 from django.core.exceptions import ValidationError
+
+# forms.py
+from django import forms
+from django.utils import timezone
+from .models import VersementBancaire, Depense
+from django import forms
+from django.contrib.auth.forms import AuthenticationForm
+from decimal import Decimal
 
 class AgentCreationForm(forms.ModelForm):
     nom = forms.CharField(
@@ -124,9 +132,6 @@ class AgentCreationForm(forms.ModelForm):
             agent.save()
             
         return agent
-
-from django import forms
-from django.contrib.auth.forms import AuthenticationForm
 
 class TelephoneOrUsernameLoginForm(AuthenticationForm):
     username = forms.CharField(
@@ -1354,41 +1359,107 @@ class RecouvrementForm(forms.ModelForm):
             
         return date_recouvrement
    
-class VersementBancaireForm(forms.ModelForm):
-    date_versement_reelle = forms.DateTimeField(
+
+
+
+# forms.py
+class VersementAvecDepensesForm(forms.ModelForm):
+    """Formulaire unique qui combine versement et dépenses"""
+    
+    # Champs pour les dépenses (optionnels)
+    montant_depenses = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        initial=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': '0.00'
+        }),
+        label="Total des dépenses",
+        help_text="Montant total des dépenses associées à ce versement"
+    )
+    
+    description_depenses = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 3,
+            'placeholder': 'Détail des dépenses effectuées...'
+        }),
+        label="Détail des dépenses"
+    )
+    
+    categorie_depenses = forms.ChoiceField(
+        choices=Depense.CATEGORIE_DEPENSE_CHOICES,
+        required=False,
+        initial='autres',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Catégorie des dépenses"
+    )
+    
+    date_depenses = forms.DateTimeField(
         required=False,
         widget=forms.DateTimeInput(attrs={
             'class': 'form-control',
             'type': 'datetime-local'
         }),
-        label="Date réelle du versement",
-        help_text="Laisser vide pour utiliser la date actuelle"
+        label="Date des dépenses",
+        help_text="Date à laquelle les dépenses ont été effectuées"
     )
     
+    justificatif_depenses = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': 'image/*,.pdf,.doc,.docx'
+        }),
+        label="Justificatif des dépenses"
+    )
+
     class Meta:
         model = VersementBancaire
         fields = [
-            'montant_depenses', 
-            'details_depenses', 
-            'preuve_depenses',
+            'type_versement',
+            'montant_verse', 
+            'details_depenses',
             'date_versement_reelle'
         ]
         widgets = {
-            'montant_depenses': forms.NumberInput(attrs={
-                'class': 'form-control', 
+            'type_versement': forms.Select(attrs={
+                'class': 'form-control',
+                'id': 'type_versement_select'
+            }),
+            'montant_verse': forms.NumberInput(attrs={
+                'class': 'form-control',
                 'step': '0.01',
-                'placeholder': 'Total des dépenses'
+                'placeholder': 'Montant à verser'
             }),
             'details_depenses': forms.Textarea(attrs={
                 'class': 'form-control', 
-                'rows': 4,
-                'placeholder': 'Détail des dépenses...'
+                'rows': 2,
+                'placeholder': 'Notes générales sur le versement...'
             }),
-            'preuve_depenses': forms.FileInput(attrs={
+            'date_versement_reelle': forms.DateTimeInput(attrs={
                 'class': 'form-control',
-                'accept': 'image/*,.pdf'
+                'type': 'datetime-local'
             }),
         }
+    
+    def __init__(self, *args, **kwargs):
+        self.superviseur = kwargs.pop('superviseur', None)
+        super().__init__(*args, **kwargs)
+        
+        # Personnalisation des labels et help texts
+        self.fields['type_versement'].help_text = (
+            "Choisissez le type de versement. "
+            "Les versements 'liés à la vente' impactent votre solde vente/recouvrement."
+        )
+        
+        if self.superviseur:
+            solde_vente = self.superviseur.solde_superviseur
+            self.fields['type_versement'].help_text += f" - Solde disponible: {solde_vente} FCFA"
     
     def clean_date_versement_reelle(self):
         date_versement = self.cleaned_data.get('date_versement_reelle')
@@ -1396,7 +1467,60 @@ class VersementBancaireForm(forms.ModelForm):
             date_versement = timezone.now()
         return date_versement
     
-
+    def clean(self):
+        cleaned_data = super().clean()
+        type_versement = cleaned_data.get('type_versement')
+        montant_verse = cleaned_data.get('montant_verse')
+        montant_depenses = cleaned_data.get('montant_depenses') or Decimal('0.00')
+        
+        # Validation pour les versements liés à la vente
+        if type_versement == 'vente' and montant_verse and self.superviseur:
+            # Créer une instance temporaire pour la validation
+            versement_temp = VersementBancaire(
+                superviseur=self.superviseur,
+                type_versement=type_versement,
+                montant_verse=montant_verse
+            )
+            
+            # Calculer le montant net (versement - dépenses)
+            montant_net = montant_verse - montant_depenses
+            
+            # Vérifier que le montant net ne dépasse pas le solde disponible
+            solde_disponible = versement_temp.solde_disponible_vente_avant_versement
+            if montant_net > solde_disponible:
+                raise forms.ValidationError(
+                    f"Le montant net du versement ({montant_net} FCFA) dépasse "
+                    f"le solde disponible ({solde_disponible} FCFA) pour les ventes/recouvrements. "
+                    f"Versement: {montant_verse} FCFA - Dépenses: {montant_depenses} FCFA"
+                )
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        """Sauvegarde le versement et crée les dépenses associées"""
+        versement = super().save(commit=False)
+        versement.superviseur = self.superviseur
+        
+        if commit:
+            versement.save()
+            
+            # Créer une dépense si un montant est spécifié
+            montant_depenses = self.cleaned_data.get('montant_depenses')
+            if montant_depenses and montant_depenses > 0:
+                Depense.objects.create(
+                    superviseur=self.superviseur,
+                    versement=versement,
+                    type_versement=versement.type_versement,
+                    montant=montant_depenses,
+                    description=self.cleaned_data.get('description_depenses', ''),
+                    categorie=self.cleaned_data.get('categorie_depenses', 'autres'),
+                    date_depense=self.cleaned_data.get('date_depenses') or timezone.now(),
+                    justificatif=self.cleaned_data.get('justificatif_depenses')
+                )
+        
+        return versement
+    
+    
 class FactureForm(forms.ModelForm):
     class Meta:
         model = Facture

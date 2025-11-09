@@ -1089,90 +1089,217 @@ class Recouvrement(models.Model):
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
 
+# models.py
+from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
+from django.core.validators import MinValueValidator
+from django.db.models import Sum, F
+from decimal import Decimal
+
 class VersementBancaire(models.Model):
-    facture = models.OneToOneField(
-        Facture,
-        on_delete=models.CASCADE,
-        related_name='versement_associe',
-        verbose_name="Facture associée"
+    TYPE_VERSEMENT_CHOICES = (
+        ('vente', 'Versement lié à la vente'),
+        ('autre', 'Versement hors vente/recouvrement'),
     )
-    
+
     superviseur = models.ForeignKey(
-        Agent,
+        'Agent',
         on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'superviseur'},
+        limit_choices_to={'type_agent': 'entrepot'},
         related_name='versements_bancaires'
     )
-    
-    # Montant total recouvré
-    montant_total_recouvre = models.DecimalField(
-        max_digits=10, 
+
+    type_versement = models.CharField(
+        max_length=20,
+        choices=TYPE_VERSEMENT_CHOICES,
+        default='vente',
+        verbose_name="Type de versement",
+        help_text="Indique si le versement est lié à la vente ou autre"
+    )
+
+    montant_verse = models.DecimalField(
+        max_digits=12,
         decimal_places=2,
-        verbose_name="Total recouvré"
+        verbose_name="Montant versé",
+        validators=[MinValueValidator(Decimal('0.01'))]
     )
-    
-    # Montant des dépenses effectuées
-    montant_depenses = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2,
-        verbose_name="Total des dépenses",
-        default=0
-    )
-    
-    # Fichiers preuves supplémentaires pour les dépenses
-    preuve_depenses = models.FileField(
-        upload_to='preuves_depenses/',
-        verbose_name="Justificatifs des dépenses",
-        blank=True,
-        null=True
-    )
-    
-    # Détails des dépenses
+
+    # Ces champs sont maintenant déplacés dans le modèle Depense séparé
     details_depenses = models.TextField(
-        blank=True,
-        verbose_name="Détail des dépenses effectuées"
+        blank=True, 
+        verbose_name="Notes générales sur les dépenses"
     )
     
-    date_debut_periode = models.DateTimeField(
-        verbose_name="Début de la période"
-    )
-    
-    date_fin_periode = models.DateTimeField(
-        default=timezone.now,
-        verbose_name="Fin de la période (date du versement)"
-    )
-    
-    # Nouveau champ pour date rétroactive
     date_versement_reelle = models.DateTimeField(
-        default=timezone.now,
-        verbose_name="Date réelle du versement",
-        help_text="Date à laquelle le versement a été effectué (peut être différente de la date d'enregistrement)"
+        default=timezone.now, 
+        verbose_name="Date réelle du versement"
     )
-    
     date_creation = models.DateTimeField(auto_now_add=True)
 
     @property
-    def montant_verse(self):
-        return self.facture.montant
+    def total_depenses_associees(self):
+        """Calcule le total des dépenses associées à ce versement"""
+        return self.depenses.aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
 
     @property
-    def solde_theorique(self):
-        return self.montant_total_recouvre - self.montant_depenses
+    def montant_net(self):
+        """Calcule le montant net (versement - dépenses associées)"""
+        return self.montant_verse - self.total_depenses_associees
 
     @property
-    def difference(self):
-        return self.solde_theorique - self.montant_verse
+    def solde_disponible_vente_avant_versement(self):
+        """
+        Calcule le solde disponible pour les ventes AVANT ce versement
+        """
+        if self.type_versement != 'vente':
+            return None
+            
+        # Total des entrées (ventes + recouvrements)
+        total_entrees = self.superviseur.total_argent_recouvre_et_ventes
+        
+        # Total des sorties AVANT ce versement (exclut le versement actuel)
+        versements_precedents = VersementBancaire.objects.filter(
+            superviseur=self.superviseur,
+            type_versement='vente'
+        ).exclude(id=self.id)
+        
+        total_versements_precedents = versements_precedents.aggregate(
+            total=Sum('montant_verse')
+        )['total'] or Decimal('0.00')
+        
+        # Total des dépenses AVANT ce versement
+        depenses_precedentes = Depense.objects.filter(
+            superviseur=self.superviseur,
+            type_versement='vente'
+        ).exclude(versement=self)
+        
+        total_depenses_precedentes = depenses_precedentes.aggregate(
+            total=Sum('montant')
+        )['total'] or Decimal('0.00')
+        
+        solde = total_entrees - total_versements_precedents - total_depenses_precedentes
+        return max(solde, Decimal('0.00'))
 
-    @property
-    def est_retroactif(self):
-        """Vérifie si c'est un versement rétroactif"""
-        return self.date_versement_reelle.date() < self.date_creation.date()
+    def clean(self):
+        """Validation pour s'assurer que le versement ne dépasse pas le solde disponible"""
+        from django.core.exceptions import ValidationError
+        
+        if self.type_versement == 'vente':
+            solde_disponible = self.solde_disponible_vente_avant_versement
+            if self.montant_net > solde_disponible:
+                raise ValidationError(
+                    f"Le montant net du versement ({self.montant_net} FCFA) dépasse "
+                    f"le solde disponible ({solde_disponible} FCFA) pour les ventes/recouvrements."
+                )
+
+    def save(self, *args, **kwargs):
+        """Sauvegarde avec validation"""
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        retroactive = " (Rétroactif)" if self.est_retroactif else ""
-        return f"Versement {self.id} - {self.superviseur} - {self.montant_verse} FCFA{retroactive}"
+        type_str = "Vente" if self.type_versement == 'vente' else "Autre"
+        return f"Versement {self.id} - {self.superviseur} - {self.montant_verse} FCFA ({type_str})"
 
     class Meta:
         ordering = ['-date_versement_reelle']
         verbose_name = "Versement Bancaire"
         verbose_name_plural = "Versements Bancaires"
+
+
+class Depense(models.Model):
+    CATEGORIE_DEPENSE_CHOICES = (
+        ('transport', 'Transport'),
+        ('communication', 'Communication'),
+        ('frais_bancaires', 'Frais Bancaires'),
+        ('materiel', 'Matériel'),
+        ('autres', 'Autres Dépenses'),
+    )
+
+    superviseur = models.ForeignKey(
+        'Agent',
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='depenses'
+    )
+
+    versement = models.ForeignKey(
+        VersementBancaire,
+        on_delete=models.CASCADE,
+        related_name='depenses',
+        null=True,
+        blank=True,
+        verbose_name="Versement associé",
+        help_text="Lien vers le versement si applicable"
+    )
+
+    type_versement = models.CharField(
+        max_length=20,
+        choices=VersementBancaire.TYPE_VERSEMENT_CHOICES,
+        default='vente',
+        verbose_name="Type de versement associé",
+        help_text="Détermine si la dépense impacte le solde des ventes"
+    )
+
+    montant = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Montant de la dépense",
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+
+    description = models.TextField(
+        verbose_name="Détails de la dépense"
+    )
+
+    categorie = models.CharField(
+        max_length=50,
+        choices=CATEGORIE_DEPENSE_CHOICES,
+        default='autres',
+        verbose_name="Catégorie de dépense"
+    )
+
+    date_depense = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Date de la dépense"
+    )
+
+    justificatif = models.FileField(
+        upload_to='justificatifs_depenses/%Y/%m/',
+        blank=True,
+        null=True,
+        verbose_name="Justificatif de dépense"
+    )
+
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def impacte_solde_vente(self):
+        """Détermine si cette dépense impacte le solde des ventes"""
+        return self.type_versement == 'vente'
+
+    def clean(self):
+        """Validation de la cohérence entre versement et type_versement"""
+        from django.core.exceptions import ValidationError
+        
+        if self.versement and self.type_versement != self.versement.type_versement:
+            raise ValidationError(
+                "Le type de versement de la dépense doit correspondre au type du versement associé."
+            )
+
+    def save(self, *args, **kwargs):
+        """Synchronise le type_versement avec le versement associé si nécessaire"""
+        if self.versement:
+            self.type_versement = self.versement.type_versement
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        type_str = "Vente" if self.type_versement == 'vente' else "Autre"
+        return f"Dépense {self.id} - {self.superviseur} - {self.montant} FCFA ({type_str})"
+
+    class Meta:
+        ordering = ['-date_depense']
+        verbose_name = "Dépense"
+        verbose_name_plural = "Dépenses"

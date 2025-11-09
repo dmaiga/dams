@@ -40,7 +40,8 @@ from .forms import (
     VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
     DistributionModificationForm,UploadFactureForm,RecouvrementForm,
-    FournisseurForm,VersementBancaireForm,AgentCreationForm, AgentModificationForm
+    FournisseurForm,VersementAvecDepensesForm,AgentCreationForm, 
+    AgentModificationForm
 
 )
 
@@ -1480,83 +1481,71 @@ def creer_dette(request):
 #=====
 #FACTURE
 #=====
+
+# views.py
 @login_required
-def creer_versement_avec_facture(request):
-    """Créer un versement bancaire avec facture associée"""
+def creer_versement_avec_depenses(request):
+    """Créer un versement bancaire avec dépenses intégrées"""
     agent_connecte = request.user.agent
     
     if not agent_connecte.est_superviseur:
         messages.error(request, "Accès réservé aux superviseurs")
         return redirect('tableau_de_bord')
     
-    # Calculer le total recouvré depuis le dernier versement
+    # Calculer le solde disponible pour les ventes
+    solde_vente_disponible = agent_connecte.solde_superviseur
+    
+    # Récupérer le dernier versement pour référence
     dernier_versement = VersementBancaire.objects.filter(
         superviseur=agent_connecte
-    ).order_by('-date_fin_periode').first()
-    
-    date_debut = dernier_versement.date_fin_periode if dernier_versement else timezone.now() - timedelta(days=365)
-    
-    total_recouvre = Recouvrement.objects.filter(
-        superviseur=agent_connecte,
-        date_recouvrement__gt=date_debut,
-        date_recouvrement__lte=timezone.now()  # Jusqu'à aujourd'hui par défaut
-    ).aggregate(total=Sum('montant_recouvre'))['total'] or 0
+    ).order_by('-date_versement_reelle').first()
     
     if request.method == 'POST':
-        form_versement = VersementBancaireForm(request.POST, request.FILES)
-        form_facture = FactureForm(request.POST, request.FILES)
+        form = VersementAvecDepensesForm(
+            request.POST, 
+            request.FILES,
+            superviseur=agent_connecte
+        )
         
-        if form_versement.is_valid() and form_facture.is_valid():
-            with transaction.atomic():
-                # Créer la facture d'abord
-                facture = form_facture.save(commit=False)
-                facture.agent = agent_connecte
-                facture.type_facture = 'versement_bancaire'
-                
-                # Utiliser la date rétroactive pour la facture aussi si fournie
-                if form_versement.cleaned_data.get('date_versement_reelle'):
-                    facture.date_depot = form_versement.cleaned_data['date_versement_reelle']
-                
-                facture.save()
-                
-                # Créer le versement bancaire
-                versement = form_versement.save(commit=False)
-                versement.facture = facture
-                versement.superviseur = agent_connecte
-                versement.montant_total_recouvre = total_recouvre
-                versement.date_debut_periode = date_debut
-                versement.save()
-            
-            # Message avec indication rétroactive
-            message = (
-                f"Versement enregistré! Recouvré: {total_recouvre} FCFA - "
-                f"Dépenses: {versement.montant_depenses} FCFA - "
-                f"Versé: {facture.montant} FCFA"
-            )
-            if versement.est_retroactif:
-                message += f" (Versement rétroactif du {versement.date_versement_reelle.strftime('%d/%m/%Y')})"
-            
-            messages.success(request, message)
-            return redirect('liste_factures')
-    
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    versement = form.save()
+                    
+                    # Message de succès détaillé
+                    total_depenses = versement.total_depenses_associees
+                    montant_net = versement.montant_net
+                    
+                    message = (
+                        f"✅ Versement {versement.get_type_versement_display()} créé avec succès! "
+                        f"Montant versé: {versement.montant_verse} FCFA"
+                    )
+                    
+                    if total_depenses > 0:
+                        message += f"Dépenses: {total_depenses} FCFA"
+                        message += f"Montant net: {montant_net} FCFA"
+                    
+                    if versement.type_versement == 'vente':
+                        nouveau_solde = agent_connecte.solde_superviseur
+                        message += f"Nouveau solde vente: {nouveau_solde} FCFA"
+                    
+                    messages.success(request, message)
+                    return redirect('liste_factures')
+                    
+            except Exception as e:
+                messages.error(request, f"❌ Erreur lors de la création du versement: {str(e)}")
+        
     else:
-        form_versement = VersementBancaireForm(initial={
-            'montant_total_recouvre': total_recouvre,
-        })
-        form_facture = FactureForm(initial={
-            'montant': total_recouvre,
-            'description': f"Versement bancaire - Période du {date_debut.strftime('%d/%m/%Y')} au {timezone.now().strftime('%d/%m/%Y')}"
-        })
+        form = VersementAvecDepensesForm(superviseur=agent_connecte)
     
     context = {
-        'form_versement': form_versement,
-        'form_facture': form_facture,
-        'total_recouvre': total_recouvre,
-        'date_debut': date_debut,
+        'form': form,
+        'solde_vente_disponible': solde_vente_disponible,
         'superviseur': agent_connecte,
+        'dernier_versement': dernier_versement,
     }
+    
     return render(request, 'core/factures/creer_versement_facture.html', context)
-
 
 @login_required
 def liste_factures(request):
