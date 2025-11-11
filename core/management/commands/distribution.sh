@@ -17,30 +17,38 @@ def creer_distributions_multiple():
             alpha = Agent.objects.get(user__username='alpha.diallo')
             fatoumata = Agent.objects.get(user__username='fatoumata.kouyate')
             koniba = Agent.objects.get(user__username='koniba.daou')
+            champ = Agent.objects.get(user__username='agent.champ')
+            massira = Agent.objects.get(user__username='massira.doumbia')
             
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES
             distributions_config = [
                 
                  {
-                    'date': '12/09/2025', 
-                    'produit': 'laurier',
-                    'prix_gros': 3000,
-                    'prix_detail': 3400,
+                    'date': '04/10/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9500,
+                    'prix_detail': 11000,
                     'distributions': [                                                   
-                        (mankoulako, 14, "Mankoulako"),                     
-                        
+                        (abdoulaye, 20, "Abdoulaye (Auto)"),                        
+
                     ]
                 },
+
                  {
-                    'date': '16/10/2025', 
-                    'produit': 'laurier',
-                    'prix_gros': 3000,
-                    'prix_detail': 3250,
-                    'distributions': [
-                        (mankoulako, 5, "Mankoulako"),                     
-                        
+                    'date': '04/10/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9500,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        (fatoumata, 1, "Fatoumata "), 
+                        (alpha, 1, "Alpha "),
+                         (massira, 10, "Fatoumata "),   
+                         (koniba, 3, "Koniba "),    
+                                               
+
                     ]
                 }
+                
             ]
             
             toutes_distributions = []

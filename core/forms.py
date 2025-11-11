@@ -855,8 +855,6 @@ class DistributionSuppressionForm(forms.Form):
 # === FORMULAIRE VENTE ===
 # === FORMULAIRE VENTE ===
 class VenteForm(forms.ModelForm):
-    # Supprimer le choix de type client et rendre le client complètement optionnel
-    
     # Nouveau client (optionnel)
     nouveau_client = forms.BooleanField(
         required=False, 
@@ -920,7 +918,7 @@ class VenteForm(forms.ModelForm):
         help_text="Date à laquelle la vente a été effectuée"
     )
 
-    # ✅ NOUVEAU : Champ stagiaire optionnel
+    # ✅ MODIFIÉ : Champ stagiaire optionnel - TOUS les stagiaires
     stagiaire = forms.ModelChoiceField(
         queryset=Agent.objects.none(),  # Sera rempli dans __init__
         required=False,
@@ -967,19 +965,17 @@ class VenteForm(forms.ModelForm):
         else:
             self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
         
-        # ✅ FILTRER LES STAGIAIRES ACTIFS
+        # ✅ MODIFIÉ : TOUS LES STAGIAIRES (sans filtre de date d'expiration)
         if self.agent:
-            # Seulement les stagiaires non expirés
-            stagiaires_actifs = Agent.objects.filter(
-                type_agent='stagiaire',
-                date_expiration__gte=timezone.now()  # Stagiaires non expirés
-            ).select_related('user')
+            # Tous les stagiaires, même expirés
+            tous_les_stagiaires = Agent.objects.filter(type_agent='stagiaire').select_related('user')
             
-            self.fields['stagiaire'].queryset = stagiaires_actifs
+            self.fields['stagiaire'].queryset = tous_les_stagiaires
             
-            # Formater l'affichage des stagiaires
+            # Formater l'affichage des stagiaires avec indication d'expiration
             self.fields['stagiaire'].label_from_instance = lambda obj: (
                 f"{obj.full_name} (Expire le {obj.date_expiration.strftime('%d/%m/%Y')})"
+                if obj.date_expiration else f"{obj.full_name} (Pas de date d'expiration)"
             )
         
         # Filtrer les clients existants
@@ -1041,13 +1037,12 @@ class VenteForm(forms.ModelForm):
         if date_vente and date_vente > timezone.now():
             self.add_error('date_vente', 'La date de vente ne peut pas être dans le futur')
         
-        # ✅ VALIDATION STAGIAIRE
+        # ✅ MODIFIÉ : Validation stagiaire plus permissive
         stagiaire = cleaned_data.get('stagiaire')
         if stagiaire:
             if stagiaire.type_agent != 'stagiaire':
                 self.add_error('stagiaire', "L'agent sélectionné doit être un stagiaire")
-            elif stagiaire.est_expire:
-                self.add_error('stagiaire', f"Ce stagiaire a expiré le {stagiaire.date_expiration.strftime('%d/%m/%Y')}")
+            # SUPPRIMÉ : Plus de vérification d'expiration
         
         return cleaned_data
 
@@ -1057,7 +1052,7 @@ class VenteForm(forms.ModelForm):
         # Associer l'agent (tuteur situationnel)
         instance.agent = self.agent
 
-        # ✅ ASSOCIER LE STAGIAIRE SI SELECTIONNE
+        # ✅ ASSOCIER LE STAGIAIRE SI SELECTIONNE (même expiré)
         stagiaire = self.cleaned_data.get('stagiaire')
         if stagiaire:
             instance.stagiaire = stagiaire
@@ -1093,7 +1088,7 @@ class VenteForm(forms.ModelForm):
             detail.quantite -= instance.quantite
             detail.save()
             
-        return instance    
+        return instance
 
 # === FORMULAIRE DETTE (pour vente à crédit) ===
 class DetteForm(forms.ModelForm):

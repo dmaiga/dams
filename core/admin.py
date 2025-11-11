@@ -100,12 +100,14 @@ class AgentAdmin(admin.ModelAdmin):
             solde = details['solde_actuel']
             total_recouvrements_agents = details['total_recouvrements_agents']
             total_ventes_personnelles = details['total_ventes_personnelles']
+            total_ventes_stagiaires = details['total_ventes_stagiaires']
             total_versements = details['total_versements']
             total_depenses = details['total_depenses']
 
             return (
                 f"🧾 Recouvrements: {total_recouvrements_agents:,} FCFA | "
                 f"Ventes pers.: {total_ventes_personnelles:,} FCFA | "
+                f"Ventes stagiaires: {total_ventes_stagiaires:,} FCFA | "
                 f"Versements: {total_versements:,} FCFA | "
                 f"Dépenses: {total_depenses:,} FCFA | "
                 f"💰 Solde: {solde:,} FCFA"
@@ -113,13 +115,29 @@ class AgentAdmin(admin.ModelAdmin):
 
         elif obj.est_agent_terrain:
             return (
-                f"Ventes: {obj.total_ventes:,} FCFA | "
+                f"Ventes pers.: {obj.total_ventes_personnelles:,} FCFA | "
+                f"Ventes stagiaires: {obj.total_ventes_stagiaires:,} FCFA | "
+                f"Total: {obj.total_ventes:,} FCFA | "
                 f"Recouvré: {obj.total_recouvre:,} FCFA | "
-                f"À recouvrir: {obj.argent_en_possession:,} FCFA"
+                f"À recouvrir: {obj.argent_en_possession:,} FCFA | "
+                f"Stagiaires: {obj.nombre_stagiaires_supervises}"
             )
 
         elif obj.est_direction:
             return "👔 Membre de la direction"
+
+        elif obj.est_stagiaire:
+            tuteur = "Aucun"
+            # Trouver le tuteur du stagiaire
+            vente_avec_tuteur = Vente.objects.filter(stagiaire=obj).first()
+            if vente_avec_tuteur and vente_avec_tuteur.agent:
+                tuteur = vente_avec_tuteur.agent.full_name
+            
+            return (
+                f"Ventes: {obj.total_ventes:,} FCFA | "
+                f"Tuteur: {tuteur} | "
+                f"Statut: {obj.statut_stagiaire}"
+            )
 
         return "—"
     statistiques_agent.short_description = "📊 Statistiques"

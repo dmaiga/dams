@@ -1142,19 +1142,28 @@ def liste_ventes(request):
         agent = Agent.objects.get(user=request.user)
     except Agent.DoesNotExist:
         messages.error(request, "Aucun agent trouvé.")
-        return redirect('dashboard')
+        return redirect('liste_ventes')
     
     # Récupérer les ventes de l'agent
     ventes = Vente.objects.filter(
         agent=agent
     ).select_related(
         'client', 
-        'detail_distribution__lot__produit'
+        'detail_distribution__lot__produit',
+        'stagiaire'
     ).prefetch_related('dette').order_by('-date_vente')
     
     # Calculer les statistiques
     total_ventes = ventes.count()
-    chiffre_affaires_total = sum(vente.total_vente for vente in ventes)
+    
+    # Calculer le chiffre d'affaires avec F() expressions
+    stats_ventes = ventes.aggregate(
+        chiffre_affaires_total=Sum(F('quantite') * F('prix_vente_unitaire')),
+        quantite_totale=Sum('quantite')
+    )
+    
+    # ✅ CORRECTION : Gérer les valeurs None
+    chiffre_affaires_total = stats_ventes['chiffre_affaires_total'] or Decimal('0.00')
     
     # Statistiques par type
     ventes_gros = ventes.filter(type_vente='gros')
@@ -1162,14 +1171,45 @@ def liste_ventes(request):
     ventes_comptant = ventes.filter(mode_paiement='comptant')
     ventes_credit = ventes.filter(mode_paiement='credit')
     
+    # Statistiques des stagiaires
+    ventes_avec_stagiaire = ventes.filter(stagiaire__isnull=False)
+    ventes_sans_stagiaire = ventes.filter(stagiaire__isnull=True)
+    
+    # Statistiques détaillées des stagiaires
+    stats_stagiaires = ventes_avec_stagiaire.aggregate(
+        total_ventes_stagiaires=Count('id'),
+        chiffre_affaires_stagiaires=Sum(F('quantite') * F('prix_vente_unitaire')),
+        nombre_stagiaires_distincts=Count('stagiaire', distinct=True)
+    )
+    
+    # Statistiques des ventes personnelles
+    stats_personnel = ventes_sans_stagiaire.aggregate(
+        chiffre_affaires_personnel=Sum(F('quantite') * F('prix_vente_unitaire'))
+    )
+    
+    # ✅ CORRECTION : Gérer les valeurs None pour les statistiques stagiaires
+    ventes_avec_stagiaire_count = stats_stagiaires['total_ventes_stagiaires'] or 0
+    chiffre_affaires_stagiaires = stats_stagiaires['chiffre_affaires_stagiaires'] or Decimal('0.00')
+    nombre_stagiaires_distincts = stats_stagiaires['nombre_stagiaires_distincts'] or 0
+    chiffre_affaires_personnel = stats_personnel['chiffre_affaires_personnel'] or Decimal('0.00')
+    
+    # ✅ CORRECTION : Calcul sécurisé des pourcentages
+    pourcentage_ventes_stagiaires = 0
+    if total_ventes > 0:
+        pourcentage_ventes_stagiaires = (ventes_avec_stagiaire_count / total_ventes) * 100
+    
+    pourcentage_ca_stagiaires = 0
+    if chiffre_affaires_total > 0:
+        pourcentage_ca_stagiaires = (chiffre_affaires_stagiaires / chiffre_affaires_total) * 100
+    
     # Calculer les bonus obtenus
-    bonus_obtenus = 0
+    bonus_obtenus = Decimal('0.00')
     dettes_avec_bonus = Dette.objects.filter(
         vente__agent=agent,
         bonus_accorde=True
     )
     for dette in dettes_avec_bonus:
-        bonus_obtenus += dette.montant_bonus
+        bonus_obtenus += dette.montant_bonus or Decimal('0.00')
     
     # Dettes en cours
     dettes_en_cours = Dette.objects.filter(
@@ -1177,17 +1217,39 @@ def liste_ventes(request):
         statut__in=['en_cours', 'partiellement_paye', 'en_retard']
     ).count()
     
+    # ✅ CORRECTION : Requête pour les stagiaires actifs avec gestion des valeurs None
+    stagiaires_actifs = Agent.objects.filter(
+        type_agent='stagiaire',
+        vente__agent=agent
+    ).distinct().annotate(
+        nombre_ventes=Count('vente'),
+        total_ventes_ca=Sum(F('vente__quantite') * F('vente__prix_vente_unitaire'))
+    ).order_by('-total_ventes_ca')
+    
+    # ✅ CORRECTION : Convertir les Decimal en float pour les templates si nécessaire
     context = {
         'ventes': ventes,
         'total_ventes': total_ventes,
-        'chiffre_affaires_total': chiffre_affaires_total,
+        'chiffre_affaires_total': float(chiffre_affaires_total),
         'ventes_gros_count': ventes_gros.count(),
         'ventes_detail_count': ventes_detail.count(),
         'ventes_comptant_count': ventes_comptant.count(),
         'ventes_credit_count': ventes_credit.count(),
-        'bonus_obtenus': bonus_obtenus,
+        'bonus_obtenus': float(bonus_obtenus),
         'dettes_en_cours': dettes_en_cours,
         'agent': agent,
+        
+        # Statistiques des stagiaires
+        'ventes_avec_stagiaire_count': ventes_avec_stagiaire_count,
+        'ventes_sans_stagiaire_count': ventes_sans_stagiaire.count(),
+        'chiffre_affaires_stagiaires': float(chiffre_affaires_stagiaires),
+        'chiffre_affaires_personnel': float(chiffre_affaires_personnel),
+        'nombre_stagiaires_distincts': nombre_stagiaires_distincts,
+        'pourcentage_ventes_stagiaires': pourcentage_ventes_stagiaires,
+        'pourcentage_ca_stagiaires': pourcentage_ca_stagiaires,
+        
+        # Liste des stagiaires avec leurs performances
+        'stagiaires_actifs': stagiaires_actifs,
     }
     
     return render(request, 'core/ventes/liste_ventes.html', context)
@@ -1490,7 +1552,7 @@ def creer_versement_avec_depenses(request):
     
     if not agent_connecte.est_superviseur:
         messages.error(request, "Accès réservé aux superviseurs")
-        return redirect('tableau_de_bord')
+        return redirect('login')
     
     # Calculer le solde disponible pour les ventes
     solde_vente_disponible = agent_connecte.solde_superviseur
@@ -1673,7 +1735,7 @@ def creer_recouvrement(request, agent_id):
     if agent_connecte.est_direction:
         if not (agent.est_agent_terrain or agent.est_superviseur):
             messages.error(request, "Vous ne pouvez recouvrir que les agents terrain et superviseurs.")
-            return redirect('tableau_de_bord')
+            return redirect('tableaulo_de_bord')
     
     if request.method == 'POST':
         form = RecouvrementForm(request.POST, agent=agent)
@@ -1988,6 +2050,14 @@ def tableau_de_bord_superviseur(request):
             ventes_detail=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='detail'))
         )
         
+        # ✅ NOUVEAU : Statistiques des stagiaires pour cet agent
+        ventes_stagiaires_agent = Vente.objects.filter(agent=agent, stagiaire__isnull=False)
+        stats_stagiaires = ventes_stagiaires_agent.aggregate(
+            total_ventes_stagiaires=Sum(F('quantite') * F('prix_vente_unitaire')),
+            nombre_ventes_stagiaires=Count('id'),
+            nombre_stagiaires_distincts=Count('stagiaire', distinct=True)
+        )
+        
         # ✅ CORRECTION : date_debut_recent est maintenant définie au début
         distributions_recentes = DistributionAgent.objects.filter(
             agent_terrain=agent,
@@ -2005,6 +2075,12 @@ def tableau_de_bord_superviseur(request):
             'clients_distincts': stats_ventes['clients_distincts'] or 0,
             'quantite_vendue': stats_ventes['quantite_vendue'] or 0,
             'produits_distribues_recent': distributions_recentes['total_produits'] or 0,
+            
+            # ✅ NOUVEAU : Statistiques stagiaires
+            'total_ventes_stagiaires': stats_stagiaires['total_ventes_stagiaires'] or 0,
+            'nombre_ventes_stagiaires': stats_stagiaires['nombre_ventes_stagiaires'] or 0,
+            'nombre_stagiaires_distincts': stats_stagiaires['nombre_stagiaires_distincts'] or 0,
+            'total_ventes_personnelles': (stats_ventes['total_ventes'] or 0) - (stats_stagiaires['total_ventes_stagiaires'] or 0),
             
             # Propriétés historiques de l'agent
             'total_ventes_historique': agent.total_ventes,
@@ -2026,6 +2102,13 @@ def tableau_de_bord_superviseur(request):
         ventes_comptant=Count('id', filter=Q(mode_paiement='comptant'))
     )
     
+    # ✅ NOUVEAU : Statistiques globales des stagiaires
+    stats_ventes_stagiaires_global = Vente.objects.filter(stagiaire__isnull=False).aggregate(
+        total_ventes_stagiaires=Sum(F('quantite') * F('prix_vente_unitaire')),
+        nombre_ventes_stagiaires=Count('id'),
+        nombre_stagiaires_distincts=Count('stagiaire', distinct=True)
+    )
+    
     ventes_global = {
         'total_ventes': stats_ventes_global['total_ventes'] or 0,
         'ventes_gros': stats_ventes_global['ventes_gros'] or 0,
@@ -2034,6 +2117,11 @@ def tableau_de_bord_superviseur(request):
         'quantite_vendue': stats_ventes_global['quantite_vendue'] or 0,
         'ventes_credit': stats_ventes_global['ventes_credit'] or 0,
         'ventes_comptant': stats_ventes_global['ventes_comptant'] or 0,
+        # ✅ NOUVEAU : Ajout des stats stagiaires globales
+        'total_ventes_stagiaires': stats_ventes_stagiaires_global['total_ventes_stagiaires'] or 0,
+        'nombre_ventes_stagiaires': stats_ventes_stagiaires_global['nombre_ventes_stagiaires'] or 0,
+        'nombre_stagiaires_distincts': stats_ventes_stagiaires_global['nombre_stagiaires_distincts'] or 0,
+        'total_ventes_personnelles': (stats_ventes_global['total_ventes'] or 0) - (stats_ventes_stagiaires_global['total_ventes_stagiaires'] or 0),
     }
     
     # Ventes par type - TOUTES LES PÉRIODES
@@ -2056,12 +2144,24 @@ def tableau_de_bord_superviseur(request):
         ventes_detail=Sum(F('quantite') * F('prix_vente_unitaire'), filter=Q(type_vente='detail'))
     )
     
+    # ✅ NOUVEAU : Statistiques stagiaires pour le superviseur
+    stats_stagiaires_superviseur = Vente.objects.filter(agent=superviseur, stagiaire__isnull=False).aggregate(
+        total_ventes_stagiaires=Sum(F('quantite') * F('prix_vente_unitaire')),
+        nombre_ventes_stagiaires=Count('id'),
+        nombre_stagiaires_distincts=Count('stagiaire', distinct=True)
+    )
+    
     ventes_superviseur = {
         'total_ventes': stats_ventes_superviseur['total_ventes'] or 0,
         'ventes_gros': stats_ventes_superviseur['ventes_gros'] or 0,
         'ventes_detail': stats_ventes_superviseur['ventes_detail'] or 0,
         'nombre_ventes': stats_ventes_superviseur['nombre_ventes'] or 0,
         'quantite_vendue': stats_ventes_superviseur['quantite_vendue'] or 0,
+        # ✅ NOUVEAU : Ajout des stats stagiaires superviseur
+        'total_ventes_stagiaires': stats_stagiaires_superviseur['total_ventes_stagiaires'] or 0,
+        'nombre_ventes_stagiaires': stats_stagiaires_superviseur['nombre_ventes_stagiaires'] or 0,
+        'nombre_stagiaires_distincts': stats_stagiaires_superviseur['nombre_stagiaires_distincts'] or 0,
+        'total_ventes_personnelles': (stats_ventes_superviseur['total_ventes'] or 0) - (stats_stagiaires_superviseur['total_ventes_stagiaires'] or 0),
     }
     
     # ✅ CORRECTION : date_debut_recent est maintenant disponible
@@ -2078,6 +2178,10 @@ def tableau_de_bord_superviseur(request):
         'solde_actuel': superviseur.solde_superviseur,
         'dernier_versement': superviseur.dernier_versement_superviseur,
         'versements_recents': superviseur.versements_recents_superviseur,
+        # ✅ NOUVEAU : Ajout des stats stagiaires du superviseur
+        'total_ventes_stagiaires': superviseur.total_ventes_stagiaires,
+        'total_ventes_personnelles': superviseur.total_ventes_personnelles,
+        'nombre_stagiaires_supervises': superviseur.nombre_stagiaires_supervises,
     }
     
     # Alertes stock faible
@@ -2097,6 +2201,10 @@ def tableau_de_bord_superviseur(request):
     total_ventes_superviseur_calc = ventes_superviseur['total_ventes']
     total_ventes_global_calc = total_ventes_agents + total_ventes_superviseur_calc
     
+    # ✅ NOUVEAU : Calculs stagiaires
+    total_ventes_stagiaires_agents = sum(agent['total_ventes_stagiaires'] for agent in performances_agents)
+    total_ventes_personnelles_agents = sum(agent['total_ventes_personnelles'] for agent in performances_agents)
+    
     # Vérification que les totaux correspondent
     ecart = abs(total_ventes_global_calc - ventes_global['total_ventes'])
     correspond = ecart < 0.01  # Tolérance de 0.01 FCFA
@@ -2113,7 +2221,11 @@ def tableau_de_bord_superviseur(request):
             'total_global_direct': ventes_global['total_ventes'],
             'ecart': ecart,
             'correspond': correspond
-        }
+        },
+        # ✅ NOUVEAU : Ajout des stats stagiaires
+        'total_ventes_stagiaires': total_ventes_stagiaires_agents + ventes_superviseur['total_ventes_stagiaires'],
+        'total_ventes_personnelles': total_ventes_personnelles_agents + ventes_superviseur['total_ventes_personnelles'],
+        'pourcentage_ventes_stagiaires': ((total_ventes_stagiaires_agents + ventes_superviseur['total_ventes_stagiaires']) / ventes_global['total_ventes'] * 100) if ventes_global['total_ventes'] > 0 else 0,
     }
     
     context = {
@@ -2149,6 +2261,7 @@ def tableau_de_bord_superviseur(request):
     }
     
     return render(request, 'core/dashboard/superviseur.html', context)
+
 
 @login_required
 def vue_detail_agent(request, agent_id):

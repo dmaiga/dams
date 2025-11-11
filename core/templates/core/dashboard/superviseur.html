@@ -208,6 +208,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Agent</th>
+                                    
                                     <th>Ventes Total</th>
                                     <th>Déjà Recouvré</th>
                                     <th>En Possession</th>
@@ -228,9 +229,15 @@
                                             Détail: {{ perf.ventes_detail|floatformat:0|intcomma }}
                                         </small>
                                     </td>
-                                    <td>
-                                        <strong>{{ perf.total_ventes|floatformat:0|intcomma }} FCFA</strong>
-                                    </td>
+
+<td>
+    <strong>{{ perf.total_ventes|floatformat:0|intcomma }} FCFA</strong>
+    <br>
+    <small class="text-muted">
+        Pers: {{ perf.total_ventes_personnelles|floatformat:0|intcomma }} | 
+        Stag: {{ perf.total_ventes_stagiaires|floatformat:0|intcomma }}
+    </small>
+</td>
                                     <td>
                                         <span class="text-success">{{ perf.total_recouvre|floatformat:0|intcomma }} FCFA</span>
                                     </td>
@@ -286,29 +293,38 @@
                 </div>
                 <div class="card-body">
                     <!-- Mes ventes -->
-                    <div class="mb-3 p-2 border-bottom">
-                        <h6>Ventes Personnelles</h6>
-                        <div class="d-flex justify-content-between">
-                            <span>Chiffre d'affaires:</span>
-                            <strong>{{ ventes_superviseur.total_ventes|default:0|floatformat:0|intcomma }} FCFA</strong>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span>Nombre de ventes:</span>
-                            <strong>{{ ventes_superviseur.nombre_ventes|default:0 }}</strong>
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <span>Quantité vendue:</span>
-                            <strong>{{ ventes_superviseur.quantite_vendue|default:0 }} unités</strong>
-                        </div>
-                        <div class="d-flex justify-content-between text-muted small">
-                            <span>Gros:</span>
-                            <span>{{ ventes_superviseur.ventes_gros|default:0|floatformat:0|intcomma }} FCFA</span>
-                        </div>
-                        <div class="d-flex justify-content-between text-muted small">
-                            <span>Détail:</span>
-                            <span>{{ ventes_superviseur.ventes_detail|default:0|floatformat:0|intcomma }} FCFA</span>
-                        </div>
-                    </div>
+
+<div class="mb-3 p-2 border-bottom">
+    <h6>Ventes Personnelles</h6>
+    <div class="d-flex justify-content-between">
+        <span>Chiffre d'affaires:</span>
+        <strong>{{ ventes_superviseur.total_ventes|default:0|floatformat:0|intcomma }} FCFA</strong>
+    </div>
+    <div class="d-flex justify-content-between text-success small">
+        <span>→ Ventes personnelles:</span>
+        <span>{{ ventes_superviseur.total_ventes_personnelles|default:0|floatformat:0|intcomma }} FCFA</span>
+    </div>
+    <div class="d-flex justify-content-between text-info small">
+        <span>→ Ventes stagiaires:</span>
+        <span>{{ ventes_superviseur.total_ventes_stagiaires|default:0|floatformat:0|intcomma }} FCFA</span>
+    </div>
+    <div class="d-flex justify-content-between">
+        <span>Nombre de ventes:</span>
+        <strong>{{ ventes_superviseur.nombre_ventes|default:0 }}</strong>
+    </div>
+    <div class="d-flex justify-content-between">
+        <span>Quantité vendue:</span>
+        <strong>{{ ventes_superviseur.quantite_vendue|default:0 }} unités</strong>
+    </div>
+    <div class="d-flex justify-content-between text-muted small">
+        <span>Gros:</span>
+        <span>{{ ventes_superviseur.ventes_gros|default:0|floatformat:0|intcomma }} FCFA</span>
+    </div>
+    <div class="d-flex justify-content-between text-muted small">
+        <span>Détail:</span>
+        <span>{{ ventes_superviseur.ventes_detail|default:0|floatformat:0|intcomma }} FCFA</span>
+    </div>
+</div>
 
                     <!-- Mes distributions -->
                     <div class="mb-3 p-2 border-bottom">
@@ -385,7 +401,21 @@
                         </div>
                     </div>
                     {% endfor %}
-
+<div class="mt-3 p-2 bg-light rounded">
+    <h6>Répartition Ventes</h6>
+    <div class="d-flex justify-content-between small">
+        <span>Ventes personnelles:</span>
+        <strong>{{ recapitulatif_financier.total_ventes_personnelles|floatformat:0|intcomma }} FCFA</strong>
+    </div>
+    <div class="d-flex justify-content-between small">
+        <span>Ventes stagiaires:</span>
+        <strong>{{ recapitulatif_financier.total_ventes_stagiaires|floatformat:0|intcomma }} FCFA</strong>
+    </div>
+    <div class="d-flex justify-content-between small">
+        <span>Part stagiaires:</span>
+        <strong>{{ recapitulatif_financier.pourcentage_ventes_stagiaires|floatformat:1 }}%</strong>
+    </div>
+</div>
                     <!-- Par mode de paiement -->
                     <h6 class="mt-3">Par Mode de Paiement</h6>
                     <div class="row text-center">

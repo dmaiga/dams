@@ -8,6 +8,9 @@ from django.db.models import (
     Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
 )
 from django.db.models.functions import Coalesce
+from django.core.validators import MinValueValidator
+from decimal import Decimal
+
 
 class Client(models.Model):
     TYPE_CLIENT_CHOICES = (
@@ -275,6 +278,29 @@ class Agent(models.Model):
         ventes = Vente.objects.filter(agent=self)
         return sum(vente.total_vente for vente in ventes)
     
+    # Ventes réalisées par les stagiaires sous sa tutelle
+    @property
+    def total_ventes_stagiaires(self):
+        """Total des ventes réalisées par les stagiaires sous sa tutelle"""
+        if self.est_agent_terrain or self.est_superviseur:
+            ventes_stagiaires = Vente.objects.filter(stagiaire__isnull=False, agent=self)
+            return sum(vente.total_vente for vente in ventes_stagiaires)
+        return 0
+    
+    #  Ventes personnelles (hors stagiaires)
+    @property
+    def total_ventes_personnelles(self):
+        """Total des ventes réalisées personnellement (sans stagiaire)"""
+        ventes_personnelles = Vente.objects.filter(agent=self, stagiaire__isnull=True)
+        return sum(vente.total_vente for vente in ventes_personnelles)
+    
+    # Nombre de stagiaires supervisés
+    @property
+    def nombre_stagiaires_supervises(self):
+        """Nombre de stagiaires distincts supervisés"""
+        if self.est_agent_terrain or self.est_superviseur:
+            return Vente.objects.filter(agent=self, stagiaire__isnull=False).values('stagiaire').distinct().count()
+        return 0
     @property
     def total_recouvre(self):
         """Total déjà recouvré auprès de l'agent"""
@@ -351,6 +377,7 @@ class Agent(models.Model):
         
         return {
             'total_ventes_personnelles': self.total_ventes,
+            'total_ventes_stagiaires':self.total_ventes_stagiaires,
             'total_recouvrements_agents': total_entrees - self.total_ventes,
             'total_entrees': total_entrees,
             'total_depenses': self.total_depenses_superviseur,
@@ -394,6 +421,7 @@ class Agent(models.Model):
         if hasattr(self, 'bonus'):
             return self.bonus.get_ventes_avec_bonus().count()
         return 0
+    
 
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
@@ -720,8 +748,10 @@ class Vente(models.Model):
 
     @property
     def total_vente(self):
-        return self.quantite * self.prix_vente_unitaire
-
+        if self.quantite and self.prix_vente_unitaire:
+            return self.quantite * self.prix_vente_unitaire
+        return Decimal('0.00')
+    
     def get_type_vente_display(self):
         return "Gros" if self.type_vente == 'gros' else "Détail"
     
@@ -1089,13 +1119,6 @@ class Recouvrement(models.Model):
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
 
-# models.py
-from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
-from django.core.validators import MinValueValidator
-from django.db.models import Sum, F
-from decimal import Decimal
 
 class VersementBancaire(models.Model):
     TYPE_VERSEMENT_CHOICES = (

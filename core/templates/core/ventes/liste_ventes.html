@@ -74,6 +74,66 @@
                         </div>
                     </div>
 
+                    <!-- ✅ NOUVEAU : Indicateurs Stagiaires -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-users"></i> Activité des Stagiaires
+                                        {% if nombre_stagiaires_distincts > 0 %}
+                                        <span class="badge bg-light text-info ms-2">{{ nombre_stagiaires_distincts }} stagiaire(s)</span>
+                                        {% endif %}
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row text-center">
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 bg-light">
+                                                <h4 class="text-info mb-1">{{ ventes_avec_stagiaire_count }}</h4>
+                                                <small class="text-muted">Ventes avec Stagiaires</small>
+                                                <br>
+                                                <small class="text-info fw-bold">{{ pourcentage_ventes_stagiaires|floatformat:1 }}% du total</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 bg-light">
+                                                <h4 class="text-success mb-1">{{ chiffre_affaires_stagiaires|floatformat:0 }} F</h4>
+                                                <small class="text-muted">CA des Stagiaires</small>
+                                                <br>
+                                                <small class="text-success fw-bold">{{ pourcentage_ca_stagiaires|floatformat:1 }}% du CA</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 bg-light">
+                                                <h4 class="text-primary mb-1">{{ ventes_sans_stagiaire_count }}</h4>
+                                                <small class="text-muted">Ventes Personnelles</small>
+                                                <br>
+                                                <small class="text-primary fw-bold">{{ chiffre_affaires_personnel|floatformat:0 }} F</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="border rounded p-3 bg-light">
+                                                <h4 class="text-warning mb-1">
+                                                    {% if nombre_stagiaires_distincts > 0 %}
+                                                    {{ nombre_stagiaires_distincts }}
+                                                    {% else %}
+                                                    0
+                                                    {% endif %}
+                                                </h4>
+                                                <small class="text-muted">Stagiaires Actifs</small>
+                                                <br>
+                                                <small class="text-warning fw-bold">Supervisés</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Répartition visuelle -->
                     <div class="row mb-4">
                         <div class="col-md-6">
@@ -126,6 +186,57 @@
                         </div>
                     </div>
 
+                    <!-- ✅ NOUVEAU : Répartition Stagiaires vs Personnel -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Répartition Stagiaires vs Personnel</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="text-center">Par Nombre de Ventes</h6>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>Ventes Personnelles</span>
+                                                <span class="fw-bold">{{ ventes_sans_stagiaire_count }} ({% widthratio ventes_sans_stagiaire_count total_ventes 100 %}%)</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 10px;">
+                                                <div class="progress-bar bg-primary" style="width: {% widthratio ventes_sans_stagiaire_count total_ventes 100 %}%"></div>
+                                            </div>
+                                            
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>Ventes Stagiaires</span>
+                                                <span class="fw-bold">{{ ventes_avec_stagiaire_count }} ({% widthratio ventes_avec_stagiaire_count total_ventes 100 %}%)</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 10px;">
+                                                <div class="progress-bar bg-info" style="width: {% widthratio ventes_avec_stagiaire_count total_ventes 100 %}%"></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-center">Par Chiffre d'Affaires</h6>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>CA Personnel</span>
+                                                <span class="fw-bold">{{ chiffre_affaires_personnel|floatformat:0 }} F ({% widthratio chiffre_affaires_personnel chiffre_affaires_total 100 %}%)</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 10px;">
+                                                <div class="progress-bar bg-success" style="width: {% widthratio chiffre_affaires_personnel chiffre_affaires_total 100 %}%"></div>
+                                            </div>
+                                            
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>CA Stagiaires</span>
+                                                <span class="fw-bold">{{ chiffre_affaires_stagiaires|floatformat:0 }} F ({% widthratio chiffre_affaires_stagiaires chiffre_affaires_total 100 %}%)</span>
+                                            </div>
+                                            <div class="progress mb-3" style="height: 10px;">
+                                                <div class="progress-bar bg-warning" style="width: {% widthratio chiffre_affaires_stagiaires chiffre_affaires_total 100 %}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Liste des ventes -->
                     {% if ventes %}
                     <div class="card">
@@ -144,6 +255,7 @@
                                             <th class="text-center">Type</th>
                                             <th class="text-center">Paiement</th>
                                             <th class="text-end">Total</th>
+                                            <th class="text-center">Stagiaire</th>  <!-- ✅ NOUVEAU : Colonne Stagiaire -->
                                             <th class="text-center">Statut</th>
                                             <th class="text-center">Actions</th>
                                         </tr>
@@ -185,6 +297,16 @@
                                                 <strong>{{ vente.total_vente }} FCFA</strong>
                                                 <br>
                                                 <small class="text-muted">{{ vente.prix_vente_unitaire }} F/u</small>
+                                            </td>
+                                            <!-- ✅ NOUVEAU : Colonne Stagiaire -->
+                                            <td class="text-center">
+                                                {% if vente.stagiaire %}
+                                                <span class="badge bg-info" title="Vente réalisée par {{ vente.stagiaire.full_name }}">
+                                                    <i class="fas fa-user-graduate"></i> {{ vente.stagiaire.full_name|truncatechars:15 }}
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Personnel</span>
+                                                {% endif %}
                                             </td>
                                             <td class="text-center">
                                                 {% if vente.mode_paiement == 'credit' %}
@@ -260,42 +382,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-// Fonction pour filtrer les ventes (optionnel)
-function filtrerVentes(type) {
-    // Implémentation future pour le filtrage
-    console.log('Filtrage par:', type);
-}
-
-// Initialiser les tooltips
-document.addEventListener('DOMContentLoaded', function() {
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
-    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-});
-</script>
-
-<style>
-.card {
-    border: none;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-.table th {
-    border-top: none;
-    font-weight: 600;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.badge {
-    font-size: 0.75rem;
-}
-.progress {
-    border-radius: 10px;
-}
-</style>
 {% endblock %}
