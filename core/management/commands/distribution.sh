@@ -19,36 +19,28 @@ def creer_distributions_multiple():
             koniba = Agent.objects.get(user__username='koniba.daou')
             champ = Agent.objects.get(user__username='agent.champ')
             massira = Agent.objects.get(user__username='massira.doumbia')
+
             
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES
             distributions_config = [
                 
                  {
-                    'date': '04/10/2025', 
+                    'date': '14/10/2025', 
                     'produit': 'ail',
-                    'prix_gros': 9500,
+                    'prix_gros': 10000,
                     'prix_detail': 11000,
                     'distributions': [                                                   
-                        (abdoulaye, 20, "Abdoulaye (Auto)"),                        
+                        (fatoumata, 6, "Fatoumata"),                        
+                        (mankoulako, 9, "Koniba "),
+                        (koniba, 4, "Massira"),   
+                         
+                        (alpha, 2, "Alpha "),  
+                        (abdoulaye, 8, "Alpha "),  
 
-                    ]
-                },
-
-                 {
-                    'date': '04/10/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9500,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
-                        (fatoumata, 1, "Fatoumata "), 
-                        (alpha, 1, "Alpha "),
-                         (massira, 10, "Fatoumata "),   
-                         (koniba, 3, "Koniba "),    
-                                               
-
-                    ]
+                        
+                        ]
                 }
-                
+
             ]
             
             toutes_distributions = []
