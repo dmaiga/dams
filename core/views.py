@@ -18,7 +18,8 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 
-
+from django import forms
+from django.core.exceptions import ValidationError 
 from django.utils import timezone
 from datetime import timedelta
 # Python stdlib
@@ -202,9 +203,24 @@ def dashboard_agent(request):
 def liste_agents(request):
     """Liste uniquement les agents terrain et superviseurs"""
     agents = Agent.objects.filter(type_agent__in=['entrepot', 'terrain','stagiaire'])
-    return render(request, 'core/agents/liste_agents.html', {'agents': agents})
-
-
+    
+    # Tri par type et statut
+    agents_superviseurs = agents.filter(type_agent='entrepot').order_by('user__first_name')
+    agents_terrain = agents.filter(type_agent='terrain').order_by('user__first_name')
+    stagiaires = agents.filter(type_agent='stagiaire')
+    stagiaires_actifs = stagiaires.filter(date_expiration__gte=timezone.now()).order_by('date_expiration')
+    stagiaires_expires = stagiaires.filter(date_expiration__lt=timezone.now()).order_by('-date_expiration')
+    
+    context = {
+        'agents': agents,
+        'agents_superviseurs': agents_superviseurs,
+        'agents_terrain': agents_terrain,
+        'stagiaires': stagiaires,
+        'stagiaires_actifs': stagiaires_actifs,
+        'stagiaires_expires': stagiaires_expires,
+    }
+    
+    return render(request, 'core/agents/liste_agents.html', context)
 
 @login_required
 def detail_agent(request, agent_id):

@@ -25,6 +25,42 @@
         </div>
     </div>
 
+    <!-- Filtres et statistiques -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="row text-center">
+                        <div class="col-6 col-sm-3 mb-2 mb-sm-0">
+                            <small class="text-muted d-block">Superviseurs</small>
+                            <div class="h6 mb-0 text-success">
+                                {{ agents_superviseurs.count }}
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3 mb-2 mb-sm-0">
+                            <small class="text-muted d-block">Agents Terrain</small>
+                            <div class="h6 mb-0 text-primary">
+                                {{ agents_terrain.count }}
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3">
+                            <small class="text-muted d-block">Stagiaires Actifs</small>
+                            <div class="h6 mb-0 text-warning">
+                                {{ stagiaires_actifs.count }}
+                            </div>
+                        </div>
+                        <div class="col-6 col-sm-3">
+                            <small class="text-muted d-block">Stagiaires Expirés</small>
+                            <div class="h6 mb-0 text-danger">
+                                {{ stagiaires_expires.count }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Carte principale -->
     <div class="card shadow-sm">
         <div class="card-header bg-white">
@@ -40,9 +76,30 @@
         
         <div class="card-body">
             {% if agents %}
+            
+            <!-- Navigation par type d'agent -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="btn-group w-100" role="group">
+                        <button type="button" class="btn btn-outline-primary active" data-type="all">
+                            Tous ({{ agents.count }})
+                        </button>
+                        <button type="button" class="btn btn-outline-success" data-type="entrepot">
+                            Superviseurs ({{ agents_superviseurs.count }})
+                        </button>
+                        <button type="button" class="btn btn-outline-info" data-type="terrain">
+                            Agents Terrain ({{ agents_terrain.count }})
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" data-type="stagiaire">
+                            Stagiaires ({{ stagiaires.count }})
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tableau responsive -->
             <div class="table-responsive">
-                <table class="table table-hover table-striped">
+                <table class="table table-hover table-striped" id="agentsTable">
                     <thead class="table-light">
                         <tr>
                             <th scope="col">Nom Complet</th>
@@ -54,101 +111,226 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for agent in agents %}
-                        <tr>
-                            <!-- Nom complet -->
+                        <!-- Section Superviseurs -->
+                        <tr class="section-header bg-success text-white">
+                            <td colspan="6">
+                                <i class="fas fa-user-tie me-2"></i>
+                                SUPERVISEURS ({{ agents_superviseurs.count }})
+                            </td>
+                        </tr>
+                        {% for agent in agents_superviseurs %}
+                        <tr class="agent-row" data-type="entrepot">
                             <td>
                                 <div class="d-flex align-items-center">
-                                    
-                                    
+                                    <div class="avatar-sm bg-success text-white rounded-circle me-3">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
                                     <div>
-                                        <strong class="text-primary">{{ agent.full_name }}</strong>
-                                        <div class="text-muted small d-md-none">{{ agent.telephone }}</div>
+                                        <strong class="text-success">{{ agent.full_name }}</strong>
+                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
                                         <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
                                     </div>
                                 </div>
                             </td>
-                            
-                            <!-- Téléphone (caché sur mobile) -->
-                            <td class="d-none d-md-table-cell">
-                                {{ agent.telephone|default:"-" }}
-                            </td>
-                            
-                            <!-- Type d'agent -->
+                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
                             <td>
-                                <span class="badge 
-                                    {% if agent.type_agent == 'entrepot' %}bg-success
-                                    {% elif agent.type_agent == 'terrain' %}bg-primary
-                                    {% elif agent.type_agent == 'stagiaire' %}bg-warning
-                                    {% else %}bg-secondary
-                                    {% endif %}">
+                                <span class="badge bg-success">
                                     {{ agent.get_type_agent_display }}
                                 </span>
-                                {% if agent.est_stagiaire %}
-                                <div class="mt-1">
-                                    <small class="text-muted">
-                                        {{ agent.jours_restants }}j restants
-                                    </small>
-                                </div>
-                                {% endif %}
                             </td>
-                            
-                            <!-- Date création (caché sur tablette) -->
-                            <td class="d-none d-lg-table-cell">
-                                {{ agent.date_creation|date:"d/m/Y" }}
-                            </td>
-                            
-                            <!-- Statut (caché sur mobile) -->
+                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
                             <td class="d-none d-sm-table-cell">
-                                {% if agent.est_stagiaire %}
-                                    <span class="badge bg-{% if agent.est_expire %}danger{% else %}success{% endif %}">
-                                        {{ agent.statut_stagiaire }}
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-success">Actif</span>
-                                {% endif %}
+                                <span class="badge bg-success">Actif</span>
                             </td>
-                            
-                            <!-- Actions -->
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
-                                    <!-- ✅ LIEN CONDITIONNEL : Détail Agent ou Stagiaire -->
-                                    {% if agent.est_stagiaire %}
-                                        <a href="{% url 'detail_stagiaire' agent.id %}" 
-                                           class="btn btn-sm btn-outline-warning" 
-                                           title="Détail stagiaire">
-                                            <i class="fas fa-user-graduate"></i>
-                                        </a>
-                                    {% else %}
-                                        <a href="{% url 'detail_agent' agent.id %}" 
-                                           class="btn btn-sm btn-outline-info" 
-                                           title="Détail agent">
-                                            <i class="fas fa-chart-line"></i>
-                                        </a>
-                                    {% endif %}
-                                    
-                                    <!-- Modification -->
+                                    <a href="{% url 'detail_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-info" 
+                                       title="Détail agent">
+                                        <i class="fas fa-chart-line"></i>
+                                    </a>
                                     <a href="{% url 'modifier_agent' agent.id %}" 
                                        class="btn btn-sm btn-outline-primary" 
                                        title="Modifier">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    
-                                    <!-- Suppression -->
-                                    {% if not agent.est_stagiaire or agent.est_expire %}
                                     <a href="{% url 'supprimer_agent' agent.id %}" 
                                        class="btn btn-sm btn-outline-danger" 
                                        title="Supprimer"
                                        onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')">
                                         <i class="fas fa-trash"></i>
                                     </a>
-                                    {% else %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        <!-- Section Agents Terrain -->
+                        <tr class="section-header bg-primary text-white">
+                            <td colspan="6">
+                                <i class="fas fa-user-check me-2"></i>
+                                AGENTS TERRAIN ({{ agents_terrain.count }})
+                            </td>
+                        </tr>
+                        {% for agent in agents_terrain %}
+                        <tr class="agent-row" data-type="terrain">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-primary text-white rounded-circle me-3">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <strong class="text-primary">{{ agent.full_name }}</strong>
+                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
+                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-primary">
+                                    {{ agent.get_type_agent_display }}
+                                </span>
+                            </td>
+                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
+                            <td class="d-none d-sm-table-cell">
+                                <span class="badge bg-success">Actif</span>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <a href="{% url 'detail_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-info" 
+                                       title="Détail agent">
+                                        <i class="fas fa-chart-line"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'supprimer_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-danger" 
+                                       title="Supprimer"
+                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        <!-- Section Stagiaires Actifs -->
+                        <tr class="section-header bg-warning text-dark">
+                            <td colspan="6">
+                                <i class="fas fa-user-graduate me-2"></i>
+                                STAGIAIRES ACTIFS ({{ stagiaires_actifs.count }})
+                            </td>
+                        </tr>
+                        {% for agent in stagiaires_actifs %}
+                        <tr class="agent-row" data-type="stagiaire">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-warning text-dark rounded-circle me-3">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <strong class="text-warning">{{ agent.full_name }}</strong>
+                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
+                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-warning">
+                                    {{ agent.get_type_agent_display }}
+                                </span>
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        {{ agent.jours_restants }}j restants
+                                    </small>
+                                </div>
+                            </td>
+                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
+                            <td class="d-none d-sm-table-cell">
+                                <span class="badge bg-success">{{ agent.statut_stagiaire }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <a href="{% url 'detail_stagiaire' agent.id %}" 
+                                       class="btn btn-sm btn-outline-warning" 
+                                       title="Détail stagiaire">
+                                        <i class="fas fa-user-graduate"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
                                     <button class="btn btn-sm btn-outline-secondary" 
                                             disabled 
                                             title="Impossible de supprimer un stagiaire actif">
                                         <i class="fas fa-trash"></i>
                                     </button>
-                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        <!-- Section Stagiaires Expirés -->
+                        <tr class="section-header bg-danger text-white">
+                            <td colspan="6">
+                                <i class="fas fa-user-clock me-2"></i>
+                                STAGIAIRES EXPIRÉS ({{ stagiaires_expires.count }})
+                            </td>
+                        </tr>
+                        {% for agent in stagiaires_expires %}
+                        <tr class="agent-row" data-type="stagiaire">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-danger text-white rounded-circle me-3">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <strong class="text-danger">{{ agent.full_name }}</strong>
+                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
+                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-danger">
+                                    {{ agent.get_type_agent_display }}
+                                </span>
+                                <div class="mt-1">
+                                    <small class="text-danger">
+                                        Expiré
+                                    </small>
+                                </div>
+                            </td>
+                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
+                            <td class="d-none d-sm-table-cell">
+                                <span class="badge bg-danger">{{ agent.statut_stagiaire }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <a href="{% url 'detail_stagiaire' agent.id %}" 
+                                       class="btn btn-sm btn-outline-danger" 
+                                       title="Détail stagiaire">
+                                        <i class="fas fa-user-graduate"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-primary" 
+                                       title="Modifier">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'supprimer_agent' agent.id %}" 
+                                       class="btn btn-sm btn-outline-danger" 
+                                       title="Supprimer"
+                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce stagiaire expiré ?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -170,43 +352,10 @@
             </div>
             {% endif %}
         </div>
-        
-        <!-- Pied de tableau (statistiques) -->
-        {% if agents %}
-        <div class="card-footer bg-light">
-            <div class="row text-center">
-                <div class="col-6 col-sm-3">
-                    <small class="text-muted">Superviseurs</small>
-                    <div class="h6 mb-0 text-success">
-                        {{ agents|length|default:0 }}
-                    </div>
-                </div>
-                <div class="col-6 col-sm-3">
-                    <small class="text-muted">Agents Terrain</small>
-                    <div class="h6 mb-0 text-primary">
-                        {{ agents|length|default:0 }}
-                    </div>
-                </div>
-                <div class="col-6 col-sm-3">
-                    <small class="text-muted">Stagiaires Actifs</small>
-                    <div class="h6 mb-0 text-warning">
-                        {{ agents|length|default:0 }}
-                    </div>
-                </div>
-                <div class="col-6 col-sm-3">
-                    <small class="text-muted">Stagiaires Expirés</small>
-                    <div class="h6 mb-0 text-danger">
-                        {{ agents|length|default:0 }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 
 <style>
-/* Styles responsives et améliorations UX */
 .avatar-sm {
     width: 40px;
     height: 40px;
@@ -221,100 +370,98 @@
     vertical-align: middle;
 }
 
+.section-header {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.section-header td {
+    padding: 12px 16px;
+}
+
 /* Adaptation mobile */
 @media (max-width: 768px) {
-    .card-header h5 {
-        font-size: 1.1rem;
+    .btn-group .btn {
+        font-size: 0.8rem;
+        padding: 0.375rem 0.5rem;
     }
     
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.8rem;
-    }
-    
-    .avatar-sm {
-        width: 35px;
-        height: 35px;
-        font-size: 0.8rem;
+    .section-header {
+        font-size: 1em;
     }
 }
 
-@media (max-width: 576px) {
-    .container-fluid {
-        padding-left: 10px;
-        padding-right: 10px;
-    }
-    
-    .card-body {
-        padding: 1rem;
-    }
-    
-    .table-responsive {
-        font-size: 0.9rem;
-    }
+/* Filtrage des lignes */
+.agent-row {
+    transition: all 0.3s ease;
 }
 
-/* Effets hover pour une meilleure UX */
-.table-hover tbody tr:hover {
+.agent-row.hidden {
+    display: none;
+}
+
+/* Effets hover */
+.table-hover tbody tr.agent-row:hover {
     background-color: rgba(0, 123, 255, 0.05);
-}
-
-.btn-outline-info:hover {
-    background-color: #0dcaf0;
-    border-color: #0dcaf0;
-}
-
-.btn-outline-warning:hover {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #000;
-}
-
-/* Badges avec meilleure lisibilité */
-.badge {
-    font-size: 0.75em;
-    font-weight: 500;
-}
-
-/* Animation légère pour les boutons */
-.btn {
-    transition: all 0.2s ease-in-out;
-}
-
-.btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transform: translateX(2px);
 }
 </style>
 
 <script>
-// Script pour améliorer l'UX sur mobile
 document.addEventListener('DOMContentLoaded', function() {
-    // Tooltip pour les boutons d'action sur mobile
+    // Filtrage par type d'agent
+    const filterButtons = document.querySelectorAll('[data-type]');
+    const agentRows = document.querySelectorAll('.agent-row');
+    const sectionHeaders = document.querySelectorAll('.section-header');
+    
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const type = this.getAttribute('data-type');
+            
+            // Mise à jour des boutons actifs
+            filterButtons.forEach(btn => {
+                btn.classList.remove('active');
+                btn.classList.add('btn-outline-primary', 'btn-outline-success', 'btn-outline-info', 'btn-outline-warning');
+            });
+            this.classList.remove('btn-outline-primary', 'btn-outline-success', 'btn-outline-info', 'btn-outline-warning');
+            this.classList.add('active', 'btn-primary');
+            
+            // Filtrage des lignes
+            agentRows.forEach(row => {
+                if (type === 'all') {
+                    row.classList.remove('hidden');
+                } else {
+                    if (row.getAttribute('data-type') === type) {
+                        row.classList.remove('hidden');
+                    } else {
+                        row.classList.add('hidden');
+                    }
+                }
+            });
+            
+            // Filtrage des en-têtes de section
+            sectionHeaders.forEach(header => {
+                if (type === 'all') {
+                    header.classList.remove('hidden');
+                } else {
+                    const headerType = header.textContent.toLowerCase();
+                    if (headerType.includes(type)) {
+                        header.classList.remove('hidden');
+                    } else {
+                        header.classList.add('hidden');
+                    }
+                }
+            });
+        });
+    });
+    
+    // Tooltip pour les boutons d'action
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl, {
             trigger: 'hover'
         });
     });
-    
-    // Adaptation des boutons sur très petits écrans
-    function adaptButtonsForMobile() {
-        const buttons = document.querySelectorAll('.btn-sm');
-        if (window.innerWidth < 400) {
-            buttons.forEach(btn => {
-                btn.classList.add('btn-xs');
-            });
-        } else {
-            buttons.forEach(btn => {
-                btn.classList.remove('btn-xs');
-            });
-        }
-    }
-    
-    // Écouter le redimensionnement
-    window.addEventListener('resize', adaptButtonsForMobile);
-    adaptButtonsForMobile(); // Initialisation
 });
 </script>
 {% endblock %}
