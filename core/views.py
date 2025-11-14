@@ -539,11 +539,11 @@ def mon_stock(request):
     try:
         agent = request.user.agent
     except Agent.DoesNotExist:
-        return redirect('access_denied')
+        return redirect('login')
     
     # Vérifier que l'utilisateur est un agent terrain
     if agent.type_agent not in ['terrain', 'entrepot','stagiaire']:
-        return redirect('access_denied')
+        return redirect('login')
     
     # Calcul du stock actuel de l'agent
     stock_agent = calculer_stock_agent(agent)
@@ -567,14 +567,21 @@ def mon_stock(request):
         if produit_data['quantite_restante'] <= produit_data.get('seuil_alerte', 5):
             alertes_stock_faible.append(produit_data)
     
+    # Calcul des totaux CORRIGÉS
+    total_quantite = sum(p['quantite_restante'] for p in stock_agent)
+    total_valeur_stock = sum(p['valeur_totale'] for p in stock_agent if p['quantite_restante'] > 0)
+    total_produits = len([p for p in stock_agent if p['quantite_restante'] != 0])
+    
     context = {
         'agent': agent,
         'stock_agent': stock_agent,
         'distributions_recentes': distributions_recentes,
         'ventes_recentes': ventes_recentes,
         'alertes_stock_faible': alertes_stock_faible,
-        'total_valeur_stock': sum(p['valeur_totale'] for p in stock_agent),
-        'total_quantite': sum(p['quantite_restante'] for p in stock_agent),
+        'total_valeur_stock': total_valeur_stock,
+        'total_quantite': total_quantite,
+        'total_produits': total_produits,
+        'total_alertes': len(alertes_stock_faible),
     }
     
     return render(request, 'core/entrepot/mon_stock.html', context)
@@ -623,14 +630,19 @@ def calculer_stock_agent(agent):
         if produit_id in stock_par_produit:
             stock_par_produit[produit_id]['quantite_vendue'] += vente.quantite
     
-    # Calculer les quantités restantes et valeurs
+    # Calculer les quantités restantes et valeurs CORRIGÉ
     for produit_id, data in stock_par_produit.items():
         data['quantite_restante'] = data['quantite_distribuee'] - data['quantite_vendue']
         
-        # Calculer la valeur du stock (au prix de détail par défaut)
-        if data['prix_detail'] and data['quantite_restante'] > 0:
+        # CORRECTION : Calculer la valeur du stock SEULEMENT si le stock est positif
+        if data['quantite_restante'] > 0 and data['prix_detail']:
             data['valeur_totale'] = data['quantite_restante'] * data['prix_detail']
         else:
+            data['valeur_totale'] = 0
+        
+        # CORRECTION : Ajuster l'affichage pour les stocks négatifs
+        if data['quantite_restante'] < 0:
+            # Pour l'affichage, on peut garder la valeur négative mais la valeur monétaire doit être 0
             data['valeur_totale'] = 0
     
     # Convertir en liste et trier par quantité restante (décroissant)
@@ -638,7 +650,6 @@ def calculer_stock_agent(agent):
     stock_list.sort(key=lambda x: x['quantite_restante'], reverse=True)
     
     return stock_list
-
 #============
 #DISTRIBUTION
 #============

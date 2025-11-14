@@ -22,51 +22,24 @@ def creer_distributions_multiple():
             anna = Agent.objects.get(user__username='anna.coulibaly')
             sali = Agent.objects.get(user__username='sali.sangare')
             kadiatou = Agent.objects.get(user__username='kadiatou.doumbia')
-
+            moussony = Agent.objects.get(user__username='moussony.konate')
+            djeneba = Agent.objects.get(user__username='djeneba.sidibe')
             
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES
             distributions_config = [
                 
-                 {
-                    'date': '17/10/2025', 
+              
+              
+                {
+                    'date': '01/11/2025', 
                     'produit': 'ail',
                     'prix_gros': 10000,
-                    'prix_detail': 11000,
+                    'prix_detail': 11500,
                     'distributions': [                                                   
-                                                  
-                        (alpha, 2, "Alpha "),  
-                        (sali, 1, "Sali "),  
-                        (anna, 2, "Anna "),  
-
                         
-                        ]
-                },
-                 {
-                    'date': '18/10/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 10000,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
-                                            
-                        (anna, 1, "Anna "),  
-                        (abdoulaye, 3, "Alpha "), 
-                        (mankoulako, 7, "Mankoulako "),
-                        (kadiatou, 3, "kadiatou "),
-
-                        ]
-                },
-
-                 {
-                    'date': '20/10/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 10000,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
-                        (abdoulaye, 6, "Alpha "), 
-                        (kadiatou, 2, "kadiatou "),
-
+                        (, 2, "fatoumata "),
+                       
                         
-                         
                         ]
                 }
 

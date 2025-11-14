@@ -47,7 +47,7 @@ class DetailDistributionAdmin(admin.ModelAdmin):
 class VenteAdmin(admin.ModelAdmin):
     list_display = ['agent', 'client', 'detail_distribution', 'quantite', 'prix_vente_unitaire', 'date_vente']
     list_filter = ['date_vente', 'agent', 'client']
-
+    search_fields = ['agent__user__username', 'agent__user__first_name', 'agent__user__last_name']
 @admin.register(MouvementStock)
 class MouvementStockAdmin(admin.ModelAdmin):
     list_display = ['produit', 'type_mouvement', 'quantite', 'date_mouvement']
