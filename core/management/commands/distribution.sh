@@ -23,7 +23,9 @@ def creer_distributions_multiple():
             sali = Agent.objects.get(user__username='sali.sangare')
             kadiatou = Agent.objects.get(user__username='kadiatou.doumbia')
             moussony = Agent.objects.get(user__username='moussony.konate')
-            djeneba = Agent.objects.get(user__username='djeneba.sidibe')
+            djenebaS = Agent.objects.get(user__username='djeneba.sidibe')
+            djenebaY = Agent.objects.get(user__username='djeneba.yirango')
+            kani = Agent.objects.get(user__username='kani.traore')
             
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES
             distributions_config = [
@@ -37,11 +39,207 @@ def creer_distributions_multiple():
                     'prix_detail': 11500,
                     'distributions': [                                                   
                         
-                        (, 2, "fatoumata "),
+                        (moussony, 5, "Moussony"),
+                        (fatoumata, 16,"fatoumata"),
                        
                         
                         ]
+                },
+                {
+                    'date': '03/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 10000,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (koniba, 7, "koniba"),
+                        (anna, 3, "anna"),
+                        (sali, 13,"sali"),
+
+                        ]
+                },
+                 {
+                    'date': '03/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 10000,
+                    'prix_detail': 11500,
+                    'distributions': [                                                   
+                        
+                        (fatoumata, 2,"fatoumata"),
+                     
+                        ]
+                },
+                 {
+                    'date': '04/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 10000,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (moussony, 3, "moussony"),
+                        (koniba, 1,"koniba"),
+                        (djenebaS, 4, "djeneba"),
+                        (massira, 10,"massira"),
+                        (anna, 4, "anna"),
+                        (sali, 3, "sali"),
+                        (kadiatou, 6,"kadiatou"),
+                        (djenebaY, 3, "djeneba Y"),
+                        (fatoumata, 3, "fatoumata"),
+                        
+                        
+                        ]
+                },
+                 {
+                    'date': '04/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (mankoulako, 2, "mankoula"),
+
+                        ]
+                },
+                 {
+                    'date': '05/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 10000,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (anna, 1, "anna"),
+                        (sali, 5, "sali"),
+                        (kani, 1,"koniba"),
+                        (kadiatou, 3,"kadiatou"),
+                        (fatoumata, 2, "fatoumata"),
+                        
+
+                        
+                        ]
+                },
+                {
+                    'date': '05/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (mankoulako, 1, "mankoula"),
+                        
+                        ]
+                },
+                   {
+                    'date': '05/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 10500,
+                    'distributions': [                                                   
+                        
+                        (abdoulaye, 2, "Abdoulaye"),
+                        
+                        ]
+                },
+                 {
+                    'date': '05/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 10000,
+                    'distributions': [                                                   
+                        
+                        (abdoulaye, 2, "Abdoulaye"),
+                        
+                        ]
+                },
+                 
+                
+                 {
+                    'date': '06/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 10000,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (moussony, 7, "moussony"),
+                        (fatoumata, 4, "fatoumata"),
+                        (anna, 6, "anna"),
+                        (sali, 5, "sali"),
+                        (kadiatou, 1,"kadiatou"),
+                        (kani, 3,"koniba"),
+                        (abdoulaye, 1, "mankoula"),
+                        
+ 
+                        ]
+                },
+                 {
+                    'date': '06/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 10000,
+                    'distributions': [                                                   
+                        
+                        (mankoulako, 2, "mankoula"),
+                        
+                        ]
+                },
+               
+                  {
+                    'date': '06/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 10000,
+                    'prix_detail': 10500,
+                    'distributions': [                                                   
+                        (abdoulaye, 2, "mankoula"),
+                        
+                        ]
+                },
+
+                {
+                    'date': '10/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 11000,
+                    'distributions': [                                                   
+                        
+                        (kani, 3,"koniba"),
+                        (sali, 7, "sali"), 
+                        (moussony, 2, "moussony"),
+                        (djenebaS, 4, "moussony"),
+
+                        ]
+                },
+
+                {
+                    'date': '11/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 10000,
+                    'distributions': [                                                   
+                        
+                        (anna, 6,"koniba"),
+                        (kadiatou, 5, "sali"), 
+                        (mankoulako, 5, "moussony"),
+                        (djenebaY, 2, "moussony"),
+                        (abdoulaye, 3, "moussony"),
+
+                        ]
+                },
+                 {
+                    'date': '11/11/2025', 
+                    'produit': 'ail',
+                    'prix_gros': 9750,
+                    'prix_detail': 10000,
+                    'distributions': [                                                   
+                        (abdoulaye, 3, "mankoula"),
+                        
+                        ]
                 }
+
+
+
+
+
+
+
 
             ]
             
