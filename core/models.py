@@ -59,13 +59,12 @@ class LotEntrepot(models.Model):
         default=None,
         verbose_name="Fournisseur (optionnel)"
     )
-    quantite_initiale = models.PositiveIntegerField()
-    quantite_restante = models.PositiveIntegerField()
+    quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite_restante = models.DecimalField(max_digits=10, decimal_places=2)
     prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
     date_reception = models.DateTimeField(default=timezone.now)
     date_enregistrement = models.DateTimeField(auto_now_add=True)
-    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True)  # AJOUTEZ CE CHAMP
-    
+    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
     facture = models.FileField(
         upload_to='factures_entrepot/%Y/%m/',
         null=True,

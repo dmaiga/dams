@@ -291,10 +291,11 @@ class ReceptionLotForm(forms.ModelForm):
                 'data-placeholder': 'Sélectionner un fournisseur...'
             }),
             'quantite_initiale': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'min': '1',
-                'placeholder': 'Quantité'
-            }),
+            'class': 'form-control',
+            'step': '0.01',   
+            'min': '0.01',
+            'placeholder': 'Quantité'
+             }),
             'prix_achat_unitaire': forms.NumberInput(attrs={
                 'class': 'form-control', 
                 'step': '0.01',
