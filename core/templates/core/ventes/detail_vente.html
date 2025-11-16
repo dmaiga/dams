@@ -1,7 +1,7 @@
 <!-- core/templates/core/ventes/detail_vente.html -->
 {% extends 'base.html' %}
 {% load static %}
-
+{% load format_fcfa %}
 {% block title %}Détail de la Vente #{{ vente.id }}{% endblock %}
 
 {% block content %}
@@ -124,11 +124,11 @@
                                     <div class="row mt-3">
                                         <div class="col-md-4">
                                             <strong>Prix unitaire:</strong><br>
-                                            {{ vente.prix_vente_unitaire }} FCFA
+                                            {{ vente.prix_vente_unitaire|fcfa }} FCFA
                                         </div>
                                         <div class="col-md-4">
                                             <strong>Total:</strong><br>
-                                            <h5 class="text-primary">{{ vente.total_vente }} FCFA</h5>
+                                            <h5 class="text-primary">{{ vente.total_vente|fcfa }} FCFA</h5>
                                         </div>
                                         <div class="col-md-4">
                                             <strong>Distribution:</strong><br>
@@ -149,12 +149,12 @@
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <strong>Montant total:</strong><br>
-                                        <h4 class="text-primary">{{ dette.montant_total }} FCFA</h4>
+                                        <h4 class="text-primary">{{ dette.montant_total|fcfa }} FCFA</h4>
                                     </div>
                                     <div class="mb-3">
                                         <strong>Montant restant:</strong><br>
                                         <h5 class="{% if dette.montant_restant > 0 %}text-danger{% else %}text-success{% endif %}">
-                                            {{ dette.montant_restant }} FCFA
+                                            {{ dette.montant_restant|fcfa }} FCFA
                                         </h5>
                                     </div>
                                     <div class="mb-3">

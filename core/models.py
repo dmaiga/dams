@@ -62,6 +62,12 @@ class LotEntrepot(models.Model):
     quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
     quantite_restante = models.DecimalField(max_digits=10, decimal_places=2)
     prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
+    valeur_stock_initiale = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
     date_reception = models.DateTimeField(default=timezone.now)
     date_enregistrement = models.DateTimeField(auto_now_add=True)
     reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
@@ -78,17 +84,49 @@ class LotEntrepot(models.Model):
     )
     def __str__(self):
         return f"{self.produit.nom} - {self.reference_lot} - {self.quantite_restante} restants"
+    
+    def save(self, *args, **kwargs):
+        # Si la valeur initiale n’est pas encore enregistrée, on la calcule UNE SEULE FOIS
+        if self.valeur_stock_initiale is None:
+            self.valeur_stock_initiale = self.quantite_initiale * (self.prix_achat_unitaire or 0)
 
+        super().save(*args, **kwargs)
     @property
     def montant_total(self):
         """Calcule le montant total du lot"""
         return self.quantite_initiale * (self.prix_achat_unitaire or 0)
+    
+    @property
+    def valeur_actuelle_stock(self):
+        """Calcule la valeur actuelle du stock basée sur la quantité restante"""
+        return self.quantite_restante * (self.prix_achat_unitaire or 0)
     @staticmethod
     def get_lots_disponibles(produit_nom):
         return LotEntrepot.objects.filter(
             produit__nom=produit_nom,
             quantite_restante__gt=0
         ).order_by("date_reception")
+
+# core/models.py
+
+class Perte(models.Model):
+    lot = models.ForeignKey(
+        LotEntrepot,
+        on_delete=models.CASCADE,
+        related_name="pertes"
+    )
+    quantite_perdue = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.TextField()
+    date_perte = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Perte de {self.quantite_perdue} sur {self.lot}"
+    
+    def save(self, *args, **kwargs):
+        if not self.pk:  # Exécute uniquement à la création
+            self.lot.quantite_restante -= self.quantite_perdue
+            self.lot.save()
+        super().save(*args, **kwargs)
 
 class Agent(models.Model):
     TYPE_AGENT_CHOICES = (
@@ -448,7 +486,11 @@ class DistributionAgent(models.Model):
     )
     
     # Champs immuables pour l'historique
-    quantite_totale = models.PositiveIntegerField(default=0, verbose_name="Quantité totale distribuée")
+    quantite_totale = models.DecimalField(default=0, 
+                                           max_digits=10, 
+                                           decimal_places=2, 
+                                           verbose_name="Quantité totale distribuée"
+                                           )
     valeur_gros_totale = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -589,20 +631,42 @@ class DistributionAgent(models.Model):
 class DetailDistribution(models.Model):
     distribution = models.ForeignKey(DistributionAgent, on_delete=models.CASCADE)
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
-    quantite = models.PositiveIntegerField()
+    quantite = models.DecimalField(default=0, 
+                                           max_digits=10, 
+                                           decimal_places=2, 
+                                           verbose_name="Quantité totale distribuée"
+                                           )
 
     # Prix fixés par le superviseur
     prix_gros = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     prix_detail = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
+    specification = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Spécification (forme, présentation, etc.)"
+    )
     # Soft delete
     est_supprime = models.BooleanField(default=False)
     date_suppression = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        statut = " [SUPPRIMÉ]" if self.est_supprime else ""
-        return f"{self.quantite} {self.lot.produit.nom} du lot {self.lot.id}{statut}"
+        spec_info = f" - {self.specification}" if self.specification else ""
+        return f"{self.quantite} {self.lot.produit.nom}{spec_info}"
 
+    @property
+    def quantite_restante_calculee(self):
+        """
+        Calcule la quantité restante en soustrayant les ventes déjà effectuées
+        """
+        from django.db.models import Sum
+        
+        # Quantité totale déjà vendue pour ce détail de distribution
+        quantite_vendue = Vente.objects.filter(
+            detail_distribution=self,
+            est_supprime=False
+        ).aggregate(total=Sum('quantite'))['total'] or 0
+        
+        return self.quantite - quantite_vendue
     class Meta:
         verbose_name = "Détail de distribution"
         verbose_name_plural = "Détails de distribution"
@@ -618,12 +682,29 @@ class MouvementStock(models.Model):
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE, null=True, blank=True)
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, null=True, blank=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, null=True, blank=True)
+    detail_distribution = models.ForeignKey(
+        'DetailDistribution', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        verbose_name="Détail de distribution lié"
+    )
     type_mouvement = models.CharField(max_length=50, choices=TYPE_MOUVEMENT)
-    quantite = models.PositiveIntegerField()
+    quantite =models.DecimalField(default=0, 
+                                           max_digits=10, 
+                                           decimal_places=2, 
+                                           verbose_name="Quantité totale distribuée"
+                                           )
     date_mouvement = models.DateTimeField(default=timezone.now)
-
+    created_at = models.DateTimeField(auto_now_add=True)
+    
     def __str__(self):
-        return f"{self.type_mouvement} - {self.produit.nom} ({self.quantite})"
+        return f"{self.type_mouvement} - {self.produit.nom} - {self.quantite}"
+
+    class Meta:
+        ordering = ['-date_mouvement']
+        verbose_name = "Mouvement de stock"
+        verbose_name_plural = "Mouvements de stock"
 
 class JournalModificationDistribution(models.Model):
     TYPE_ACTION = (
@@ -699,7 +780,16 @@ class Vente(models.Model):
                                 null=True,
                                 blank=True)
     detail_distribution = models.ForeignKey(DetailDistribution, on_delete=models.CASCADE)
-    quantite = models.PositiveIntegerField()
+    specification = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Spécification du produit"
+    )   
+    quantite = models.DecimalField(
+    max_digits=10,      
+    decimal_places=2,   # Chiffres après la virgule
+    default=Decimal('0.00')
+)
     type_vente = models.CharField(max_length=50, choices=TYPE_VENTE_CHOICES, default='detail')
     prix_vente_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
     mode_paiement = models.CharField(max_length=50, choices=MODE_PAIEMENT_CHOICES, default='comptant')
@@ -724,6 +814,8 @@ class Vente(models.Model):
             else:
                 self.prix_vente_unitaire = self.detail_distribution.prix_detail
         
+        if self.detail_distribution and not self.specification:
+            self.specification = self.detail_distribution.specification
         super().save(*args, **kwargs)
         
         # Créer automatiquement une dette si c'est un paiement à crédit
@@ -744,7 +836,13 @@ class Vente(models.Model):
     @property
     def produit_nom(self):
         return self.detail_distribution.lot.produit.nom
-
+    
+    @property
+    def produit_complet(self):
+        """Retourne le nom du produit avec sa spécification"""
+        if self.specification:
+            return f"{self.produit_nom} ({self.specification})"
+        return self.produit_nom
     @property
     def total_vente(self):
         if self.quantite and self.prix_vente_unitaire:

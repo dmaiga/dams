@@ -59,43 +59,47 @@ from core.models import Agent
 def custom_login(request):
     if request.method == "POST":
         form = TelephoneOrUsernameLoginForm(request, data=request.POST)
+
         if form.is_valid():
             username = form.cleaned_data.get("username")
             password = form.cleaned_data.get("password")
 
-            # ✅ Tente d’abord une connexion classique, puis par téléphone
             user = authenticate(request, username=username, password=password)
-            if not user:
-                user = authenticate(request, username=username, password=password)
 
             if user:
                 login(request, user)
-                try:
-                    agent = Agent.objects.get(user=user)
 
-                       # 🔹 Cas direction
+                # 🔹 CAS 1 : Utilisateur staff / Direction interne
+                if user.is_staff or user.is_superuser:
+                    # S'ils ont un dashboard direction
+                    return redirect("dashboard")
+
+                # 🔹 CAS 2 : Utilisateur lié à un Agent
+                agent = Agent.objects.filter(user=user).first()
+
+                if agent:
+                    # Cas direction
                     if agent.type_agent == "direction":
                         return redirect("dashboard")
 
-                    # 🔹 Cas superviseur
+                    # Cas superviseur (entrepôt)
                     elif agent.type_agent == "entrepot":
                         return redirect("tableau_de_bord_superviseur")
 
-                    # 🔹 Cas terrain
+                    # Cas terrain
                     elif agent.type_agent == "terrain":
                         return redirect("dashboard_agent")
 
-                    else:
-                        return redirect("dashboard_agent")
+                    # Cas stagiaire ou autre
+                    return redirect("dashboard_agent")
 
-                except Agent.DoesNotExist:
-                    if user.is_staff or user.is_superuser:
-                        return redirect("admin:index")
-                    messages.warning(request, "Aucun profil d’agent associé à ce compte.")
-                    return redirect("login")
+                # 🔹 CAS 3 : Aucun agent + pas staff = compte mal configuré
+                messages.warning(request, "Aucun profil agent associé à ce compte.")
+                return redirect("login")
 
             else:
                 messages.error(request, "Numéro de téléphone ou mot de passe incorrect.")
+
     else:
         form = TelephoneOrUsernameLoginForm()
 
@@ -512,25 +516,94 @@ def liste_lots(request):
         elif statut_filter == 'epuise':
             lots = lots.filter(quantite_restante=0)
     
-    # Calcul des statistiques
+    # Calcul des statistiques avec les nouvelles métriques
     stats = lots.aggregate(
-        total_lots=models.Count('id'),  # AJOUT IMPORTANT
+        total_lots=models.Count('id'),
         total_stock=models.Sum('quantite_restante'),
         lots_epuises=models.Count('id', filter=models.Q(quantite_restante=0)),
-        total_valeur=models.Sum(
+        total_valeur_initiale=models.Sum('valeur_stock_initiale'),
+        total_valeur_actuelle=models.Sum(
             models.F('quantite_restante') * models.F('prix_achat_unitaire')
         )
     )
     
     context = {
         'lots': lots,
-        'total_lots': stats['total_lots'] or 0,  # CORRECTION ICI
+        'total_lots': stats['total_lots'] or 0,
         'total_stock': stats['total_stock'] or 0,
-        'total_valeur': stats['total_valeur'] or 0,
+        'total_valeur_initiale': stats['total_valeur_initiale'] or 0,
+        'total_valeur_actuelle': stats['total_valeur_actuelle'] or 0,
         'lots_epuises': stats['lots_epuises'] or 0,
     }
     
     return render(request, 'core/entrepot/liste_lots.html', context)
+
+# core/views.py
+
+from django.shortcuts import render, get_object_or_404, redirect
+from core.models import LotEntrepot
+from core.forms import PerteForm
+
+
+@login_required
+def detail_lot(request, lot_id):
+    lot = get_object_or_404(
+        LotEntrepot.objects.select_related('produit', 'fournisseur'),
+        id=lot_id
+    )
+
+    facture_uploadee = False
+
+    # --- FORMULAIRE PERTE (POST sans fichier) ---
+    if request.method == 'POST' and 'quantite_perdue' in request.POST:
+        perte_form = PerteForm(request.POST)
+        if perte_form.is_valid():
+            perte = perte_form.save(commit=False)
+
+            if perte.quantite_perdue > lot.quantite_restante:
+                messages.error(request, "❌ La quantité perdue dépasse la quantité restante.")
+            else:
+                perte.lot = lot
+                perte.save()
+                messages.success(request, "🛑 Perte enregistrée avec succès.")
+                return redirect("detail_lot", lot_id=lot.id)
+        else:
+            messages.error(request, "❌ Formulaire de perte invalide.")
+    else:
+        perte_form = PerteForm()
+
+    # --- FORMULAIRE FACTURE (POST avec fichier) ---
+    if request.method == 'POST' and 'facture' in request.FILES:
+        facture_form = UploadFactureForm(request.POST, request.FILES, instance=lot)
+        if facture_form.is_valid():
+            try:
+                lot_modifie = facture_form.save(commit=False)
+                lot_modifie.date_upload_facture = timezone.now()
+                lot_modifie.save()
+
+                messages.success(request, "📄 Facture uploadée avec succès!")
+                facture_uploadee = True
+
+                lot = LotEntrepot.objects.get(id=lot_id)
+
+            except Exception as e:
+                messages.error(request, f"❌ Erreur : {str(e)}")
+        else:
+            messages.error(request, "❌ Veuillez corriger les erreurs de la facture.")
+    else:
+        facture_form = UploadFactureForm(instance=lot)
+
+    pertes = lot.pertes.all().order_by('-date_perte')
+
+    return render(request, 'core/entrepot/detail_lot.html', {
+        'lot': lot,
+        'form': facture_form,
+        'perte_form': perte_form,
+        'pertes': pertes,
+        'facture_uploadee': facture_uploadee,
+        'title': f'Lot {lot.reference_lot}'
+    })
+
 
 # views.py
 @login_required
@@ -895,80 +968,6 @@ def detail_distribution(request, distribution_id):
     return render(request, 'core/distribution/detail_distribution.html', context)
 
 
-@login_required
-def get_stock_produit_a_date(request):
-    """API pour récupérer le stock d'un produit à une date donnée (AJAX)"""
-    try:
-        produit_id = request.GET.get('produit_id')
-        date_str = request.GET.get('date')
-        
-        if not produit_id or not date_str:
-            return JsonResponse({'error': 'Paramètres manquants'}, status=400)
-        
-        produit = Produit.objects.get(id=produit_id)
-        
-        # ✅ CORRECTION : Gérer correctement le timezone
-        if 'T' in date_str:
-            date_reference = timezone.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-        else:
-            date_reference = timezone.datetime.strptime(date_str, '%Y-%m-%dT%H:%M')
-        
-        # Créer une instance de formulaire pour utiliser ses méthodes
-        form = DistributionForm(current_user=request.user)
-        
-        # ✅ CORRECTION : Utiliser la méthode corrigée
-        stock_disponible = form.get_stock_a_date(produit.nom, date_reference)
-        
-        # Récupérer les vrais lots avec leurs quantités restantes
-        lots_disponibles = form.get_lots_disponibles_a_date(produit.nom, date_reference)
-        lots_info = []
-        
-        for lot in lots_disponibles:
-            lots_info.append({
-                'lot_id': lot.id,
-                'reference': lot.reference_lot or f"Lot#{lot.id}",
-                'quantite_restante': getattr(lot, '_quantite_restante_calculee', 0),
-                'date_reception': lot.date_reception.strftime('%d/%m/%Y'),
-                'prix_achat': float(lot.prix_achat_unitaire)
-            })
-        
-        return JsonResponse({
-            'stock': stock_disponible,
-            'produit': produit.nom,
-            'lots_disponibles': lots_info,
-            'date_reference': date_reference.strftime('%d/%m/%Y %H:%M')
-        })
-        
-    except Produit.DoesNotExist:
-        return JsonResponse({'error': 'Produit non trouvé'}, status=404)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
-
-# API pour récupérer le stock actuel (conservée pour compatibilité)
-def get_stock_produit(request, produit_id):
-    """API pour récupérer le stock actuel d'un produit (AJAX)"""
-    try:
-        produit = Produit.objects.get(id=produit_id)
-        lots_disponibles = LotEntrepot.get_lots_disponibles(produit.nom)
-        stock_total = sum(lot.quantite_restante for lot in lots_disponibles)
-        
-        # Informations sur les lots disponibles
-        lots_info = []
-        for lot in lots_disponibles:
-            lots_info.append({
-                'reference': lot.reference_lot or f"Lot#{lot.id}",
-                'quantite_restante': lot.quantite_restante,
-                'prix_achat': float(lot.prix_achat_unitaire),
-                'date_reception': lot.date_reception.strftime('%d/%m/%Y')
-            })
-        
-        return JsonResponse({
-            'stock': stock_total,
-            'produit': produit.nom,
-            'lots_disponibles': lots_info
-        })
-    except Produit.DoesNotExist:
-        return JsonResponse({'error': 'Produit non trouvé'}, status=404)
 
 @login_required
 def stats_superviseurs(request):
@@ -1499,6 +1498,7 @@ def get_info_distribution(request, detail_id):
             'quantite_disponible': detail.quantite,
             'prix_gros': float(detail.prix_gros) if detail.prix_gros else None,
             'prix_detail': float(detail.prix_detail) if detail.prix_detail else None,
+            'specification': detail.specification or '',            
             'reference_lot': detail.lot.reference_lot or f"Lot#{detail.lot.id}",
         }
         
@@ -1645,44 +1645,6 @@ def liste_factures(request):
     })
 
 # views.py
-@login_required
-def detail_lot(request, lot_id):
-    """Détail d'un lot avec upload de facture"""
-    lot = get_object_or_404(
-        LotEntrepot.objects.select_related('produit', 'fournisseur'),
-        id=lot_id
-    )
-    
-    # Gérer l'upload de facture
-    facture_uploadee = False
-    if request.method == 'POST' and 'facture' in request.FILES:
-        form = UploadFactureForm(request.POST, request.FILES, instance=lot)
-        if form.is_valid():
-            try:
-                lot_modifie = form.save(commit=False)
-                lot_modifie.date_upload_facture = timezone.now()
-                lot_modifie.save()
-                
-                messages.success(request, "✅ Facture uploadée avec succès!")
-                facture_uploadee = True
-                
-                # Recharger l'objet pour avoir les données fraîches
-                lot = LotEntrepot.objects.get(id=lot_id)
-                
-            except Exception as e:
-                messages.error(request, f"❌ Erreur lors de l'upload: {str(e)}")
-        else:
-            messages.error(request, "❌ Veuillez corriger les erreurs ci-dessous.")
-    else:
-        form = UploadFactureForm(instance=lot)
-    
-    context = {
-        'lot': lot,
-        'form': form,
-        'facture_uploadee': facture_uploadee,
-        'title': f'Lot {lot.reference_lot}'
-    }
-    return render(request, 'core/entrepot/detail_lot.html', context)
 
 
 @login_required

@@ -1,7 +1,7 @@
 <!-- templates/core/ventes/liste_ventes.html -->
 {% extends 'base.html' %}
 {% load static %}
-
+{% load format_fcfa %}
 {% block title %}Mes Ventes{% endblock %}
 
 {% block content %}
@@ -35,7 +35,7 @@
                         <div class="col-xl-2 col-md-4 col-6 mb-3">
                             <div class="card bg-success text-white">
                                 <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ chiffre_affaires_total|floatformat:0 }} F</h4>
+                                    <h4 class="mb-1">{{ chiffre_affaires_total|fcfa }} F</h4>
                                     <small class="opacity-8">Chiffre d'Affaires</small>
                                 </div>
                             </div>
@@ -98,7 +98,7 @@
                                         </div>
                                         <div class="col-md-3">
                                             <div class="border rounded p-3 bg-light">
-                                                <h4 class="text-success mb-1">{{ chiffre_affaires_stagiaires|floatformat:0 }} F</h4>
+                                                <h4 class="text-success mb-1">{{ chiffre_affaires_stagiaires|fcfa }} F</h4>
                                                 <small class="text-muted">CA des Stagiaires</small>
                                                 <br>
                                                 <small class="text-success fw-bold">{{ pourcentage_ca_stagiaires|floatformat:1 }}% du CA</small>
@@ -109,7 +109,7 @@
                                                 <h4 class="text-primary mb-1">{{ ventes_sans_stagiaire_count }}</h4>
                                                 <small class="text-muted">Ventes Personnelles</small>
                                                 <br>
-                                                <small class="text-primary fw-bold">{{ chiffre_affaires_personnel|floatformat:0 }} F</small>
+                                                <small class="text-primary fw-bold">{{ chiffre_affaires_personnel|fcfa }} F</small>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
@@ -294,9 +294,9 @@
                                                 </span>
                                             </td>
                                             <td class="text-end">
-                                                <strong>{{ vente.total_vente }} FCFA</strong>
+                                                <strong>{{ vente.total_vente|fcfa }} FCFA</strong>
                                                 <br>
-                                                <small class="text-muted">{{ vente.prix_vente_unitaire }} F/u</small>
+                                                <small class="text-muted">{{ vente.prix_vente_unitaire|fcfa }} F/u</small>
                                             </td>
                                             <!-- ✅ NOUVEAU : Colonne Stagiaire -->
                                             <td class="text-center">

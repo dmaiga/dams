@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load humanize %}
+{% load format_fcfa %}
 
 {% block title %}Détail Agent - {{ agent.full_name }}{% endblock %}
 
@@ -45,7 +47,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title text-muted mb-1">Total Ventes</h6>
-                            <h4 class="text-primary">{{ total_ventes }} FCFA</h4>
+                            <h4 class="text-primary">{{ total_ventes|fcfa }} FCFA</h4>
                             <small class="text-muted">{{ ventes_total_count }} vente{{ ventes_total_count|pluralize }}</small>
                         </div>
                         <div class="align-self-center">
@@ -54,8 +56,8 @@
                     </div>
                     <div class="mt-2">
                         <small class="text-muted">
-                            Gros: {{ total_ventes_gros }} FCFA<br>
-                            Détail: {{ total_ventes_detail }} FCFA
+                            Gros: {{ total_ventes_gros|fcfa }} FCFA<br>
+                            Détail: {{ total_ventes_detail|fcfa }} FCFA
                         </small>
                     </div>
                 </div>
@@ -68,7 +70,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title text-muted mb-1">Total Recouvré</h6>
-                            <h4 class="text-success">{{ total_recouvre }} FCFA</h4>
+                            <h4 class="text-success">{{ total_recouvre|fcfa }} FCFA</h4>
                             <small class="text-muted">{{ recouvrements|length }} recouvrement{{ recouvrements|length|pluralize }}</small>
                         </div>
                         <div class="align-self-center">
@@ -85,7 +87,7 @@
                     <div class="d-flex justify-content-between">
                         <div>
                             <h6 class="card-title text-muted mb-1">Argent en Possession</h6>
-                            <h4 class="text-warning">{{ argent_en_possession }} FCFA</h4>
+                            <h4 class="text-warning">{{ argent_en_possession|fcfa }} FCFA</h4>
                             <small class="text-muted">Non recouvré</small>
                         </div>
                         <div class="align-self-center">
@@ -226,9 +228,9 @@
                                             {{ vente.get_type_vente_display }}
                                         </span>
                                     </td>
-                                    <td class="text-end">{{ vente.quantite }}</td>
-                                    <td class="text-end">{{ vente.prix_vente_unitaire }} FCFA</td>
-                                    <td class="text-end"><strong>{{ vente.total_vente }} FCFA</strong></td>
+                                    <td class="text-end">{{ vente.quantite|floatformat }}</td>
+                                    <td class="text-end">{{ vente.prix_vente_unitaire|fcfa }} FCFA</td>
+                                    <td class="text-end"><strong>{{ vente.total_vente|fcfa }} FCFA</strong></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

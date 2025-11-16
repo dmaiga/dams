@@ -24,6 +24,7 @@ urlpatterns = [
 # Entrepôt
     path('entrepot/reception/', views.reception_lot, name='reception_lot'),
     path('entrepot/lots/', views.liste_lots, name='liste_lots'),
+    path('lots/<int:lot_id>/', views.detail_lot, name='detail_lot'),
     path('agent/mon-stock/', views.mon_stock, name='mon_stock'),
 # Distribution
     path('distribuer/', views.distribuer_produits_agent, name='distribuer_produits'),
@@ -32,8 +33,7 @@ urlpatterns = [
     path('distribution/<int:distribution_id>/restaurer/', views.restaurer_distribution, name='restaurer_distribution'),
     path('distributions/', views.liste_distributions, name='liste_distributions'),
     path('distribution/<int:distribution_id>/', views.detail_distribution, name='detail_distribution'),
-    path('api/stock-produit/<int:produit_id>/', views.get_stock_produit, name='get_stock_produit'),
-    path('api/stock-produit-date/', views.get_stock_produit_a_date, name='get_stock_produit_date'),
+
     path('stats-superviseurs/', views.stats_superviseurs, name='stats_superviseurs'),
     path('agent/mes-distributions/', views.mes_distributions, name='mes_distributions'),
 # Ventes
@@ -61,7 +61,7 @@ urlpatterns = [
 #factures
     path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
     path('factures/depots/', views.liste_factures, name='liste_factures'),
-    path('lots/<int:lot_id>/', views.detail_lot, name='detail_lot'),
+    
     path('factures/creer/', views.creer_facture, name='creer_facture'),
     path('factures/versement/', views.creer_versement_avec_depenses, name='creer_versement_avec_facture'),
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),

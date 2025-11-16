@@ -93,73 +93,94 @@
                             </div>
                         </div>
 
-                        <!-- Produit à distribuer -->
+                        <!-- Sélection du Lot -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Produit à Distribuer</h5>
+                                <h5 class="mb-0">Sélection du Lot</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Produit *</label>
-                                        {{ form.produit }}
-                                        {% if form.produit.errors %}
-                                        <div class="text-danger small">{{ form.produit.errors }}</div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Lot *</label>
+                                        {{ form.lot }}
+                                        {% if form.lot.errors %}
+                                        <div class="text-danger small">{{ form.lot.errors }}</div>
                                         {% endif %}
-                                        <div class="form-text">
-                                            Stock disponible: 
-                                            <span id="stock-disponible" class="fw-bold">-</span> unités
-                                            <span id="stock-date-info" class="text-muted"></span>
-                                        </div>
                                     </div>
-                                    <div class="col-md-3">
+                                    
+                                    <div class="col-md-2">
                                         <label class="form-label">Quantité *</label>
                                         {{ form.quantite }}
                                         {% if form.quantite.errors %}
                                         <div class="text-danger small">{{ form.quantite.errors }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-3">
+                                    
+                                    <div class="col-md-2">
                                         <label class="form-label">Unité</label>
                                         <input type="text" class="form-control" id="unite-produit" readonly value="-">
                                     </div>
+                                    
+                                    <!-- ✅ NOUVEAU : Spécification facultative -->
+                                    <div class="col-md-4">
+                                        <label class="form-label">Spécification (optionnel)</label>
+                                        {{ form.specification }}
+                                        <div class="form-text">
+                                            <i class="fas fa-info-circle"></i>
+                                            Ex: "en poudre", "en graine", "moulu", "sachet 100g", etc.
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                <!-- Informations sur les lots disponibles -->
-<!-- Informations sur les lots disponibles -->
-<div id="lots-info" class="mt-3" style="display: none;">
-    <div class="alert alert-info py-2">
-        <h6 class="mb-2">
-            <i class="fas fa-boxes me-2"></i>Lots disponibles (FIFO) :
-            <span id="total-lots-disponibles" class="badge bg-primary ms-2">0</span>
-        </h6>
-        <div id="lots-list" class="small">
-            <!-- Les lots seront affichés ici -->
-        </div>
-        <div class="mt-2 text-warning small">
-            <i class="fas fa-info-circle me-1"></i>
-            Les lots sont consommés dans l'ordre de réception (plus ancien d'abord)
-        </div>
-    </div>
-</div>
+                                <!-- Informations du lot sélectionné -->
+                                <div id="lot-info" class="mt-3 p-3 bg-light rounded" style="display: none;">
+                                    <h6 class="mb-2">
+                                        <i class="fas fa-info-circle me-2"></i>Informations du lot sélectionné
+                                    </h6>
+                                    <div class="row small">
+                                        <div class="col-md-3">
+                                            <strong>Produit:</strong> <span id="lot-produit">-</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Stock disponible:</strong> <span id="lot-stock" class="fw-bold">-</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Prix d'achat:</strong> <span id="lot-prix-achat">-</span> FCFA
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Fournisseur:</strong> <span id="lot-fournisseur">-</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Prix de vente -->
+                        <!-- Prix de vente OBLIGATOIRES -->
                         <div class="card mb-4">
                             <div class="card-header">
-                                <h5 class="mb-0">Prix de Vente Recommandés</h5>
+                                <h5 class="mb-0">Prix de Vente Fixes <span class="text-danger">*</span></h5>
                             </div>
                             <div class="card-body">
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Attention :</strong> Ces prix sont immuables et devront être respectés par l'agent lors des ventes.
+                                </div>
+                                
                                 <div class="row">
-                                    <div class="col-md-4">
-                                        <label class="form-label">Prix Gros (FCFA)</label>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Prix Gros (FCFA) *</label>
                                         {{ form.prix_gros }}
+                                        {% if form.prix_gros.errors %}
+                                        <div class="text-danger small">{{ form.prix_gros.errors }}</div>
+                                        {% endif %}
                                         <div class="form-text">Prix pour les grossistes</div>
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Prix Détail (FCFA)</label>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Prix Détail (FCFA) *</label>
                                         {{ form.prix_detail }}
+                                        {% if form.prix_detail.errors %}
+                                        <div class="text-danger small">{{ form.prix_detail.errors }}</div>
+                                        {% endif %}
                                         <div class="form-text">Prix pour les détaillants</div>
                                     </div>
                                     <div class="col-md-4">
@@ -174,23 +195,19 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-text text-info mt-2">
-                                    <i class="fas fa-info-circle"></i>
-                                    Les prix sont immuables et ne peuvent plus être ajustés par l'agent lors de la vente
-                                </div>
                             </div>
                         </div>
 
-                        <!-- Résumé -->
+                        <!-- Résumé mis à jour -->
                         <div class="card bg-light mb-4">
                             <div class="card-body">
                                 <h6>Résumé de la Distribution</h6>
                                 <div class="row text-center">
-                                    <div class="col-3">
+                                    <div class="col-2">
                                         <div class="h5" id="resume-type">Terrain</div>
                                         <small>Type</small>
                                     </div>
-                                    <div class="col-3">
+                                    <div class="col-2">
                                         <div class="h5" id="resume-agent">-</div>
                                         <small>Destinataire</small>
                                     </div>
@@ -198,9 +215,13 @@
                                         <div class="h5" id="resume-produit">-</div>
                                         <small>Produit</small>
                                     </div>
-                                    <div class="col-3">
+                                    <div class="col-2">
                                         <div class="h5" id="resume-quantite">0</div>
                                         <small>Unités</small>
+                                    </div>
+                                    <div class="col-3">
+                                        <div class="h6" id="resume-specification" style="font-size: 0.9rem;">-</div>
+                                        <small>Spécification</small>
                                     </div>
                                 </div>
                                 <div class="row text-center mt-2">
@@ -230,27 +251,65 @@
 document.addEventListener('DOMContentLoaded', function() {
     const typeDistributionRadios = document.querySelectorAll('input[name="type_distribution"]');
     const agentTerrainField = document.getElementById('agent-terrain-field');
-    const produitSelect = document.getElementById('{{ form.produit.id_for_label }}');
-    const quantiteInput = document.getElementById('{{ form.quantite.id_for_label }}');
-    const agentSelect = document.getElementById('{{ form.agent_terrain.id_for_label }}');
-    const dateDistributionInput = document.getElementById('{{ form.date_distribution.id_for_label }}');
-    const prixGrosInput = document.getElementById('{{ form.prix_gros.id_for_label }}');
-    const prixDetailInput = document.getElementById('{{ form.prix_detail.id_for_label }}');
+    const lotSelect = document.getElementById('lot-select');
+    const specificationInput = document.getElementById('specification-input');
+    const quantiteInput = document.getElementById('quantite-input');
+    const agentSelect = document.getElementById('agent-select');
+    const dateDistributionInput = document.getElementById('date-distribution-input');
+    const prixGrosInput = document.getElementById('prix-gros-input');
+    const prixDetailInput = document.getElementById('prix-detail-input');
     
-    const stockDisponibleSpan = document.getElementById('stock-disponible');
-    const stockDateInfoSpan = document.getElementById('stock-date-info');
-    const lotsInfoDiv = document.getElementById('lots-info');
-    const lotsListDiv = document.getElementById('lots-list');
+    const lotInfoDiv = document.getElementById('lot-info');
+    const lotProduitSpan = document.getElementById('lot-produit');
+    const lotStockSpan = document.getElementById('lot-stock');
+    const lotPrixAchatSpan = document.getElementById('lot-prix-achat');
+    const lotFournisseurSpan = document.getElementById('lot-fournisseur');
     const uniteProduitInput = document.getElementById('unite-produit');
     
     const resumeType = document.getElementById('resume-type');
     const resumeAgent = document.getElementById('resume-agent');
     const resumeProduit = document.getElementById('resume-produit');
     const resumeQuantite = document.getElementById('resume-quantite');
+    const resumeSpecification = document.getElementById('resume-specification');
     const resumeDate = document.getElementById('resume-date');
     
     const valeurGrosTotale = document.getElementById('valeur-gros-totale');
     const valeurDetailTotale = document.getElementById('valeur-detail-totale');
+
+    // Données des lots (préchargées depuis le template)
+    const lotsData = {
+        {% for lot in form.fields.lot.queryset %}
+        "{{ lot.id }}": {
+            produit: "{{ lot.produit.nom }}",
+            produit_complet: "{{ lot.produit.nom }} ({{ lot.produit.unite_mesure|default:'unité' }})",
+            stock: parseFloat("{{ lot.quantite_restante }}"), // ✅ CONVERTI EN FLOAT
+            prix_achat: parseFloat("{{ lot.prix_achat_unitaire }}"), // ✅ CONVERTI EN FLOAT
+            fournisseur: "{{ lot.fournisseur.nom|default:'Non spécifié' }}",
+            reference: "{{ lot.reference_lot|default:'Lot #' }}{{ lot.id }}",
+            date_reception: "{{ lot.date_reception|date:'d/m/Y' }}",
+            unite: "{{ lot.produit.unite_mesure|default:'unité' }}"
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
+
+    // ✅ NOUVELLE FONCTION : Convertir la virgule en point pour les décimales
+    function normaliserDecimal(valeur) {
+        if (typeof valeur === 'string') {
+            // Remplacer la virgule par un point
+            return valeur.replace(',', '.');
+        }
+        return valeur;
+    }
+
+    // ✅ NOUVELLE FONCTION : Parse une valeur décimale
+    function parseDecimal(valeur) {
+        if (!valeur && valeur !== 0) return 0;
+        
+        const valeurNormalisee = normaliserDecimal(valeur.toString());
+        const resultat = parseFloat(valeurNormalisee);
+        
+        return isNaN(resultat) ? 0 : resultat;
+    }
 
     // Gestion du type de distribution
     function gererTypeDistribution() {
@@ -269,120 +328,39 @@ document.addEventListener('DOMContentLoaded', function() {
             updateResumeAgent();
         }
     }
-    // Mettre à jour les informations de stock
-    async function updateStockInfo() {
-        const produitId = produitSelect.value;
-        const dateDistribution = dateDistributionInput.value;
+
+    // Gestion de la sélection du lot
+    function updateLotInfo() {
+        const lotId = lotSelect.value;
+        if (lotId && lotsData[lotId]) {
+            const lot = lotsData[lotId];
+            
+            // Mettre à jour les informations du lot
+            lotProduitSpan.textContent = lot.produit;
+            lotStockSpan.textContent = formatDecimal(lot.stock); // ✅ FORMATAGE
+            lotStockSpan.className = lot.stock > 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
+            lotPrixAchatSpan.textContent = formatDecimal(lot.prix_achat) + ' FCFA'; // ✅ FORMATAGE
+            lotFournisseurSpan.textContent = lot.fournisseur;
+            uniteProduitInput.value = lot.unite;
+            
+            // Afficher les informations du lot
+            lotInfoDiv.style.display = 'block';
+            
+            // Mettre à jour le max de la quantité
+            quantiteInput.max = lot.stock;
+            quantiteInput.placeholder = `Max: ${formatDecimal(lot.stock)}`; // ✅ FORMATAGE
+            
+            // Mettre à jour le résumé
+            resumeProduit.textContent = lot.produit;
+            
+        } else {
+            lotInfoDiv.style.display = 'none';
+            uniteProduitInput.value = '-';
+            resumeProduit.textContent = '-';
+        }
         
-        if (produitId && dateDistribution) {
-            try {
-                const response = await fetch(`/api/stock-produit-date/?produit_id=${produitId}&date=${dateDistribution}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-                
-                // ✅ CORRECTION : Le stock sera calculé à partir des lots disponibles
-                // On initialise avec la valeur de l'API
-                let stockCalculé = data.stock;
-                
-                // Info sur la date de référence
-                stockDateInfoSpan.textContent = `(au ${data.date_reference})`;
-                
-                // ✅ CORRECTION : Afficher uniquement les lots qui ont du stock disponible
-                if (data.lots_disponibles && data.lots_disponibles.length > 0) {
-                    let lotsHTML = '';
-                    let totalLotsDisponibles = 0;
-                    
-                    // Filtrer uniquement les lots qui ont du stock disponible
-                    const lotsAvecStock = data.lots_disponibles.filter(lot => lot.quantite_restante > 0);
-                    
-                    if (lotsAvecStock.length > 0) {
-                        lotsAvecStock.forEach((lot, index) => {
-                            const isPremierLot = index === 0;
-                            const badgeFifo = isPremierLot ? '<span class="badge bg-success ms-1">PROCHAIN</span>' : '';
-                            
-                            lotsHTML += `
-                                <div class="lot-item ${isPremierLot ? 'border-start border-3 border-success ps-2' : 'border-bottom pb-1 mb-1'}">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <strong>${lot.reference}</strong> ${badgeFifo}
-                                            <br>
-                                            <span class="text-success fw-bold">${lot.quantite_restante} unités</span> - 
-                                            Reçu le ${lot.date_reception}
-                                        </div>
-                                        <div class="text-end">
-                                            <small class="text-muted">Prix d'achat:<br>${lot.prix_achat.toLocaleString('fr-FR')} FCFA</small>
-                                        </div>
-                                    </div>
-                                </div>`;
-                        });
-                        
-                        totalLotsDisponibles = lotsAvecStock.reduce((total, lot) => total + lot.quantite_restante, 0);
-                        stockCalculé = totalLotsDisponibles; // ✅ Utiliser le total des lots disponibles
-                        
-                        lotsListDiv.innerHTML = lotsHTML;
-                        document.getElementById('total-lots-disponibles').textContent = totalLotsDisponibles;
-                        lotsInfoDiv.style.display = 'block';
-                        
-                    } else {
-                        // Aucun lot n'a de stock disponible
-                        lotsHTML = '<div class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Aucun lot disponible</div>';
-                        lotsListDiv.innerHTML = lotsHTML;
-                        lotsInfoDiv.style.display = 'block';
-                        document.getElementById('total-lots-disponibles').textContent = '0';
-                        stockCalculé = 0;
-                    }
-                } else {
-                    lotsInfoDiv.style.display = 'none';
-                    document.getElementById('total-lots-disponibles').textContent = '0';
-                    stockCalculé = 0;
-                }
-                
-                // ✅ Mettre à jour le stock disponible affiché
-                stockDisponibleSpan.textContent = stockCalculé;
-                stockDisponibleSpan.className = stockCalculé > 0 ? 'fw-bold text-success' : 'fw-bold text-danger';
-                
-                // Mettre à jour le max de la quantité
-                if (quantiteInput) {
-                    quantiteInput.max = stockCalculé;
-                    if (parseInt(quantiteInput.value) > stockCalculé) {
-                        quantiteInput.value = Math.max(0, stockCalculé);
-                        updateValeursTotales();
-                    }
-                }
-                
-                updateResume();
-                updateValeursTotales();
-                
-            } catch (error) {
-                console.error('Erreur:', error);
-                stockDisponibleSpan.textContent = 'Erreur';
-                stockDisponibleSpan.className = 'fw-bold text-danger';
-                stockDateInfoSpan.textContent = '';
-                lotsInfoDiv.style.display = 'none';
-                document.getElementById('total-lots-disponibles').textContent = '0';
-            }
-        } else {
-            stockDisponibleSpan.textContent = '-';
-            stockDisponibleSpan.className = 'fw-bold';
-            stockDateInfoSpan.textContent = '';
-            lotsInfoDiv.style.display = 'none';
-            document.getElementById('total-lots-disponibles').textContent = '0';
-            updateResume();
-        }
-    }
-    // Mettre à jour l'unité du produit
-    function updateUniteProduit() {
-        const produitText = produitSelect.options[produitSelect.selectedIndex]?.text || '';
-        // Extraire l'unité du texte du produit (suppose que l'unité est entre parenthèses)
-        const match = produitText.match(/\(([^)]+)\)/);
-        if (match) {
-            uniteProduitInput.value = match[1];
-        } else {
-            uniteProduitInput.value = 'unité';
-        }
+        updateResume();
+        updateValeursTotales();
     }
 
     // Mettre à jour l'agent dans le résumé
@@ -397,12 +375,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Mettre à jour les valeurs totales
     function updateValeursTotales() {
-        const quantite = parseInt(quantiteInput.value) || 0;
-        const prixGros = parseFloat(prixGrosInput.value) || 0;
-        const prixDetail = parseFloat(prixDetailInput.value) || 0;
+        const quantite = parseDecimal(quantiteInput.value); // ✅ UTILISATION DE parseDecimal
+        const prixGros = parseDecimal(prixGrosInput.value);
+        const prixDetail = parseDecimal(prixDetailInput.value);
         
-        valeurGrosTotale.value = (quantite * prixGros).toLocaleString('fr-FR') + ' FCFA';
-        valeurDetailTotale.value = (quantite * prixDetail).toLocaleString('fr-FR') + ' FCFA';
+        valeurGrosTotale.value = formatDecimal(quantite * prixGros) + ' FCFA';
+        valeurDetailTotale.value = formatDecimal(quantite * prixDetail) + ' FCFA';
+    }
+
+    // Mettre à jour la spécification dans le résumé
+    function updateResumeSpecification() {
+        const specification = specificationInput.value.trim();
+        if (specification) {
+            resumeSpecification.textContent = specification;
+            resumeSpecification.className = 'h6 text-info';
+        } else {
+            resumeSpecification.textContent = '-';
+            resumeSpecification.className = 'h6 text-muted';
+        }
     }
 
     // Mettre à jour le résumé complet
@@ -412,12 +402,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Agent
         updateResumeAgent();
         
-        // Produit
-        const produitText = produitSelect.options[produitSelect.selectedIndex]?.text || '-';
-        resumeProduit.textContent = produitText.includes('Sélectionner') ? '-' : produitText.split(' (')[0];
-        
         // Quantité
-        resumeQuantite.textContent = quantiteInput.value || '0';
+        const quantiteValue = quantiteInput.value;
+        resumeQuantite.textContent = quantiteValue || '0';
+        
+        // Spécification
+        updateResumeSpecification();
         
         // Date
         const dateValue = dateDistributionInput.value;
@@ -435,29 +425,145 @@ document.addEventListener('DOMContentLoaded', function() {
                 resumeDate.className = 'text-muted';
             }
         }
+    }
+
+    // Validation en temps réel de la quantité
+    function validateQuantite() {
+        const lotId = lotSelect.value;
+        const quantite = parseDecimal(quantiteInput.value); // ✅ UTILISATION DE parseDecimal
         
-        updateUniteProduit();
+        if (lotId && lotsData[lotId]) {
+            const stockMax = lotsData[lotId].stock;
+            
+            if (quantite <= 0) {
+                quantiteInput.setCustomValidity('La quantité doit être supérieure à 0');
+                quantiteInput.classList.add('is-invalid');
+            } else if (quantite > stockMax) {
+                quantiteInput.setCustomValidity(`Quantité trop élevée. Stock maximum: ${formatDecimal(stockMax)}`);
+                quantiteInput.classList.add('is-invalid');
+            } else {
+                quantiteInput.setCustomValidity('');
+                quantiteInput.classList.remove('is-invalid');
+            }
+        } else if (quantite <= 0) {
+            quantiteInput.setCustomValidity('La quantité doit être supérieure à 0');
+            quantiteInput.classList.add('is-invalid');
+        } else {
+            quantiteInput.setCustomValidity('');
+            quantiteInput.classList.remove('is-invalid');
+        }
+    }
+
+    // Validation des prix
+    function validatePrix() {
+        const prixGros = parseDecimal(prixGrosInput.value);
+        const prixDetail = parseDecimal(prixDetailInput.value);
+        
+        if (prixGros <= 0) {
+            prixGrosInput.setCustomValidity('Le prix gros doit être supérieur à 0');
+            prixGrosInput.classList.add('is-invalid');
+        } else {
+            prixGrosInput.setCustomValidity('');
+            prixGrosInput.classList.remove('is-invalid');
+        }
+        
+        if (prixDetail <= 0) {
+            prixDetailInput.setCustomValidity('Le prix détail doit être supérieur à 0');
+            prixDetailInput.classList.add('is-invalid');
+        } else if (prixDetail > 0 && prixGros > 0 && prixDetail <= prixGros) {
+            prixDetailInput.setCustomValidity('Le prix détail doit être supérieur au prix gros');
+            prixDetailInput.classList.add('is-invalid');
+        } else {
+            prixDetailInput.setCustomValidity('');
+            prixDetailInput.classList.remove('is-invalid');
+        }
+    }
+
+    // ✅ NOUVELLE FONCTION : Formater un nombre décimal (remplace point par virgule)
+    function formatDecimal(number) {
+        if (!number && number !== 0) return '0';
+        
+        const num = typeof number === 'string' ? parseDecimal(number) : number;
+        
+        // Formater avec 2 décimales et remplacer le point par une virgule
+        return num.toFixed(2).replace('.', ',');
+    }
+
+    // Suggestion automatique de spécification basée sur le produit
+    function suggestSpecification() {
+        const lotId = lotSelect.value;
+        if (lotId && lotsData[lotId]) {
+            const produit = lotsData[lotId].produit.toLowerCase();
+            
+            // Suggestions basées sur le nom du produit
+            const suggestions = {
+                'poivre': ['en poudre', 'en graine', 'moulu', 'entier'],
+                'riz': ['parfumé', 'basmati', 'complet', 'sachet 1kg', 'vrac'],
+                'huile': ['bouteille 1L', 'bidon 5L', 'vierge extra'],
+                'sucre': 'en poudre',
+                'farine': ['de blé', 'de maïs', 'complète']
+            };
+            
+            // Trouver une suggestion correspondante
+            for (const [key, values] of Object.entries(suggestions)) {
+                if (produit.includes(key)) {
+                    const suggestion = Array.isArray(values) ? values[0] : values;
+                    specificationInput.placeholder = `Ex: ${suggestion}`;
+                    return;
+                }
+            }
+        }
+        specificationInput.placeholder = 'Ex: en poudre, en graine, moulu, etc.';
+    }
+
+    // ✅ NOUVEL ÉVÉNEMENT : Gérer l'entrée dans le champ quantité
+    function gererEntreeQuantite(e) {
+        // Permettre la virgule et la convertir en point
+        if (e.inputType === 'insertText' && e.data === ',') {
+            e.preventDefault();
+            const start = quantiteInput.selectionStart;
+            const end = quantiteInput.selectionEnd;
+            const valeur = quantiteInput.value;
+            
+            quantiteInput.value = valeur.substring(0, start) + '.' + valeur.substring(end);
+            quantiteInput.setSelectionRange(start + 1, start + 1);
+        }
+        
+        updateResume();
+        updateValeursTotales();
+        validateQuantite();
     }
 
     // Événements
     typeDistributionRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
-            gererTypeDistribution();
-            updateStockInfo();
-        });
+        radio.addEventListener('change', gererTypeDistribution);
     });
     
-    if (produitSelect) {
-        produitSelect.addEventListener('change', function() {
-            updateStockInfo();
-            updateUniteProduit();
+    if (lotSelect) {
+        lotSelect.addEventListener('change', function() {
+            updateLotInfo();
+            suggestSpecification();
         });
     }
     
+    if (specificationInput) {
+        specificationInput.addEventListener('input', updateResume);
+    }
+    
     if (quantiteInput) {
+        // ✅ REMPLACÉ : Utiliser input et beforeinput pour mieux gérer les décimales
+        quantiteInput.addEventListener('beforeinput', gererEntreeQuantite);
         quantiteInput.addEventListener('input', function() {
             updateResume();
             updateValeursTotales();
+            validateQuantite();
+        });
+        
+        // ✅ AJOUTÉ : Conversion automatique à la perte de focus
+        quantiteInput.addEventListener('blur', function() {
+            if (this.value.includes(',')) {
+                this.value = this.value.replace(',', '.');
+            }
         });
     }
     
@@ -466,43 +572,65 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (dateDistributionInput) {
-        dateDistributionInput.addEventListener('change', updateStockInfo);
+        dateDistributionInput.addEventListener('change', updateResume);
     }
     
     if (prixGrosInput) {
-        prixGrosInput.addEventListener('input', updateValeursTotales);
+        prixGrosInput.addEventListener('input', function() {
+            updateValeursTotales();
+            validatePrix();
+        });
+        
+        // ✅ AJOUTÉ : Conversion automatique pour les prix aussi
+        prixGrosInput.addEventListener('blur', function() {
+            if (this.value.includes(',')) {
+                this.value = this.value.replace(',', '.');
+            }
+        });
     }
     
     if (prixDetailInput) {
-        prixDetailInput.addEventListener('input', updateValeursTotales);
+        prixDetailInput.addEventListener('input', function() {
+            updateValeursTotales();
+            validatePrix();
+        });
+        
+        // ✅ AJOUTÉ : Conversion automatique pour les prix aussi
+        prixDetailInput.addEventListener('blur', function() {
+            if (this.value.includes(',')) {
+                this.value = this.value.replace(',', '.');
+            }
+        });
     }
 
     // Initialisation
     gererTypeDistribution();
-    updateStockInfo();
+    if (lotSelect.value) {
+        updateLotInfo();
+        suggestSpecification();
+    }
     updateResume();
     updateValeursTotales();
 });
+
+// Fonction pour formater les nombres (gros montants)
+function formatNumber(number) {
+    return new Intl.NumberFormat('fr-FR').format(number);
+}
+
+// Fonction pour calculer les totaux
+function calculerTotaux(quantite, prixGros, prixDetail) {
+    return {
+        totalGros: quantite * prixGros,
+        totalDetail: quantite * prixDetail
+    };
+}
 </script>
 
 <style>
-.lot-item {
-    padding: 8px;
-    margin-bottom: 5px;
-    border-radius: 4px;
-    background-color: #f8f9fa;
-}
-
-.lot-item:last-child {
-    margin-bottom: 0;
-}
-
-.border-success {
-    border-left-color: #198754 !important;
-}
-
-#total-lots-disponibles {
-    font-size: 0.8em;
+#lot-info {
+    border-left: 4px solid #4e73df;
+    font-size: 0.85rem;
 }
 
 /* Style pour le résumé */
@@ -511,10 +639,25 @@ document.addEventListener('DOMContentLoaded', function() {
     color: #198754;
 }
 
+#resume-specification {
+    word-break: break-word;
+}
+
 /* Alert personnalisé */
-.alert-info {
-    background-color: #f0f9ff;
-    border-color: #b6e0fe;
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+}
+
+/* Animation pour les changements */
+.h5, .h6 {
+    transition: all 0.3s ease;
+}
+
+/* Style pour les champs obligatoires */
+.form-label[for*="prix"]::after {
+    content: " *";
+    color: #dc3545;
 }
 </style>
 

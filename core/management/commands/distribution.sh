@@ -28,103 +28,23 @@ def creer_distributions_multiple():
             kani = Agent.objects.get(user__username='kani.traore')
             ramata = Agent.objects.get(user__username='ramata.sangare')
             
-            # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES
+            # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
-                
-              
-              
                 {
-                    'date': '07/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
+                    'date': '31/10/2025', 
+                    'produit': 'poivre',
+                    'specification': 'graine',
+                    'prix_gros': 5000,
+                    'prix_detail': 5000,
+                    'distributions': [  
+                        (kadiatou, 6, "Mankoulako"),
+                        (moussony, 10, "Mankoulako"),                                     
+                        (mankoulako, 19, "Mankoulako"),
+                        (fatoumata, 3, "Mankoulako"),
                         
-                      
-                        (fatoumata, 4,"fatoumata"),
-                       
-                        
-                        ]
-                },
-                {
-                    'date': '08/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
-                        
-                        (koniba, 8, "koniba"),
-                        (fatoumata, 3,"fatoumata"),
-                       
-                        ]
-                },
-                 {
-                    'date': '10/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
-                        
-                      
-                        (fatoumata, 2,"fatoumata"),
-                        (koniba, 2, "koniba"),
-                     
-                        ]
-                },
-                
-                 {
-                    'date': '10/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 10500,
-                    'distributions': [                                                   
-                        
-                        (abdoulaye, 9, "koniba"),
-                     
-                        ]
-                },
-                  {
-                    'date': '11/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 11000,
-                    'distributions': [                                                   
-                        
-                        (moussony, 3, "koniba"),
-                        (abdoulaye, 5, "koniba"),
-                        (fatoumata, 2,"fatoumata"),
-                        
-                        ]
-                },
-                {
-                    'date': '12/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 10000,
-                    'distributions': [                                                   
-                        
-                        (abdoulaye, 1, "koniba"),
-                        (fatoumata, 3,"fatoumata"),
-                        (moussony, 4, "koniba"),
-                        
-                        ]
-                },
-                  {
-                    'date': '12/11/2025', 
-                    'produit': 'ail',
-                    'prix_gros': 9750,
-                    'prix_detail': 10500,
-                    'distributions': [                                                   
-                        
-                        (ramata, 2, "koniba"),
-                        
+
                         ]
                 }
-
-
-
-
-
             ]
             
             toutes_distributions = []
@@ -137,37 +57,42 @@ def creer_distributions_multiple():
                 print(f"\n{'='*60}")
                 print(f"📅 DISTRIBUTION DU {config['date']}")
                 print(f"📦 Produit: {config['produit']}")
+                print(f"🔍 Spécification: {config['specification']}")
                 print(f"💰 Prix gros: {config['prix_gros']} FCFA")
                 print(f"💰 Prix détail: {config['prix_detail']} FCFA")
                 print(f"{'='*60}")
                 
                 distributions_crees = []
+
                 
                 for agent, quantite, nom in config['distributions']:
-                    print(f"\n🎯 Distribution à {nom}: {quantite} unités...")
+                    print(f"\n🎯 Distribution à {nom}: {quantite} unités de {config['produit']} ({config['specification']})...")
                     
-                    # Trouver un lot disponible
+                    # Trouver un lot disponible (sans filtrer par spécification car elle n'existe pas dans LotEntrepot)
                     lot = LotEntrepot.objects.filter(
                         produit__nom=config['produit'],
                         quantite_restante__gte=quantite
                     ).order_by('date_reception').first()
                     
                     if lot:
-                        # Créer distribution avec date rétroactive
+                        # Créer distribution avec date rétroactive si nécessaire
+                        est_retroactive = date_distribution.date() < timezone.now().date()
+                        
                         distrib = DistributionAgent.objects.create(
                             superviseur=superviseur,
                             agent_terrain=agent,
                             date_distribution=date_distribution,
-                            est_retroactive=True
+                            est_retroactive=est_retroactive
                         )
                         
-                        # Créer détail
+                        # Créer détail AVEC la spécification
                         DetailDistribution.objects.create(
                             distribution=distrib,
                             lot=lot,
                             quantite=quantite,
                             prix_gros=config['prix_gros'],
-                            prix_detail=config['prix_detail']
+                            prix_detail=config['prix_detail'],
+                            specification=config['specification']  # Spécification ajoutée ici
                         )
                         
                         # Mettre à jour stock
@@ -183,6 +108,10 @@ def creer_distributions_multiple():
                         # Afficher info auto-distribution
                         if agent == superviseur:
                             print("   🤖 AUTO-DISTRIBUTION du superviseur")
+                            
+                        # Afficher info rétroactive
+                        if est_retroactive:
+                            print("   📅 DISTRIBUTION RÉTROACTIVE")
                     else:
                         print(f"❌ Échec - Stock insuffisant de {config['produit']} pour {nom}")
                 
@@ -193,24 +122,33 @@ def creer_distributions_multiple():
                 print(f"\n📊 RÉCAPITULATIF {config['date']}:")
                 print(f"   📦 Distribué: {total_date} unités")
                 print(f"   👥 Distributions: {len(distributions_crees)}")
+                print(f"   🔍 Spécification: {config['specification']}")
             
             # 3. RÉCAPITULATIF GÉNÉRAL
             print("\n" + "="*60)
             print("🎉 TOUTES LES DISTRIBUTIONS TERMINÉES AVEC SUCCÈS!")
             print("="*60)
             
-            # Statistiques par produit
+            # Statistiques par produit et spécification
+            produits_specs_distribues = set()
+            for distrib in toutes_distributions:
+                for detail in distrib.detaildistribution_set.all():
+                    spec = f"{detail.lot.produit.nom} ({detail.specification})"  # Utiliser specification du DetailDistribution
+                    produits_specs_distribues.add(spec)
+            
+            print(f"\n📈 STATISTIQUES GÉNÉRALES:")
+            print(f"📦 Total distributions créées: {len(toutes_distributions)}")
+            print(f"🎯 Produits et spécifications distribués:")
+            for produit_spec in produits_specs_distribues:
+                print(f"   • {produit_spec}")
+            
+            # Détail par produit
+            print(f"\n📊 STOCK RESTANT PAR PRODUIT:")
             produits_distribues = set()
             for distrib in toutes_distributions:
                 for detail in distrib.detaildistribution_set.all():
                     produits_distribues.add(detail.lot.produit.nom)
             
-            print(f"\n📈 STATISTIQUES GÉNÉRALES:")
-            print(f"📦 Total distributions créées: {len(toutes_distributions)}")
-            print(f"🎯 Produits distribués: {', '.join(produits_distribues)}")
-            
-            # Détail par produit
-            print(f"\n📊 STOCK RESTANT PAR PRODUIT:")
             for produit in produits_distribues:
                 stock_restant = LotEntrepot.objects.filter(
                     produit__nom=produit
@@ -220,11 +158,15 @@ def creer_distributions_multiple():
             # Détail des distributions créées
             print(f"\n👥 RÉCAPITULATIF DES DISTRIBUTIONS:")
             for distrib in toutes_distributions:
-                produit_nom = distrib.detaildistribution_set.first().lot.produit.nom
+                detail = distrib.detaildistribution_set.first()
+                produit_nom = detail.lot.produit.nom
+                specification = detail.specification  # Récupérer la spécification du détail
                 type_distrib = "🤖 Auto" if distrib.agent_terrain == superviseur else "👥 Terrain"
+                retro = " 📅" if distrib.est_retroactive else ""
+                
                 print(f"   • {type_distrib} {distrib.agent_terrain.full_name}: "
-                      f"{distrib.quantite_totale} {produit_nom} "
-                      f"le {distrib.date_distribution.strftime('%d/%m/%Y')}")
+                      f"{distrib.quantite_totale} {produit_nom} ({specification}) "
+                      f"le {distrib.date_distribution.strftime('%d/%m/%Y')}{retro}")
                       
     except Exception as e:
         print(f"❌ ERREUR: {e}")

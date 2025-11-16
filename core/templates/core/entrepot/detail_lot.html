@@ -1,235 +1,241 @@
-<!-- core/entrepot/detail_lot.html -->
 {% extends 'base.html' %}
 {% load static %}
-
-{% block title %}Détail Lot {{ lot.reference_lot }}{% endblock %}
+{% load format_fcfa %}
+{% block title %}Lot {{ lot.reference_lot }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="fas fa-box-open me-2"></i>Lot {{ lot.reference_lot }}</h2>
+            <p class="text-muted">Suivi complet du lot, facture et pertes</p>
+        </div>
+        <a href="{% url 'liste_lots' %}" class="btn btn-dark">
+            <i class="fas fa-arrow-left me-1"></i> Retour
+        </a>
+    </div>
+
     <div class="row">
-        <div class="col-12">
-            <!-- En-tête -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 class="h3 mb-2">📦 Lot {{ lot.reference_lot }}</h1>
-                    <p class="text-muted">Détails du lot et gestion de la facture</p>
-                </div>
-                <div>
-                    <a href="{% url 'liste_lots' %}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Retour aux lots
-                    </a>
-                </div>
-            </div>
 
-            <!-- Informations du lot -->
-            <div class="row">
-                <div class="col-md-8">
-                    <div class="card mb-4">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">Informations du Lot</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p><strong>Référence:</strong> {{ lot.reference_lot }}</p>
-                                    <p><strong>Produit:</strong> {{ lot.produit.nom }}</p>
-                                    <p><strong>Fournisseur:</strong> {{ lot.fournisseur.nom }}</p>
-                                    {% if lot.fournisseur.contact %}
-                                    <p><strong>Contact fournisseur:</strong> {{ lot.fournisseur.contact }}</p>
-                                    {% endif %}
-                                </div>
-                                <div class="col-md-6">
-                                    <p><strong>Quantité initiale:</strong> {{ lot.quantite_initiale }} unités</p>
-                                    <p><strong>Quantité restante:</strong> {{ lot.quantite_restante }} unités</p>
-                                    <p><strong>Prix d'achat unitaire:</strong> {{ lot.prix_achat_unitaire|floatformat:0 }} FCFA</p>
-                                    <p><strong>Montant total:</strong> <span class="fw-bold text-success">{{ lot.montant_total|floatformat:0 }} FCFA</span></p>
-                                </div>
-                            </div>
-                            <div class="row mt-3">
-                                <div class="col-md-6">
-                                    <p><strong>Date de réception:</strong> {{ lot.date_reception|date:"d/m/Y H:i" }}</p>
-                                </div>
-                                {% if lot.date_upload_facture %}
-                                <div class="col-md-6">
-                                    <p><strong>Date d'upload facture:</strong> {{ lot.date_upload_facture|date:"d/m/Y H:i" }}</p>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+        <!-- INFORMATIONS LOT -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informations du Lot</h5>
                 </div>
 
-                <!-- Section Facture -->
-                <div class="col-md-4">
-                    <div class="card mb-4">
-                        <div class="card-header {% if lot.facture %}bg-success{% else %}bg-warning{% endif %} text-white">
-                            <h5 class="mb-0">
-                                <i class="fas fa-file-invoice"></i>
-                                Facture
-                            </h5>
-                        </div>
-                        <div class="card-body text-center">
-                            {% if lot.facture %}
-                                <!-- Facture existante -->
-                                <div class="mb-4">
-                                    <i class="fas fa-file-invoice fa-4x text-success mb-3"></i>
-                                    <h5>Facture Disponible</h5>
-                                    <p class="text-muted small">{{ lot.facture.name|slice:"-30:" }}</p>
-                                </div>
-                                
-                                <!-- Actions -->
-                                <div class="d-grid gap-2 mb-3">
-                                    <a href="{{ lot.facture.url }}" target="_blank" class="btn btn-primary">
-                                        <i class="fas fa-eye"></i> Voir la Facture
-                                    </a>
-                                    <a href="{{ lot.facture.url }}" download class="btn btn-outline-success">
-                                        <i class="fas fa-download"></i> Télécharger
-                                    </a>
-                                </div>
-                                
-                                <!-- Informations -->
-                                <div class="p-3 bg-light rounded">
-                                    <small class="text-muted">
-                                        <i class="fas fa-info-circle"></i>
-                                        Uploadée le {{ lot.date_upload_facture|date:"d/m/Y à H:i" }}
-                                    </small>
-                                </div>
-                            {% else %}
-                                <!-- Aucune facture -->
-                                <div class="mb-4">
-                                    <i class="fas fa-file-excel fa-4x text-muted mb-3"></i>
-                                    <h5 class="text-muted">Aucune Facture</h5>
-                                    <p class="text-muted small">Aucune facture n'a été uploadée pour ce lot.</p>
-                                </div>
+                <div class="card-body pt-4 pb-2">
+                    <div class="row">
+
+                        <div class="col-md-6 mb-3">
+                            <p class="mb-1 text-muted small">Référence</p>
+                            <h5>{{ lot.reference_lot }}</h5>
+
+                            <p class="mb-1 text-muted small">Produit</p>
+                            <h5>{{ lot.produit.nom }}</h5>
+
+                            <p class="mb-1 text-muted small">Fournisseur</p>
+                            <h6>{{ lot.fournisseur.nom }}</h6>
+
+                            {% if lot.fournisseur.contact %}
+                            <p class="mb-1 text-muted small">Contact Fournisseur</p>
+                            <h6>{{ lot.fournisseur.contact }}</h6>
                             {% endif %}
                         </div>
+
+                        <div class="col-md-6 mb-3">
+                            <p class="mb-1 text-muted small">Quantité initiale</p>
+                            <h5 class="text-primary">{{ lot.quantite_initiale }}</h5>
+
+                            <p class="mb-1 text-muted small">Quantité restante</p>
+                            <h5 class="{% if lot.quantite_restante > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ lot.quantite_restante }}
+                            </h5>
+
+                            <p class="mb-1 text-muted small">Prix unitaire</p>
+                            <h6>{{ lot.prix_achat_unitaire|fcfa }} FCFA</h6>
+
+                            <p class="mb-1 text-muted small">Montant total</p>
+                            <h5 class="text-success fw-bold">
+                                {{ lot.montant_total|fcfa }} FCFA
+                            </h5>
+                        </div>
+
                     </div>
 
-                    <!-- Upload de facture -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h6 class="mb-0">
-                                <i class="fas fa-upload"></i>
-                                {% if lot.facture %}Remplacer la Facture{% else %}Uploader une Facture{% endif %}
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <form method="post" enctype="multipart/form-data" id="upload-facture-form">
-                                {% csrf_token %}
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Sélectionner un fichier</label>
-                                    {{ form.facture }}
-                                    {% if form.facture.errors %}
-                                    <div class="text-danger small mt-1">{{ form.facture.errors }}</div>
-                                    {% endif %}
-                                    <div class="form-text">
-                                        Formats: PDF, JPG, PNG, DOC (max 10MB)
-                                    </div>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-success w-100">
-                                    <i class="fas fa-upload"></i> 
-                                    {% if lot.facture %}Remplacer la Facture{% else %}Uploader la Facture{% endif %}
-                                </button>
-                            </form>
-                            
-                            <!-- Aperçu du fichier -->
-                            <div id="facture-preview" class="mt-3 p-2 border rounded bg-light" style="display: none;">
-                                <small>
-                                    <i class="fas fa-file me-1"></i>
-                                    <span id="facture-filename"></span>
-                                    <span id="facture-size" class="text-muted ms-2"></span>
-                                </small>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="mt-3 pt-2 border-top">
+                        <p class="mb-1 text-muted small">Date réception</p>
+                        <h6>{{ lot.date_reception|date:"d/m/Y H:i" }}</h6>
 
-                    <!-- Statistiques rapides -->
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">Statistiques</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <div class="h5 text-primary">{{ lot.quantite_initiale }}</div>
-                                    <small class="text-muted">Initiale</small>
-                                </div>
-                                <div class="col-6">
-                                    <div class="h5 {% if lot.quantite_restante > 0 %}text-success{% else %}text-danger{% endif %}">
-                                        {{ lot.quantite_restante }}
-                                    </div>
-                                    <small class="text-muted">Restante</small>
-                                </div>
-                            </div>
-                            <div class="progress mt-2" style="height: 8px;">
-                                <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}" 
-                                     style="width: {% widthratio lot.quantite_restante lot.quantite_initiale 100 %}%">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex gap-2 flex-wrap">
-                        <a href="{% url 'liste_lots' %}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Retour aux lots
-                        </a>
-                        <a href="{% url 'liste_factures_entrepot' %}" class="btn btn-outline-primary">
-                            <i class="fas fa-file-invoice"></i> Voir toutes les factures
-                        </a>
-                        {% if lot.facture %}
-                        <a href="{{ lot.facture.url }}" target="_blank" class="btn btn-outline-info">
-                            <i class="fas fa-eye"></i> Voir Facture
-                        </a>
-                        <a href="{{ lot.facture.url }}" download class="btn btn-outline-success">
-                            <i class="fas fa-download"></i> Télécharger
-                        </a>
+                        {% if lot.date_upload_facture %}
+                        <p class="mb-1 text-muted small mt-3">Dernier upload facture</p>
+                        <h6>{{ lot.date_upload_facture|date:"d/m/Y H:i" }}</h6>
                         {% endif %}
                     </div>
                 </div>
             </div>
+
+            <!-- DECLARATION PERTE -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-minus-circle me-2"></i>Déclarer une Perte</h5>
+                </div>
+
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="fw-bold">Quantité perdue</label>
+                            {{ perte_form.quantite_perdue }}
+                            <div class="text-danger small">{{ perte_form.quantite_perdue.errors }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="fw-bold">Description</label>
+                            {{ perte_form.description }}
+                        </div>
+
+                        <button class="btn btn-danger w-100">
+                            <i class="fas fa-save me-1"></i> Enregistrer la perte
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- HISTORIQUE DES PERTES -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Historique des pertes</h5>
+                </div>
+
+                <div class="card-body">
+                    {% if pertes %}
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Quantité</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in pertes %}
+                            <tr>
+                                <td>{{ p.date_perte|date:"d/m/Y H:i" }}</td>
+                                <td class="text-danger fw-bold">{{ p.quantite_perdue }}</td>
+                                <td>{{ p.description }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">Aucune perte enregistrée.</p>
+                    {% endif %}
+                </div>
+            </div>
+
         </div>
+
+        <!-- FACTURE & STATISTIQUES -->
+        <div class="col-lg-4">
+
+            <!-- FACTURE -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header {% if lot.facture %}bg-success{% else %}bg-warning{% endif %} text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Facture</h5>
+                </div>
+
+                <div class="card-body text-center">
+
+                    {% if lot.facture %}
+                    <i class="fas fa-file-pdf fa-4x text-success mb-3"></i>
+                    <h5 class="fw-bold">Facture disponible</h5>
+                    <p class="text-muted small">{{ lot.facture.name }}</p>
+
+                    <div class="d-grid gap-2">
+                        <a href="{{ lot.facture.url }}" class="btn btn-primary" target="_blank">
+                            <i class="fas fa-eye me-1"></i> Voir
+                        </a>
+
+                        <a href="{{ lot.facture.url }}" class="btn btn-outline-success" download>
+                            <i class="fas fa-download me-1"></i> Télécharger
+                        </a>
+                    </div>
+                    {% else %}
+                    <i class="fas fa-file-slash fa-4x text-muted mb-3"></i>
+                    <h6 class="text-muted">Aucune facture</h6>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- UPLOAD FACTURE -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 fw-bold"><i class="fas fa-upload me-2"></i>
+                        {% if lot.facture %}Remplacer la Facture{% else %}Uploader une Facture{% endif %}
+                    </h6>
+                </div>
+
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" id="upload-facture-form">
+                        {% csrf_token %}
+
+                        <label class="form-label fw-bold">Fichier</label>
+                        {{ form.facture }}
+
+                        <button type="submit" class="btn btn-success w-100 mt-3">
+                            <i class="fas fa-upload me-1"></i>
+                            {% if lot.facture %}Remplacer{% else %}Uploader{% endif %}
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- STATISTIQUES -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0 fw-bold"><i class="fas fa-chart-bar me-2"></i>Statistiques</h6>
+                </div>
+
+                <div class="card-body text-center">
+
+                    <div class="row">
+                        <div class="col-6">
+                            <h4 class="text-primary">{{ lot.quantite_initiale }}</h4>
+                            <small class="text-muted">Initiale</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="{% if lot.quantite_restante > 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ lot.quantite_restante }}
+                            </h4>
+                            <small class="text-muted">Restante</small>
+                        </div>
+                    </div>
+
+                    <div class="progress mt-3" style="height: 10px;">
+                        <div class="progress-bar 
+                            {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}"
+                            style="width: {% widthratio lot.quantite_restante lot.quantite_initiale 100 %}%">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- end right column -->
+
     </div>
+
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Aperçu de la facture avant upload
-    const factureInput = document.getElementById('{{ form.facture.id_for_label }}');
-    const facturePreview = document.getElementById('facture-preview');
-    const factureFilename = document.getElementById('facture-filename');
-    const factureSize = document.getElementById('facture-size');
-
-    if (factureInput) {
-        factureInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                factureFilename.textContent = file.name;
-                factureSize.textContent = `(${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-                facturePreview.style.display = 'block';
-            } else {
-                facturePreview.style.display = 'none';
-            }
-        });
-    }
-
-    // Confirmation pour le remplacement de facture
-    const uploadForm = document.getElementById('upload-facture-form');
-    const hasExistingFacture = {% if lot.facture %}true{% else %}false{% endif %};
-
-    if (uploadForm && hasExistingFacture) {
-        uploadForm.addEventListener('submit', function(e) {
-            if (!confirm('⚠️ Une facture existe déjà. Voulez-vous vraiment la remplacer ?')) {
-                e.preventDefault();
-            }
-        });
-    }
+// Aperçu fichier facture
+document.addEventListener("DOMContentLoaded", function () {
+    const input = document.getElementById('{{ form.facture.id_for_label }}');
+    if (!input) return;
 });
 </script>
+
 {% endblock %}

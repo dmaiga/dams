@@ -2,7 +2,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load humanize %}
-
+{% load format_fcfa %}
 {% block title %}Historique des Distributions{% endblock %}
 
 {% block content %}
@@ -91,7 +91,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h6 class="card-title text-muted mb-1">Produits distribués</h6>
-                            <h4 class="mb-0 text-success">{{ total_quantite|intcomma }}</h4>
+                            <h4 class="mb-0 text-success">{{ total_quantite|floatformat:2|intcomma  }}</h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm rounded-circle bg-success bg-opacity-10 text-success d-flex align-items-center justify-content-center">
@@ -108,7 +108,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h6 class="card-title text-muted mb-1">Valeur Gros</h6>
-                            <h4 class="mb-0 ">{{ total_valeur_gros|intcomma }} <small class="fs-6">FCFA</small></h4>
+                            <h4 class="mb-0 ">{{ total_valeur_gros|fcfa }} <small class="fs-6">FCFA</small></h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm rounded-circle bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center">
@@ -125,7 +125,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
                             <h6 class="card-title text-muted mb-1">Valeur Détail</h6>
-                            <h4 class="mb-0 ">{{ total_valeur_detail|intcomma }} <small class="fs-6">FCFA</small></h4>
+                            <h4 class="mb-0 ">{{ total_valeur_detail|fcfa }} <small class="fs-6">FCFA</small></h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm rounded-circle bg-info bg-opacity-10 text-info d-flex align-items-center justify-content-center">
@@ -211,16 +211,16 @@
                             
                             <!-- Quantité -->
                             <td class="text-center">
-                                <span class="fw-bold text-dark fs-6">{{ dist.quantite_totale|intcomma }}</span>
+                                <span class="fw-bold text-dark fs-6">{{ dist.quantite_totale|floatformat:2|intcomma  }}</span>
                             </td>
                             
                             <!-- Valeurs -->
                             <td class="text-end">
-                                <span class="fw-bold ">{{ dist.valeur_gros_totale|intcomma }}</span>
+                                <span class="fw-bold ">{{ dist.valeur_gros_totale|fcfa }}</span>
                                 <div class="text-muted small">FCFA</div>
                             </td>
                             <td class="text-end">
-                                <span class="fw-bold ">{{ dist.valeur_detail_totale|intcomma }}</span>
+                                <span class="fw-bold ">{{ dist.valeur_detail_totale|fcfa }}</span>
                                 <div class="text-muted small">FCFA</div>
                             </td>
                             

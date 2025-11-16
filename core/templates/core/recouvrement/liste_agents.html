@@ -2,6 +2,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load humanize %}
+{% load format_fcfa %}
 
 {% block content %}
 <div class="container-fluid">
@@ -37,21 +38,21 @@
                         <div class="col-md-2 col-6 mb-3">
                             <div class="border rounded p-3">
                                 <h6 class="text-muted mb-1">Mes Ventes</h6>
-                                <h4 class="text-primary">{{ etat_superviseur.total_ventes_personnelles|intcomma }} FCFA</h4>
+                                <h4 class="text-primary">{{ etat_superviseur.total_ventes_personnelles|fcfa }} FCFA</h4>
                                 <small class="text-muted">Auto-recouvrées</small>
                             </div>
                         </div>
                         <div class="col-md-2 col-6 mb-3">
                             <div class="border rounded p-3">
                                 <h6 class="text-muted mb-1">Dépenses</h6>
-                                <h4 class="text-warning">{{ etat_superviseur.total_depenses|intcomma }} FCFA</h4>
+                                <h4 class="text-warning">{{ etat_superviseur.total_depenses|fcfa }} FCFA</h4>
                                 <small class="text-muted">Engagées</small>
                             </div>
                         </div>
                         <div class="col-md-2 col-6 mb-3">
                             <div class="border rounded p-3">
                                 <h6 class="text-muted mb-1">Versé à la Banque</h6>
-                                <h4 class="text-success">{{ etat_superviseur.total_versements_bancaires|intcomma }} FCFA</h4>
+                                <h4 class="text-success">{{ etat_superviseur.total_versements_bancaires|fcfa }} FCFA</h4>
                                 <small class="text-muted">Total versé</small>
                             </div>
                         </div>
@@ -59,7 +60,7 @@
                             <div class="border rounded p-3">
                                 <h6 class="text-muted mb-1">Solde Actuel</h6>
                                 <h4 class="{% if etat_superviseur.solde_actuel > 0 %}text-danger{% else %}text-secondary{% endif %}">
-                                    {{ etat_superviseur.solde_actuel|intcomma }} FCFA
+                                    {{ etat_superviseur.solde_actuel|fcfa }} FCFA
                                 </h4>
                                 <small class="text-muted">En ma possession</small>
                             </div>
@@ -68,7 +69,7 @@
                             <div class="border rounded p-3 bg-light">
                                 <h6 class="text-muted mb-1">Dernier Versement</h6>
                                 {% if etat_superviseur.dernier_versement %}
-                                <h4 class="text-info">{{ etat_superviseur.dernier_versement.montant_verse|intcomma }} FCFA</h4>
+                                <h4 class="text-info">{{ etat_superviseur.dernier_versement.montant_verse|fcfa }} FCFA</h4>
                                 <small class="text-muted">
                                     Le {{ etat_superviseur.dernier_versement.date_versement_reelle|date:"d/m/Y" }}
                                 </small>
@@ -90,7 +91,7 @@
                         <div class="card-body text-center">
                             <i class="fas fa-chart-line fa-2x text-primary mb-2"></i>
                             <h6 class="text-muted mb-1">Total des Ventes</h6>
-                            <h3 class="text-primary">{{ total_ventes_tous_agents|intcomma }} FCFA</h3>
+                            <h3 class="text-primary">{{ total_ventes_tous_agents|fcfa }} FCFA</h3>
                             <small class="text-muted">Agents + Superviseur</small>
                         </div>
                     </div>
@@ -100,7 +101,7 @@
                         <div class="card-body text-center">
                             <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
                             <h6 class="text-muted mb-1">Total Recouvré</h6>
-                            <h3 class="text-success">{{ total_recouvre_tous_agents|intcomma }} FCFA</h3>
+                            <h3 class="text-success">{{ total_recouvre_tous_agents|fcfa }} FCFA</h3>
                             <small class="text-muted">Déjà récupéré</small>
                         </div>
                     </div>
@@ -110,7 +111,7 @@
                         <div class="card-body text-center">
                             <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
                             <h6 class="text-muted mb-1">Reste à Recouvrir</h6>
-                            <h3 class="text-warning">{{ reste_a_recouvrir|intcomma }} FCFA</h3>
+                            <h3 class="text-warning">{{ reste_a_recouvrir|fcfa }} FCFA</h3>
                             <small class="text-muted">En attente de recouvrement</small>
                         </div>
                     </div>
@@ -164,16 +165,16 @@
                                         </span>
                                     </td>
                                     <td class="text-end">
-                                        <strong>{{ data.total_ventes|intcomma }} FCFA</strong>
+                                        <strong>{{ data.total_ventes|fcfa }} FCFA</strong>
                                     </td>
                                     <td class="text-end">
                                         <span class="text-success">
-                                            <i class="fas fa-check-circle me-1"></i>{{ data.total_recouvre|intcomma }} FCFA
+                                            <i class="fas fa-check-circle me-1"></i>{{ data.total_recouvre|fcfa }} FCFA
                                         </span>
                                     </td>
                                     <td class="text-end">
                                         <span class="badge bg-{{ data.couleur }} fs-6">
-                                            {{ data.difference|intcomma }} FCFA
+                                            {{ data.difference|fcfa }} FCFA
                                         </span>
                                     </td>
                                     <td>

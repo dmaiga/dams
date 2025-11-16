@@ -45,9 +45,28 @@ class DetailDistributionAdmin(admin.ModelAdmin):
 
 @admin.register(Vente)
 class VenteAdmin(admin.ModelAdmin):
-    list_display = ['agent', 'client', 'detail_distribution', 'quantite', 'prix_vente_unitaire', 'date_vente']
+    list_display = [
+        'agent',
+        'client',
+        'get_produit',  # ← Nouveau champ calculé
+        'detail_distribution',
+        'quantite',
+        'prix_vente_unitaire',
+        'date_vente'
+    ]
     list_filter = ['date_vente', 'agent', 'client']
-    search_fields = ['agent__user__username', 'agent__user__first_name', 'agent__user__last_name']
+    search_fields = [
+        'agent__user__username', 
+        'agent__user__first_name', 
+        'agent__user__last_name',
+        'detail_distribution__lot__produit__nom'  # Permet rechercher par produit
+    ]
+
+    def get_produit(self, obj):
+        return obj.detail_distribution.lot.produit.nom if obj.detail_distribution else "-"
+    get_produit.short_description = 'Produit'
+
+
 @admin.register(MouvementStock)
 class MouvementStockAdmin(admin.ModelAdmin):
     list_display = ['produit', 'type_mouvement', 'quantite', 'date_mouvement']

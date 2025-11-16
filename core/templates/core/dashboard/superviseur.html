@@ -2,7 +2,7 @@
 {% extends 'base.html' %}
 {% load humanize %}
 {% load custom_filters %}
-
+{% load format_fcfa %}
 {% block title %}Tableau de Bord Superviseur{% endblock %}
 
 {% block content %}
@@ -34,55 +34,46 @@
     <!-- Cartes de résumé PRINCIPALES -->
     <div class="row mb-4">
         <!-- Carte Stock -->
-        <div class="col-xl-2 col-md-3">
+        <div class="col-xl-3 col-md-3">
             <div class="card text-white bg-primary">
                 <div class="card-body">
                     <h5 class="card-title">Stock Total</h5>
-                    <h2>{{ stock_total.total_quantite|default:0|intcomma }}</h2>
-                    <p class="card-text">{{ stock_total.total_valeur|default:0|floatformat:0|intcomma }} FCFA</p>
+                    <h2>{{ stock_total.total_quantite|floatformat:0 }}</h2>
+                    <p class="card-text">{{ stock_total.total_valeur|default:0|fcfa}} FCFA</p>
                 </div>
             </div>
         </div>
 
-        <!-- Carte Agents -->
-        <div class="col-xl-2 col-md-3">
-            <div class="card text-white bg-success">
-                <div class="card-body">
-                    <h5 class="card-title">Agents Terrain</h5>
-                    <h2>{{ agents_terrain.count }}</h2>
-                    <p class="card-text">Actifs</p>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Carte Ventes -->
-        <div class="col-xl-2 col-md-3">
+        <div class="col-xl-3 col-md-3">
             <div class="card text-white bg-info">
                 <div class="card-body">
                     <h5 class="card-title">Ventes Total</h5>
-                    <h2>{{ ventes_global.total_ventes|default:0|floatformat:0|intcomma }} FCFA</h2>
+                    <h2>{{ ventes_global.total_ventes|fcfa }} FCFA</h2>
                     <p class="card-text">{{ ventes_global.nombre_ventes|default:0 }} transactions</p>
                 </div>
             </div>
         </div>
 
         <!-- Carte Recouvrement -->
-        <div class="col-xl-2 col-md-3">
+        <div class="col-xl-3 col-md-3">
             <div class="card text-white bg-secondary">
                 <div class="card-body">
                     <h5 class="card-title">À Recouvrer</h5>
-                    <h2>{{ recapitulatif_financier.total_a_recouvrer|floatformat:0|intcomma }} FCFA</h2>
+                    <h2>{{ recapitulatif_financier.total_a_recouvrer|fcfa }} FCFA</h2>
                     <p class="card-text">Total agents</p>
                 </div>
             </div>
         </div>
 
         <!-- Carte Finances Superviseur -->
-        <div class="col-xl-2 col-md-3">
+        <div class="col-xl-3 col-md-3">
             <div class="card text-white bg-warning">
                 <div class="card-body">
                     <h5 class="card-title">Mon Solde</h5>
-                    <h2>{{ stats_superviseur.solde_actuel|floatformat:0|intcomma }} FCFA</h2>
+                    <h2>{{ stats_superviseur.solde_actuel|fcfa }} FCFA</h2>
                     <p class="card-text">
                         {% if stats_superviseur.solde_actuel > 0 %}
                         <span class="badge bg-success">Excédent</span>
@@ -94,16 +85,7 @@
             </div>
         </div>
 
-        <!-- Carte Dettes -->
-        <div class="col-xl-2 col-md-3">
-            <div class="card text-white bg-dark">
-                <div class="card-body">
-                    <h5 class="card-title">Dettes</h5>
-                    <h2>{{ recapitulatif_financier.dettes_en_cours_count }}</h2>
-                    <p class="card-text">En cours</p>
-                </div>
-            </div>
-        </div>
+
     </div>
 
     <!-- Récapitulatif financier rapide -->
@@ -118,20 +100,20 @@
                 <div class="card-body py-2">
                     <div class="row text-center">
                         <div class="col-md-3 border-end">
-                            <small class="text-muted">Valeur Stock</small><br>
-                            <strong>{{ recapitulatif_financier.valeur_stock_total|floatformat:0|intcomma }} FCFA</strong>
+                            <small class="text-muted">Valeur Stock actuel</small><br>
+                            <strong>{{ recapitulatif_financier.valeur_stock_total|fcfa}} FCFA</strong>
                         </div>
                         <div class="col-md-3 border-end">
                             <small class="text-muted">Chiffre d'Affaires Total</small><br>
-                            <strong>{{ recapitulatif_financier.ventes_total|floatformat:0|intcomma }} FCFA</strong>
+                            <strong>{{ recapitulatif_financier.ventes_total|fcfa}} FCFA</strong>
                         </div>
                         <div class="col-md-3 border-end">
                             <small class="text-muted">Recouvrements Effectués</small><br>
-                            <strong>{{ stats_superviseur.total_recouvrements|floatformat:0|intcomma }} FCFA</strong>
+                            <strong>{{ stats_superviseur.total_recouvrements|fcfa}} FCFA</strong>
                         </div>
                         <div class="col-md-3">
                             <small class="text-muted">Versements Bancaires</small><br>
-                            <strong>{{ stats_superviseur.total_versements|floatformat:0|intcomma }} FCFA</strong>
+                            <strong>{{ stats_superviseur.total_versements|fcfa}} FCFA</strong>
                         </div>
                     </div>
                 </div>
@@ -167,7 +149,7 @@
                                 <tr>
                                     <td>{{ produit.produit__nom }}</td>
                                     <td>{{ produit.quantite_totale|intcomma }}</td>
-                                    <td>{{ produit.valeur_totale|floatformat:0|intcomma }} FCFA</td>
+                                    <td>{{ produit.valeur_totale|fcfa}} FCFA</td>
                                     <td>
                                         {% if produit.quantite_totale > 0 %}
                                             {{ produit.valeur_totale|div:produit.quantite_totale|floatformat:0 }} FCFA
@@ -213,8 +195,8 @@
                                     <th>Déjà Recouvré</th>
                                     <th>En Possession</th>
                                     <th>Nb Ventes</th>
-                                    <th>Clients</th>
-                                    <th>Statut</th>
+                                    
+                                 
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -225,36 +207,30 @@
                                         <strong>{{ perf.agent.full_name }}</strong>
                                         <br>
                                         <small class="text-muted">
-                                            Gros: {{ perf.ventes_gros|floatformat:0|intcomma }} | 
-                                            Détail: {{ perf.ventes_detail|floatformat:0|intcomma }}
+                                            Gros: {{ perf.ventes_gros|fcfa}} <br>
+                                            Détail: {{ perf.ventes_detail|fcfa}}
                                         </small>
                                     </td>
 
 <td>
-    <strong>{{ perf.total_ventes|floatformat:0|intcomma }} FCFA</strong>
+    <strong>{{ perf.total_ventes|fcfa}} FCFA</strong>
     <br>
     <small class="text-muted">
-        Pers: {{ perf.total_ventes_personnelles|floatformat:0|intcomma }} | 
-        Stag: {{ perf.total_ventes_stagiaires|floatformat:0|intcomma }}
+        Pers: {{ perf.total_ventes_personnelles|fcfa}} <br>
+        Stag: {{ perf.total_ventes_stagiaires|fcfa}}
     </small>
 </td>
                                     <td>
-                                        <span class="text-success">{{ perf.total_recouvre|floatformat:0|intcomma }} FCFA</span>
+                                        <span class="text-success">{{ perf.total_recouvre|fcfa}} FCFA</span>
                                     </td>
                                     <td>
                                         <span class="{% if perf.argent_en_possession > 0 %}text-warning fw-bold{% else %}text-muted{% endif %}">
-                                            {{ perf.argent_en_possession|floatformat:0|intcomma }} FCFA
+                                            {{ perf.argent_en_possession|fcfa}} FCFA
                                         </span>
                                     </td>
                                     <td>{{ perf.nombre_ventes }}</td>
-                                    <td>{{ perf.clients_distincts }}</td>
-                                    <td>
-                                        {% if perf.peut_etre_recouvre %}
-                                        <span class="badge bg-warning">À recouvrer</span>
-                                        {% else %}
-                                        <span class="badge bg-success">À jour</span>
-                                        {% endif %}
-                                    </td>
+
+                                 
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <a href="{% url 'vue_detail_agent' perf.agent.id %}" 
@@ -298,15 +274,15 @@
     <h6>Ventes Personnelles</h6>
     <div class="d-flex justify-content-between">
         <span>Chiffre d'affaires:</span>
-        <strong>{{ ventes_superviseur.total_ventes|default:0|floatformat:0|intcomma }} FCFA</strong>
+        <strong>{{ ventes_superviseur.total_ventes|default:0|fcfa}} FCFA</strong>
     </div>
     <div class="d-flex justify-content-between text-success small">
         <span>→ Ventes personnelles:</span>
-        <span>{{ ventes_superviseur.total_ventes_personnelles|default:0|floatformat:0|intcomma }} FCFA</span>
+        <span>{{ ventes_superviseur.total_ventes_personnelles|default:0|fcfa}} FCFA</span>
     </div>
     <div class="d-flex justify-content-between text-info small">
         <span>→ Ventes stagiaires:</span>
-        <span>{{ ventes_superviseur.total_ventes_stagiaires|default:0|floatformat:0|intcomma }} FCFA</span>
+        <span>{{ ventes_superviseur.total_ventes_stagiaires|default:0|fcfa}} FCFA</span>
     </div>
     <div class="d-flex justify-content-between">
         <span>Nombre de ventes:</span>
@@ -318,11 +294,11 @@
     </div>
     <div class="d-flex justify-content-between text-muted small">
         <span>Gros:</span>
-        <span>{{ ventes_superviseur.ventes_gros|default:0|floatformat:0|intcomma }} FCFA</span>
+        <span>{{ ventes_superviseur.ventes_gros|default:0|fcfa}} FCFA</span>
     </div>
     <div class="d-flex justify-content-between text-muted small">
         <span>Détail:</span>
-        <span>{{ ventes_superviseur.ventes_detail|default:0|floatformat:0|intcomma }} FCFA</span>
+        <span>{{ ventes_superviseur.ventes_detail|default:0|fcfa}} FCFA</span>
     </div>
 </div>
 
@@ -340,20 +316,20 @@
                         <h6>Mes Finances</h6>
                         <div class="d-flex justify-content-between">
                             <span>Recouvrements effectués:</span>
-                            <strong class="text-success">{{ stats_superviseur.total_recouvrements|floatformat:0|intcomma }} FCFA</strong>
+                            <strong class="text-success">{{ stats_superviseur.total_recouvrements|fcfa}} FCFA</strong>
                         </div>
                         <div class="d-flex justify-content-between">
                             <span>Dépenses engagées:</span>
-                            <strong class="text-danger">{{ stats_superviseur.total_depenses|floatformat:0|intcomma }} FCFA</strong>
+                            <strong class="text-danger">{{ stats_superviseur.total_depenses|fcfa}} FCFA</strong>
                         </div>
                         <div class="d-flex justify-content-between">
                             <span>Versements bancaires:</span>
-                            <strong class="text-info">{{ stats_superviseur.total_versements|floatformat:0|intcomma }} FCFA</strong>
+                            <strong class="text-info">{{ stats_superviseur.total_versements|fcfa}} FCFA</strong>
                         </div>
                         <div class="d-flex justify-content-between mt-1 pt-1 border-top">
                             <span><strong>Solde actuel:</strong></span>
                             <strong class="{% if stats_superviseur.solde_actuel > 0 %}text-success{% else %}text-danger{% endif %}">
-                                {{ stats_superviseur.solde_actuel|floatformat:0|intcomma }} FCFA
+                                {{ stats_superviseur.solde_actuel|fcfa}} FCFA
                             </strong>
                         </div>
                     </div>
@@ -370,7 +346,7 @@
                 </div>
                 <div class="card-body">
                     <div class="text-center">
-                        <h4>{{ stats_superviseur.dernier_versement.montant_verse|floatformat:0|intcomma }} FCFA</h4>
+                        <h4>{{ stats_superviseur.dernier_versement.montant_verse|fcfa}} FCFA</h4>
                         <small class="text-muted">
                             {{ stats_superviseur.dernier_versement.date_versement_reelle|date:"d/m/Y" }}
                         </small>
@@ -393,7 +369,7 @@
                     <div class="mb-2 p-2 border rounded">
                         <div class="d-flex justify-content-between">
                             <strong>{{ vente_type.type_vente|title }}</strong>
-                            <span>{{ vente_type.total|floatformat:0|intcomma }} FCFA</span>
+                            <span>{{ vente_type.total|fcfa}} FCFA</span>
                         </div>
                         <div class="d-flex justify-content-between text-muted small">
                             <span>{{ vente_type.count }} ventes</span>
@@ -405,11 +381,11 @@
     <h6>Répartition Ventes</h6>
     <div class="d-flex justify-content-between small">
         <span>Ventes personnelles:</span>
-        <strong>{{ recapitulatif_financier.total_ventes_personnelles|floatformat:0|intcomma }} FCFA</strong>
+        <strong>{{ recapitulatif_financier.total_ventes_personnelles|fcfa}} FCFA</strong>
     </div>
     <div class="d-flex justify-content-between small">
         <span>Ventes stagiaires:</span>
-        <strong>{{ recapitulatif_financier.total_ventes_stagiaires|floatformat:0|intcomma }} FCFA</strong>
+        <strong>{{ recapitulatif_financier.total_ventes_stagiaires|fcfa}} FCFA</strong>
     </div>
     <div class="d-flex justify-content-between small">
         <span>Part stagiaires:</span>
@@ -437,11 +413,11 @@
                     <div class="mt-3 p-2 bg-light rounded">
                         <div class="d-flex justify-content-between small">
                             <span>Total Gros:</span>
-                            <strong>{{ ventes_global.ventes_gros|default:0|floatformat:0|intcomma }} FCFA</strong>
+                            <strong>{{ ventes_global.ventes_gros|default:0|fcfa}} FCFA</strong>
                         </div>
                         <div class="d-flex justify-content-between small">
                             <span>Total Détail:</span>
-                            <strong>{{ ventes_global.ventes_detail|default:0|floatformat:0|intcomma }} FCFA</strong>
+                            <strong>{{ ventes_global.ventes_detail|default:0|fcfa}} FCFA</strong>
                         </div>
                     </div>
                 </div>
@@ -468,7 +444,7 @@
                     {% if recapitulatif_financier.total_a_recouvrer > 0 %}
                     <div class="alert alert-sm alert-info mb-2">
                         <i class="fas fa-money-bill-wave"></i>
-                        <strong>À recouvrer:</strong> {{ recapitulatif_financier.total_a_recouvrer|floatformat:0|intcomma }} FCFA
+                        <strong>À recouvrer:</strong> {{ recapitulatif_financier.total_a_recouvrer|fcfa}} FCFA
                         <a href="{% url 'liste_agents_recouvrement' %}" class="float-end">
                             <i class="fas fa-arrow-right"></i>
                         </a>
@@ -485,12 +461,12 @@
                     {% if stats_superviseur.solde_actuel > 0 %}
                     <div class="alert alert-sm alert-success">
                         <i class="fas fa-piggy-bank"></i>
-                        <strong>Solde positif:</strong> {{ stats_superviseur.solde_actuel|floatformat:0|intcomma }} FCFA
+                        <strong>Solde positif:</strong> {{ stats_superviseur.solde_actuel|fcfa}} FCFA
                     </div>
                     {% elif stats_superviseur.solde_actuel < 0 %}
                     <div class="alert alert-sm alert-danger">
                         <i class="fas fa-exclamation-circle"></i>
-                        <strong>Solde négatif:</strong> {{ stats_superviseur.solde_actuel|floatformat:0|intcomma }} FCFA
+                        <strong>Solde négatif:</strong> {{ stats_superviseur.solde_actuel|fcfa}} FCFA
                     </div>
                     {% endif %}
                 </div>

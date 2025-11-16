@@ -6,461 +6,329 @@
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- En-tête -->
+    <!-- En-tête simplifié -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+            <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 class="h3 mb-2">
-                        <i class="fas fa-users me-2 text-primary"></i>Gestion des Agents
+                    <h1 class="h4 mb-1 text-gray-800">
+                        <i class="fas fa-users me-2 text-primary"></i>Agents
                     </h1>
-                    <p class="text-muted mb-0">Liste de tous les agents du système</p>
+                    <p class="text-muted mb-0">Gestion des superviseurs, agents terrain et stagiaires</p>
                 </div>
-                <div class="mt-3 mt-md-0">
-                    <a href="{% url 'creer_agent' %}" class="btn btn-success">
-                        <i class="fas fa-user-plus me-2"></i>Nouvel Agent
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filtres et statistiques -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-body py-3">
-                    <div class="row text-center">
-                        <div class="col-6 col-sm-3 mb-2 mb-sm-0">
-                            <small class="text-muted d-block">Superviseurs</small>
-                            <div class="h6 mb-0 text-success">
-                                {{ agents_superviseurs.count }}
-                            </div>
-                        </div>
-                        <div class="col-6 col-sm-3 mb-2 mb-sm-0">
-                            <small class="text-muted d-block">Agents Terrain</small>
-                            <div class="h6 mb-0 text-primary">
-                                {{ agents_terrain.count }}
-                            </div>
-                        </div>
-                        <div class="col-6 col-sm-3">
-                            <small class="text-muted d-block">Stagiaires Actifs</small>
-                            <div class="h6 mb-0 text-warning">
-                                {{ stagiaires_actifs.count }}
-                            </div>
-                        </div>
-                        <div class="col-6 col-sm-3">
-                            <small class="text-muted d-block">Stagiaires Expirés</small>
-                            <div class="h6 mb-0 text-danger">
-                                {{ stagiaires_expires.count }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Carte principale -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
-                <h5 class="card-title mb-2 mb-md-0">
-                    <i class="fas fa-list me-2"></i>Liste des Agents
-                </h5>
-                <div class="d-flex gap-2">
-                    <span class="badge bg-primary">{{ agents.count }} agent(s)</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card-body">
-            {% if agents %}
-            
-            <!-- Navigation par type d'agent -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="btn-group w-100" role="group">
-                        <button type="button" class="btn btn-outline-primary active" data-type="all">
-                            Tous ({{ agents.count }})
-                        </button>
-                        <button type="button" class="btn btn-outline-success" data-type="entrepot">
-                            Superviseurs ({{ agents_superviseurs.count }})
-                        </button>
-                        <button type="button" class="btn btn-outline-info" data-type="terrain">
-                            Agents Terrain ({{ agents_terrain.count }})
-                        </button>
-                        <button type="button" class="btn btn-outline-warning" data-type="stagiaire">
-                            Stagiaires ({{ stagiaires.count }})
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tableau responsive -->
-            <div class="table-responsive">
-                <table class="table table-hover table-striped" id="agentsTable">
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col">Nom Complet</th>
-                            <th scope="col" class="d-none d-md-table-cell">Téléphone</th>
-                            <th scope="col">Type</th>
-                            <th scope="col" class="d-none d-lg-table-cell">Date création</th>
-                            <th scope="col" class="d-none d-sm-table-cell">Statut</th>
-                            <th scope="col" class="text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Section Superviseurs -->
-                        <tr class="section-header bg-success text-white">
-                            <td colspan="6">
-                                <i class="fas fa-user-tie me-2"></i>
-                                SUPERVISEURS ({{ agents_superviseurs.count }})
-                            </td>
-                        </tr>
-                        {% for agent in agents_superviseurs %}
-                        <tr class="agent-row" data-type="entrepot">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-sm bg-success text-white rounded-circle me-3">
-                                        {{ agent.full_name|slice:":1"|upper }}
-                                    </div>
-                                    <div>
-                                        <strong class="text-success">{{ agent.full_name }}</strong>
-                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
-                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
-                            <td>
-                                <span class="badge bg-success">
-                                    {{ agent.get_type_agent_display }}
-                                </span>
-                            </td>
-                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
-                            <td class="d-none d-sm-table-cell">
-                                <span class="badge bg-success">Actif</span>
-                            </td>
-                            <td>
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a href="{% url 'detail_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-info" 
-                                       title="Détail agent">
-                                        <i class="fas fa-chart-line"></i>
-                                    </a>
-                                    <a href="{% url 'modifier_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="Modifier">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="{% url 'supprimer_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-danger" 
-                                       title="Supprimer"
-                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        <!-- Section Agents Terrain -->
-                        <tr class="section-header bg-primary text-white">
-                            <td colspan="6">
-                                <i class="fas fa-user-check me-2"></i>
-                                AGENTS TERRAIN ({{ agents_terrain.count }})
-                            </td>
-                        </tr>
-                        {% for agent in agents_terrain %}
-                        <tr class="agent-row" data-type="terrain">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-sm bg-primary text-white rounded-circle me-3">
-                                        {{ agent.full_name|slice:":1"|upper }}
-                                    </div>
-                                    <div>
-                                        <strong class="text-primary">{{ agent.full_name }}</strong>
-                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
-                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
-                            <td>
-                                <span class="badge bg-primary">
-                                    {{ agent.get_type_agent_display }}
-                                </span>
-                            </td>
-                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
-                            <td class="d-none d-sm-table-cell">
-                                <span class="badge bg-success">Actif</span>
-                            </td>
-                            <td>
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a href="{% url 'detail_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-info" 
-                                       title="Détail agent">
-                                        <i class="fas fa-chart-line"></i>
-                                    </a>
-                                    <a href="{% url 'modifier_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="Modifier">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="{% url 'supprimer_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-danger" 
-                                       title="Supprimer"
-                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet agent ?')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        <!-- Section Stagiaires Actifs -->
-                        <tr class="section-header bg-warning text-dark">
-                            <td colspan="6">
-                                <i class="fas fa-user-graduate me-2"></i>
-                                STAGIAIRES ACTIFS ({{ stagiaires_actifs.count }})
-                            </td>
-                        </tr>
-                        {% for agent in stagiaires_actifs %}
-                        <tr class="agent-row" data-type="stagiaire">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-sm bg-warning text-dark rounded-circle me-3">
-                                        {{ agent.full_name|slice:":1"|upper }}
-                                    </div>
-                                    <div>
-                                        <strong class="text-warning">{{ agent.full_name }}</strong>
-                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
-                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
-                            <td>
-                                <span class="badge bg-warning">
-                                    {{ agent.get_type_agent_display }}
-                                </span>
-                                <div class="mt-1">
-                                    <small class="text-muted">
-                                        {{ agent.jours_restants }}j restants
-                                    </small>
-                                </div>
-                            </td>
-                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
-                            <td class="d-none d-sm-table-cell">
-                                <span class="badge bg-success">{{ agent.statut_stagiaire }}</span>
-                            </td>
-                            <td>
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a href="{% url 'detail_stagiaire' agent.id %}" 
-                                       class="btn btn-sm btn-outline-warning" 
-                                       title="Détail stagiaire">
-                                        <i class="fas fa-user-graduate"></i>
-                                    </a>
-                                    <a href="{% url 'modifier_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="Modifier">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <button class="btn btn-sm btn-outline-secondary" 
-                                            disabled 
-                                            title="Impossible de supprimer un stagiaire actif">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        <!-- Section Stagiaires Expirés -->
-                        <tr class="section-header bg-danger text-white">
-                            <td colspan="6">
-                                <i class="fas fa-user-clock me-2"></i>
-                                STAGIAIRES EXPIRÉS ({{ stagiaires_expires.count }})
-                            </td>
-                        </tr>
-                        {% for agent in stagiaires_expires %}
-                        <tr class="agent-row" data-type="stagiaire">
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-sm bg-danger text-white rounded-circle me-3">
-                                        {{ agent.full_name|slice:":1"|upper }}
-                                    </div>
-                                    <div>
-                                        <strong class="text-danger">{{ agent.full_name }}</strong>
-                                        <div class="text-muted small d-md-none">{{ agent.telephone|default:"-" }}</div>
-                                        <div class="text-muted small d-lg-none">{{ agent.date_creation|date:"d/m/Y" }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="d-none d-md-table-cell">{{ agent.telephone|default:"-" }}</td>
-                            <td>
-                                <span class="badge bg-danger">
-                                    {{ agent.get_type_agent_display }}
-                                </span>
-                                <div class="mt-1">
-                                    <small class="text-danger">
-                                        Expiré
-                                    </small>
-                                </div>
-                            </td>
-                            <td class="d-none d-lg-table-cell">{{ agent.date_creation|date:"d/m/Y" }}</td>
-                            <td class="d-none d-sm-table-cell">
-                                <span class="badge bg-danger">{{ agent.statut_stagiaire }}</span>
-                            </td>
-                            <td>
-                                <div class="d-flex justify-content-center gap-1">
-                                    <a href="{% url 'detail_stagiaire' agent.id %}" 
-                                       class="btn btn-sm btn-outline-danger" 
-                                       title="Détail stagiaire">
-                                        <i class="fas fa-user-graduate"></i>
-                                    </a>
-                                    <a href="{% url 'modifier_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="Modifier">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="{% url 'supprimer_agent' agent.id %}" 
-                                       class="btn btn-sm btn-outline-danger" 
-                                       title="Supprimer"
-                                       onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce stagiaire expiré ?')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <!-- État vide -->
-            <div class="text-center py-5">
-                <div class="mb-4">
-                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">Aucun agent enregistré</h4>
-                    <p class="text-muted">Commencez par créer votre premier agent</p>
-                </div>
-                <a href="{% url 'creer_agent' %}" class="btn btn-primary btn-lg">
-                    <i class="fas fa-user-plus me-2"></i>Créer le premier agent
+                <a href="{% url 'creer_agent' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i>Nouvel agent
                 </a>
             </div>
+        </div>
+    </div>
+
+    <!-- Cartes statistiques minimalistes -->
+    <div class="row mb-4">
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center p-3">
+                    <div class="h5 mb-1 text-primary">{{ agents_superviseurs.count }}</div>
+                    <small class="text-muted">Superviseurs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center p-3">
+                    <div class="h5 mb-1 text-info">{{ agents_terrain.count }}</div>
+                    <small class="text-muted">Agents terrain</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center p-3">
+                    <div class="h5 mb-1 text-warning">{{ stagiaires_actifs.count }}</div>
+                    <small class="text-muted">Stagiaires actifs</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3 mb-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center p-3">
+                    <div class="h5 mb-1 text-danger">{{ stagiaires_expires.count }}</div>
+                    <small class="text-muted">Stagiaires expirés</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm btn-primary active" data-filter="all">
+                    Tous ({{ agents.count }})
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-filter="superviseur">
+                    Superviseurs ({{ agents_superviseurs.count }})
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-filter="terrain">
+                    Agents terrain ({{ agents_terrain.count }})
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-filter="stagiaire">
+                    Stagiaires ({{ stagiaires.count }})
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des agents -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if agents %}
+                <div class="list-group list-group-flush">
+                    <!-- Superviseurs -->
+                    {% for agent in agents_superviseurs %}
+                    <div class="list-group-item p-3 agent-item" data-type="superviseur">
+                        <div class="row align-items-center">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 text-primary">{{ agent.full_name }}</h6>
+                                        <small class="text-muted d-md-none">{{ agent.telephone|default:"-" }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2 mb-md-0">
+                                <span class="badge bg-primary">Superviseur</span>
+                            </div>
+                            <div class="col-md-3 d-none d-md-block">
+                                <small class="text-muted">{{ agent.date_creation|date:"d/m/Y" }}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Agents terrain -->
+                    {% for agent in agents_terrain %}
+                    <div class="list-group-item p-3 agent-item" data-type="terrain">
+                        <div class="row align-items-center">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ agent.full_name }}</h6>
+                                        <small class="text-muted d-md-none">{{ agent.telephone|default:"-" }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2 mb-md-0">
+                                <span class="badge bg-info">Agent terrain</span>
+                            </div>
+                            <div class="col-md-3 d-none d-md-block">
+                                <small class="text-muted">{{ agent.date_creation|date:"d/m/Y" }}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Stagiaires actifs -->
+                    {% for agent in stagiaires_actifs %}
+                    <div class="list-group-item p-3 agent-item" data-type="stagiaire">
+                        <div class="row align-items-center">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">{{ agent.full_name }}</h6>
+                                        <small class="text-muted d-md-none">{{ agent.telephone|default:"-" }}</small>
+                                        <small class="text-warning d-md-none">{{ agent.jours_restants }}j restants</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2 mb-md-0">
+                                <span class="badge bg-warning text-dark">Stagiaire</span>
+                                <small class="text-warning d-none d-md-block">{{ agent.jours_restants }}j restants</small>
+                            </div>
+                            <div class="col-md-3 d-none d-md-block">
+                                <small class="text-muted">{{ agent.date_creation|date:"d/m/Y" }}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <a href="{% url 'detail_stagiaire' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-user-graduate"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <!-- Stagiaires expirés -->
+                    {% for agent in stagiaires_expires %}
+                    <div class="list-group-item p-3 agent-item" data-type="stagiaire">
+                        <div class="row align-items-center">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                        {{ agent.full_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 text-danger">{{ agent.full_name }}</h6>
+                                        <small class="text-muted d-md-none">{{ agent.telephone|default:"-" }}</small>
+                                        <small class="text-danger d-md-none">Expiré</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-2 mb-md-0">
+                                <span class="badge bg-danger">Stagiaire expiré</span>
+                            </div>
+                            <div class="col-md-3 d-none d-md-block">
+                                <small class="text-muted">{{ agent.date_creation|date:"d/m/Y" }}</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <a href="{% url 'detail_stagiaire' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-user-graduate"></i>
+                                    </a>
+                                    <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'supprimer_agent' agent.id %}" class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Supprimer ce stagiaire expiré ?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- État vide -->
+                <div class="text-center py-5">
+                    <i class="fas fa-users fa-2x text-muted mb-3"></i>
+                    <p class="text-muted mb-3">Aucun agent enregistré</p>
+                    <a href="{% url 'creer_agent' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>Créer le premier agent
+                    </a>
+                </div>
             {% endif %}
         </div>
     </div>
 </div>
 
 <style>
-.avatar-sm {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 0.9rem;
+.agent-item {
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s ease;
 }
 
-.table td {
-    vertical-align: middle;
+.agent-item:last-child {
+    border-bottom: none;
 }
 
-.section-header {
-    font-weight: bold;
-    font-size: 1.1em;
+.agent-item:hover {
+    background-color: #f8f9fa;
 }
 
-.section-header td {
-    padding: 12px 16px;
-}
-
-/* Adaptation mobile */
+/* Adaptation mobile améliorée */
 @media (max-width: 768px) {
-    .btn-group .btn {
-        font-size: 0.8rem;
-        padding: 0.375rem 0.5rem;
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
     }
     
-    .section-header {
-        font-size: 1em;
+    .list-group-item {
+        padding: 1rem 0.75rem !important;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    
+    .d-flex.gap-1 .btn {
+        padding: 0.25rem 0.4rem;
     }
 }
 
-/* Filtrage des lignes */
-.agent-row {
+/* Animation de filtrage */
+.agent-item {
     transition: all 0.3s ease;
 }
 
-.agent-row.hidden {
+.agent-item.hidden {
     display: none;
-}
-
-/* Effets hover */
-.table-hover tbody tr.agent-row:hover {
-    background-color: rgba(0, 123, 255, 0.05);
-    transform: translateX(2px);
+    opacity: 0;
+    transform: translateX(-10px);
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Filtrage par type d'agent
-    const filterButtons = document.querySelectorAll('[data-type]');
-    const agentRows = document.querySelectorAll('.agent-row');
-    const sectionHeaders = document.querySelectorAll('.section-header');
+    // Filtrage simplifié
+    const filterButtons = document.querySelectorAll('[data-filter]');
+    const agentItems = document.querySelectorAll('.agent-item');
     
     filterButtons.forEach(button => {
         button.addEventListener('click', function() {
-            const type = this.getAttribute('data-type');
+            const filter = this.getAttribute('data-filter');
             
             // Mise à jour des boutons actifs
             filterButtons.forEach(btn => {
-                btn.classList.remove('active');
-                btn.classList.add('btn-outline-primary', 'btn-outline-success', 'btn-outline-info', 'btn-outline-warning');
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-outline-primary');
             });
-            this.classList.remove('btn-outline-primary', 'btn-outline-success', 'btn-outline-info', 'btn-outline-warning');
+            this.classList.remove('btn-outline-primary');
             this.classList.add('active', 'btn-primary');
             
-            // Filtrage des lignes
-            agentRows.forEach(row => {
-                if (type === 'all') {
-                    row.classList.remove('hidden');
+            // Filtrage des éléments
+            agentItems.forEach(item => {
+                if (filter === 'all') {
+                    item.classList.remove('hidden');
                 } else {
-                    if (row.getAttribute('data-type') === type) {
-                        row.classList.remove('hidden');
+                    if (item.getAttribute('data-type') === filter) {
+                        item.classList.remove('hidden');
                     } else {
-                        row.classList.add('hidden');
-                    }
-                }
-            });
-            
-            // Filtrage des en-têtes de section
-            sectionHeaders.forEach(header => {
-                if (type === 'all') {
-                    header.classList.remove('hidden');
-                } else {
-                    const headerType = header.textContent.toLowerCase();
-                    if (headerType.includes(type)) {
-                        header.classList.remove('hidden');
-                    } else {
-                        header.classList.add('hidden');
+                        item.classList.add('hidden');
                     }
                 }
             });
         });
     });
     
-    // Tooltip pour les boutons d'action
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
-    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl, {
-            trigger: 'hover'
-        });
+    // Tooltips pour les boutons d'action
+    const tooltips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltips.map(function(tooltip) {
+        return new bootstrap.Tooltip(tooltip);
     });
 });
 </script>

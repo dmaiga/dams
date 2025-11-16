@@ -4,28 +4,15 @@ from django.utils import timezone
 from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
     DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
-    MouvementStock,Recouvrement,VersementBancaire,Fournisseur,Depense
+    MouvementStock,Recouvrement,VersementBancaire,Fournisseur,
+    Depense,Perte
 )
+
+from django.contrib.auth.models import User
 from django.db import models
 import os
 
-# forms.py
-from django import forms
-from django.contrib.auth.models import User
-from .models import Agent
 from django.core.exceptions import ValidationError
-
-# forms.py
-from django import forms
-from django.contrib.auth.models import User
-from .models import Agent
-from django.core.exceptions import ValidationError
-
-# forms.py
-from django import forms
-from django.utils import timezone
-from .models import VersementBancaire, Depense
-from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 from decimal import Decimal
 
@@ -213,8 +200,6 @@ class FournisseurForm(forms.ModelForm):
         model = Fournisseur
         fields = ['nom', 'contact', 'email', 'adresse']
 
-
-
 class ReceptionLotForm(forms.ModelForm):
     # Champs pour nouveau fournisseur
     nouveau_fournisseur = forms.BooleanField(
@@ -292,13 +277,13 @@ class ReceptionLotForm(forms.ModelForm):
             }),
             'quantite_initiale': forms.NumberInput(attrs={
             'class': 'form-control',
-            'step': '0.01',   
-            'min': '0.01',
+            'step': '0.5',   
+            'min': '0.5',
             'placeholder': 'Quantité'
              }),
             'prix_achat_unitaire': forms.NumberInput(attrs={
                 'class': 'form-control', 
-                'step': '0.01',
+                'step': '1',
                 'placeholder': '0.00'
             }),
             'date_reception': forms.DateTimeInput(attrs={
@@ -365,10 +350,7 @@ class ReceptionLotForm(forms.ModelForm):
         if not quantite or quantite <= 0:
             self.add_error('quantite_initiale', 'La quantité doit être supérieure à 0')
         
-        prix = cleaned_data.get('prix_achat_unitaire')
-        if not prix or prix <= 0:
-            self.add_error('prix_achat_unitaire', 'Le prix d\'achat doit être supérieur à 0')
-        
+
         # Validation de la date de réception
         date_reception = cleaned_data.get('date_reception')
         if date_reception:
@@ -466,6 +448,18 @@ class ReceptionLotForm(forms.ModelForm):
     
     # forms.py
 
+# core/forms.py
+
+
+class PerteForm(forms.ModelForm):
+    class Meta:
+        model = Perte
+        fields = ["quantite_perdue", "description"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
 class UploadFactureForm(forms.ModelForm):
     class Meta:
         model = LotEntrepot
@@ -496,7 +490,7 @@ class UploadFactureForm(forms.ModelForm):
 
 class DistributionForm(forms.ModelForm):
     TYPE_DISTRIBUTION = (
-        ('TERRAIN', 'Distribution à un agent '),
+        ('TERRAIN', 'Distribution à un agent'),
         ('AUTO', 'Auto-distribution'),
         ('STAGIAIRE', 'Distribution à un stagiaire'),
     )
@@ -507,35 +501,80 @@ class DistributionForm(forms.ModelForm):
         widget=forms.RadioSelect(attrs={'class': 'form-check-input'})
     )
     
-    # Champs dynamiques pour les produits
-    produit = forms.ModelChoiceField(
-        queryset=Produit.objects.all(),
+    # Champ pour sélectionner le lot directement
+    lot = forms.ModelChoiceField(
+        queryset=LotEntrepot.objects.filter(quantite_restante__gt=0),
         required=True,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={
+            'class': 'form-select',
+            'id': 'lot-select'
+        }),
+        label="Sélectionner un lot"
     )
-    quantite = forms.IntegerField(
-        min_value=1,
+    
+    specification = forms.CharField(
+        required=False,
+        max_length=200,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex: En poudre, en graine, moulu, etc.',
+            'id': 'specification-input'
+        }),
+        label="Spécification (optionnel)",
+        help_text="Forme, présentation ou autre spécification du produit"
+    )
+    
+     
+    quantite = forms.DecimalField(
+        min_value=0.01,  # ✅ CHANGÉ : 0.01 au lieu de 0.5 pour plus de flexibilité
+        max_digits=10,
+        decimal_places=2,
         required=True,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'id': 'quantite-input'})
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control', 
+            'step': '0.01',  # ✅ CHANGÉ : 0.01 pour accepter les centimes
+            'id': 'quantite-input',
+            'min': '0.01',   # ✅ AJOUTÉ : validation HTML
+            'placeholder': 'Ex: 1.5 ou 1,5'
+        })
     )
+
+    # PRIX OBLIGATOIRES maintenant
     prix_gros = forms.DecimalField(
-        required=False,
+        required=True,
         max_digits=10,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Prix gros'})
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control', 
+            'step': '0.01',  # ✅ CHANGÉ : 0.01 pour les centimes
+            'placeholder': 'Prix gros *',
+            'id': 'prix-gros-input',
+            'min': '0.01'    # ✅ AJOUTÉ
+        }),
+        label="Prix gros *"
     )
+    
     prix_detail = forms.DecimalField(
-        required=False,
+        required=True,
         max_digits=10,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Prix détail'})
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control', 
+            'step': '0.01',  
+            'placeholder': 'Prix détail *',
+            'id': 'prix-detail-input',
+            'min': '0.01'    
+        }),
+        label="Prix détail *"
     )
+    
     
     date_distribution = forms.DateTimeField(
         required=True,
         widget=forms.DateTimeInput(attrs={
             'class': 'form-control datetimepicker',
-            'type': 'datetime-local'
+            'type': 'datetime-local',
+            'id': 'date-distribution-input'
         }),
         initial=timezone.now
     )
@@ -544,7 +583,10 @@ class DistributionForm(forms.ModelForm):
         model = DistributionAgent
         fields = ['type_distribution', 'agent_terrain', 'date_distribution']
         widgets = {
-            'agent_terrain': forms.Select(attrs={'class': 'form-select', 'id': 'agent-select'}),
+            'agent_terrain': forms.Select(attrs={
+                'class': 'form-select', 
+                'id': 'agent-select'
+            }),
         }
 
     def __init__(self, *args, **kwargs):
@@ -552,19 +594,16 @@ class DistributionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # Limiter aux agents terrain (sauf pour l'auto-distribution)
-        self.fields['agent_terrain'].queryset = Agent.objects.filter(type_agent__in=['terrain', 'stagiaire'])
+        self.fields['agent_terrain'].queryset = Agent.objects.filter(
+            type_agent__in=['terrain', 'stagiaire']
+        )
         self.fields['agent_terrain'].empty_label = "Sélectionner un agent (terrain ou stagiaire)"
         self.fields['agent_terrain'].required = False
         
-        # Filtrer les produits qui ont du stock disponible
-        produits_avec_stock = []
-        for produit in Produit.objects.all():
-            if LotEntrepot.get_lots_disponibles(produit.nom).exists():
-                produits_avec_stock.append(produit)
-        
-        self.fields['produit'].queryset = Produit.objects.filter(
-            id__in=[p.id for p in produits_avec_stock]
-        )
+        # Filtrer les lots avec stock disponible et précharger les relations
+        self.fields['lot'].queryset = LotEntrepot.objects.filter(
+            quantite_restante__gt=0
+        ).select_related('produit', 'fournisseur').order_by('produit__nom', 'date_reception')
         
         # Formater la date initiale
         if self.instance and self.instance.pk:
@@ -576,7 +615,12 @@ class DistributionForm(forms.ModelForm):
         cleaned_data = super().clean()
         type_distribution = cleaned_data.get('type_distribution')
         agent = cleaned_data.get('agent_terrain')
+        lot = cleaned_data.get('lot')
+        quantite = cleaned_data.get('quantite')
+        prix_gros = cleaned_data.get('prix_gros')
+        prix_detail = cleaned_data.get('prix_detail')
     
+        # Validation du type de distribution
         if type_distribution in ['TERRAIN', 'STAGIAIRE'] and not agent:
             self.add_error('agent_terrain', 'Un agent est requis pour ce type de distribution.')
     
@@ -587,83 +631,48 @@ class DistributionForm(forms.ModelForm):
                 self.add_error('agent_terrain', 'Ce stagiaire est expiré.')
     
         elif type_distribution == 'AUTO':
-            # Pour l'auto-distribution, pas besoin d'agent_terrain
             cleaned_data['agent_terrain'] = None
         
-        # Validation commune
-        if not cleaned_data.get('produit'):
-            self.add_error('produit', 'Produit requis')
-        if not cleaned_data.get('quantite') or cleaned_data.get('quantite', 0) <= 0:
-            self.add_error('quantite', 'Quantité valide requise')
+        # Validation du lot et de la quantité
+        if lot and quantite:
+            if quantite > lot.quantite_restante:
+                self.add_error(
+                    'quantite', 
+                    f'Quantité insuffisante dans ce lot. Stock disponible: {lot.quantite_restante}'
+                )
+            
+            if quantite <= 0:
+                self.add_error('quantite', 'La quantité doit être supérieure à 0')
+        
+        # Validation des prix (OBLIGATOIRES)
+        if not prix_gros:
+            self.add_error('prix_gros', 'Le prix gros est obligatoire')
+        elif prix_gros <= 0:
+            self.add_error('prix_gros', 'Le prix gros doit être supérieur à 0')
+            
+        if not prix_detail:
+            self.add_error('prix_detail', 'Le prix détail est obligatoire')
+        elif prix_detail <= 0:
+            self.add_error('prix_detail', 'Le prix détail doit être supérieur à 0')
+            
+        # Vérifier que le prix détail est supérieur au prix gros
+        if prix_gros and prix_detail and prix_detail <= prix_gros:
+            self.add_error('prix_detail', 'Le prix détail doit être supérieur au prix gros')
         
         # Validation de la date
         date_distribution = cleaned_data.get('date_distribution')
         if date_distribution:
             if date_distribution > timezone.now():
                 self.add_error('date_distribution', 'La date de distribution ne peut pas être dans le futur')
+            
+            if lot and date_distribution < lot.date_reception:
+                self.add_error(
+                    'date_distribution',
+                    f'Ce lot n\'était pas encore reçu à cette date. Date de réception: {lot.date_reception.strftime("%d/%m/%Y")}'
+                )
         
-        # Vérifier le stock disponible
-        if cleaned_data.get('produit') and cleaned_data.get('quantite') and cleaned_data.get('date_distribution'):
-            produit_nom = cleaned_data['produit'].nom
-            quantite_demandee = cleaned_data['quantite']
-            stock_disponible = self.get_stock_a_date(produit_nom, cleaned_data['date_distribution'])
-            
-            if quantite_demandee > stock_disponible:
-                self.add_error('quantite', f'Stock insuffisant à cette date. Disponible: {stock_disponible} unités')
-            
         return cleaned_data
 
-    def get_stock_a_date(self, produit_nom, date_reference):
-        """
-        Calcule le stock disponible à une date donnée - version optimisée
-        """
-        from django.db.models import Sum
-        
-        # Stock total initial (lots reçus avant la date de référence)
-        stock_total_initial = LotEntrepot.objects.filter(
-            produit__nom=produit_nom,
-            date_reception__lte=date_reference
-        ).aggregate(total=Sum('quantite_initiale'))['total'] or 0
-        
-        # Quantité déjà distribuée avant cette date
-        quantite_deja_distribuee = DetailDistribution.objects.filter(
-            lot__produit__nom=produit_nom,
-            distribution__date_distribution__lte=date_reference,
-            distribution__est_supprime=False,
-            est_supprime=False
-        ).aggregate(total=Sum('quantite'))['total'] or 0
-        
-        return stock_total_initial - quantite_deja_distribuee
-    
-
-    def get_lots_disponibles_a_date(self, produit_nom, date_reference):
-        """Retourne les lots disponibles à une date donnée en VRAI FIFO"""
-        from django.db.models import Sum
-
-        lots = LotEntrepot.objects.filter(
-            produit__nom=produit_nom,
-            date_reception__lte=date_reference
-        ).order_by('date_reception', 'id')  # FIFO = plus ancienne date d'abord
-
-        lots_avec_stock = []
-        for lot in lots:
-            # ✅ CORRECTION : Calculer la quantité déjà distribuée de CE LOT avant la date de référence
-            quantite_distribuee = DetailDistribution.objects.filter(
-                lot=lot,  # ✅ Important : filtrer par LOT spécifique
-                distribution__date_distribution__lte=date_reference,
-                distribution__est_supprime=False,  # ✅ Ignorer les distributions supprimées
-                est_supprime=False  # ✅ Ignorer les détails supprimés
-            ).aggregate(total=Sum('quantite'))['total'] or 0
-
-            quantite_restante = lot.quantite_initiale - quantite_distribuee
-
-            # ✅ CORRECTION : Ne garder que les lots qui ont encore du stock
-            if quantite_restante > 0:
-                lot._quantite_restante_calculee = quantite_restante
-                lots_avec_stock.append(lot)
-
-        return lots_avec_stock
-    
     def save(self, commit=True):
         from django.db import transaction
     
@@ -685,96 +694,50 @@ class DistributionForm(forms.ModelForm):
                 with transaction.atomic():
                     instance.save()
     
-                    produit = self.cleaned_data.get('produit')
-                    quantite_demandee = self.cleaned_data.get('quantite')
+                    lot = self.cleaned_data.get('lot')
+                    quantite = self.cleaned_data.get('quantite')
                     prix_gros = self.cleaned_data.get('prix_gros')
                     prix_detail = self.cleaned_data.get('prix_detail')
+                    specification = self.cleaned_data.get('specification', '').strip()
+                    
+                    if lot and quantite:
+                        # Créer le détail de distribution
+                        detail = DetailDistribution.objects.create(
+                            distribution=instance,
+                            lot=lot,
+                            quantite=quantite,
+                            prix_gros=prix_gros,
+                            prix_detail=prix_detail,
+                            specification=specification
+
+                        )
     
-                    if produit and quantite_demandee:
-                        lots_disponibles = self.get_lots_disponibles_a_date(produit.nom, instance.date_distribution)
-                        quantite_restante = quantite_demandee
+                        # Mettre à jour le stock du lot
+                        LotEntrepot.objects.filter(id=lot.id).update(
+                            quantite_restante=models.F('quantite_restante') - quantite
+                        )
     
-                        # VÉRIFICATION FINALE DU STOCK
-                        stock_total_disponible = sum(lot._quantite_restante_calculee for lot in lots_disponibles)
-    
-                        if quantite_demandee > stock_total_disponible:
-                            raise forms.ValidationError(
-                                f"Stock insuffisant pour {produit.nom}. "
-                                f"Demandé: {quantite_demandee}, Disponible: {stock_total_disponible}"
-                            )
-    
-                        details_creation = []
-                        mouvements_creation = []
-                        lots_a_mettre_a_jour = []
-    
-                        for lot in lots_disponibles:
-                            if quantite_restante <= 0:
-                                break
-                            
-                            quantite_a_prelever = min(quantite_restante, lot._quantite_restante_calculee)
-    
-                            # Vérifier le stock actuel du lot
-                            lot_actuel = LotEntrepot.objects.get(id=lot.id)
-                            if quantite_a_prelever > lot_actuel.quantite_restante:
-                                quantite_a_prelever = lot_actuel.quantite_restante
-    
-                            if quantite_a_prelever <= 0:
-                                continue
-                            
-                            # ✅ CORRECTION : Créer un DetailDistribution POUR CHAQUE LOT
-                            details_creation.append(DetailDistribution(
-                                distribution=instance,
-                                lot=lot,
-                                quantite=quantite_a_prelever,  # Quantité spécifique à ce lot
-                                prix_gros=prix_gros,           # Même prix pour tous les lots du même produit
-                                prix_detail=prix_detail        # Même prix pour tous les lots du même produit
-                            ))
-    
-                            # Préparer la mise à jour du lot
-                            lots_a_mettre_a_jour.append((lot.id, quantite_a_prelever))
-    
-                            # Préparer le mouvement de stock
-                            mouvements_creation.append(MouvementStock(
-                                produit=produit,
-                                lot=lot,
-                                agent=instance.superviseur,
-                                type_mouvement='DISTRIBUTION',
-                                quantite=quantite_a_prelever,
-                                date_mouvement=instance.date_distribution
-                            ))
-    
-                            quantite_restante -= quantite_a_prelever
-    
-                        if quantite_restante > 0:
-                            raise forms.ValidationError(
-                                f"Stock insuffisant pour {produit.nom}. "
-                                f"Manquant: {quantite_restante} unités"
-                            )
-    
-                        # CRÉATION EN MASSE DES DÉTAILS
-                        DetailDistribution.objects.bulk_create(details_creation)
-    
-                        # MISE À JOUR DES LOTS
-                        for lot_id, quantite in lots_a_mettre_a_jour:
-                            LotEntrepot.objects.filter(id=lot_id).update(
-                                quantite_restante=models.F('quantite_restante') - quantite
-                            )
-    
-                        # CRÉATION DES MOUVEMENTS DE STOCK
-                        MouvementStock.objects.bulk_create(mouvements_creation)
+                        # Créer le mouvement de stock
+                        MouvementStock.objects.create(
+                            produit=lot.produit,
+                            lot=lot,
+                            agent=instance.superviseur,
+                            type_mouvement='DISTRIBUTION',
+                            quantite=quantite,
+                            date_mouvement=instance.date_distribution,
+                            detail_distribution=detail
+                        )
     
                         # Mettre à jour les totaux
                         instance._mettre_a_jour_totaux()
     
             except Exception as e:
-                # En cas d'erreur, tout est annulé automatiquement par la transaction
                 if instance.pk:
                     instance.delete()
                 raise e
     
         return instance
     
-
 class DistributionModificationForm(forms.ModelForm):
     """Formulaire pour modifier une distribution existante"""
     
@@ -937,7 +900,7 @@ class VenteForm(forms.ModelForm):
         widgets = {
             'client': forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
             'detail_distribution': forms.Select(attrs={'class': 'form-select', 'id': 'detail-distribution'}),
-            'quantite': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'id': 'quantite-vente'}),
+            'quantite': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'id': 'quantite-vente'}),
             'prix_vente_unitaire': forms.NumberInput(attrs={
                 'class': 'form-control', 
                 'step': '0.01', 
@@ -966,14 +929,10 @@ class VenteForm(forms.ModelForm):
         else:
             self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
         
-        # ✅ MODIFIÉ : TOUS LES STAGIAIRES (sans filtre de date d'expiration)
+        # ✅ Tous les stagiaires, même expirés
         if self.agent:
-            # Tous les stagiaires, même expirés
             tous_les_stagiaires = Agent.objects.filter(type_agent='stagiaire').select_related('user')
-            
             self.fields['stagiaire'].queryset = tous_les_stagiaires
-            
-            # Formater l'affichage des stagiaires avec indication d'expiration
             self.fields['stagiaire'].label_from_instance = lambda obj: (
                 f"{obj.full_name} (Expire le {obj.date_expiration.strftime('%d/%m/%Y')})"
                 if obj.date_expiration else f"{obj.full_name} (Pas de date d'expiration)"
@@ -987,27 +946,41 @@ class VenteForm(forms.ModelForm):
             empty_label="Sélectionner un client existant (optionnel)..."
         )
         
-        # Filtrer les détails de distribution disponibles pour cet agent
-        if self.agent:
-            self.fields['detail_distribution'].queryset = DetailDistribution.objects.filter(
-                distribution__agent_terrain=self.agent,
-                quantite__gt=0  # Seulement les distributions avec du stock disponible
-            ).select_related('lot', 'lot__produit')
-            
-            # Ajouter des informations utiles dans l'affichage
-            self.fields['detail_distribution'].label_from_instance = lambda obj: (
-                f"{obj.lot.produit.nom} - Lot {obj.lot.reference_lot} - "
-                f"Stock: {obj.quantite} - "
-                f"Prix gros: {obj.prix_gros or 'N/D'} FCFA - "
-                f"Prix détail: {obj.prix_detail or 'N/D'} FCFA"
-            )
+        # ✅ Filtrer les détails de distribution disponibles avec ORM
+        from django.db.models import DecimalField, Sum, F, Value, ExpressionWrapper
+        from django.db.models.functions import Coalesce
 
-        # Initialiser les champs comme désactivés
+        if self.agent:
+            detail_qs = DetailDistribution.objects.filter(
+                distribution__agent_terrain=self.agent,
+                distribution__est_supprime=False,
+                est_supprime=False
+            ).annotate(
+                quantite_vendue=Coalesce(Sum('vente__quantite'), Value(0, output_field=DecimalField()))
+            ).annotate(
+                quantite_restante=ExpressionWrapper(
+                    F('quantite') - F('quantite_vendue'),
+                    output_field=DecimalField()
+                )
+            ).filter(
+                quantite_restante__gt=0
+            ).select_related('lot__produit', 'lot')
+
+            self.fields['detail_distribution'].queryset = detail_qs
+
+        # Initialiser les champs client comme désactivés
         self.fields['client'].widget.attrs['disabled'] = True
         self.fields['client_nom'].widget.attrs['disabled'] = True
         self.fields['client_contact'].widget.attrs['disabled'] = True
         self.fields['client_type'].widget.attrs['disabled'] = True
 
+    def label_from_distribution(self, obj):
+        produit = obj.lot.produit.nom
+        lot_ref = obj.lot.reference_lot or f"Lot#{obj.lot.id}"
+        quantite_dispo = obj.quantite - getattr(obj, 'quantite_vendue', 0)
+        specification = f" - {obj.specification}" if obj.specification else ""
+        return f"{produit}{specification} - {lot_ref} (Stock dispo: {quantite_dispo})"
+    
     def clean(self):
         cleaned_data = super().clean()
         
