@@ -52,9 +52,10 @@ class VenteAdmin(admin.ModelAdmin):
         'detail_distribution',
         'quantite',
         'prix_vente_unitaire',
-        'date_vente'
+        'date_vente',
+        'date_creation'
     ]
-    list_filter = ['date_vente', 'agent', 'client']
+    list_filter = ['date_vente', 'agent', 'client','date_creation']
     search_fields = [
         'agent__user__username', 
         'agent__user__first_name', 
