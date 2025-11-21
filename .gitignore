@@ -4,12 +4,31 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # -----------------------------
 # Django
 # -----------------------------
 # Base de données SQLite
 db.sqlite3
+db.sqlite3-journal
 
 # Dossier media (uploads)
 media/
@@ -18,6 +37,12 @@ factures_depots/
 # Fichiers statiques générés
 staticfiles/
 *.log
+logs/
+*.log
+local_settings.py
+
+# Fichiers de cache
+.cache
 
 # -----------------------------
 # Environnements virtuels
@@ -26,32 +51,96 @@ venv/
 env/
 .venv/
 .env/
+.env.local
+.env.production
+.env.development
 
 # -----------------------------
 # IDEs & OS
 # -----------------------------
 # VSCode
 .vscode/
+*.swp
+*.swo
 
 # PyCharm
 .idea/
+*.iws
+*.iml
+*.ipr
 
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
 
 # -----------------------------
 # Coverage & Tests
 # -----------------------------
 .coverage
+.coverage.*
 htmlcov/
 *.cover
 *.py,cover
 nosetests.xml
 coverage.xml
 *.pytest_cache/
+.pytest_cache/
+.pytest_cache/*
+.pytest_cache/**/*
+.pytest_cache/**
 
+# -----------------------------
+# Spécifique au projet
+# -----------------------------
+# Fichiers de cache Python spécifiques
+core/__pycache__/
+core/__pycache__/models.cpython-313.pyc
+core/__pycache__/*.pyc
+core/migrations/__pycache__/
+
+# Autres apps Django
+*/__pycache__/
+*/migrations/__pycache__/
+
+# Fichiers temporaires
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+
+# Database backups
+*.dump
+*.sql
+backup/
+
+# -----------------------------
+# Documentation
+# -----------------------------
+docs/_build/
+
+# -----------------------------
+# Jupyter Notebook
+# -----------------------------
+.ipynb_checkpoints
+
+# -----------------------------
+# Package managers
+# -----------------------------
+Pipfile.lock
+poetry.lock
+requirements/*.txt
+!requirements/base.txt
+!requirements/development.txt
+!requirements/production.txt
