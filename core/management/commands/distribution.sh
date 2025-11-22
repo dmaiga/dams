@@ -25,125 +25,101 @@ def creer_distributions_multiple():
             moussony = Agent.objects.get(user__username='moussony.konate')
             djenebaS = Agent.objects.get(user__username='djeneba.sidibe')
             djenebaY = Agent.objects.get(user__username='djeneba.yirango')
+            djenebaC = Agent.objects.get(user__username='djeneba.cisse')
             kani = Agent.objects.get(user__username='kani.traore')
             ramata = Agent.objects.get(user__username='ramata.sangare')
             sira = Agent.objects.get(user__username='sira.sidibe')
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
                 {
-                    'date': '13/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9750,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                        (fatoumata, 5, "Fatou"),
-                        (moussony, 3, "onate"),
-
-                        ]
-                },
-                {
-                    'date': '14/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9750,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                        (fatoumata, 2, "Yirango"),
-                        (sali, 10, "Yirango"),
-                        (anna, 10, "Yirango"),
-                        (moussony, 1, "Yirango"),
-
-                        ]
-                },
-                {
-                    'date': '14/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 10000,
-                    'prix_detail': 10500,
-                    'distributions': [  
-                        (ramata, 4, "Yirango"),
-
-                        ]
-                },
-                 {
                     'date': '15/11/2025', 
                     'produit': 'ail',
                     'specification': '',
-                    'prix_gros': 9750,
+                    'prix_gros': 9000,
                     'prix_detail': 10000,
                     'distributions': [  
-                        (fatoumata, 2, "Yirango"),
-
+                        (fatoumata, 4, "Fatou"),
+                        
                         ]
                 },
-                
+
+
+                       
                 {
                     'date': '17/11/2025', 
                     'produit': 'ail',
                     'specification': '',
-                    'prix_gros': 9750,
-                    'prix_detail': 10500,
+                    'prix_gros': 9000,
+                    'prix_detail': 10000,
                     'distributions': [  
-                        (ramata, 3, "Yirango"),
+                        (sali, 2, "Yirango"),
+                        (fatoumata, 1, "Yirango"),
 
                         ]
                 },
-                   {
-                    'date': '17/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9750,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                        (fatoumata, 2, "Yirango"),
-                        (abdoulaye, 4, "Yirango"),
-                       
-                        (sali, 5, "Yirango"),
-                        (anna, 5, "Yirango"),
-                        
-                        (moussony, 5, "Yirango"),
-                        (koniba, 5, "Yirango"),
-                        ]
-                },
-             
                 {
                     'date': '18/11/2025', 
                     'produit': 'ail',
                     'specification': '',
-                    'prix_gros': 9750,
+                    'prix_gros': 9000,
                     'prix_detail': 10000,
                     'distributions': [  
-                        (fatoumata, 1, "Yirango"),
+                      
+                        (fatoumata, 13, "Yirango"),
+                        
+                        (sali, 7, "Yirango"),
+                        (anna, 5, "Yirango"),
+                        
+                        (kadiatou, 5, "Yirango"),
+                        (mankoulako, 10, "Yirango"),
 
                         ]
                 },
-                   {
+                 {
                     'date': '19/11/2025', 
                     'produit': 'ail',
                     'specification': '',
-                    'prix_gros': 9750,
+                    'prix_gros': 9000,
                     'prix_detail': 10000,
                     'distributions': [  
-                        (moussony, 3, "Yirango"),
-                        (fatoumata, 1, "Yirango"),
                        
+                       (fatoumata, 2, "Yirango"),
+                       (sali, 5, "Yirango"),
+                       (kani, 4, "Yirango"),
+
                         ]
                 },
+                
                    {
                     'date': '20/11/2025', 
                     'produit': 'ail',
                     'specification': '',
-                    'prix_gros': 9750,
+                    'prix_gros': 9000,
                     'prix_detail': 10000,
                     'distributions': [  
-                       
                         (fatoumata, 2, "Yirango"),
-                        (moussony, 3, "Yirango"),
-                        (ramata, 2, "Yirango"),
+                        (sali, 7, "Yirango"),
+                        (anna, 20, "Yirango"),                        
+                        (djenebaC, 4, "Yirango"),                       
+                        (djenebaY, 2, "Yirango"),                      
+                        (ramata, 3, "Yirango"),
+                        (moussony, 2, "Yirango"),
                         ]
                 },
+                {
+                    'date': '20/11/2025', 
+                    'produit': 'ail',
+                    'specification': '',
+                    'prix_gros': 8750,
+                    'prix_detail': 10000,
+                    'distributions': [  
+                                    
+                        (mankoulako, 8, "Yirango"), 
+                        
+                        ]
+                },
+             
+                
             ]
             
             toutes_distributions = []
