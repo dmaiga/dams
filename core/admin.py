@@ -35,8 +35,8 @@ class LotEntrepotAdmin(admin.ModelAdmin):
 
 @admin.register(DistributionAgent)
 class DistributionAgentAdmin(admin.ModelAdmin):
-    list_display = ['superviseur', 'agent_terrain', 'date_distribution']
-    list_filter = ['date_distribution', 'superviseur', 'agent_terrain']
+    list_display = ['superviseur', 'agent_terrain', 'date_distribution','date_creation']
+    list_filter = ['date_distribution', 'superviseur', 'agent_terrain','date_creation']
 
 @admin.register(DetailDistribution)
 class DetailDistributionAdmin(admin.ModelAdmin):
@@ -83,7 +83,12 @@ class FactureAdmin(admin.ModelAdmin):
 class RecouvrementAdmin(admin.ModelAdmin):
     list_display = ('id', 'agent', 'superviseur', 'montant_recouvre', 'date_recouvrement', 'date_creation')
     list_filter = ('agent', 'superviseur', 'date_recouvrement')
-    search_fields = ('agent__nom', 'superviseur__nom')
+    search_fields = [
+        'agent__user__username', 
+        'agent__user__first_name', 
+        'agent__user__last_name',
+         # Permet rechercher par produit
+    ]
     ordering = ('-date_recouvrement',)
     readonly_fields = ('date_creation',)
 

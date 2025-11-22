@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-
+{% load format_fcfa %}
 {% block content %}
 <div class="container mt-4">
     <h2><i class="fas fa-money-bill-wave"></i> Nouveau Versement Bancaire</h2>
@@ -15,13 +15,13 @@
                 <div class="col-md-6">
                     <p><strong>Superviseur:</strong> {{ superviseur.full_name }}</p>
                     <p><strong>Solde disponible pour vente:</strong> 
-                        <span class="badge bg-success fs-6" id="solde-disponible">{{ solde_vente_disponible }} FCFA</span>
+                        <span class="badge bg-success fs-6" id="solde-disponible">{{ solde_vente_disponible|floatformat:0 }} FCFA</span>
                     </p>
                 </div>
                 <div class="col-md-6">
                     {% if dernier_versement %}
                     <p><strong>Dernier versement:</strong> {{ dernier_versement.date_versement_reelle|date:"d/m/Y" }}</p>
-                    <p><strong>Montant dernier versement:</strong> {{ dernier_versement.montant_verse }} FCFA</p>
+                    <p><strong>Montant dernier versement:</strong> {{ dernier_versement.montant_verse|floatformat:0 }} FCFA</p>
                     {% endif %}
                 </div>
             </div>

@@ -944,9 +944,8 @@ class VenteForm(forms.ModelForm):
             required=False,
             widget=forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
             empty_label="Sélectionner un client existant (optionnel)..."
-        )
-        
-        # ✅ Filtrer les détails de distribution disponibles avec ORM
+        )        
+        # ✅ APPROCHE CALCUL DYNAMIQUE
         from django.db.models import DecimalField, Sum, F, Value, ExpressionWrapper
         from django.db.models.functions import Coalesce
 
@@ -956,11 +955,14 @@ class VenteForm(forms.ModelForm):
                 distribution__est_supprime=False,
                 est_supprime=False
             ).annotate(
-                quantite_vendue=Coalesce(Sum('vente__quantite'), Value(0, output_field=DecimalField()))
+                quantite_vendue=Coalesce(
+                    Sum('vente__quantite'), 
+                    Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+                )
             ).annotate(
                 quantite_restante=ExpressionWrapper(
                     F('quantite') - F('quantite_vendue'),
-                    output_field=DecimalField()
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
                 )
             ).filter(
                 quantite_restante__gt=0
@@ -968,30 +970,32 @@ class VenteForm(forms.ModelForm):
 
             self.fields['detail_distribution'].queryset = detail_qs
 
-        # Initialiser les champs client comme désactivés
-        self.fields['client'].widget.attrs['disabled'] = True
-        self.fields['client_nom'].widget.attrs['disabled'] = True
-        self.fields['client_contact'].widget.attrs['disabled'] = True
-        self.fields['client_type'].widget.attrs['disabled'] = True
-
     def label_from_distribution(self, obj):
+        """Format correct pour l'affichage des options"""
         produit = obj.lot.produit.nom
         lot_ref = obj.lot.reference_lot or f"Lot#{obj.lot.id}"
-        quantite_dispo = obj.quantite - getattr(obj, 'quantite_vendue', 0)
+        
+        # ✅ FORCER le calcul de la quantité restante
+        if hasattr(obj, 'quantite_restante'):
+            quantite_dispo = obj.quantite_restante
+        else:
+            # Calcul manuel si l'annotation n'est pas disponible
+            from django.db.models import Sum
+            quantite_vendue = obj.vente_set.aggregate(
+                total=Sum('quantite')
+            )['total'] or 0
+            quantite_dispo = obj.quantite - quantite_vendue
+        
         specification = f" - {obj.specification}" if obj.specification else ""
+        
         return f"{produit}{specification} - {lot_ref} (Stock dispo: {quantite_dispo})"
-    
     def clean(self):
         cleaned_data = super().clean()
         
         # Validation client - TOUT EST OPTIONNEL
-        # Si nouveau client est coché, valider les champs correspondants
-        if cleaned_data.get('nouveau_client'):
-            if cleaned_data.get('client_nom'):
-                # Valider seulement si un nom est saisi
-                if not cleaned_data.get('client_nom'):
-                    self.add_error('client_nom', 'Nom requis si vous créez un nouveau client')
-        # Aucune validation pour les clients existants ou inconnus
+        if cleaned_data.get('nouveau_client') and cleaned_data.get('client_nom'):
+            if not cleaned_data.get('client_nom'):
+                self.add_error('client_nom', 'Nom requis si vous créez un nouveau client')
         
         # Validation de base (produit et quantité)
         if not cleaned_data.get('detail_distribution'):
@@ -1000,40 +1004,47 @@ class VenteForm(forms.ModelForm):
         if not cleaned_data.get('quantite') or cleaned_data.get('quantite', 0) <= 0:
             self.add_error('quantite', 'Quantité valide requise')
         
-        # Vérifier la quantité disponible
+        # ✅ Vérifier la quantité disponible AVEC LE CALCUL DYNAMIQUE
         if cleaned_data.get('detail_distribution') and cleaned_data.get('quantite'):
             detail = cleaned_data['detail_distribution']
-            if cleaned_data['quantite'] > detail.quantite:
-                self.add_error('quantite', f'Quantité insuffisante. Disponible: {detail.quantite}')
+            
+            # Calculer la quantité déjà vendue
+            from django.db.models import Sum
+            quantite_vendue = detail.vente_set.aggregate(
+                total=Sum('quantite')
+            )['total'] or 0
+            
+            quantite_disponible = detail.quantite - quantite_vendue
+            
+            if cleaned_data['quantite'] > quantite_disponible:
+                self.add_error('quantite', f'Quantité insuffisante. Disponible: {quantite_disponible}')
         
         # Validation de la date de vente
         date_vente = cleaned_data.get('date_vente')
         if date_vente and date_vente > timezone.now():
             self.add_error('date_vente', 'La date de vente ne peut pas être dans le futur')
         
-        # ✅ MODIFIÉ : Validation stagiaire plus permissive
+        # Validation stagiaire
         stagiaire = cleaned_data.get('stagiaire')
         if stagiaire:
             if stagiaire.type_agent != 'stagiaire':
                 self.add_error('stagiaire', "L'agent sélectionné doit être un stagiaire")
-            # SUPPRIMÉ : Plus de vérification d'expiration
         
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
 
-        # Associer l'agent (tuteur situationnel)
+        # Associer l'agent
         instance.agent = self.agent
 
-        # ✅ ASSOCIER LE STAGIAIRE SI SELECTIONNE (même expiré)
+        # Associer le stagiaire si sélectionné
         stagiaire = self.cleaned_data.get('stagiaire')
         if stagiaire:
             instance.stagiaire = stagiaire
 
-        # Gérer le client - TOUT EST OPTIONNEL
+        # Gérer le client
         if self.cleaned_data.get('nouveau_client') and self.cleaned_data.get('client_nom'):
-            # Créer un nouveau client seulement si le nom est fourni
             client = Client.objects.create(
                 nom=self.cleaned_data['client_nom'],
                 contact=self.cleaned_data.get('client_contact', ''),
@@ -1041,13 +1052,11 @@ class VenteForm(forms.ModelForm):
             )
             instance.client = client
         elif self.cleaned_data.get('client'):
-            # Utiliser le client existant sélectionné
             instance.client = self.cleaned_data.get('client')
         else:
-            # Aucun client associé → sera "Inconnu"
             instance.client = None
 
-        # Déterminer automatiquement le prix si non fourni
+        # Déterminer automatiquement le prix
         if not instance.prix_vente_unitaire and instance.detail_distribution:
             if instance.type_vente == 'gros':
                 instance.prix_vente_unitaire = instance.detail_distribution.prix_gros
@@ -1056,11 +1065,7 @@ class VenteForm(forms.ModelForm):
 
         if commit:
             instance.save()
-            
-            # Mettre à jour la quantité restante dans le détail de distribution
-            detail = instance.detail_distribution
-            detail.quantite -= instance.quantite
-            detail.save()
+            # ✅ NE RIEN FAIRE - la quantité disponible est calculée dynamiquement
             
         return instance
 

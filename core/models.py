@@ -82,15 +82,24 @@ class LotEntrepot(models.Model):
         blank=True,
         verbose_name="Date d'upload de la facture"
     )
+
     def __str__(self):
         return f"{self.produit.nom} - {self.reference_lot} - {self.quantite_restante} restants"
     
     def save(self, *args, **kwargs):
-        # Si la valeur initiale n’est pas encore enregistrée, on la calcule UNE SEULE FOIS
+        # Si la valeur initiale n'est pas encore enregistrée, on la calcule UNE SEULE FOIS
         if self.valeur_stock_initiale is None:
             self.valeur_stock_initiale = self.quantite_initiale * (self.prix_achat_unitaire or 0)
+        
+        # Validation de cohérence des quantités
+        if self.quantite_restante > self.quantite_initiale:
+            raise ValueError("La quantité restante ne peut pas être supérieure à la quantité initiale")
+        
+        if self.quantite_restante < 0:
+            raise ValueError("La quantité restante ne peut pas être négative")
 
         super().save(*args, **kwargs)
+    
     @property
     def montant_total(self):
         """Calcule le montant total du lot"""
@@ -100,15 +109,40 @@ class LotEntrepot(models.Model):
     def valeur_actuelle_stock(self):
         """Calcule la valeur actuelle du stock basée sur la quantité restante"""
         return self.quantite_restante * (self.prix_achat_unitaire or 0)
+    
+    @property
+    def quantite_perdue_totale(self):
+        """Calcule la quantité totale perdue pour ce lot"""
+        return sum(perte.quantite_perdue for perte in self.pertes.all())
+    
+    @property
+    def quantite_theorique_restante(self):
+        """Quantité théorique restante (initiale - pertes)"""
+        return self.quantite_initiale - self.quantite_perdue_totale
+    
+    @property
+    def coherence_quantites(self):
+        """Vérifie la cohérence entre quantité restante et pertes"""
+        return self.quantite_restante == self.quantite_theorique_restante
+    
+    @property
+    def ecart_quantite(self):
+        """Retourne l'écart entre quantité réelle et théorique"""
+        return self.quantite_restante - self.quantite_theorique_restante
+    
+    def recalculer_quantite_restante(self):
+        """Recalcule la quantité restante basée sur les pertes"""
+        self.quantite_restante = self.quantite_theorique_restante
+        self.save()
+    
     @staticmethod
     def get_lots_disponibles(produit_nom):
         return LotEntrepot.objects.filter(
             produit__nom=produit_nom,
             quantite_restante__gt=0
         ).order_by("date_reception")
-
+    
 # core/models.py
-
 class Perte(models.Model):
     lot = models.ForeignKey(
         LotEntrepot,
@@ -116,17 +150,70 @@ class Perte(models.Model):
         related_name="pertes"
     )
     quantite_perdue = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite_perdue_originale = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Quantité perdue initiale"
+    )
     description = models.TextField()
-    date_perte = models.DateTimeField(auto_now_add=True)
-
+    date_perte = models.DateTimeField(default=timezone.now)
+    date_modification = models.DateTimeField(auto_now=True)
+    est_modifiee = models.BooleanField(default=False)
+    
     def __str__(self):
-        return f"Perte de {self.quantite_perdue} sur {self.lot}"
+        statut = " (modifiée)" if self.est_modifiee else ""
+        return f"Perte de {self.quantite_perdue} sur {self.lot}{statut}"
     
     def save(self, *args, **kwargs):
-        if not self.pk:  # Exécute uniquement à la création
-            self.lot.quantite_restante -= self.quantite_perdue
+        from django.db import transaction
+        
+        with transaction.atomic():
+            if not self.pk:  # Création
+                # Sauvegarder la quantité originale
+                self.quantite_perdue_originale = self.quantite_perdue
+                # Déduire la quantité du lot
+                self.lot.quantite_restante -= self.quantite_perdue
+                self.lot.save()
+            else:  # Modification
+                ancienne_perte = Perte.objects.get(pk=self.pk)
+                difference = self.quantite_perdue - ancienne_perte.quantite_perdue
+                
+                if difference != 0:
+                    # Ajuster la quantité du lot
+                    self.lot.quantite_restante -= difference
+                    self.lot.save()
+                    self.est_modifiee = True
+            
+            super().save(*args, **kwargs)
+    
+    def delete(self, using=None, keep_parents=False):
+        """Restituer la quantité au lot lors de la suppression"""
+        from django.db import transaction
+        
+        with transaction.atomic():
+            # Restituer la quantité perdue au lot
+            self.lot.quantite_restante += self.quantite_perdue
             self.lot.save()
-        super().save(*args, **kwargs)
+            super().delete(using=using, keep_parents=keep_parents)
+    
+    @property
+    def difference_quantite(self):
+        """Retourne la différence entre la quantité actuelle et originale"""
+        return self.quantite_perdue - self.quantite_perdue_originale
+    
+    @property
+    def impact_quantite(self):
+        """Retourne l'impact sur la quantité du lot"""
+        return {
+            'quantite_avant_perte': self.lot.quantite_initiale,
+            'quantite_actuelle': self.lot.quantite_restante,
+            'quantite_perdue_totale': self.quantite_perdue,
+            'quantite_originale': self.quantite_perdue_originale,
+            'difference': self.difference_quantite
+        }
+    
+
 
 class Agent(models.Model):
     TYPE_AGENT_CHOICES = (
@@ -460,6 +547,7 @@ class Agent(models.Model):
         return 0
     
 
+
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent '),
@@ -671,6 +759,7 @@ class DetailDistribution(models.Model):
         verbose_name = "Détail de distribution"
         verbose_name_plural = "Détails de distribution"
 
+
 class MouvementStock(models.Model):
     TYPE_MOUVEMENT = (
         ('RECEPTION', 'Réception fournisseur'),
@@ -751,6 +840,7 @@ class Facture(models.Model):
     class Meta:
         verbose_name = "Facture"
         verbose_name_plural = "Factures"
+
 
 class Vente(models.Model):
     TYPE_VENTE_CHOICES = (
@@ -910,6 +1000,7 @@ class Vente(models.Model):
         ordering = ['-date_vente']
         verbose_name = "Vente"
         verbose_name_plural = "Ventes"
+        
 
 class Dette(models.Model):
     STATUT_CHOICES = (
