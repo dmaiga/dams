@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize', 
     'core',
     'mathfilters',
+    'tinymce',
 
 
 
@@ -159,3 +160,13 @@ if not os.path.exists(MEDIA_ROOT):
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+TINYMCE_SIMPLE_CONFIG = {
+    'height': 200,
+    'width': '100%',
+    'menubar': False,
+    'plugins': 'link lists preview',
+    'toolbar': 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist | link | preview',
+    'statusbar': False,
+}

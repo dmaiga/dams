@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-
+from tinymce.models import HTMLField
 from datetime import timedelta
 
 from django.db.models import (
@@ -1365,7 +1365,7 @@ class VersementBancaire(models.Model):
         verbose_name="Montant hors vente"
     )
 
-    description = models.TextField(
+    description = HTMLField(
         blank=True,
         verbose_name="Description du versement"
     )
@@ -1426,7 +1426,7 @@ class Depense(models.Model):
         validators=[MinValueValidator(Decimal('0.01'))]
     )
 
-    description = models.TextField(
+    description = HTMLField(
         verbose_name="Détails de la dépense"
     )
 
@@ -1439,7 +1439,7 @@ class Depense(models.Model):
 
 
     def __str__(self):
-        return f"Dépense {self.id} - {self.montant} FCFA - {self.categorie}"
+        return f"Dépense {self.id} - {self.montant} FCFA "
 
     class Meta:
         ordering = ['-date_depense']

@@ -16,9 +16,9 @@
                 <i class="fas fa-arrow-left"></i> Retour à la liste
             </a>
             {% if request.user.agent == versement.superviseur or request.user.agent.est_direction %}
-<a href="{% url 'modifier_versement' versement.id %}" class="btn btn-warning">
-    <i class="fas fa-edit"></i> Modifier
-</a>
+            <a href="{% url 'modifier_versement' versement.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Modifier
+            </a>
             {% endif %}
         </div>
     </div>
@@ -79,68 +79,68 @@
                         </div>
                     </div>
 
-                    <!-- Description -->
+                    <!-- Description CORRIGÉE -->
                     {% if versement.description %}
                     <div class="mt-3 p-3 bg-light rounded">
                         <h6 class="text-muted">📝 Description:</h6>
-                        <p class="mb-0">{{ versement.description }}</p>
+                        <div class="mb-0">{{ versement.description|safe }}</div>
                     </div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Section Dépenses -->
-            <!-- Section Dépenses -->
-<div class="card mb-4">
-    <div class="card-header bg-warning text-dark">
-        <h5 class="mb-0">📝 Dépenses Associées</h5>
-    </div>
-    <div class="card-body">
-        {% if depenses %}
-        <div class="table-responsive">
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Description</th>
-                        <th>Montant</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for depense in depenses %}
-                    <tr>
-                        <td>
-                            <small>{{ depense.date_depense|date:"d/m/Y" }}</small>
-                        </td>
-                        <td>
-                            {{ depense.description|default:"-" }}
-                        </td>
-                        <td class="{% if depense.montant > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
-                            {% if depense.montant > 0 %}
-                                - {{ depense.montant|floatformat:0 }} FCFA
-                            {% else %}
-                                <span class="text-muted">0 FCFA</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot class="table-light">
-                    <tr>
-                        <td colspan="2" class="text-end"><strong>Total Dépenses:</strong></td>
-                        <td class="text-danger fw-bold">- {{ total_depenses|floatformat:0 }} FCFA</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-        {% else %}
-        <div class="text-center py-3">
-            <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
-            <p class="text-muted mb-0">Aucune dépense associée à ce versement</p>
-        </div>
-        {% endif %}
-    </div>
-</div>
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">📝 Dépenses Associées</h5>
+                </div>
+                <div class="card-body">
+                    {% if depenses %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for depense in depenses %}
+                                <tr>
+                                    <td>
+                                        <small>{{ depense.date_depense|date:"d/m/Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <!-- CORRECTION ICI AUSSI -->
+                                        <div>{{ depense.description|safe|default:"-" }}</div>
+                                    </td>
+                                    <td class="{% if depense.montant > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                        {% if depense.montant > 0 %}
+                                            - {{ depense.montant|floatformat:0 }} FCFA
+                                        {% else %}
+                                            <span class="text-muted">0 FCFA</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="2" class="text-end"><strong>Total Dépenses:</strong></td>
+                                    <td class="text-danger fw-bold">- {{ total_depenses|floatformat:0 }} FCFA</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">Aucune dépense associée à ce versement</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
         <!-- Résumé financier -->

@@ -1361,6 +1361,9 @@ class FactureForm(forms.ModelForm):
             }),
         }
 
+from tinymce.widgets import TinyMCE
+from tinymce.widgets import TinyMCE
+
 class VersementForm(forms.ModelForm):
     # Dépense optionnelle intégrée
     depense_montant = forms.DecimalField(
@@ -1375,8 +1378,13 @@ class VersementForm(forms.ModelForm):
     depense_description = forms.CharField(
         required=False,
         label="Description de la dépense",
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2})
+        widget=TinyMCE(attrs={
+            'cols': 5,
+            'rows': 4,
+            'style': 'min-height: 60px; width:100%; max-width:100%;'
+        })
     )
+
 
     class Meta:
         model = VersementBancaire
@@ -1390,10 +1398,20 @@ class VersementForm(forms.ModelForm):
         widgets = {
             'montant_vente': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'montant_hors_vente': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'description': TinyMCE(attrs={
+                'rows': 2,
+                'class': 'form-control'
+            }), 
             'date_versement_reelle': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'recu': forms.FileInput(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ajout de placeholder pour une meilleure UX mobile
+        self.fields['montant_vente'].widget.attrs['placeholder'] = '0.00'
+        self.fields['montant_hors_vente'].widget.attrs['placeholder'] = '0.00'
+        self.fields['depense_montant'].widget.attrs['placeholder'] = '0.00'
 
     def save(self, superviseur=None, commit=True):
         """
@@ -1403,28 +1421,22 @@ class VersementForm(forms.ModelForm):
         """
         versement = super().save(commit=False)
         
-        # Si un superviseur est fourni (création), on l'assigne
-        # Sinon (modification), on garde le superviseur existant
         if superviseur is not None:
             versement.superviseur = superviseur
         
         if commit:
             versement.save()
 
-            # CORRECTION : Logique améliorée
             dep_montant = self.cleaned_data.get('depense_montant') or 0
             dep_desc = self.cleaned_data.get('depense_description', '').strip()
             
-            # Conditions pour créer une dépense
             has_description = bool(dep_desc)
             has_amount = dep_montant > 0
             
             if has_description or has_amount:
-                # Si description vide mais montant > 0, utiliser une description par défaut
                 if not dep_desc and has_amount:
                     dep_desc = "Dépense associée au versement"
                 
-                # Si montant 0 mais description, garder montant à 0
                 if not has_amount:
                     dep_montant = 0
                     

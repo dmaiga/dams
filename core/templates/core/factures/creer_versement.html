@@ -2,166 +2,126 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container ">
+{{ form.media }}
+<div class="container">
     <div class="row justify-content-center">
-        <div class="col">
-                            <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="col-lg-10">
+            <!-- En-tête -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                     <h4 class="mb-0">💳 Nouveau Versement</h4>
+                    <h4 class="mb-1">💳 Nouveau Versement</h4>
+                    <p class="text-muted mb-0">Remplissez les informations du versement bancaire</p>
                 </div>
                 <div>
-                  <a href="{% url 'liste_versement' %}" class="btn btn-secondary">
+                    <a href="{% url 'liste_versement' %}" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> Retour
                     </a>
                 </div>
             </div>
-            <div class="card">
 
-                <div class="card-body">
+            <!-- Carte principale -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
                     
                     <!-- Info solde -->
-                    <div class="alert alert-info mb-4">
-                        <strong>💰 Solde vente disponible :</strong> 
-                        {{ superviseur.solde_vente_superviseur|floatformat:0 }} FCFA
+                    <div class="alert alert-info border-0 mb-4">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-wallet me-2"></i>
+                            <div>
+                                <strong class="d-block">Solde vente disponible</strong>
+                                <span class="h5 mb-0">{{ superviseur.solde_vente_superviseur|floatformat:0 }} FCFA</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
                         {% csrf_token %}
                         
                         <!-- Section Montants -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">💰 Montants à verser</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
+                        <div class="card border-0 bg-light mb-4">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-3">💰 Montants à verser</h5>
+                                <div class="row g-3">
                                     <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Montant vente *</label>
+                                        <div class="form-group">
+                                            <label class="form-label fw-semibold">Montant vente *</label>
                                             {{ form.montant_vente }}
-                                            <div class="form-text text-success">
+                                            <div class="form-text text-success mt-1">
+                                                <i class="fas fa-info-circle me-1"></i>
                                                 Sera déduit de votre solde vente
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold">Montant hors vente</label>
+                                        <div class="form-group">
+                                            <label class="form-label fw-semibold">Montant hors vente</label>
                                             {{ form.montant_hors_vente }}
-                                            <div class="form-text text-muted">
-                                                Pour analyse seulement
-                                            </div>
+                                      
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <!-- Total -->
-                                <div class="alert alert-warning">
-                                    <strong>Total à verser : </strong>
-                                    <span id="totalVersement">0</span> FCFA
-                                </div>
+                                
                             </div>
                         </div>
 
                         <!-- Section Dépense optionnelle -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">📝 Dépense associée (optionnel)</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Montant dépense</label>
-                                            {{ form.depense_montant }}
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Description</label>
-                                            {{ form.depense_description }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+<div class="card border-0 bg-light mb-4">
+    <div class="card-body p-4">
+        <h5 class="card-title mb-3">
+            <span class="text-muted">📝</span> Dépense associée <small class="text-muted">(optionnel)</small>
+        </h5>
+        
+        <div class="form-group mb-3">
+            <label class="form-label">Montant dépense</label>
+            {{ form.depense_montant }}
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Description de la dépense</label>
+            {{ form.depense_description }}
+        </div>
+    </div>
+</div>
+
 
                         <!-- Section Informations -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">📋 Informations complémentaires</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="mb-3">
-                                    <label class="form-label">Description</label>
+                        <div class="card border-0 bg-light mb-4">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-3">📋 Informations complémentaires</h5>
+                                
+                                <div class="form-group mb-4">
+                                    <label class="form-label fw-semibold">Description du versement</label>
                                     {{ form.description }}
-                                    <div class="form-text">
-                                        Ex: "Versement vente semaine 45", "Fonds direction"...
-                                    </div>
                                 </div>
                                 
-                                <div class="row">
+                                <div class="row g-3">
                                     <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Date du versement</label>
+                                        <div class="form-group">
+                                            <label class="form-label fw-semibold">Date du versement</label>
                                             {{ form.date_versement_reelle }}
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Reçu</label>
+                                        <div class="form-group">
+                                            <label class="form-label fw-semibold">Justificatif (reçu)</label>
                                             {{ form.recu }}
+                                            <div class="form-text text-muted mt-1">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                PDF, JPG ou PNG
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Résumé & Validation -->
-                        <div class="card mb-4 border-primary">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0">🧮 Résumé</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row text-center">
-                                    <div class="col-md-4">
-                                        <div class="border rounded p-2">
-                                            <h6 class="text-muted">Vente</h6>
-                                            <h5 class="text-success" id="resumeVente">0</h5>
-                                            <small>FCFA</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="border rounded p-2">
-                                            <h6 class="text-muted">Hors vente</h6>
-                                            <h5 class="text-info" id="resumeHorsVente">0</h5>
-                                            <small>FCFA</small>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="border rounded p-2 bg-light">
-                                            <h6 class="text-muted">Dépense</h6>
-                                            <h5 class="text-warning" id="resumeDepense">0</h5>
-                                            <small>FCFA</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-3 text-center">
-                                    <div class="alert alert-info">
-                                        <strong>📊 Impact solde :</strong> 
-                                        Votre solde vente passera de 
-                                        <strong>{{ superviseur.solde_vente_superviseur|floatformat:0 }} FCFA</strong> à 
-                                        <strong><span id="nouveauSolde">{{ superviseur.solde_vente_superviseur|floatformat:0 }}</span> FCFA</strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Bouton de soumission -->
-                        <div class="text-center">
-                            <button type="submit" class="btn btn-success btn-lg px-5">
-                                💳 Enregistrer le Versement
+                        <div class="text-center pt-3">
+                            <button type="submit" class="btn btn-success btn-lg px-5 py-3">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Enregistrer le Versement
                             </button>
                         </div>
                     </form>
@@ -170,47 +130,46 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const montantVente = document.querySelector('input[name="montant_vente"]');
-    const montantHorsVente = document.querySelector('input[name="montant_hors_vente"]');
-    const montantDepense = document.querySelector('input[name="depense_montant"]');
-    
-    function updateCalcul() {
-        const vente = parseFloat(montantVente.value) || 0;
-        const horsVente = parseFloat(montantHorsVente.value) || 0;
-        const depense = parseFloat(montantDepense.value) || 0;
-        
-        // Mise à jour des résumés
-        document.getElementById('resumeVente').textContent = vente.toLocaleString('fr-FR');
-        document.getElementById('resumeHorsVente').textContent = horsVente.toLocaleString('fr-FR');
-        document.getElementById('resumeDepense').textContent = depense.toLocaleString('fr-FR');
-        document.getElementById('totalVersement').textContent = (vente + horsVente).toLocaleString('fr-FR');
-        
-        // Calcul du nouveau solde (seulement vente + dépense impactent le solde)
-        const soldeActuel = {{ superviseur.solde_vente_superviseur }};
-        const nouveauSolde = soldeActuel - vente - depense;
-        document.getElementById('nouveauSolde').textContent = nouveauSolde.toLocaleString('fr-FR');
-        
-        // Style pour le nouveau solde
-        const nouveauSoldeElement = document.getElementById('nouveauSolde');
-        if (nouveauSolde < 0) {
-            nouveauSoldeElement.className = 'text-danger';
-        } else {
-            nouveauSoldeElement.className = 'text-success';
-        }
+<style>
+/* Améliorations CSS légères */
+.card {
+    border-radius: 12px;
+}
+
+.form-control, .tox-tinymce {
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus, .tox-tinymce:focus-within {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.1);
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.alert {
+    border-radius: 10px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 10px;
     }
     
-    // Écouteurs d'événements
-    [montantVente, montantHorsVente, montantDepense].forEach(input => {
-        input.addEventListener('input', updateCalcul);
-    });
+    .card-body {
+        padding: 1.5rem !important;
+    }
     
-    // Initialisation
-    updateCalcul();
-});
-</script>
+    .btn-lg {
+        width: 100%;
+    }
+}
+</style>
 {% endblock %}
