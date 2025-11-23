@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Supprimer Versement #{{ versement.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🗑️ Supprimer le Versement</h5>
+                </div>
+                <div class="card-body text-center">
+                    <!-- Icône d'alerte -->
+                    <div class="mb-4">
+                        <i class="fas fa-exclamation-triangle fa-4x text-danger mb-3"></i>
+                        <h4 class="text-danger">Confirmer la suppression</h4>
+                    </div>
+
+                    <!-- Informations du versement -->
+                    <div class="alert alert-warning">
+                        <h6>Vous êtes sur le point de supprimer le versement suivant :</h6>
+                        <div class="mt-3">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <th width="40%">ID Versement:</th>
+                                    <td><strong>#{{ versement.id }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Superviseur:</th>
+                                    <td>{{ versement.superviseur.user.get_full_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Date:</th>
+                                    <td>{{ versement.date_versement_reelle|date:"d/m/Y H:i" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Montant Vente:</th>
+                                    <td class="text-success">{{ versement.montant_vente|floatformat:0 }} FCFA</td>
+                                </tr>
+                                <tr>
+                                    <th>Montant Hors Vente:</th>
+                                    <td class="text-info">{{ versement.montant_hors_vente|floatformat:0 }} FCFA</td>
+                                </tr>
+                                <tr>
+                                    <th>Total:</th>
+                                    <td class="fw-bold text-primary">{{ versement.montant_total|floatformat:0 }} FCFA</td>
+                                </tr>
+                                {% if versement.depenses.exists %}
+                                <tr>
+                                    <th>Dépenses associées:</th>
+                                    <td class="text-danger">
+                                        {{ versement.depenses.count }} dépense(s) seront également supprimées
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Avertissements -->
+                    <div class="alert alert-danger">
+                        <h6>⚠️ Cette action est irréversible !</h6>
+                        <small class="mb-0">
+                            La suppression entraînera :
+                            <ul class="mb-0 mt-2">
+                                <li>La suppression définitive du versement</li>
+                                <li>La suppression de toutes les dépenses associées</li>
+                                <li>Un impact sur les statistiques et le solde</li>
+                            </ul>
+                        </small>
+                    </div>
+
+                    <!-- Boutons d'action -->
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-center gap-3">
+                            <a href="{% url 'detail_versement' versement.id %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Annuler
+                            </a>
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Êtes-vous ABSOLUMENT sûr de vouloir supprimer ce versement ? Cette action est irréversible.')">
+                                <i class="fas fa-trash"></i> Confirmer la suppression
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Informations complémentaires -->
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">📊 Impact de la suppression</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <h6 class="text-muted">Dépenses associées</h6>
+                                <h5 class="text-danger">{{ versement.depenses.count }}</h5>
+                                <small>seront supprimées</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <h6 class="text-muted">Total du versement</h6>
+                                <h5 class="text-primary">{{ versement.montant_total|floatformat:0 }} FCFA</h5>
+                                <small>seront retirés des archives</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

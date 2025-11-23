@@ -6,6 +6,6 @@
     {% csrf_token %}
     {{ form.as_p }}
     <button type="submit" class="btn btn-success">Enregistrer</button>
-    <a href="{% url 'liste_factures' %}" class="btn btn-secondary">Annuler</a>
+    <a href="{% url 'liste_versement' %}" class="btn btn-secondary">Annuler</a>
 </form>
 {% endblock %}

@@ -59,11 +59,16 @@ urlpatterns = [
     # API
     path('api/info-distribution/<int:detail_id>/', views.get_info_distribution, name='get_info_distribution'),
 #factures
+
     path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
-    path('factures/depots/', views.liste_factures, name='liste_factures'),
-    
+    path('versement/liste/', views.liste_versement, name='liste_versement'),
+    path('versements/<int:versement_id>/', views.detail_versement, name='detail_versement'),
+
     path('factures/creer/', views.creer_facture, name='creer_facture'),
-    path('factures/versement/', views.creer_versement_avec_depenses, name='creer_versement_avec_facture'),
+    path('versement/creer/', views.creer_versement, name='creer_versement'),
+    path('versements/<int:versement_id>/modifier/', views.modifier_versement, name='modifier_versement'),
+    path('versements/<int:versement_id>/supprimer/', views.supprimer_versement, name='supprimer_versement'),
+    
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
     path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),
 #Clients

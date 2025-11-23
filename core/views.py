@@ -33,7 +33,7 @@ from .models import (
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
-    Recouvrement,VersementBancaire
+    Recouvrement,VersementBancaire,VersementBancaire
 )
 
 # Project forms
@@ -41,7 +41,7 @@ from .forms import (
     VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
     DistributionModificationForm,UploadFactureForm,RecouvrementForm,
-    FournisseurForm,VersementAvecDepensesForm,AgentCreationForm, 
+    FournisseurForm,VersementForm,AgentCreationForm, 
     AgentModificationForm
 
 )
@@ -1572,78 +1572,190 @@ def creer_dette(request):
 #=====
 
 # views.py
+# views.py
+# versement
+
 @login_required
-def creer_versement_avec_depenses(request):
-    """Créer un versement bancaire avec dépenses intégrées"""
+def creer_versement(request):
+    """Créer un versement - interface simple"""
     agent_connecte = request.user.agent
     
-    if not agent_connecte.est_superviseur:
-        messages.error(request, "Accès réservé aux superviseurs")
-        return redirect('login')
-    
-    # Calculer le solde disponible pour les ventes
-    solde_vente_disponible = agent_connecte.solde_superviseur
-    
-    # Récupérer le dernier versement pour référence
-    dernier_versement = VersementBancaire.objects.filter(
-        superviseur=agent_connecte
-    ).order_by('-date_versement_reelle').first()
-    
-    if request.method == 'POST':
-        form = VersementAvecDepensesForm(
-            request.POST, 
-            request.FILES,
-            superviseur=agent_connecte
-        )
-        
+    if request.method == "POST":
+        form = VersementForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                with transaction.atomic():
-                    versement = form.save()
-                    
-                    # Message de succès détaillé
-                    total_depenses = versement.total_depenses_associees
-                    montant_net = versement.montant_net
-                    
-                    message = (
-                        f"✅ Versement {versement.get_type_versement_display()} créé avec succès! "
-                        f"Montant versé: {versement.montant_verse} FCFA"
-                    )
-                    
-                    if total_depenses > 0:
-                        message += f"Dépenses: {total_depenses} FCFA"
-                        message += f"Montant net: {montant_net} FCFA"
-                    
-                    if versement.type_versement == 'vente':
-                        nouveau_solde = agent_connecte.solde_superviseur
-                        message += f"Nouveau solde vente: {nouveau_solde} FCFA"
-                    
-                    messages.success(request, message)
-                    return redirect('liste_factures')
+                # CORRECTION : Utiliser save() avec superviseur pour la création
+                form.save(superviseur=agent_connecte)
+                messages.success(request, "✅ Versement créé avec succès!")
+                return redirect("liste_versement")
                     
             except Exception as e:
-                messages.error(request, f"❌ Erreur lors de la création du versement: {str(e)}")
-        
+                messages.error(request, f"Erreur: {str(e)}")
     else:
-        form = VersementAvecDepensesForm(superviseur=agent_connecte)
+        form = VersementForm()
+
+    context = {
+        "form": form, 
+        "superviseur": agent_connecte
+    }
+    
+    return render(request, "core/factures/creer_versement.html", context)
+
+
+@login_required
+def liste_versement(request):
+    """Afficher la liste des versements avec statistiques"""
+    # Récupérer tous les versements
+    versements = VersementBancaire.objects.all().order_by('-date_versement_reelle')
+    
+    # Calculer les statistiques
+    total_vente = versements.aggregate(total=Sum('montant_vente'))['total'] or 0
+    total_hors_vente = versements.aggregate(total=Sum('montant_hors_vente'))['total'] or 0
+    total_general = total_vente + total_hors_vente
+    
+    context = {
+        'versements': versements,
+        'total_vente': total_vente,
+        'total_hors_vente': total_hors_vente,
+        'total_general': total_general,
+    }
+    
+    return render(request, 'core/factures/liste_versement.html', context)
+
+@login_required
+def detail_versement(request, versement_id):
+    """Afficher le détail d'un versement"""
+    # Récupérer le versement
+    versement = get_object_or_404(VersementBancaire, id=versement_id)
+    
+    # Vérifier les permissions
+    if hasattr(request.user, 'agent'):
+        user_agent = request.user.agent
+        if not (user_agent.est_direction or user_agent.est_superviseur and versement.superviseur == user_agent):
+            messages.error(request, "Vous n'avez pas accès à ce versement.")
+            return redirect('liste_versements')
+    
+    # Récupérer les dépenses associées
+    depenses = versement.depenses.all()
+    
+    # Calculer les statistiques
+    total_depenses = versement.total_depenses_associees
+    montant_net = versement.montant_total - total_depenses
+    
+    context = {
+        'versement': versement,
+        'depenses': depenses,
+        'total_depenses': total_depenses,
+        'montant_net': montant_net,
+    }
+    
+    return render(request, 'core/factures/detail_versement.html', context)
+
+@login_required
+def modifier_versement(request, versement_id):
+    """Modifier un versement existant"""
+    # Récupérer le versement
+    versement = get_object_or_404(VersementBancaire, id=versement_id)
+    
+    # Vérifier les permissions
+    if not hasattr(request.user, 'agent'):
+        messages.error(request, "Accès réservé aux agents.")
+        return redirect('login')
+    
+    user_agent = request.user.agent
+    
+    # Un superviseur ne peut modifier que ses propres versements
+    # La direction peut modifier tous les versements
+    if user_agent.est_superviseur and versement.superviseur != user_agent:
+        messages.error(request, "Vous ne pouvez modifier que vos propres versements.")
+        return redirect('liste_versements')
+    
+    if not (user_agent.est_superviseur or user_agent.est_direction):
+        messages.error(request, "Accès non autorisé.")
+        return redirect('liste_versements')
+    
+    # Récupérer la dépense existante s'il y en a une
+    depense_existante = versement.depenses.first()
+    
+    if request.method == 'POST':
+        form = VersementForm(request.POST, request.FILES, instance=versement)
+        if form.is_valid():
+            try:
+                # CORRECTION : Utiliser save() sans superviseur pour la modification
+                versement_modifie = form.save(superviseur=None, commit=True)
+                
+                # Gérer les dépenses (logique déjà dans save() maintenant)
+                # Plus besoin de cette partie car gérée dans save()
+                
+                messages.success(request, "✅ Versement modifié avec succès!")
+                return redirect('detail_versement', versement_id=versement.id)
+                
+            except Exception as e:
+                messages.error(request, f"Erreur lors de la modification: {str(e)}")
+    else:
+        # Pré-remplir le formulaire avec les données existantes
+        initial_data = {}
+        if depense_existante:
+            initial_data = {
+                'depense_montant': depense_existante.montant,
+                'depense_description': depense_existante.description,
+            }
+        
+        form = VersementForm(instance=versement, initial=initial_data)
     
     context = {
         'form': form,
-        'solde_vente_disponible': solde_vente_disponible,
-        'superviseur': agent_connecte,
-        'dernier_versement': dernier_versement,
+        'versement': versement,
+        'depense_existante': depense_existante,
     }
     
-    return render(request, 'core/factures/creer_versement_facture.html', context)
+    return render(request, 'core/factures/modifier_versement.html', context)
 
 @login_required
-def liste_factures(request):
-    factures = Facture.objects.all().order_by('-date_depot')
-    
-    return render(request, 'core/factures/liste_factures.html', {
-        'factures': factures
-    })
-
+def supprimer_versement(request, versement_id):
+    """Supprimer un versement existant"""
+    try:
+        # Récupérer le versement
+        versement = get_object_or_404(VersementBancaire, id=versement_id)
+        
+        # Vérifier les permissions
+        if not hasattr(request.user, 'agent'):
+            messages.error(request, "Accès réservé aux agents.")
+            return redirect('login')
+        
+        user_agent = request.user.agent
+        
+        # Vérification des permissions
+        if user_agent.est_superviseur and versement.superviseur != user_agent:
+            messages.error(request, "Vous ne pouvez supprimer que vos propres versements.")
+            return redirect('liste_versement')
+        
+        if not (user_agent.est_superviseur or user_agent.est_direction):
+            messages.error(request, "Accès non autorisé.")
+            return redirect('liste_versement')
+        
+        if request.method == 'POST':
+            # Sauvegarder les informations avant suppression
+            versement_info = f"Versement #{versement.id} - {versement.montant_total} FCFA"
+            
+            # Supprimer le versement
+            versement.delete()
+            
+            messages.success(request, f"✅ Versement {versement_info} supprimé avec succès!")
+            return redirect('liste_versement')
+        
+        # Si méthode GET, afficher la page de confirmation
+        context = {
+            'versement': versement,
+        }
+        return render(request, 'core/factures/supprimer_versement.html', context)
+        
+    except VersementBancaire.DoesNotExist:
+        messages.error(request, "❌ Le versement que vous essayez de supprimer n'existe pas.")
+        return redirect('liste_versement')
+    except Exception as e:
+        messages.error(request, f"❌ Erreur inattendue: {str(e)}")
+        return redirect('liste_versement')
 # views.py
 
 
@@ -1699,7 +1811,7 @@ def supprimer_facture(request, facture_id):
         facture.delete()
         messages.success(request, "Facture supprimée.")
         return redirect('liste_factures')
-    return render(request, 'core/factures/confirm_delete.html', {'facture': facture})
+    return render(request, 'core/factures/confirm_versement_delete.html', {'facture': facture})
 #=========
 # #RECOUVREMENT
 #=========
@@ -2162,9 +2274,9 @@ def tableau_de_bord_superviseur(request):
     # STATISTIQUES SUPERVISEUR
     stats_superviseur = {
         'total_recouvrements': superviseur.total_argent_recouvre_et_ventes,
-        'total_depenses': superviseur.total_depenses_superviseur,
-        'total_versements': superviseur.total_versements_bancaires,
-        'solde_actuel': superviseur.solde_superviseur,
+        'total_depenses': superviseur.total_depenses_vente,  # ← CORRECTION
+        'total_versements': superviseur.total_versements_vente,  # ← CORRECTION
+        'solde_actuel': superviseur.solde_vente_superviseur,  # ← CORRECTION
         'dernier_versement': superviseur.dernier_versement_superviseur,
         'versements_recents': superviseur.versements_recents_superviseur,
         # ✅ NOUVEAU : Ajout des stats stagiaires du superviseur

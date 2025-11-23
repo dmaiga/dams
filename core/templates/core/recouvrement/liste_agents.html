@@ -17,7 +17,7 @@
                         <i class="fas fa-arrow-left me-1"></i>Retour
                     </a>
                     {% if agent_connecte.est_superviseur %}
-                    <a href="{% url 'creer_versement_avec_facture' %}" class="btn btn-success">
+                    <a href="{% url 'creer_versement' %}" class="btn btn-success">
                         <i class="fas fa-money-bill-wave me-1"></i>Nouveau Versement
                     </a>
                     {% endif %}
@@ -198,7 +198,7 @@
             <i class="fas fa-hand-holding-usd"></i> Recouvrir
         </a>
         {% elif data.est_superviseur and agent_connecte.id == data.agent.id %}
-        <a href="{% url 'creer_versement_avec_facture' %}" 
+        <a href="{% url 'creer_versement' %}" 
            class="btn btn-success btn-sm">
             <i class="fas fa-money-bill-wave"></i> Verser
         </a>

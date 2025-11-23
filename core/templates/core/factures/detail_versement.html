@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Détail Versement #{{ versement.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-2">💳 Détail du Versement</h1>
+            <p class="text-muted">Informations complètes du versement #{{ versement.id }}</p>
+        </div>
+        <div>
+            <a href="{% url 'liste_versement' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour à la liste
+            </a>
+            {% if request.user.agent == versement.superviseur or request.user.agent.est_direction %}
+<a href="{% url 'modifier_versement' versement.id %}" class="btn btn-warning">
+    <i class="fas fa-edit"></i> Modifier
+</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Informations principales -->
+        <div class="col-md-8">
+            <!-- Carte Informations du Versement -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📋 Informations du Versement</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">ID Versement:</th>
+                                    <td><strong>#{{ versement.id }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Superviseur:</th>
+                                    <td>
+                                        <strong>{{ versement.superviseur.user.get_full_name }}</strong><br>
+                                        <small class="text-muted">{{ versement.superviseur.get_type_agent_display }}</small>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Type:</th>
+                                    <td>
+                                        <span class="badge 
+                                            {% if versement.type_versement == 'vente' %}bg-success
+                                            {% elif versement.type_versement == 'autre' %}bg-info
+                                            {% elif versement.type_versement == 'mixte' %}bg-warning
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ versement.type_versement|title }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="40%">Date versement:</th>
+                                    <td>
+                                        <strong>{{ versement.date_versement_reelle|date:"d/m/Y" }}</strong><br>
+                                        <small class="text-muted">{{ versement.date_versement_reelle|date:"H:i" }}</small>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Date création:</th>
+                                    <td>
+                                        <small class="text-muted">{{ versement.date_creation|date:"d/m/Y H:i" }}</small>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    {% if versement.description %}
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6 class="text-muted">📝 Description:</h6>
+                        <p class="mb-0">{{ versement.description }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Section Dépenses -->
+            <!-- Section Dépenses -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0">📝 Dépenses Associées</h5>
+    </div>
+    <div class="card-body">
+        {% if depenses %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for depense in depenses %}
+                    <tr>
+                        <td>
+                            <small>{{ depense.date_depense|date:"d/m/Y" }}</small>
+                        </td>
+                        <td>
+                            {{ depense.description|default:"-" }}
+                        </td>
+                        <td class="{% if depense.montant > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                            {% if depense.montant > 0 %}
+                                - {{ depense.montant|floatformat:0 }} FCFA
+                            {% else %}
+                                <span class="text-muted">0 FCFA</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="2" class="text-end"><strong>Total Dépenses:</strong></td>
+                        <td class="text-danger fw-bold">- {{ total_depenses|floatformat:0 }} FCFA</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-3">
+            <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
+            <p class="text-muted mb-0">Aucune dépense associée à ce versement</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+        </div>
+
+        <!-- Résumé financier -->
+        <div class="col-md-4">
+            <!-- Carte Montants -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">💰 Montants</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Montant Vente:</span>
+                            <strong class="text-success">{{ versement.montant_vente|floatformat:0 }} FCFA</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Montant Hors Vente:</span>
+                            <strong class="text-info">{{ versement.montant_hors_vente|floatformat:0 }} FCFA</strong>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold">Total Versé:</span>
+                            <strong class="text-primary">{{ versement.montant_total|floatformat:0 }} FCFA</strong>
+                        </div>
+                        {% if total_depenses > 0 %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">Dépenses:</span>
+                            <strong class="text-danger">- {{ total_depenses|floatformat:0 }} FCFA</strong>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">Montant Net:</span>
+                            <strong class="text-dark">{{ montant_net|floatformat:0 }} FCFA</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carte Reçu -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">📎 Pièce Jointe</h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if versement.recu %}
+                    <div class="mb-3">
+                        <i class="fas fa-file-pdf fa-3x text-danger mb-2"></i>
+                        <p class="mb-2">Reçu du versement</p>
+                        <a href="{{ versement.recu.url }}" target="_blank" class="btn btn-primary btn-sm">
+                            <i class="fas fa-download"></i> Télécharger
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="text-muted">
+                        <i class="fas fa-file-excel fa-3x mb-2"></i>
+                        <p class="mb-0">Aucun reçu joint</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Carte Impact Solde -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 Impact sur le Solde</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <small>
+                            <strong>💡 Information:</strong><br>
+                            • <strong>Montant vente</strong> impacte le solde vente<br>
+                            • <strong>Montant hors vente</strong> pour analyse seulement<br>
+                            • <strong>Dépenses</strong> déduites du solde
+                        </small>
+                    </div>
+                    
+                    {% if versement.superviseur == request.user.agent %}
+                    <div class="text-center">
+                        <a href="{% url 'creer_versement' %}" class="btn btn-success btn-sm">
+                            <i class="fas fa-plus"></i> Nouveau Versement
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

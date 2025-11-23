@@ -11,7 +11,11 @@ from .models import (
 from django.contrib.auth.models import User
 from django.db import models
 import os
-
+from django.db.models import (
+    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
+)
+from django.db.models.functions import Coalesce
+from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import AuthenticationForm
 from decimal import Decimal
@@ -1333,168 +1337,9 @@ class RecouvrementForm(forms.ModelForm):
             
         return date_recouvrement
    
-
-
-
 # forms.py
-class VersementAvecDepensesForm(forms.ModelForm):
-    """Formulaire unique qui combine versement et dépenses"""
-    
-    # Champs pour les dépenses (optionnels)
-    montant_depenses = forms.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        required=False,
-        initial=0,
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.01',
-            'placeholder': '0.00'
-        }),
-        label="Total des dépenses",
-        help_text="Montant total des dépenses associées à ce versement"
-    )
-    
-    description_depenses = forms.CharField(
-        required=False,
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'rows': 3,
-            'placeholder': 'Détail des dépenses effectuées...'
-        }),
-        label="Détail des dépenses"
-    )
-    
-    categorie_depenses = forms.ChoiceField(
-        choices=Depense.CATEGORIE_DEPENSE_CHOICES,
-        required=False,
-        initial='autres',
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label="Catégorie des dépenses"
-    )
-    
-    date_depenses = forms.DateTimeField(
-        required=False,
-        widget=forms.DateTimeInput(attrs={
-            'class': 'form-control',
-            'type': 'datetime-local'
-        }),
-        label="Date des dépenses",
-        help_text="Date à laquelle les dépenses ont été effectuées"
-    )
-    
-    justificatif_depenses = forms.FileField(
-        required=False,
-        widget=forms.FileInput(attrs={
-            'class': 'form-control',
-            'accept': 'image/*,.pdf,.doc,.docx'
-        }),
-        label="Justificatif des dépenses"
-    )
+# forms.py
 
-    class Meta:
-        model = VersementBancaire
-        fields = [
-            'type_versement',
-            'montant_verse', 
-            'details_depenses',
-            'date_versement_reelle'
-        ]
-        widgets = {
-            'type_versement': forms.Select(attrs={
-                'class': 'form-control',
-                'id': 'type_versement_select'
-            }),
-            'montant_verse': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.01',
-                'placeholder': 'Montant à verser'
-            }),
-            'details_depenses': forms.Textarea(attrs={
-                'class': 'form-control', 
-                'rows': 2,
-                'placeholder': 'Notes générales sur le versement...'
-            }),
-            'date_versement_reelle': forms.DateTimeInput(attrs={
-                'class': 'form-control',
-                'type': 'datetime-local'
-            }),
-        }
-    
-    def __init__(self, *args, **kwargs):
-        self.superviseur = kwargs.pop('superviseur', None)
-        super().__init__(*args, **kwargs)
-        
-        # Personnalisation des labels et help texts
-        self.fields['type_versement'].help_text = (
-            "Choisissez le type de versement. "
-            "Les versements 'liés à la vente' impactent votre solde vente/recouvrement."
-        )
-        
-        if self.superviseur:
-            solde_vente = self.superviseur.solde_superviseur
-            self.fields['type_versement'].help_text += f" - Solde disponible: {solde_vente} FCFA"
-    
-    def clean_date_versement_reelle(self):
-        date_versement = self.cleaned_data.get('date_versement_reelle')
-        if not date_versement:
-            date_versement = timezone.now()
-        return date_versement
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        type_versement = cleaned_data.get('type_versement')
-        montant_verse = cleaned_data.get('montant_verse')
-        montant_depenses = cleaned_data.get('montant_depenses') or Decimal('0.00')
-        
-        # Validation pour les versements liés à la vente
-        if type_versement == 'vente' and montant_verse and self.superviseur:
-            # Créer une instance temporaire pour la validation
-            versement_temp = VersementBancaire(
-                superviseur=self.superviseur,
-                type_versement=type_versement,
-                montant_verse=montant_verse
-            )
-            
-            # Calculer le montant net (versement - dépenses)
-            montant_net = montant_verse - montant_depenses
-            
-            # Vérifier que le montant net ne dépasse pas le solde disponible
-            solde_disponible = versement_temp.solde_disponible_vente_avant_versement
-            if montant_net > solde_disponible:
-                raise forms.ValidationError(
-                    f"Le montant net du versement ({montant_net} FCFA) dépasse "
-                    f"le solde disponible ({solde_disponible} FCFA) pour les ventes/recouvrements. "
-                    f"Versement: {montant_verse} FCFA - Dépenses: {montant_depenses} FCFA"
-                )
-        
-        return cleaned_data
-    
-    def save(self, commit=True):
-        """Sauvegarde le versement et crée les dépenses associées"""
-        versement = super().save(commit=False)
-        versement.superviseur = self.superviseur
-        
-        if commit:
-            versement.save()
-            
-            # Créer une dépense si un montant est spécifié
-            montant_depenses = self.cleaned_data.get('montant_depenses')
-            if montant_depenses and montant_depenses > 0:
-                Depense.objects.create(
-                    superviseur=self.superviseur,
-                    versement=versement,
-                    type_versement=versement.type_versement,
-                    montant=montant_depenses,
-                    description=self.cleaned_data.get('description_depenses', ''),
-                    categorie=self.cleaned_data.get('categorie_depenses', 'autres'),
-                    date_depense=self.cleaned_data.get('date_depenses') or timezone.now(),
-                    justificatif=self.cleaned_data.get('justificatif_depenses')
-                )
-        
-        return versement
-    
-    
 class FactureForm(forms.ModelForm):
     class Meta:
         model = Facture
@@ -1515,3 +1360,78 @@ class FactureForm(forms.ModelForm):
                 'placeholder': 'Description du versement'
             }),
         }
+
+class VersementForm(forms.ModelForm):
+    # Dépense optionnelle intégrée
+    depense_montant = forms.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+        initial=0,
+        label="Montant de la dépense",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+
+    depense_description = forms.CharField(
+        required=False,
+        label="Description de la dépense",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2})
+    )
+
+    class Meta:
+        model = VersementBancaire
+        fields = [
+            'montant_vente',
+            'montant_hors_vente',
+            'description',
+            'date_versement_reelle',
+            'recu'
+        ]
+        widgets = {
+            'montant_vente': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'montant_hors_vente': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'date_versement_reelle': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'recu': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+
+    def save(self, superviseur=None, commit=True):
+        """
+        Sauvegarde qui gère création et modification
+        - Création : superviseur est requis
+        - Modification : superviseur est None (gardé existant)
+        """
+        versement = super().save(commit=False)
+        
+        # Si un superviseur est fourni (création), on l'assigne
+        # Sinon (modification), on garde le superviseur existant
+        if superviseur is not None:
+            versement.superviseur = superviseur
+        
+        if commit:
+            versement.save()
+
+            # CORRECTION : Logique améliorée
+            dep_montant = self.cleaned_data.get('depense_montant') or 0
+            dep_desc = self.cleaned_data.get('depense_description', '').strip()
+            
+            # Conditions pour créer une dépense
+            has_description = bool(dep_desc)
+            has_amount = dep_montant > 0
+            
+            if has_description or has_amount:
+                # Si description vide mais montant > 0, utiliser une description par défaut
+                if not dep_desc and has_amount:
+                    dep_desc = "Dépense associée au versement"
+                
+                # Si montant 0 mais description, garder montant à 0
+                if not has_amount:
+                    dep_montant = 0
+                    
+                Depense.objects.create(
+                    versement=versement,
+                    montant=dep_montant,
+                    description=dep_desc
+                )
+
+        return versement

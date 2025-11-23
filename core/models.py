@@ -446,92 +446,128 @@ class Agent(models.Model):
         """Vérifie si l'agent peut accéder à l'administration"""
         return self.est_direction or self.est_superviseur
 
-    # NOUVELLES PROPERTIES POUR SUPERVISEUR SEULEMENT - CORRIGÉES
+
+    # PROPRIÉTÉS FINANCIÈRES POUR SUPERVISEUR - CORRIGÉES
     @property
     def total_argent_recouvre_et_ventes(self):
-        """
-        TOTAL de l'argent recouvré + ventes personnelles AVANT déductions
-        C'est l'argent qui est passé entre ses mains
-        """
+        """Total des entrées (recouvrements + ventes personnelles)"""
         if self.est_superviseur:
-            # 1. Recouvrements sur les agents terrain
             recouvrements_agents = Recouvrement.objects.filter(superviseur=self)
-            total_recouvrements_agents = sum(recouvrement.montant_recouvre for recouvrement in recouvrements_agents)
-            
-            # 2. Ventes personnelles du superviseur
-            total_ventes_personnelles = self.total_ventes
-            
-            return total_recouvrements_agents + total_ventes_personnelles
+            total_recouvrements = sum(r.montant_recouvre for r in recouvrements_agents)
+            return total_recouvrements + self.total_ventes
         return 0
-    
+
+    @property
+    def total_depenses_vente(self):
+        """Total des dépenses impactant le solde vente"""
+        if self.est_superviseur:
+            # Toutes les dépenses impactent le solde vente
+            return Depense.objects.filter(
+                versement__superviseur=self
+            ).aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
+        return 0
+
+    @property
+    def total_versements_vente(self):
+        """Total des versements impactant le solde vente"""
+        if self.est_superviseur:
+            return self.versements_bancaires.aggregate(
+                total=Sum('montant_vente')
+            )['total'] or Decimal('0.00')
+        return 0
+
+    @property
+    def solde_vente_superviseur(self):
+        """Solde actuel pour les ventes"""
+        if not self.est_superviseur:
+            return 0
+        
+        entrees = self.total_argent_recouvre_et_ventes
+        versements = self.total_versements_vente
+        depenses = self.total_depenses_vente
+        
+        return entrees - versements - depenses + self.ajustement_solde
+
+    # PROPRIÉTÉS DE COMPATIBILITÉ (pour la vue existante)
     @property
     def total_depenses_superviseur(self):
-        """Total des dépenses déclarées par le superviseur"""
-        if self.est_superviseur:
-            versements = VersementBancaire.objects.filter(superviseur=self)
-            return sum(versement.montant_depenses for versement in versements)
-        return 0
-    
+        """Alias pour total_depenses_vente"""
+        return self.total_depenses_vente
+
     @property
     def total_versements_bancaires(self):
-        """Total des versements à la banque effectués par le superviseur"""
-        if self.est_superviseur:
-            versements = VersementBancaire.objects.filter(superviseur=self)
-            return sum(versement.montant_verse for versement in versements)
-        return 0
-    
+        """Alias pour total_versements_vente"""
+        return self.total_versements_vente
+
     @property
     def solde_superviseur(self):
-        """Solde réel actuel en possession du superviseur"""
+        """Alias pour solde_vente_superviseur"""
+        return self.solde_vente_superviseur
+
+    # Autres propriétés existantes...
+    @property
+    def total_depenses_hors_vente(self):
+        """Total des dépenses hors vente"""
         if self.est_superviseur:
-            total_entrees = self.total_argent_recouvre_et_ventes
-            total_sorties = self.total_depenses_superviseur + self.total_versements_bancaires
-            # 🔹 Ajout de l’ajustement manuel
-            return total_entrees - total_sorties + self.ajustement_solde
+            return Decimal('0.00')  # Simplifié pour l'instant
         return 0
-    
+
+    @property
+    def total_versements_hors_vente(self):
+        """Total des versements hors vente"""
+        if self.est_superviseur:
+            return self.versements_bancaires.aggregate(
+                total=Sum('montant_hors_vente')
+            )['total'] or Decimal('0.00')
+        return 0
+
     @property
     def detail_solde_superviseur(self):
         """Détail complet du solde du superviseur"""
         if not self.est_superviseur:
             return {}
         
-        total_entrees = self.total_argent_recouvre_et_ventes
-        total_sorties = self.total_depenses_superviseur + self.total_versements_bancaires
-        
         return {
             'total_ventes_personnelles': self.total_ventes,
-            'total_ventes_stagiaires':self.total_ventes_stagiaires,
-            'total_recouvrements_agents': total_entrees - self.total_ventes,
-            'total_entrees': total_entrees,
-            'total_depenses': self.total_depenses_superviseur,
-            'total_versements': self.total_versements_bancaires,
-            'total_sorties': total_sorties,
-            'solde_actuel': self.solde_superviseur,
+            'total_ventes_stagiaires': self.total_ventes_stagiaires,
+            'total_recouvrements_agents': self.total_argent_recouvre_et_ventes - self.total_ventes,
+            'total_entrees_vente': self.total_argent_recouvre_et_ventes,
+            'total_depenses_vente': self.total_depenses_vente,
+            'total_versements_vente': self.total_versements_vente,
+            'solde_vente_actuel': self.solde_vente_superviseur,
+            'total_depenses_hors_vente': self.total_depenses_hors_vente,
+            'total_versements_hors_vente': self.total_versements_hors_vente,
         }
     
     @property
-    def argent_disponible_pour_versement(self):
-        """Argent réellement disponible pour un nouveau versement"""
+    def argent_disponible_pour_versement_vente(self):
+        """Argent réellement disponible pour un nouveau versement lié aux ventes"""
         if not self.est_superviseur:
             return 0
-        return max(self.solde_superviseur, 0)
+        return max(self.solde_vente_superviseur, 0)
     
     @property
     def dernier_versement_superviseur(self):
-        """Dernier versement effectué par le superviseur"""
+        """Dernier versement effectué par le superviseur (compatibilité)"""
         if self.est_superviseur:
-            return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle').first()
+            dernier = VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle').first()
+            if dernier:
+                return {
+                    'versement': dernier,
+                    'type': dernier.type_versement,  # ✅ Propriété calculée
+                    'montant_verse': dernier.montant_total,  # ✅ Alias pour compatibilité
+                    'depenses_associees': dernier.total_depenses_associees,
+                    'date': dernier.date_versement_reelle
+                }
         return None
-    
-    # Supprimer la propriété depenses_recentes_superviseur ou la remplacer par :
+
     @property
     def versements_recents_superviseur(self):
         """Versements récents du superviseur (5 derniers)"""
         if self.est_superviseur:
             return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle')[:5]
         return VersementBancaire.objects.none()
-
+    
     @property
     def bonus_total(self):
         """Retourne le bonus total de l'agent"""
@@ -1307,13 +1343,7 @@ class Recouvrement(models.Model):
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
 
-
 class VersementBancaire(models.Model):
-    TYPE_VERSEMENT_CHOICES = (
-        ('vente', 'Versement lié à la vente'),
-        ('autre', 'Versement hors vente/recouvrement'),
-    )
-
     superviseur = models.ForeignKey(
         'Agent',
         on_delete=models.CASCADE,
@@ -1321,136 +1351,72 @@ class VersementBancaire(models.Model):
         related_name='versements_bancaires'
     )
 
-    type_versement = models.CharField(
-        max_length=20,
-        choices=TYPE_VERSEMENT_CHOICES,
-        default='vente',
-        verbose_name="Type de versement",
-        help_text="Indique si le versement est lié à la vente ou autre"
-    )
-
-    montant_verse = models.DecimalField(
+    montant_vente = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        verbose_name="Montant versé",
-        validators=[MinValueValidator(Decimal('0.01'))]
+        default=0,
+        verbose_name="Montant provenant de la vente"
     )
 
-    # Ces champs sont maintenant déplacés dans le modèle Depense séparé
-    details_depenses = models.TextField(
-        blank=True, 
-        verbose_name="Notes générales sur les dépenses"
+    montant_hors_vente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        verbose_name="Montant hors vente"
     )
-    
+
+    description = models.TextField(
+        blank=True,
+        verbose_name="Description du versement"
+    )
+
     date_versement_reelle = models.DateTimeField(
-        default=timezone.now, 
+        default=timezone.now,
         verbose_name="Date réelle du versement"
     )
-    date_creation = models.DateTimeField(auto_now_add=True)
+    
+
+    recu = models.FileField(
+        upload_to='recu_versement/%Y/%m/',
+        blank=True,
+        null=True,
+        verbose_name="Justificatif du versement"
+    )
+
+    # PROPRIÉTÉS CALCULÉES - AJOUTEZ CES PROPRIÉTÉS
+    @property
+    def type_versement(self):
+        """Détermine le type de versement basé sur les montants"""
+        if self.montant_vente > 0 and self.montant_hors_vente > 0:
+            return 'mixte'
+        elif self.montant_vente > 0:
+            return 'vente'
+        elif self.montant_hors_vente > 0:
+            return 'autre'
+        else:
+            return 'aucun'
+
+    @property
+    def montant_total(self):
+        """Montant total du versement"""
+        return self.montant_vente + self.montant_hors_vente
 
     @property
     def total_depenses_associees(self):
-        """Calcule le total des dépenses associées à ce versement"""
+        """Total des dépenses associées"""
         return self.depenses.aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
 
-    @property
-    def montant_net(self):
-        """Calcule le montant net (versement - dépenses associées)"""
-        return self.montant_verse - self.total_depenses_associees
-
-    @property
-    def solde_disponible_vente_avant_versement(self):
-        """
-        Calcule le solde disponible pour les ventes AVANT ce versement
-        """
-        if self.type_versement != 'vente':
-            return None
-            
-        # Total des entrées (ventes + recouvrements)
-        total_entrees = self.superviseur.total_argent_recouvre_et_ventes
-        
-        # Total des sorties AVANT ce versement (exclut le versement actuel)
-        versements_precedents = VersementBancaire.objects.filter(
-            superviseur=self.superviseur,
-            type_versement='vente'
-        ).exclude(id=self.id)
-        
-        total_versements_precedents = versements_precedents.aggregate(
-            total=Sum('montant_verse')
-        )['total'] or Decimal('0.00')
-        
-        # Total des dépenses AVANT ce versement
-        depenses_precedentes = Depense.objects.filter(
-            superviseur=self.superviseur,
-            type_versement='vente'
-        ).exclude(versement=self)
-        
-        total_depenses_precedentes = depenses_precedentes.aggregate(
-            total=Sum('montant')
-        )['total'] or Decimal('0.00')
-        
-        solde = total_entrees - total_versements_precedents - total_depenses_precedentes
-        return max(solde, Decimal('0.00'))
-
-    def clean(self):
-        """Validation pour s'assurer que le versement ne dépasse pas le solde disponible"""
-        from django.core.exceptions import ValidationError
-        
-        if self.type_versement == 'vente':
-            solde_disponible = self.solde_disponible_vente_avant_versement
-            if self.montant_net > solde_disponible:
-                raise ValidationError(
-                    f"Le montant net du versement ({self.montant_net} FCFA) dépasse "
-                    f"le solde disponible ({solde_disponible} FCFA) pour les ventes/recouvrements."
-                )
-
-    def save(self, *args, **kwargs):
-        """Sauvegarde avec validation"""
-        self.clean()
-        super().save(*args, **kwargs)
-
     def __str__(self):
-        type_str = "Vente" if self.type_versement == 'vente' else "Autre"
-        return f"Versement {self.id} - {self.superviseur} - {self.montant_verse} FCFA ({type_str})"
+        return f"Versement {self.id} - {self.superviseur} - {self.montant_total} FCFA"
 
     class Meta:
         ordering = ['-date_versement_reelle']
-        verbose_name = "Versement Bancaire"
-        verbose_name_plural = "Versements Bancaires"
-
 
 class Depense(models.Model):
-    CATEGORIE_DEPENSE_CHOICES = (
-        ('transport', 'Transport'),
-        ('communication', 'Communication'),
-        ('frais_bancaires', 'Frais Bancaires'),
-        ('materiel', 'Matériel'),
-        ('autres', 'Autres Dépenses'),
-    )
-
-    superviseur = models.ForeignKey(
-        'Agent',
-        on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'entrepot'},
-        related_name='depenses'
-    )
-
     versement = models.ForeignKey(
         VersementBancaire,
         on_delete=models.CASCADE,
-        related_name='depenses',
-        null=True,
-        blank=True,
-        verbose_name="Versement associé",
-        help_text="Lien vers le versement si applicable"
-    )
-
-    type_versement = models.CharField(
-        max_length=20,
-        choices=VersementBancaire.TYPE_VERSEMENT_CHOICES,
-        default='vente',
-        verbose_name="Type de versement associé",
-        help_text="Détermine si la dépense impacte le solde des ventes"
+        related_name='depenses'
     )
 
     montant = models.DecimalField(
@@ -1464,51 +1430,16 @@ class Depense(models.Model):
         verbose_name="Détails de la dépense"
     )
 
-    categorie = models.CharField(
-        max_length=50,
-        choices=CATEGORIE_DEPENSE_CHOICES,
-        default='autres',
-        verbose_name="Catégorie de dépense"
-    )
-
     date_depense = models.DateTimeField(
         default=timezone.now,
         verbose_name="Date de la dépense"
     )
-
-    justificatif = models.FileField(
-        upload_to='justificatifs_depenses/%Y/%m/',
-        blank=True,
-        null=True,
-        verbose_name="Justificatif de dépense"
-    )
-
     date_creation = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def impacte_solde_vente(self):
-        """Détermine si cette dépense impacte le solde des ventes"""
-        return self.type_versement == 'vente'
 
-    def clean(self):
-        """Validation de la cohérence entre versement et type_versement"""
-        from django.core.exceptions import ValidationError
-        
-        if self.versement and self.type_versement != self.versement.type_versement:
-            raise ValidationError(
-                "Le type de versement de la dépense doit correspondre au type du versement associé."
-            )
-
-    def save(self, *args, **kwargs):
-        """Synchronise le type_versement avec le versement associé si nécessaire"""
-        if self.versement:
-            self.type_versement = self.versement.type_versement
-        self.clean()
-        super().save(*args, **kwargs)
 
     def __str__(self):
-        type_str = "Vente" if self.type_versement == 'vente' else "Autre"
-        return f"Dépense {self.id} - {self.superviseur} - {self.montant} FCFA ({type_str})"
+        return f"Dépense {self.id} - {self.montant} FCFA - {self.categorie}"
 
     class Meta:
         ordering = ['-date_depense']
