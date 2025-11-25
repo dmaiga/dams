@@ -60,17 +60,18 @@ urlpatterns = [
     path('api/info-distribution/<int:detail_id>/', views.get_info_distribution, name='get_info_distribution'),
 #factures
 
-    path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
     path('versement/liste/', views.liste_versement, name='liste_versement'),
     path('versements/<int:versement_id>/', views.detail_versement, name='detail_versement'),
-
-    path('factures/creer/', views.creer_facture, name='creer_facture'),
+    path('versement/<int:pk>/ajouter-recus/', views.AjouterRecusView.as_view(), name='ajouter_recus'),
     path('versement/creer/', views.creer_versement, name='creer_versement'),
     path('versements/<int:versement_id>/modifier/', views.modifier_versement, name='modifier_versement'),
     path('versements/<int:versement_id>/supprimer/', views.supprimer_versement, name='supprimer_versement'),
     
+    path('factures/creer/', views.creer_facture, name='creer_facture'),
+    path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
     path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),
+
 #Clients
     path('clients/', views.ClientListView.as_view(), name='liste_clients'),
     path('clients/ajouter/', views.ClientCreateView.as_view(), name='ajouter_client'),

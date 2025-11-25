@@ -1375,14 +1375,6 @@ class VersementBancaire(models.Model):
         verbose_name="Date réelle du versement"
     )
     
-
-    recu = models.FileField(
-        upload_to='recu_versement/%Y/%m/',
-        blank=True,
-        null=True,
-        verbose_name="Justificatif du versement"
-    )
-
     # PROPRIÉTÉS CALCULÉES - AJOUTEZ CES PROPRIÉTÉS
     @property
     def type_versement(self):
@@ -1405,12 +1397,51 @@ class VersementBancaire(models.Model):
     def total_depenses_associees(self):
         """Total des dépenses associées"""
         return self.depenses.aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
-
+    
+    @property
+    def recus_count(self):
+        """Nombre de reçus associés"""
+        return self.recus.count()
+    
     def __str__(self):
         return f"Versement {self.id} - {self.superviseur} - {self.montant_total} FCFA"
 
     class Meta:
         ordering = ['-date_versement_reelle']
+
+
+class RecuVersement(models.Model):
+    versement = models.ForeignKey(
+        VersementBancaire,
+        on_delete=models.CASCADE,
+        related_name='recus',
+        verbose_name="Versement associé"
+    )
+    
+    fichier = models.FileField(
+        upload_to='recu_versement/%Y/%m/',
+        verbose_name="Fichier reçu"
+    )
+    
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Description du reçu"
+    )
+    
+    date_upload = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date d'upload"
+    )
+    
+    def __str__(self):
+        return f"Reçu {self.id} - Versement {self.versement.id}"
+    
+    class Meta:
+        ordering = ['-date_upload']
+        verbose_name = "Reçu de versement"
+        verbose_name_plural = "Reçus de versement"
+
 
 class Depense(models.Model):
     versement = models.ForeignKey(

@@ -33,7 +33,7 @@ from .models import (
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
-    Recouvrement,VersementBancaire,VersementBancaire
+    Recouvrement,VersementBancaire,VersementBancaire,RecuVersement
 )
 
 # Project forms
@@ -1603,55 +1603,6 @@ def creer_versement(request):
 
 
 @login_required
-def liste_versement(request):
-    """Afficher la liste des versements avec statistiques"""
-    # Récupérer tous les versements
-    versements = VersementBancaire.objects.all().order_by('-date_versement_reelle')
-    
-    # Calculer les statistiques
-    total_vente = versements.aggregate(total=Sum('montant_vente'))['total'] or 0
-    total_hors_vente = versements.aggregate(total=Sum('montant_hors_vente'))['total'] or 0
-    total_general = total_vente + total_hors_vente
-    
-    context = {
-        'versements': versements,
-        'total_vente': total_vente,
-        'total_hors_vente': total_hors_vente,
-        'total_general': total_general,
-    }
-    
-    return render(request, 'core/factures/liste_versement.html', context)
-
-@login_required
-def detail_versement(request, versement_id):
-    """Afficher le détail d'un versement"""
-    # Récupérer le versement
-    versement = get_object_or_404(VersementBancaire, id=versement_id)
-    
-    # Vérifier les permissions
-    if hasattr(request.user, 'agent'):
-        user_agent = request.user.agent
-        if not (user_agent.est_direction or user_agent.est_superviseur and versement.superviseur == user_agent):
-            messages.error(request, "Vous n'avez pas accès à ce versement.")
-            return redirect('liste_versements')
-    
-    # Récupérer les dépenses associées
-    depenses = versement.depenses.all()
-    
-    # Calculer les statistiques
-    total_depenses = versement.total_depenses_associees
-    montant_net = versement.montant_total - total_depenses
-    
-    context = {
-        'versement': versement,
-        'depenses': depenses,
-        'total_depenses': total_depenses,
-        'montant_net': montant_net,
-    }
-    
-    return render(request, 'core/factures/detail_versement.html', context)
-
-@login_required
 def modifier_versement(request, versement_id):
     """Modifier un versement existant"""
     # Récupérer le versement
@@ -1711,6 +1662,97 @@ def modifier_versement(request, versement_id):
     
     return render(request, 'core/factures/modifier_versement.html', context)
 
+
+@login_required
+def liste_versement(request):
+    """Afficher la liste des versements avec statistiques"""
+    # Récupérer tous les versements
+    versements = VersementBancaire.objects.all().order_by('-date_versement_reelle')
+    
+    # Calculer les statistiques
+    total_vente = versements.aggregate(total=Sum('montant_vente'))['total'] or 0
+    total_hors_vente = versements.aggregate(total=Sum('montant_hors_vente'))['total'] or 0
+    total_general = total_vente + total_hors_vente
+    
+    context = {
+        'versements': versements,
+        'total_vente': total_vente,
+        'total_hors_vente': total_hors_vente,
+        'total_general': total_general,
+    }
+    
+    return render(request, 'core/factures/liste_versement.html', context)
+
+@login_required
+def detail_versement(request, versement_id):
+    """Afficher le détail d'un versement"""
+    # Récupérer le versement
+    versement = get_object_or_404(VersementBancaire, id=versement_id)
+    
+    # Vérifier les permissions
+    if hasattr(request.user, 'agent'):
+        user_agent = request.user.agent
+        if not (user_agent.est_direction or user_agent.est_superviseur and versement.superviseur == user_agent):
+            messages.error(request, "Vous n'avez pas accès à ce versement.")
+            return redirect('liste_versements')
+    
+    # Récupérer les dépenses associées
+    depenses = versement.depenses.all()
+    
+    # Calculer les statistiques
+    total_depenses = versement.total_depenses_associees
+    montant_net = versement.montant_total - total_depenses
+    
+    context = {
+        'versement': versement,
+        'depenses': depenses,
+        'total_depenses': total_depenses,
+        'montant_net': montant_net,
+    }
+    
+    return render(request, 'core/factures/detail_versement.html', context)
+
+# Dans views.py
+from django.views.generic import UpdateView
+from django.urls import reverse_lazy
+from django.contrib import messages
+
+from django.views.generic import UpdateView
+from django.urls import reverse_lazy
+from django.contrib import messages
+
+class AjouterRecusView(UpdateView):
+    model = VersementBancaire
+    template_name = 'core/factures/ajouter_recus.html'
+    fields = []  # Aucun champ du modèle principal
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['recus'] = self.object.recus.all()
+        context['versement'] = self.object  # Ajouter versement au contexte
+        return context
+    
+    def form_valid(self, form):
+        # Gérer l'upload de nouveaux reçus
+        nouveaux_recus = self.request.FILES.getlist('nouveaux_recus')
+        description = self.request.POST.get('description_recus', '').strip()
+        
+        if nouveaux_recus:
+            for recu_file in nouveaux_recus:
+                RecuVersement.objects.create(
+                    versement=self.object,
+                    fichier=recu_file,
+                    description=description or f"Reçu supplémentaire pour versement {self.object.id}"
+                )
+            messages.success(self.request, f"{len(nouveaux_recus)} reçu(s) ajouté(s) avec succès!")
+        else:
+            messages.warning(self.request, "Aucun nouveau reçu sélectionné.")
+        
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        # Utiliser le bon nom d'URL et le bon paramètre
+        return reverse_lazy('detail_versement', kwargs={'versement_id': self.object.id})
 @login_required
 def supprimer_versement(request, versement_id):
     """Supprimer un versement existant"""
@@ -1756,6 +1798,8 @@ def supprimer_versement(request, versement_id):
     except Exception as e:
         messages.error(request, f"❌ Erreur inattendue: {str(e)}")
         return redirect('liste_versement')
+
+
 # views.py
 
 
@@ -2934,6 +2978,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         })
         
         return context
+    
 class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/stat_agents.html'
     

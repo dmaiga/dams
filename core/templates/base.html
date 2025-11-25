@@ -516,23 +516,13 @@
                             <i class="fas fa-file-invoice-dollar"></i>
                             <span>Dettes</span>
                         </a>
-
-                        <div class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-file-invoice"></i>
+                          <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
+                            href="{% url 'liste_versement' %}">
+                             <i class="fas fa-file-invoice"></i>
                                 <span>Factures</span>
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li>
-                                    <a class="dropdown-item {% if request.resolver_match.url_name == 'liste_factures_entrepot' %}active{% endif %}" 
-                                       href="{% url 'liste_factures_entrepot' %}">Fournisseur</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item {% if request.resolver_match.url_name == 'liste_factures' %}active{% endif %}" 
-                                       href="{% url 'liste_versement' %}">Versement</a>
-                                </li>
-                            </ul>
-                        </div>
+                        </a>
+
+                      
 
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
                            href="{% url 'liste_clients' %}">

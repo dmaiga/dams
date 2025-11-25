@@ -5,7 +5,7 @@ from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
     DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
     MouvementStock,Recouvrement,VersementBancaire,Fournisseur,
-    Depense,Perte
+    Depense,Perte,RecuVersement
 )
 
 from django.contrib.auth.models import User
@@ -1364,6 +1364,7 @@ class FactureForm(forms.ModelForm):
 from tinymce.widgets import TinyMCE
 from tinymce.widgets import TinyMCE
 
+
 class VersementForm(forms.ModelForm):
     # Dépense optionnelle intégrée
     depense_montant = forms.DecimalField(
@@ -1384,7 +1385,26 @@ class VersementForm(forms.ModelForm):
             'style': 'min-height: 60px; width:100%; max-width:100%;'
         })
     )
+    
+    # Champ pour plusieurs reçus - APPROCHE SIMPLE
+    recus = forms.FileField(
+        required=False,
+        label="Reçus de versement",
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx',
+        }),
+        help_text="Maintenez Ctrl pour sélectionner plusieurs fichiers"
+    )
 
+    recus_description = forms.CharField(
+        required=False,
+        label="Description des reçus",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Description générale pour tous les reçus...'
+        })
+    )
 
     class Meta:
         model = VersementBancaire
@@ -1393,7 +1413,6 @@ class VersementForm(forms.ModelForm):
             'montant_hors_vente',
             'description',
             'date_versement_reelle',
-            'recu'
         ]
         widgets = {
             'montant_vente': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
@@ -1403,7 +1422,6 @@ class VersementForm(forms.ModelForm):
                 'class': 'form-control'
             }), 
             'date_versement_reelle': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
-            'recu': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -1415,35 +1433,69 @@ class VersementForm(forms.ModelForm):
 
     def save(self, superviseur=None, commit=True):
         """
-        Sauvegarde qui gère création et modification
-        - Création : superviseur est requis
-        - Modification : superviseur est None (gardé existant)
+        Sauvegarde qui gère création / modification
+        - Dépense mise à jour si elle existe
+        - Plusieurs reçus
         """
         versement = super().save(commit=False)
-        
+
+        # Affectation superviseur seulement en création
         if superviseur is not None:
             versement.superviseur = superviseur
-        
+
         if commit:
             versement.save()
 
+            # ============================
+            # 🔥 GESTION DES DÉPENSES
+            # ============================
             dep_montant = self.cleaned_data.get('depense_montant') or 0
-            dep_desc = self.cleaned_data.get('depense_description', '').strip()
-            
+            dep_desc = (self.cleaned_data.get('depense_description') or "").strip()
+
             has_description = bool(dep_desc)
             has_amount = dep_montant > 0
-            
+
+            # Récupération éventuelle d'une dépense existante
+            depense_existante = versement.depenses.first()
+
+            # Si l'utilisateur a saisi une dépense
             if has_description or has_amount:
-                if not dep_desc and has_amount:
+
+                # Valeurs par défaut si partiellement remplies
+                if has_amount and not dep_desc:
                     dep_desc = "Dépense associée au versement"
-                
                 if not has_amount:
                     dep_montant = 0
-                    
-                Depense.objects.create(
+
+                if depense_existante:
+                    # 🔄 Mise à jour de la dépense existante
+                    depense_existante.montant = dep_montant
+                    depense_existante.description = dep_desc
+                    depense_existante.save()
+                else:
+                    # ✨ Création d'une nouvelle dépense
+                    Depense.objects.create(
+                        versement=versement,
+                        montant=dep_montant,
+                        description=dep_desc
+                    )
+
+            else:
+                # L'utilisateur supprime les champs -> supprimer la dépense existante
+                if depense_existante:
+                    depense_existante.delete()
+
+            # ============================
+            # 📂 GESTION DES RÉCUS MULTIPLES
+            # ============================
+            recus_files = self.files.getlist('recus')
+            recus_description = (self.cleaned_data.get('recus_description') or "").strip()
+
+            for recu_file in recus_files:
+                RecuVersement.objects.create(
                     versement=versement,
-                    montant=dep_montant,
-                    description=dep_desc
+                    fichier=recu_file,
+                    description=recus_description or f"Reçu pour versement {versement.id}"
                 )
 
         return versement

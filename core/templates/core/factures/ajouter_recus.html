@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ajouter des reçus - Versement #{{ versement.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-plus"></i> Ajouter des reçus
+                        </h5>
+                        <span class="badge bg-light text-dark">Versement #{{ versement.id }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Reçus existants -->
+                    {% if recus %}
+                    <div class="mb-4">
+                        <h6>Reçus existants ({{ recus|length }})</h6>
+                        <div class="list-group">
+                            {% for recu in recus %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas 
+                                            {% if recu.fichier.name|lower|slice:'-4:' == '.pdf' %}fa-file-pdf text-danger
+                                            {% elif recu.fichier.name|lower|slice:'-4:' in '.jpg,.jpeg,.png' %}fa-file-image text-success
+                                            {% elif recu.fichier.name|lower|slice:'-4:' in '.doc,.docx' %}fa-file-word text-primary
+                                            {% else %}fa-file text-secondary{% endif %}
+                                            me-2">
+                                        </i>
+                                        {{ recu.fichier.name }}
+                                    </div>
+                                    <small class="text-muted">{{ recu.date_upload|date:"d/m/Y H:i" }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Formulaire d'ajout -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="nouveaux_recus" class="form-label">
+                                <i class="fas fa-file-upload"></i> Sélectionner de nouveaux reçus
+                            </label>
+                            <input type="file" 
+                                   class="form-control" 
+                                   id="nouveaux_recus" 
+                                   name="nouveaux_recus" 
+                                   multiple
+                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                            <div class="form-text">
+                                Vous pouvez sélectionner plusieurs fichiers. Formats acceptés: PDF, JPG, PNG, DOC, DOCX
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description_recus" class="form-label">
+                                <i class="fas fa-align-left"></i> Description des reçus
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="description_recus" 
+                                   name="description_recus" 
+                                   placeholder="Description optionnelle pour tous les reçus...">
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'detail_versement' versement.id %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Retour au détail
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save"></i> Ajouter les reçus
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

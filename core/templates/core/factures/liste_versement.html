@@ -2,6 +2,8 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% load format_fcfa%}
+
 {% block title %}Factures Dépôts{% endblock %}
 
 {% block content %}
@@ -13,10 +15,10 @@
         </div>
         <div>
             <a href="{% url 'creer_versement' %}" class="btn btn-success">
-                <i class="fas fa-plus"></i> Nouvelle Facture
+                <i class="fas fa-plus"></i> Nouveau Versement
             </a>
             <a href="{% url 'liste_factures_entrepot' %}" class="btn btn-outline-primary">
-                <i class="fas fa-warehouse"></i> Voir Factures Entrepôt
+                <i class="fas fa-warehouse"></i> Voir Factures Stock
             </a>
         </div>
     </div>
@@ -47,10 +49,10 @@
                             </td>
                       
                             <td>
-                                <span class="fw-bold text-success">{{ versement.montant_vente|floatformat:0 }} FCFA</span>
+                                <span class="fw-bold text-success">{{ versement.montant_vente|fcfa }} FCFA</span>
                             </td>
                             <td>
-                                <span class="text-info">{{ versement.montant_hors_vente|floatformat:0 }} FCFA</span>
+                                <span class="text-info">{{ versement.montant_hors_vente|fcfa }} FCFA</span>
                             </td>
 
                 
@@ -93,15 +95,15 @@
                         <small class="text-muted">Total Versements</small>
                     </div>
                     <div class="col-md-3">
-                        <h5 class="text-success">{{ total_vente|default:0 }} FCFA</h5>
+                        <h5 class="text-success">{{ total_vente|fcfa }} FCFA</h5>
                         <small class="text-muted">Total Vente</small>
                     </div>
                     <div class="col-md-3">
-                        <h5 class="text-info">{{ total_hors_vente|default:0 }} FCFA</h5>
+                        <h5 class="text-info">{{ total_hors_vente|fcfa }} FCFA</h5>
                         <small class="text-muted">Total Hors Vente</small>
                     </div>
                     <div class="col-md-3">
-                        <h5 class="text-dark">{{ total_general|default:0 }} FCFA</h5>
+                        <h5 class="text-dark">{{ total_general|fcfa }} FCFA</h5>
                         <small class="text-muted">Total Général</small>
                     </div>
                 </div>

@@ -217,8 +217,8 @@ class VersementBancaireAdmin(admin.ModelAdmin):
         'montant_hors_vente',
         'montant_total',
         'type_versement',
-        'date_versement_reelle',
-        'recu'
+        'date_versement_reelle'
+        
     ]
     list_filter = ['date_versement_reelle', 'superviseur']
     search_fields = ['superviseur__user__username', 'description']
