@@ -208,41 +208,23 @@ class DepenseAdmin(admin.ModelAdmin):
 # -------------------------
 # Admin pour VersementBancaire
 # -------------------------
+from django.contrib import admin
+from .models import VersementBancaire, RecuVersement
+
+class RecuVersementInline(admin.TabularInline):
+    model = RecuVersement
+    extra = 1
+    fields = ('fichier', 'description', 'date_upload')
+    readonly_fields = ('date_upload',)
+
 @admin.register(VersementBancaire)
 class VersementBancaireAdmin(admin.ModelAdmin):
-    list_display = [
-        'id',
-        'superviseur',
-        'montant_vente',
-        'montant_hors_vente',
-        'montant_total',
-        'type_versement',
-        'date_versement_reelle'
-        
-    ]
-    list_filter = ['date_versement_reelle', 'superviseur']
-    search_fields = ['superviseur__user__username', 'description']
-    readonly_fields = ['montant_total', 'type_versement']
+    inlines = [RecuVersementInline]
+    list_display = ('id', 'superviseur', 'montant_vente', 'montant_hors_vente', 'date_versement_reelle')
 
-    # Affichage du montant total comme propriété
-    def montant_total(self, obj):
-        return obj.montant_total
-    montant_total.short_description = "Montant Total (FCFA)"
 
-    # Affichage du type de versement comme propriété
-    def type_versement(self, obj):
-        type_map = {
-            'vente': "Vente",
-            'autre': "Hors vente",
-            'mixte': "Mixte",
-            'aucun': "Aucun"
-        }
-        return type_map.get(obj.type_versement, "Inconnu")
-    type_versement.short_description = "Type de Versement"
-
-    # Possibilité de voir un lien vers le justificatif
-    def recu_link(self, obj):
-        if obj.recu:
-            return format_html('<a href="{}" target="_blank">Voir justificatif</a>', obj.recu.url)
-        return "-"
-    recu_link.short_description = "Reçu"
+@admin.register(RecuVersement)
+class RecuVersementAdmin(admin.ModelAdmin):
+    list_display = ('id', 'versement', 'description', 'date_upload')
+    list_filter = ('date_upload', )
+    search_fields = ('description', 'versement__id')

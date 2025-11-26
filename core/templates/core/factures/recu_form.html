@@ -1,0 +1,99 @@
+<!-- core/factures/recu_form.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title mb-0">
+                        <i class="fas fa-receipt me-2"></i>Ajouter des reçus
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <!-- Messages -->
+                    {% if messages %}
+                    <div class="mb-4">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <form method="POST" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+
+                        <!-- Champ Versement -->
+                        <div class="mb-3">
+                            <label for="{{ form.versement.id_for_label }}" class="form-label">
+                                {{ form.versement.label }} *
+                            </label>
+                            {{ form.versement }}
+                            {% if form.versement.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.versement.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Champ Fichiers -->
+                        <div class="mb-3">
+                            <label for="{{ form.fichiers.id_for_label }}" class="form-label">
+                                {{ form.fichiers.label }} *
+                            </label>
+                            {{ form.fichiers }}
+                            <div class="form-text">{{ form.fichiers.help_text }}</div>
+                            {% if form.fichiers.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.fichiers.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Champ Description -->
+                        <div class="mb-4">
+                            <label for="{{ form.description_generale.id_for_label }}" class="form-label">
+                                {{ form.description_generale.label }}
+                            </label>
+                            {{ form.description_generale }}
+                            {% if form.description_generale.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.description_generale.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Boutons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>Enregistrer les reçus
+                            </button>
+                            <a href="{% url 'recu_liste' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Annuler
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+</style>
+{% endblock %}

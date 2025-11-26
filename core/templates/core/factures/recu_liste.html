@@ -1,0 +1,44 @@
+<!-- core/entrepot/detail_lot.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Liste des reçus</h2>
+
+    <a href="{% url 'recu_create' %}" class="btn btn-primary mb-3">Ajouter un reçu</a>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Fichier</th>
+                <th>Description</th>
+                <th>Versement associé</th>
+                <th>Date upload</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for recu in recus %}
+            <tr>
+                <td>{{ recu.id }}</td>
+                <td>
+                    <a href="{{ recu.fichier.url }}" target="_blank">{{ recu.fichier.name }}</a>
+                </td>
+                <td>{{ recu.description }}</td>
+                <td>
+                    {% if recu.versement %}
+                        Versement #{{ recu.versement.id }}
+                    {% else %}
+                        <span class="text-muted">Aucun</span>
+                    {% endif %}
+                </td>
+                <td>{{ recu.date_upload }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+{%endblock%}

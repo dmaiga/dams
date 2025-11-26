@@ -1753,6 +1753,7 @@ class AjouterRecusView(UpdateView):
     def get_success_url(self):
         # Utiliser le bon nom d'URL et le bon paramètre
         return reverse_lazy('detail_versement', kwargs={'versement_id': self.object.id})
+
 @login_required
 def supprimer_versement(request, versement_id):
     """Supprimer un versement existant"""
@@ -1798,6 +1799,35 @@ def supprimer_versement(request, versement_id):
     except Exception as e:
         messages.error(request, f"❌ Erreur inattendue: {str(e)}")
         return redirect('liste_versement')
+
+from django.shortcuts import render, redirect
+from .forms import RecuVersementForm
+
+@login_required
+def recu_liste(request):
+    recus = RecuVersement.objects.all()
+    return render(request, 'core/factures/recu_liste.html', {'recus': recus})
+
+@login_required
+def recu_create(request):
+    if request.method == 'POST':
+        form = RecuVersementForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                recus_crees = form.save()
+                messages.success(
+                    request, 
+                    f"{len(recus_crees)} reçu(s) créé(s) avec succès !"
+                )
+                return redirect('recu_liste')
+            except Exception as e:
+                messages.error(request, f"Erreur lors de la création : {str(e)}")
+        else:
+            messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+    else:
+        form = RecuVersementForm()
+
+    return render(request, 'core/factures/recu_form.html', {'form': form})
 
 
 # views.py

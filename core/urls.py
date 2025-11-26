@@ -66,7 +66,8 @@ urlpatterns = [
     path('versement/creer/', views.creer_versement, name='creer_versement'),
     path('versements/<int:versement_id>/modifier/', views.modifier_versement, name='modifier_versement'),
     path('versements/<int:versement_id>/supprimer/', views.supprimer_versement, name='supprimer_versement'),
-    
+    path('recus/', views.recu_liste, name='recu_liste'),
+    path('recus/nouveau/', views.recu_create, name='recu_create'),
     path('factures/creer/', views.creer_facture, name='creer_facture'),
     path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
     path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),

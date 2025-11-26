@@ -1499,3 +1499,73 @@ class VersementForm(forms.ModelForm):
                 )
 
         return versement
+    
+from django.forms.widgets import FileInput
+from django import forms
+from django.core.files.uploadedfile import UploadedFile
+
+class MultiFileInput(forms.FileInput):
+    allow_multiple_selected = True
+
+class MultiFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultiFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = single_file_clean(data, initial)
+        return result
+
+class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
+    versement = forms.ModelChoiceField(
+        queryset=VersementBancaire.objects.all(),
+        required=False,
+        label="Versement associé",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    fichiers = MultiFileField(
+        required=True,  # ✅ Changer à True pour rendre obligatoire
+        label="Fichiers reçus",
+        widget=MultiFileInput(attrs={
+            'class': 'form-control',
+            'multiple': True,
+            'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx',
+        }),
+        help_text="Sélectionnez un ou plusieurs fichiers (Ctrl + clic)"
+    )
+
+    description_generale = forms.CharField(
+        required=False,
+        label="Description",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': "Description commune pour tous les reçus"
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Optionnel: filtrer les versements si nécessaire
+        # self.fields['versement'].queryset = VersementBancaire.objects.filter(...)
+
+    def save(self):
+        
+        description = (self.cleaned_data.get('description_generale') or "").strip()
+        fichiers = self.cleaned_data['fichiers']
+
+        recus_crees = []
+        for fichier in fichiers:
+            recu = RecuVersement.objects.create(
+               
+                fichier=fichier,
+                description=description or f"Reçu pour versement "
+            )
+            recus_crees.append(recu)
+
+        return recus_crees
+    

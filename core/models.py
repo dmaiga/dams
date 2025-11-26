@@ -1413,7 +1413,9 @@ class VersementBancaire(models.Model):
 class RecuVersement(models.Model):
     versement = models.ForeignKey(
         VersementBancaire,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='recus',
         verbose_name="Versement associé"
     )
@@ -1435,7 +1437,8 @@ class RecuVersement(models.Model):
     )
     
     def __str__(self):
-        return f"Reçu {self.id} - Versement {self.versement.id}"
+        return f"Reçu {self.id} - Versement {self.versement.id if self.versement else 'Aucun'}"
+    
     
     class Meta:
         ordering = ['-date_upload']
