@@ -1,0 +1,58 @@
+<!-- direction/partials/table_depenses.html -->
+<div class="overflow-x-auto bg-base-100 shadow rounded-lg p-4">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">Dépenses</h3>
+        <div class="flex gap-2">
+            <div class="badge badge-primary">{{ depenses|length }} dépenses</div>
+            <div class="badge badge-error">
+                Total: {{ total_depenses|floatformat:0 }} FCFA
+            </div>
+        </div>
+    </div>
+
+    <table class="table table-zebra w-full">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Superviseur</th>
+                <th>Montant</th>
+                <th>Justificatif</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for depense in depenses %}
+                <tr>
+                    <td>{{ depense.date_depense|date:"d/m/Y" }}</td>
+                    <td>
+                        <span class="badge badge-outline">
+                            {{ depense.get_type_depense_display }}
+                        </span>
+                    </td>
+                    <td class="max-w-xs truncate">{{ depense.description|default:"-" }}</td>
+                    <td>
+                        {{ depense.versement.superviseur.user.username|default:"Système" }}
+                    </td>
+                    <td class="font-semibold text-error">
+                        {{ depense.montant|floatformat:0 }} FCFA
+                    </td>
+                    <td>
+                        {% if depense.justificatif %}
+                            <a href="{{ depense.justificatif.url }}" class="btn btn-xs btn-outline" target="_blank">
+                                Voir
+                            </a>
+                        {% else %}
+                            <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-4">Aucune dépense enregistrée</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

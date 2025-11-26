@@ -2157,7 +2157,7 @@ def tableau_de_bord_superviseur(request):
     try:
         superviseur = Agent.objects.get(user=request.user, type_agent='entrepot')
     except Agent.DoesNotExist:
-        return render(request, 'errors/403.html', status=403)
+        redirect('login')
     
     # ✅ CORRECTION : Définir date_debut_recent AU DÉBUT de la fonction
     date_debut_recent = timezone.now() - timedelta(days=30)
@@ -2773,208 +2773,97 @@ def tous_les_bonus(request):
     
     return render(request, 'core/analyses/tous_les_bonus_admin.html', context)
 
+# core/views/dashboard.py
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from core.services.dashboard_service import DashboardService
+
+# core/views.py
+
+# core/views/dashboard.py
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from core.services.dashboard_service import DashboardService
+
+# core/views/dashboard.py
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/dashboard.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Périodes
-        today = timezone.now()
-        debut_mois = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        debut_semaine = today - timedelta(days=today.weekday())
+        # Récupération des paramètres de filtre
+        periode_type = self.request.GET.get('periode', 'mois')
+        annee = self.request.GET.get('annee')
+        mois = self.request.GET.get('mois')
         
-        # === CHIFFRE D'AFFAIRES ===
-        ventes_mois = Vente.objects.filter(date_vente__gte=debut_mois)
-        ventes_semaine = Vente.objects.filter(date_vente__gte=debut_semaine)
+        # Conversion des paramètres
+        if annee:
+            annee = int(annee)
+        if mois:
+            mois = int(mois)
         
-        # Calcul manuel du CA pour éviter les problèmes d'annotation
-        ca_mois = 0
-        for vente in ventes_mois:
-            ca_mois += float(vente.quantite * vente.prix_vente_unitaire)
-            
-        ca_semaine = 0
-        for vente in ventes_semaine:
-            ca_semaine += float(vente.quantite * vente.prix_vente_unitaire)
-            
-        ca_total = 0
-        for vente in Vente.objects.all():
-            ca_total += float(vente.quantite * vente.prix_vente_unitaire)
+        # 🔵 Bloc 1 : KPIs Globaux
+        kpis_globaux = DashboardService.get_kpis_globaux(periode_type, annee, mois)
         
-        # === CLIENTS PAR TYPE ===
-        # Méthode alternative sans multiplication dans l'annotation
-        clients_par_type = []
-        for type_client, label in Client.TYPE_CLIENT_CHOICES:
-            clients = Client.objects.filter(type_client=type_client)
-            ventes_clients = Vente.objects.filter(client__type_client=type_client)
-            
-            total_ca = 0
-            for vente in ventes_clients:
-                total_ca += float(vente.quantite * vente.prix_vente_unitaire)
-                
-            clients_par_type.append({
-                'type_client': type_client,
-                'label': label,
-                'total': clients.count(),
-                'total_ventes': ventes_clients.count(),
-                'total_ca': total_ca
-            })
+        # 🟣 Bloc 2 : Stock ESSENTIEL avec fournisseurs
+        stock_essentiel = DashboardService.get_stock_essentiel_avec_fournisseurs()
         
-        # Trier par CA décroissant
-        clients_par_type.sort(key=lambda x: x['total_ca'], reverse=True)
+        # 🟠 Bloc 3 : Performances Agents
+        performances_agents = DashboardService.get_performances_agents(periode_type, annee, mois)
         
-        # === MOUVEMENT PRODUITS (DÉTAIL vs GROS) ===
-        # Ventilation détail vs gros
-        ventilation_type = []
-        for type_vente, label in Vente.TYPE_VENTE_CHOICES:
-            ventes_type = Vente.objects.filter(type_vente=type_vente)
-            
-            total_quantite = sum(vente.quantite for vente in ventes_type)
-            total_ca = 0
-            for vente in ventes_type:
-                total_ca += float(vente.quantite * vente.prix_vente_unitaire)
-                
-            ventilation_type.append({
-                'type_vente': type_vente,
-                'label': label,
-                'total_quantite': total_quantite,
-                'total_ca': total_ca,
-                'nombre_ventes': ventes_type.count()
-            })
+        # 🔴 Bloc 4 : Analyses Ventes AVANCÉES
+        analyses_ventes = DashboardService.get_analyses_ventes_avancees(periode_type, annee, mois)
         
-        # === PRODUITS VENDUS ===
-        produits_vendus_data = {}
-        for vente in Vente.objects.all():
-            # Vérifier que la relation existe
-            if (vente.detail_distribution and 
-                vente.detail_distribution.lot and 
-                vente.detail_distribution.lot.produit):
-                
-                produit_nom = vente.detail_distribution.lot.produit.nom
-                if produit_nom not in produits_vendus_data:
-                    produits_vendus_data[produit_nom] = {
-                        'total_quantite': 0,
-                        'total_ca': 0,
-                        'ventes_count': 0
-                    }
-                
-                produits_vendus_data[produit_nom]['total_quantite'] += vente.quantite
-                produits_vendus_data[produit_nom]['total_ca'] += float(vente.quantite * vente.prix_vente_unitaire)
-                produits_vendus_data[produit_nom]['ventes_count'] += 1
+        # 🟢 Bloc 5 : Analyses Dépenses
+        analyses_depenses = DashboardService.get_analyses_depenses(periode_type, annee, mois)
         
-        # Convertir en liste et trier
-        produits_vendus = [
-            {
-                'nom': nom,
-                'total_quantite': data['total_quantite'],
-                'total_ca': data['total_ca'],
-                'ventes_count': data['ventes_count']
-            }
-            for nom, data in produits_vendus_data.items()
-        ]
-        produits_vendus.sort(key=lambda x: x['total_ca'], reverse=True)
-        produits_vendus = produits_vendus[:10]  # Top 10
+        # 🟦 Bloc 6 : Portefeuilles de TOUS les superviseurs (pour la direction)
+        portefeuilles_superviseurs = []
+        user_has_agent = hasattr(self.request.user, 'agent')
+        user_is_direction = False
         
-        # === CLIENTS ACTIFS ===
-        clients_actifs_mois = ventes_mois.values('client').distinct().count()
-        clients_actifs_semaine = ventes_semaine.values('client').distinct().count()
-        clients_total = Client.objects.count()
+        if user_has_agent:
+            user_is_direction = self.request.user.agent.est_direction
+            if user_is_direction:
+                portefeuilles_superviseurs = DashboardService.get_portefeuilles_tous_superviseurs(
+                    periode_type, annee, mois
+                )
         
-        # === PANIER MOYEN ===
-        panier_moyen_mois = ca_mois / ventes_mois.count() if ventes_mois.count() > 0 else 0
-        panier_moyen_semaine = ca_semaine / ventes_semaine.count() if ventes_semaine.count() > 0 else 0
-        
-        # === TAUX ROTATION STOCK ===
-        distributions_mois = DetailDistribution.objects.filter(
-            distribution__date_distribution__gte=debut_mois
-        )
-        quantite_distribuee = sum(dist.quantite for dist in distributions_mois)
-        quantite_vendue = sum(vente.quantite for vente in ventes_mois)
-        
-        taux_rotation = (quantite_vendue / quantite_distribuee * 100) if quantite_distribuee > 0 else 0
-        
-        # === TOP CLIENTS RENTABLES ===
-        clients_data = {}
-        for vente in Vente.objects.all():
-            # CORRECTION : Vérifier que le client existe
-            if vente.client is not None:
-                client_nom = vente.client.nom
-                client_type = vente.client.type_client
-                
-                if client_nom not in clients_data:
-                    clients_data[client_nom] = {
-                        'type_client': client_type,
-                        'total_achats': 0,
-                        'nombre_commandes': 0,
-                        'montants_commandes': []
-                    }
-                
-                montant_commande = float(vente.quantite * vente.prix_vente_unitaire)
-                clients_data[client_nom]['total_achats'] += montant_commande
-                clients_data[client_nom]['nombre_commandes'] += 1
-                clients_data[client_nom]['montants_commandes'].append(montant_commande)
-        
-        # Calculer le panier moyen et créer la liste
-        top_clients = []
-        for client_nom, data in clients_data.items():
-            panier_moyen = data['total_achats'] / data['nombre_commandes'] if data['nombre_commandes'] > 0 else 0
-            top_clients.append({
-                'nom': client_nom,
-                'type_client': data['type_client'],
-                'total_achats': data['total_achats'],
-                'nombre_commandes': data['nombre_commandes'],
-                'panier_moyen': panier_moyen
-            })
-        
-        top_clients.sort(key=lambda x: x['total_achats'], reverse=True)
-        top_clients = top_clients[:10]  # Top 10
-        
-        # === ÉVOLUTION MENSUELLE ===
-        evolution_data = []
-        for i in range(6):  # 6 derniers mois
-            mois_date = today - timedelta(days=30*i)
-            debut_mois_ref = mois_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            fin_mois_ref = (debut_mois_ref + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-            
-            ventes_mois_ref = Vente.objects.filter(date_vente__range=[debut_mois_ref, fin_mois_ref])
-            ca_mois_ref = 0
-            for vente in ventes_mois_ref:
-                ca_mois_ref += float(vente.quantite * vente.prix_vente_unitaire)
-            
-            evolution_data.append({
-                'mois': debut_mois_ref.strftime('%b %Y'),
-                'ca': ca_mois_ref
-            })
-        
-        evolution_data.reverse()
+        # Années disponibles pour le filtre
+        annees_disponibles = DashboardService.get_annees_disponibles()
         
         context.update({
-            # Chiffre d'affaires
-            'ca_mois': ca_mois,
-            'ca_semaine': ca_semaine,
-            'ca_total': ca_total,
-            'ventes_mois': ventes_mois.count(),
-            'ventes_semaine': ventes_semaine.count(),
+            # KPI Globaux
+            **kpis_globaux,
             
-            # Clients
-            'clients_par_type': clients_par_type,
-            'clients_actifs_mois': clients_actifs_mois,
-            'clients_actifs_semaine': clients_actifs_semaine,
-            'clients_total': clients_total,
-            'top_clients': top_clients,
+            # Stock ESSENTIEL avec fournisseurs
+            'stock_essentiel': stock_essentiel,
             
-            # Produits
-            'ventilation_type': ventilation_type,
-            'produits_vendus': produits_vendus,
-            'quantite_vendue_mois': quantite_vendue,
+            # Performances
+            'performances_agents': performances_agents,
             
-            # Performance
-            'panier_moyen_mois': panier_moyen_mois,
-            'panier_moyen_semaine': panier_moyen_semaine,
-            'taux_rotation': taux_rotation,
+            # Ventes
+            **analyses_ventes,
             
-            # Évolution
-            'evolution_data': evolution_data,
+            # Dépenses
+            **analyses_depenses,
+            
+            # Portefeuilles superviseurs (pour la direction)
+            'portefeuilles_superviseurs': portefeuilles_superviseurs,
+            'user_has_agent': user_has_agent,
+            'user_is_direction': user_is_direction,
+            
+            # Filtres
+            'annees_disponibles': annees_disponibles,
+            'periode_selectionnee': periode_type,
+            'annee_selectionnee': annee,
+            'mois_selectionne': mois,
+            'mois_liste': [
+                (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
+                (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
+                (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre')
+            ]
         })
         
         return context
@@ -3193,7 +3082,6 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
         })
         
         return context
-
 class AnalyseProduitsView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/analyse_produits.html'
     
@@ -3206,7 +3094,11 @@ class AnalyseProduitsView(LoginRequiredMixin, TemplateView):
         # === PERFORMANCE PAR PRODUIT ===
         produits_data = {}
         
-        for vente in Vente.objects.select_related('detail_distribution__lot__produit'):
+        for vente in Vente.objects.select_related('detail_distribution__lot__produit', 'client', 'agent'):
+            # Vérification que le produit existe
+            if not vente.detail_distribution or not vente.detail_distribution.lot or not vente.detail_distribution.lot.produit:
+                continue
+                
             produit = vente.detail_distribution.lot.produit
             produit_nom = produit.nom
             
@@ -3227,8 +3119,14 @@ class AnalyseProduitsView(LoginRequiredMixin, TemplateView):
             data['total_quantite'] += vente.quantite
             data['total_ca'] += float(vente.quantite * vente.prix_vente_unitaire)
             data['ventes_count'] += 1
-            data['clients_count'].add(vente.client.id)
-            data['agents_count'].add(vente.agent.id)
+            
+            # Gestion des clients (peut être None)
+            if vente.client and vente.client.id:
+                data['clients_count'].add(vente.client.id)
+            
+            # Gestion des agents (toujours présent normalement)
+            if vente.agent and vente.agent.id:
+                data['agents_count'].add(vente.agent.id)
             
             # Ventes du mois
             if vente.date_vente >= debut_mois:
@@ -3261,6 +3159,9 @@ class AnalyseProduitsView(LoginRequiredMixin, TemplateView):
         # === STOCK VS VENTES ===
         stock_ventes_data = []
         for lot in LotEntrepot.objects.filter(quantite_restante__gt=0).select_related('produit'):
+            if not lot.produit:
+                continue
+                
             produit_nom = lot.produit.nom
             ventes_produit = next((p for p in produits_performance if p['produit'].nom == produit_nom), None)
             
@@ -3532,45 +3433,58 @@ class AnalyseAgentsView(LoginRequiredMixin, TemplateView):
             ventes_mois = ventes_agent.filter(date_vente__gte=debut_mois)
             ventes_trimestre = ventes_agent.filter(date_vente__gte=debut_trimestre)
             
-            # Calculs détaillés
-            ca_total = 0
-            ca_mois = 0
-            ca_trimestre = 0
-            quantite_total = 0
+            # Calculs détaillés - TOUT en Decimal pour éviter les conflits
+            ca_total = Decimal('0.00')
+            ca_mois = Decimal('0.00')
+            ca_trimestre = Decimal('0.00')
+            quantite_total = Decimal('0.00')
             clients_servis = set()
             produits_vendus = set()
             montants_ventes = []
             
             for vente in ventes_agent:
-                montant = float(vente.quantite * vente.prix_vente_unitaire)
+                montant = vente.quantite * vente.prix_vente_unitaire  # Garder en Decimal
                 ca_total += montant
                 quantite_total += vente.quantite
-                clients_servis.add(vente.client.id)
-                produits_vendus.add(vente.detail_distribution.lot.produit.nom)
-                montants_ventes.append(montant)
+                
+                # Gestion des clients (peut être None)
+                if vente.client and vente.client.id:
+                    clients_servis.add(vente.client.id)
+                
+                # Gestion des produits
+                if (vente.detail_distribution and 
+                    vente.detail_distribution.lot and 
+                    vente.detail_distribution.lot.produit):
+                    produits_vendus.add(vente.detail_distribution.lot.produit.nom)
+                
+                montants_ventes.append(float(montant))  # Convertir en float seulement pour la liste
                 
                 if vente.date_vente >= debut_mois:
                     ca_mois += montant
                 if vente.date_vente >= debut_trimestre:
                     ca_trimestre += montant
             
-            # Indicateurs de performance
+            # Indicateurs de performance - convertir en float pour les calculs
             nombre_ventes = ventes_agent.count()
-            panier_moyen = ca_total / nombre_ventes if nombre_ventes > 0 else 0
-            efficacite = ca_total / len(clients_servis) if clients_servis else 0
+            panier_moyen = float(ca_total) / nombre_ventes if nombre_ventes > 0 else 0
+            efficacite = float(ca_total) / len(clients_servis) if clients_servis else 0
             
             # Taux de conversion (basé sur les distributions)
             distributions_agent = DistributionAgent.objects.filter(agent_terrain=agent)
             quantite_distribuee = sum(
-                detail.quantite for dist in distributions_agent 
+                float(detail.quantite) for dist in distributions_agent 
                 for detail in dist.detaildistribution_set.all()
             )
-            taux_conversion = (quantite_total / quantite_distribuee * 100) if quantite_distribuee > 0 else 0
+            taux_conversion = (float(quantite_total) / quantite_distribuee * 100) if quantite_distribuee > 0 else 0
             
             # Performance temporelle
             if nombre_ventes > 0:
-                anciennete_jours = (today - ventes_agent.earliest('date_vente').date_vente).days
-                ventes_par_jour = nombre_ventes / anciennete_jours if anciennete_jours > 0 else 0
+                try:
+                    premiere_vente = ventes_agent.earliest('date_vente')
+                    anciennete_jours = (today - premiere_vente.date_vente).days
+                    ventes_par_jour = nombre_ventes / anciennete_jours if anciennete_jours > 0 else 0
+                except Vente.DoesNotExist:
+                    ventes_par_jour = 0
             else:
                 ventes_par_jour = 0
             
@@ -3582,20 +3496,21 @@ class AnalyseAgentsView(LoginRequiredMixin, TemplateView):
                 if dettes_agent.count() > 0 else 100
             )
             
-            # Score de performance composite
+            # Score de performance composite - utiliser les valeurs float
+            ca_mois_float = float(ca_mois)
             score_performance = (
-                (ca_mois / max(ca_mois, 1)) * 40 +  # Poids CA: 40%
-                (taux_conversion / 100) * 30 +       # Poids conversion: 30%
-                (taux_recouvrement / 100) * 20 +     # Poids recouvrement: 20%
+                (ca_mois_float / max(ca_mois_float, 1)) * 40 +  # Poids CA: 40%
+                (taux_conversion / 100) * 30 +                  # Poids conversion: 30%
+                (taux_recouvrement / 100) * 20 +                # Poids recouvrement: 20%
                 (len(clients_servis) / max(len(clients_servis), 1)) * 10  # Poids clientèle: 10%
             )
             
             agents_analyse.append({
                 'agent': agent,
-                'ca_total': ca_total,
-                'ca_mois': ca_mois,
-                'ca_trimestre': ca_trimestre,
-                'quantite_total': quantite_total,
+                'ca_total': float(ca_total),  # Convertir en float pour le template
+                'ca_mois': float(ca_mois),
+                'ca_trimestre': float(ca_trimestre),
+                'quantite_total': float(quantite_total),
                 'nombre_ventes': nombre_ventes,
                 'clients_servis': len(clients_servis),
                 'produits_vendus': len(produits_vendus),
@@ -3632,12 +3547,13 @@ class AnalyseAgentsView(LoginRequiredMixin, TemplateView):
                     date_vente__range=[debut_mois_ref, fin_mois_ref]
                 )
                 
-                ca_mois_ref = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_mois_ref)
+                # Calcul en Decimal puis conversion en float
+                ca_mois_ref = sum(v.quantite * v.prix_vente_unitaire for v in ventes_mois_ref)
                 clients_mois_ref = ventes_mois_ref.values('client').distinct().count()
                 
                 evolution_data.append({
                     'mois': debut_mois_ref.strftime('%b %Y'),
-                    'ca': ca_mois_ref,
+                    'ca': float(ca_mois_ref),  # Convertir en float
                     'clients': clients_mois_ref,
                     'ventes': ventes_mois_ref.count()
                 })
@@ -3658,3 +3574,4 @@ class AnalyseAgentsView(LoginRequiredMixin, TemplateView):
         })
         
         return context
+

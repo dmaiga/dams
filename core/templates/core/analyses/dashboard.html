@@ -1,180 +1,260 @@
-<!-- templates/core/statistiques/dashboard.html -->
+<!-- templates/core/analyses/dashboard.html -->
 {% extends 'base_admin.html' %}
 {% load static %}
+{% load format_fcfa %}
+{% load dashboard_filters %}
 
-{% block title %}Tableau de Bord Statistiques{% endblock %}
+
+
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- En-tête -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-2">📊 Tableau de Bord Statistiques</h1>
-            <p class="text-muted">Analyse complète des performances commerciales</p>
-        </div>
-        <div class="btn-group">
-            <button class="btn btn-outline-primary active" data-period="month">Mois</button>
-            <button class="btn btn-outline-primary" data-period="week">Semaine</button>
-            <button class="btn btn-outline-primary" data-period="all">Tout</button>
-        </div>
-    </div>
-
-    <!-- KPI Principaux -->
-    <div class="row mb-4">
-        <div class="col-xl-2 col-md-4 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                CA Mensuel
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ ca_mois|floatformat:0 }} FCFA
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
+<div class="space-y-6">
+    <!-- En-tête avec Filtres -->
+    <div class="bg-base-100 rounded-lg shadow-sm border border-base-300 p-6">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+            <div>
+                <h1 class="text-2xl font-bold text-base-content">📊 Tableau de Bord Commercial</h1>
+                <p class="text-base-content/70 mt-1">
+                    {% if periode_selectionnee == 'annee' %}
+                        Vue Annuelle {{ annee_selectionnee|default:date_debut.year }}
+                    {% else %}
+                        Vue Mensuelle 
+                        {% if mois_selectionne %}
+                            {{ mois_liste|get_item:mois_selectionne }}/{{ annee_selectionnee|default:date_debut.year }}
+                        {% else %}
+                            {{ date_debut|date:"F Y" }}
+                        {% endif %}
+                    {% endif %}
+                </p>
+            </div>
+            
+            <!-- Filtres de Période -->
+            <div class="flex flex-col sm:flex-row gap-2">
+                <form method="get" class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                    <!-- Type de période -->
+                    <select name="periode" class="select select-bordered select-sm" onchange="this.form.submit()">
+                        <option value="mois" {% if periode_selectionnee == 'mois' %}selected{% endif %}>Vue Mensuelle</option>
+                        <option value="annee" {% if periode_selectionnee == 'annee' %}selected{% endif %}>Vue Annuelle</option>
+                    </select>
+                    
+                    <!-- Sélection d'année -->
+                    <select name="annee" class="select select-bordered select-sm" onchange="this.form.submit()">
+                        {% for annee in annees_disponibles %}
+                            <option value="{{ annee }}" {% if annee_selectionnee == annee %}selected{% endif %}>{{ annee }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <!-- Sélection de mois (seulement en vue mensuelle) -->
+                    {% if periode_selectionnee == 'mois' %}
+                    <select name="mois" class="select select-bordered select-sm" onchange="this.form.submit()">
+                        {% for num, nom in mois_liste %}
+                            <option value="{{ num }}" {% if mois_selectionne == num %}selected{% endif %}>{{ nom }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
+                    
+                    <!-- Bouton reset -->
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm">
+                        <i class="fas fa-refresh mr-1"></i>Reset
+                    </a>
+                </form>
             </div>
         </div>
-
-        <div class="col-xl-2 col-md-4 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Ventes Mois
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ ventes_mois }}
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-shopping-cart fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
+        
+        <!-- Indicateur de période active -->
+        <div class="flex flex-wrap gap-2">
+            <div class="badge badge-primary">
+                <i class="fas fa-calendar mr-1"></i>
+                {% if periode_selectionnee == 'annee' %}
+                    Année {{ annee_selectionnee|default:date_debut.year }}
+                {% else %}
+                    {% if mois_selectionne %}
+                        {{ mois_liste|get_item:mois_selectionne }} {{ annee_selectionnee|default:date_debut.year }}
+                    {% else %}
+                        {{ date_debut|date:"F Y" }}
+                    {% endif %}
+                {% endif %}
             </div>
-        </div>
-
-        <div class="col-xl-2 col-md-4 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Clients Actifs
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ clients_actifs_mois }}
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-users fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
+            <div class="badge badge-secondary">
+                <i class="fas fa-chart-line mr-1"></i>
+                {{ total_ventes_periode|fcfa }} FCFA de CA
             </div>
-        </div>
-
-        <div class="col-xl-2 col-md-4 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Panier Moyen
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ panier_moyen_mois|floatformat:0 }} FCFA
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-chart-pie fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-2 col-md-4 mb-4">
-            <div class="card border-left-danger shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                Rotation Stock
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ taux_rotation|floatformat:1 }}%
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-sync-alt fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-2 col-md-4 mb-4">
-            <div class="card border-left-secondary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">
-                                Produits Vendus
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ quantite_vendue_mois }}
-                            </div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-boxes fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
+            <div class="badge badge-accent">
+                <i class="fas fa-boxes mr-1"></i>
+                {{ stock_essentiel|length|default:0 }} produits en stock
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- Clients par Type -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h6 class="m-0 font-weight-bold">👥 Clients par Type</h6>
+    <!-- 🔵 Bloc 1 : KPIs Principaux -->
+    <div class="bg-base-100 rounded-lg shadow-sm border border-base-300 p-6">
+        <h2 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+            <i class="fas fa-tachometer-alt text-primary"></i>
+            Indicateurs de Performance
+            <span class="text-sm font-normal text-base-content/60">
+                ({% if periode_selectionnee == 'annee' %}Année {{ annee_selectionnee }}{% else %}
+                {% if mois_selectionne %}{{ mois_liste|get_item:mois_selectionne }} {{ annee_selectionnee }}{% else %}{{ date_debut|date:"F Y" }}{% endif %}
+                {% endif %})
+            </span>
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- CA Période -->
+            <div class="card bg-base-100 shadow-sm border-l-4 border-l-success">
+                <div class="card-body p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-semibold text-base-content/70 uppercase">
+                                {% if periode_selectionnee == 'annee' %}CA Annuel{% else %}CA Mensuel{% endif %}
+                            </div>
+                            <div class="text-xl font-bold text-base-content mt-1">
+                                {{ total_ventes_periode|fcfa }} FCFA
+                            </div>
+                            <div class="text-xs text-base-content/50 mt-1">
+                                {{ nombre_ventes_periode|default:0 }} ventes
+                            </div>
+                        </div>
+                        <div class="text-success opacity-70">
+                            <i class="fas fa-money-bill-wave text-xl"></i>
+                        </div>
+                    </div>
+                    {% if periode_selectionnee == 'mois' and total_ventes_periode and total_ventes_periode > 0 %}
+                    <div class="mt-2 pt-2 border-t border-base-200">
+                        <div class="text-xs text-base-content/60">Moyenne journalière</div>
+                        <div class="text-sm font-semibold text-success">
+                            {{ total_ventes_periode|div:date_fin.day|floatformat:2 }} F/jour
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Type Client</th>
-                                    <th>Nombre</th>
-                                    <th>Ventes</th>
-                                    <th>Chiffre d'Affaires</th>
+            </div>
+
+            <!-- Marge Brute -->
+            <div class="card bg-base-100 shadow-sm border-l-4 border-l-primary">
+                <div class="card-body p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-semibold text-base-content/70 uppercase">Marge Brute</div>
+                            <div class="text-xl font-bold text-base-content mt-1">
+                                {{ marge_brute_periode|fcfa }} FCFA
+                            </div>
+                            <div class="text-xs text-base-content/50 mt-1">
+                                {% if total_ventes_periode and total_ventes_periode > 0 %}
+                                Taux: {% widthratio marge_brute_periode total_ventes_periode 100 %}%
+                                {% else %}0% de marge{% endif %}
+                            </div>
+                        </div>
+                        <div class="text-primary opacity-70">
+                            <i class="fas fa-chart-line text-xl"></i>
+                        </div>
+                    </div>
+                    {% if marge_brute_periode and marge_brute_periode > 0 %}
+                    <div class="mt-2 pt-2 border-t border-base-200">
+                        <div class="text-xs text-base-content/60">Moyenne/vente</div>
+                        <div class="text-sm font-semibold text-primary">
+                            {{ marge_brute_periode|div:nombre_ventes_periode|fcfa }} F
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Cash Flow -->
+            <div class="card bg-base-100 shadow-sm border-l-4 border-l-info">
+                <div class="card-body p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-semibold text-base-content/70 uppercase">Cash Flow</div>
+                            <div class="text-xl font-bold text-base-content mt-1">
+                                {{ cash_flow|fcfa }} FCFA
+                            </div>
+                            <div class="text-xs text-base-content/50 mt-1">
+                                CA - Dépenses
+                            </div>
+                        </div>
+                        <div class="text-info opacity-70">
+                            <i class="fas fa-exchange-alt text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-base-200">
+                        <div class="text-xs text-base-content/60">Dépenses totales</div>
+                        <div class="text-sm font-semibold {% if total_depenses and total_depenses > total_ventes_periode|div:2 %}text-error{% else %}text-info{% endif %}">
+                            {{ total_depenses|fcfa}} FCFA
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stock Actif -->
+            <div class="card bg-base-100 shadow-sm border-l-4 border-l-warning">
+                <div class="card-body p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-semibold text-base-content/70 uppercase">Stock Actif</div>
+                            <div class="text-xl font-bold text-base-content mt-1">
+                                {{ stock_total|fcfa }} FCFA
+                            </div>
+                            <div class="text-xs text-base-content/50 mt-1">
+                                Valeur actuelle
+                            </div>
+                        </div>
+                        <div class="text-warning opacity-70">
+                            <i class="fas fa-boxes text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-base-200">
+                        <div class="text-xs text-base-content/60">{{ stock_essentiel|length|default:0 }} produits</div>
+                        <div class="text-sm font-semibold text-warning">
+                            Rotation: {{ stock_essentiel|avg_rotation|floatformat:2 }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔴 Bloc 2 : Analyses Ventes Détaillées -->
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="card-title text-lg">
+                    <i class="fas fa-chart-bar text-success mr-2"></i>
+                    Analyse des Ventes
+                </h2>
+                <div class="badge badge-success badge-lg">
+                    Total: {{ total_ca_mois|fcfa }} FCFA
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Top 10 Produits -->
+                <div>
+                    <h3 class="font-semibold text-base-content mb-4 flex items-center gap-2">
+                        <i class="fas fa-trophy text-warning"></i>
+                        Top 10 Produits par CA
+                    </h3>
+                    <div class="overflow-x-auto max-h-96">
+                        <table class="table table-zebra table-sm">
+                            <thead>
+                                <tr class="bg-base-200 sticky top-0">
+                                    <th class="font-semibold">Produit</th>
+                                    <th class="text-center">Quantité</th>
+                                    <th class="text-center">CA</th>
+                                    <th class="text-center">Marge</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for client_type in clients_par_type %}
-                                <tr>
-                                    <td>
-                                        <span class="badge 
-                                            {% if client_type.type_client == 'grossiste' %}bg-primary
-                                            {% elif client_type.type_client == 'detail' %}bg-success
-                                            {% else %}bg-secondary{% endif %}">
-                                            {{ client_type.label }}
-                                        </span>
+                                {% for produit in top_produits %}
+                                <tr class="hover:bg-base-200/50 transition-colors">
+                                    <td class="font-medium">{{ produit.nom }}</td>
+                                    <td class="text-center">
+                                        <div class="badge badge-primary">{{ produit.quantite|floatformat:2 }}</div>
                                     </td>
-                                    <td>{{ client_type.total }}</td>
-                                    <td>{{ client_type.total_ventes }}</td>
-                                    <td class="fw-bold text-success">
-                                        {{ client_type.total_ca|floatformat:0 }} FCFA
+                                    <td class="text-center font-bold text-success">
+                                        {{ produit.ca|fcfa }} F
+                                    </td>
+                                    <td class="text-center font-bold text-info">
+                                        {{ produit.marge|fcfa }} F
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -182,214 +262,302 @@
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Mouvement Produits (Détail vs Gros) -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h6 class="m-0 font-weight-bold">📦 Détail vs Vente en Gros</h6>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Type Vente</th>
-                                    <th>Quantité</th>
-                                    <th>CA Total</th>
-                                    <th>Nombre Ventes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for vent_type in ventilation_type %}
-                                <tr>
-                                    <td>
-                                        <span class="badge {% if vent_type.type_vente == 'gros' %}bg-primary{% else %}bg-success{% endif %}">
-                                            {{ vent_type.label }}
-                                        </span>
-                                    </td>
-                                    <td>{{ vent_type.total_quantite }}</td>
-                                    <td class="fw-bold text-success">
-                                        {{ vent_type.total_ca|floatformat:0 }} FCFA
-                                    </td>
-                                    <td>{{ vent_type.nombre_ventes }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <!-- Répartition des Ventes -->
+                <div class="space-y-6">
+                    <!-- Type de Vente -->
+                    <div>
+                        <h4 class="font-semibold text-base-content mb-3 flex items-center gap-2">
+                            <i class="fas fa-chart-pie text-primary"></i>
+                            Répartition par Type
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="card bg-primary/10">
+                                <div class="card-body p-4 text-center">
+                                    <div class="text-2xl font-bold text-primary">
+                                        {{ repartition_type.gros.pourcentage|floatformat:2 }}%
+                                    </div>
+                                    <div class="text-sm font-semibold">GROS</div>
+                                    <div class="text-xs text-base-content/70">
+                                        {{ repartition_type.gros.ca|fcfa }} F
+                                    </div>
+                                    <div class="text-xs text-base-content/50">
+                                        {{ repartition_type.gros.ventes }} ventes
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card bg-success/10">
+                                <div class="card-body p-4 text-center">
+                                    <div class="text-2xl font-bold text-success">
+                                        {{ repartition_type.detail.pourcentage|floatformat:2 }}%
+                                    </div>
+                                    <div class="text-sm font-semibold">DÉTAIL</div>
+                                    <div class="text-xs text-base-content/70">
+                                        {{ repartition_type.detail.ca|fcfa }} F
+                                    </div>
+                                    <div class="text-xs text-base-content/50">
+                                        {{ repartition_type.detail.ventes }} ventes
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mode de Paiement -->
+                    <div>
+                        <h4 class="font-semibold text-base-content mb-3 flex items-center gap-2">
+                            <i class="fas fa-credit-card text-info"></i>
+                            Mode de Paiement
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="card bg-info/10">
+                                <div class="card-body p-4 text-center">
+                                    <div class="text-2xl font-bold text-info">
+                                        {{ repartition_paiement.comptant.pourcentage|floatformat:0 }}%
+                                    </div>
+                                    <div class="text-sm font-semibold">COMPTANT</div>
+                                    <div class="text-xs text-base-content/70">
+                                        {{ repartition_paiement.comptant.ca|fcfa }} F
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card bg-warning/10">
+                                <div class="card-body p-4 text-center">
+                                    <div class="text-2xl font-bold text-warning">
+                                        {{ repartition_paiement.credit.pourcentage|floatformat:0 }}%
+                                    </div>
+                                    <div class="text-sm font-semibold">CRÉDIT</div>
+                                    <div class="text-xs text-base-content/70">
+                                        {{ repartition_paiement.credit.ca|fcfa}} F
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- Top 10 Produits -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-warning text-dark">
-                    <h6 class="m-0 font-weight-bold">🏆 Top 10 Produits</h6>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Produit</th>
-                                    <th>Quantité</th>
-                                    <th>Chiffre d'Affaires</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for produit in produits_vendus %}
-                                <tr>
-                                    <td>{{ produit.nom }}</td>
-                                    <td>
-                                        <span class="badge bg-primary">{{ produit.total_quantite }}</span>
-                                    </td>
-                                    <td class="fw-bold text-success">
-                                        {{ produit.total_ca|floatformat:0 }} FCFA
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+    <!-- Tendance des Ventes 7 jours -->
+    {% if tendance_7j %}
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h3 class="card-title text-lg mb-4">
+                <i class="fas fa-chart-line text-success mr-2"></i>
+                Tendance des Ventes (7 derniers jours)
+            </h3>
+            <div class="overflow-x-auto">
+                <div class="flex items-end justify-between h-32 gap-2 min-w-max">
+                    {% for jour in tendance_7j %}
+                    <div class="flex flex-col items-center flex-1">
+                        <div 
+                            class="bg-success/30 rounded-t w-full max-w-12 transition-all hover:bg-success/50 tooltip"
+                            data-tip="{{ jour.date }}: {{ jour.ca|floatformat:0 }} F - {{ jour.ventes }} ventes"
+                            style="height: {% widthratio jour.ca max_ca_jour 80 %}%"
+                        ></div>
+                        <div class="text-xs mt-2 text-base-content/70">{{ jour.date|slice:":3" }}</div>
+                        <div class="text-xs font-semibold">{{ jour.ca|floatformat:0 }}F</div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top 10 Clients -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-info text-white">
-                    <h6 class="m-0 font-weight-bold">💎 Top 10 Clients</h6>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Client</th>
-                                    <th>Type</th>
-                                    <th>Total Achats</th>
-                                    <th>Panier Moyen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for client in top_clients %}
-                                <tr>
-                                    <td>{{ client.nom }}</td>
-                                    <td>
-                                        <span class="badge 
-                                            {% if client.type_client == 'grossiste' %}bg-primary
-                                            {% elif client.type_client == 'detail' %}bg-success
-                                            {% else %}bg-secondary{% endif %}">
-                                            {{ client.type_client }}
-                                        </span>
-                                    </td>
-                                    <td class="fw-bold text-success">
-                                        {{ client.total_achats|floatformat:0 }} FCFA
-                                    </td>
-                                    <td>{{ client.panier_moyen|floatformat:0 }} FCFA</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Évolution du CA -->
-    <div class="row">
-        <div class="col-12 mb-4">
-            <div class="card shadow">
-                <div class="card-header bg-dark text-white">
-                    <h6 class="m-0 font-weight-bold">📈 Évolution du Chiffre d'Affaires (6 derniers mois)</h6>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    {% for data in evolution_data %}
-                                    <th class="text-center">{{ data.mois }}</th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    {% for data in evolution_data %}
-                                    <td class="text-center fw-bold text-success">
-                                        {{ data.ca|floatformat:0 }} FCFA
-                                    </td>
-                                    {% endfor %}
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    {% endif %}
+<!-- 🟦 Bloc 3 : Portefeuilles des Superviseurs (Direction) -->
+<!-- Version tableau compact -->
+{% if user_is_direction and portefeuilles_superviseurs %}
+<div class="card bg-base-100 shadow-xl mb-8">
+    <div class="card-body">
+        <h2 class="card-title text-lg mb-4">
+            <i class="fas fa-wallet text-purple-500 mr-2"></i>
+            Portefeuilles Superviseurs - Vue Synthétique
+        </h2>
+        
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                    <tr class="bg-base-200">
+                        <th class="font-semibold">Superviseur</th>
+                        <th class="text-center">Recouvrements</th>
+                        <th class="text-center">Dépenses</th>
+                        <th class="text-center">Versements</th>
+                     
+                        <th class="text-center">Solde</th>
+                       
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for portefeuille in portefeuilles_superviseurs %}
+                    <tr class="hover:bg-base-200/50 transition-colors">
+                        <td class="font-bold">{{ portefeuille.superviseur }}</td>
+                        <td class="text-center text-success font-bold">
+                            {{ portefeuille.total_recouvre_periode|fcfa}} F
+                        </td>
+                        <td class="text-center text-error font-bold">
+                            {{ portefeuille.total_depenses_periode|fcfa}} F
+                        </td>
+                        <td class="text-center text-info font-bold">
+                            {{ portefeuille.total_versements_periode|fcfa}} F
+                        </td>
+                        <td class="text-center">
+                            <div class="badge {% if portefeuille.solde_actuel > 0 %}badge-success{% else %}badge-error{% endif %} badge-lg">
+                                {{ portefeuille.solde_actuel|fcfa}} F
+                            </div>
+                        </td>
+                      
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+{% endif %}
 
-<style>
-.card {
-    border: none;
-    border-radius: 0.5rem;
-}
+    <!-- 🟣 Bloc 4 : Stock Essentiel AVEC FOURNISSEURS -->
 
-.border-left-primary {
-    border-left: 0.25rem solid #4e73df !important;
-}
-
-.border-left-success {
-    border-left: 0.25rem solid #1cc88a !important;
-}
-
-.border-left-info {
-    border-left: 0.25rem solid #36b9cc !important;
-}
-
-.border-left-warning {
-    border-left: 0.25rem solid #f6c23e !important;
-}
-
-.border-left-danger {
-    border-left: 0.25rem solid #e74a3b !important;
-}
-
-.border-left-secondary {
-    border-left: 0.25rem solid #858796 !important;
-}
-
-.text-xs {
-    font-size: 0.7rem;
-}
-
-.shadow {
-    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15) !important;
-}
-</style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const periodButtons = document.querySelectorAll('[data-period]');
     
-    periodButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            periodButtons.forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            
-            const period = this.getAttribute('data-period');
-            console.log('Période sélectionnée:', period);
-        });
-    });
-});
-</script>
+<!-- 🟣 Bloc 4 : Stock Essentiel AVEC STATUT AMÉLIORÉ -->
+{% if stock_essentiel %}
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="card-title text-lg">
+                <i class="fas fa-boxes text-info mr-2"></i>
+                Analyse du Stock Actif
+            </h2>
+            <div class="flex gap-2">
+                <div class="badge badge-info badge-lg">{{ stock_essentiel|length }} produits</div>
+                <div class="badge badge-success badge-lg">{{ stock_total|floatformat:0 }} FCFA</div>
+            </div>
+        </div>
+        
+        <!-- Légende des statuts -->
+        <div class="mb-4 p-3 bg-base-200 rounded-lg">
+            <div class="flex flex-wrap gap-4 text-xs">
+                <div class="flex items-center gap-2">
+                    <div class="badge badge-success"></div>
+                    <span>Optimal - Rotation élevée, niveau approprié</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="badge badge-info"></div>
+                    <span>Correct - Équilibre acceptable</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="badge badge-warning"></div>
+                    <span>Attention - Surveiller le stock</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="badge badge-error"></div>
+                    <span>Critique - Action requise</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                    <tr class="bg-base-200">
+                        <th class="font-semibold">Produit</th>
+                        <th class="font-semibold">Fournisseur</th>
+                        <th class="text-center">Quantité Restante</th>
+                        <th class="text-center">Valeur Actuelle</th>
+                        <th class="text-center">Ventes 30j</th>
+                        <th class="text-center">Jours Stock</th>
+                        <th class="text-center">Rotation</th>
+                        <th class="text-center">Statut</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stock in stock_essentiel %}
+                    <tr class="hover:bg-base-200/50 transition-colors">
+                        <td class="font-medium">
+                            <div class="flex flex-col">
+                                <span>{{ stock.produit }}</span>
+                                <span class="text-xs text-base-content/50">{{ stock.reference_lot }}</span>
+                            </div>
+                        </td>
+                        <td class="font-medium">
+                            <div class="badge badge-outline">
+                                {{ stock.fournisseur }}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div class="badge {% if stock.quantite_restante < 20 %}badge-error{% elif stock.quantite_restante < 50 %}badge-warning{% else %}badge-outline{% endif %} badge-lg font-mono">
+                                {{ stock.quantite_restante|floatformat:0 }}
+                            </div>
+                        </td>
+                        <td class="text-center font-bold text-primary font-mono">
+                            {{ stock.valeur_actuelle|floatformat:0 }} F
+                        </td>
+                        <td class="text-center">
+                            <div class="badge badge-primary font-mono">
+                                {{ stock.ventes_30j|floatformat:0 }}
+                            </div>
+                        </td>
+                        <td class="text-center font-mono">
+                            {% if stock.jours_stock == 999 %}
+                                <span class="text-base-content/50" title="Aucune vente récente">∞</span>
+                            {% elif stock.jours_stock < 7 %}
+                                <span class="text-error font-bold" title="Risque de rupture">{{ stock.jours_stock|floatformat:0 }}j</span>
+                            {% elif stock.jours_stock < 15 %}
+                                <span class="text-warning font-bold" title="Stock faible">{{ stock.jours_stock|floatformat:0 }}j</span>
+                            {% else %}
+                                <span class="text-success">{{ stock.jours_stock|floatformat:0 }}j</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="tooltip" data-tip="Rotation: {{ stock.taux_rotation|floatformat:1 }}%">
+                                <div class="badge 
+                                    {% if stock.taux_rotation > 100 %}badge-success
+                                    {% elif stock.taux_rotation > 50 %}badge-warning
+                                    {% else %}badge-error{% endif %}">
+                                    {{ stock.taux_rotation|floatformat:1 }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div class="tooltip" data-tip="{{ stock.statut_description }}">
+                                <div class="badge {{ stock.badge_class }}">
+                                    {{ stock.statut|title }}
+                                </div>
+                            </div>
+                        </td>
+                       
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Résumé des statuts -->
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            {% with optimal=stock_essentiel|filter_statut:"optimal" correct=stock_essentiel|filter_statut:"correct" attention=stock_essentiel|filter_statut:"attention" critique=stock_essentiel|filter_statut:"critique" %}
+            <div class="stat place-items-center">
+                <div class="stat-title text-success">Optimal</div>
+                <div class="stat-value text-success text-lg">{{ optimal|length }}</div>
+            </div>
+            <div class="stat place-items-center">
+                <div class="stat-title text-info">Correct</div>
+                <div class="stat-value text-info text-lg">{{ correct|length }}</div>
+            </div>
+            <div class="stat place-items-center">
+                <div class="stat-title text-warning">Attention</div>
+                <div class="stat-value text-warning text-lg">{{ attention|length }}</div>
+            </div>
+            <div class="stat place-items-center">
+                <div class="stat-title text-error">Critique</div>
+                <div class="stat-value text-error text-lg">{{ critique|length }}</div>
+
+            </div>
+            {% endwith %}
+        </div>
+    </div>
+</div>
+{% endif %}    
+</div>
+
 {% endblock %}

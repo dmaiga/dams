@@ -37,7 +37,7 @@ urlpatterns = [
     path('stats-superviseurs/', views.stats_superviseurs, name='stats_superviseurs'),
     path('agent/mes-distributions/', views.mes_distributions, name='mes_distributions'),
 # Ventes
-  # Ventes personnelles
+# Ventes personnelles
     path('ventes/enregistrer/', views.enregistrer_vente, name='enregistrer_vente'),
     path('ventes/', views.liste_ventes, name='liste_ventes'),
     path('ventes/<int:vente_id>/', views.detail_vente, name='detail_vente'),
@@ -86,9 +86,10 @@ urlpatterns = [
     path('recouvrement/agents/', views.liste_agents_recouvrement, name='liste_agents_recouvrement'),
     path('agent/<int:agent_id>/recouvrement/creer/', views.creer_recouvrement, name='creer_recouvrement'),
     path('agent/<int:agent_id>/recouvrement/historique/', views.historique_recouvrement, name='historique_recouvrement'),
-path('agent/<int:agent_id>/recouvrement/historique/complet/', views.detail_historique, name='detail_historique'),
+    path('agent/<int:agent_id>/recouvrement/historique/complet/', views.detail_historique, name='detail_historique'),
+
 #ADMIN
-    path('direction/', DashboardView.as_view(), name='dashboard'),
+    path('core/direction/', DashboardView.as_view(), name='dashboard'),
     path('analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
     path('analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
     path('analyses/ventes', views.toutes_les_ventes, name='toutes_les_ventes'),  

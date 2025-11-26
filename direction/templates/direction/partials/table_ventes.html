@@ -1,0 +1,51 @@
+<!-- direction/partials/table_ventes.html -->
+<div class="overflow-x-auto bg-base-100 shadow rounded-lg p-4">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">Dernières ventes</h3>
+        <div class="badge badge-primary">{{ ventes|length }} ventes</div>
+    </div>
+
+    <table class="table table-zebra w-full">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Produit</th>
+                <th>Client</th>
+                <th>Agent</th>
+                <th>Quantité</th>
+                <th>Prix unitaire</th>
+                <th>Montant total</th>
+                <th>Marge</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for vente in ventes %}
+                <tr>
+                    <td>{{ vente.date_vente|date:"d/m/Y" }}</td>
+                    <td class="font-semibold">{{ vente.detail_distribution.lot.produit.nom }}</td>
+                    <td>{{ vente.client.nom|default:"-" }}</td>
+                    <td>
+                        <span class="badge badge-outline">
+                            {{ vente.agent.user.username }}
+                        </span>
+                    </td>
+                    <td>{{ vente.quantite }}</td>
+                    <td>{{ vente.prix_vente_unitaire|floatformat:0 }} FCFA</td>
+                    <td class="font-semibold text-primary">
+                        {{ vente.montant_total|floatformat:0 }} FCFA
+                    </td>
+                    <td class="text-secondary font-semibold">
+                        {% with marge=vente.marge_unitaire %}
+                            {{ marge|floatformat:0 }} FCFA
+                        {% endwith %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-4">Aucune vente enregistrée</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

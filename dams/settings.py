@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize', 
     'core',
+    'direction',
     'mathfilters',
     'tinymce',
 

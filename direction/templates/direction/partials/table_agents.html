@@ -1,0 +1,49 @@
+<!-- direction/partials/table_agents.html -->
+<div class="overflow-x-auto bg-base-100 shadow rounded-lg p-4">
+    <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-semibold">Performance des Agents</h3>
+        <div class="badge badge-primary">{{ agents|length }} agents</div>
+    </div>
+
+    <table class="table table-zebra w-full">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Type</th>
+                <th>Ventes réalisées</th>
+                <th>Chiffre d'affaires</th>
+                <th>Commission</th>
+                <th>Statut</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for agent in agents %}
+                <tr>
+                    <td class="font-semibold">{{ agent.user.get_full_name|default:agent.user.username }}</td>
+                    <td>
+                        <span class="badge {% if agent.type_agent == 'SUPERVISEUR' %}badge-primary{% else %}badge-secondary{% endif %}">
+                            {{ agent.get_type_agent_display }}
+                        </span>
+                    </td>
+                    <td>{{ agent.nombre_ventes|default:0 }}</td>
+                    <td>{{ agent.chiffre_affaires|floatformat:0|default:0 }} FCFA</td>
+                    <td class="text-success font-semibold">
+                        {{ agent.commission_totale|floatformat:0|default:0 }} FCFA
+                    </td>
+                    <td>
+                        {% if agent.user.is_active %}
+                            <span class="badge badge-success">Actif</span>
+                        {% else %}
+                            <span class="badge badge-error">Inactif</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-4">Aucun agent enregistré</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
