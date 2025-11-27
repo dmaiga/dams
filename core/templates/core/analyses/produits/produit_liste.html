@@ -1,0 +1,322 @@
+{% extends 'base_admin.html' %}
+{% load humanize %}
+{%load format_fcfa%}
+
+{% block title %}Analyse des Produits{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Analyse des Produits</h1>
+    </div>
+<!-- KPI Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <!-- Stock Total -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-primary text-sm">
+                <i class="fas fa-boxes"></i>
+                Stock Total
+            </h2>
+            <p class="text-xl font-bold">{{ kpis.total_stock|floatformat:1 }} unités</p>
+        </div>
+    </div>
+
+    <!-- Valeur Stock Disponible -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-secondary text-sm">
+                <i class="fas fa-warehouse"></i>
+                Valeur Stock
+            </h2>
+            <p class="text-xl font-bold">{{ kpis.total_valeur_stock_disponible|fcfa }} FCFA</p>
+        </div>
+    </div>
+
+    <!-- Valeur Achat Total -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-accent text-sm">
+                <i class="fas fa-money-bill-wave"></i>
+                Investissement
+            </h2>
+            <p class="text-xl font-bold">{{ kpis.valeur_achat_total|fcfa }} FCFA</p>
+        </div>
+    </div>
+
+    <!-- Chiffre d'Affaires -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-info text-sm">
+                <i class="fas fa-chart-line"></i>
+                Chiffre d'Affaires
+            </h2>
+            <p class="text-xl font-bold">{{ kpis.ca_total|fcfa }} FCFA</p>
+        </div>
+    </div>
+
+    <!-- Pertes -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-error text-sm">
+                <i class="fas fa-exclamation-triangle"></i>
+                Pertes
+            </h2>
+            <p class="text-xl font-bold">{{ kpis.pertes_valeur|fcfa }} FCFA</p>
+        </div>
+    </div>
+
+    <!-- Marge Générée -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-success text-sm">
+                <i class="fas fa-hand-holding-usd"></i>
+                Marge Générée
+            </h2>
+            <p class="text-xl font-bold">{{ kpis.marge_totale|fcfa }} FCFA</p>
+        </div>
+    </div>
+</div>
+
+    <!-- Filtres -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title">Filtres</h2>
+            <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="form-control w-full md:w-auto">
+                    <label class="label">
+                        <span class="label-text">Fournisseur</span>
+                    </label>
+                    <select name="fournisseur" class="select select-bordered w-full">
+                        <option value="">Tous les fournisseurs</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}" 
+                            {% if current_filters.fournisseur == supplier.id|stringformat:"i" %}selected{% endif %}>
+                            {{ supplier.nom }} ({{ supplier.total_stock|floatformat:1 }} unités)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i>
+                    Filtrer
+                </button>
+                {% if current_filters.fournisseur %}
+                <a href="{% url 'product_list' %}" class="btn btn-outline">
+                    <i class="fas fa-times"></i>
+                    Effacer
+                </a>
+                {% endif %}
+            </form>
+
+            {% if selected_supplier %}
+            <div class="mt-4">
+                <div class="badge badge-info badge-lg">
+                    Fournisseur: {{ selected_supplier.nom }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+<!-- Liste des produits -->
+<div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="card-title">Liste des Produits</h2>
+            <div class="badge badge-primary badge-lg">
+                {{ page_obj.paginator.count }} produit(s)
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>Produit</th>
+                        <th class="text-center">Stock</th>
+                        <th class="text-right">Valeur Stock</th>
+                        <th class="text-center">Ventes Total</th>
+                        <th class="text-right">Marge Total</th>
+                        <th class="text-center">Taux Marge</th>
+                        <th class="text-center">Pertes</th>
+                        <th class="text-center">Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product_data in products_data %}
+                    <tr>
+                        <td>
+                            <div class="font-bold">{{ product_data.product.nom }}</div>
+                            {% if product_data.fournisseur_specifique %}
+                            <div class="text-sm text-gray-500">
+                                Fournisseur: {{ product_data.fournisseur_specifique.nom }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="font-bold">{{ product_data.total_stock|floatformat:1 }}</div>
+                        </td>
+                        <td class="text-right font-mono font-bold">
+                            {{ product_data.total_valeur_stock_disponible|fcfa }} FCFA
+                        </td>
+                        <td class="text-center">
+                            <div>{{ product_data.total_sales_quantity|floatformat:1 }} unités</div>
+                            <div class="text-xs text-success">
+                                {{ product_data.total_sales_revenue|fcfa }} FCFA
+                            </div>
+                        </td>
+                        <td class="text-right font-mono font-bold text-success">
+                            {{ product_data.marge_totale|fcfa }} FCFA
+                        </td>
+                        <td class="text-center">
+                            <div class="tooltip" data-tip="Taux de marge: {{ product_data.taux_marge|floatformat:1 }}%">
+                                <div class="radial-progress 
+                                    {% if product_data.taux_marge > 30 %}text-success
+                                    {% elif product_data.taux_marge > 15 %}text-warning
+                                    {% else %}text-error{% endif %}" 
+                                    style="--value:{{ product_data.taux_marge|floatformat:0 }}; --size:3rem;">
+                                    {{ product_data.taux_marge|floatformat:0 }}%
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% if product_data.total_losses_quantite > 0 %}
+                            <div class="tooltip" data-tip="{{ product_data.total_losses_quantite|fcfa }} unités - {{ product_data.total_losses_valeur|fcfa }} FCFA">
+                                <span class="badge badge-error">
+                                    {{ product_data.total_losses_valeur|fcfa }} FCFA
+                                </span>
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <span class="badge 
+                                {% if product_data.stock_status == 'CRITIQUE' %}badge-error
+                                {% elif product_data.stock_status == 'EXCÉDENTAIRE' %}badge-warning
+                                {% elif product_data.stock_status == 'RUPTURE' %}badge-secondary
+                                {% else %}badge-success{% endif %}">
+                                {{ product_data.stock_status }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'product_detail' product_data.product.id %}{% if current_filters.fournisseur %}?fournisseur={{ current_filters.fournisseur }}{% endif %}" 
+                               class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye"></i>
+                                Détails
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-gray-500 py-4">
+                            Aucun produit trouvé avec les filtres actuels
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+
+
+    <!-- Ventes par agent (si fournisseur sélectionné) -->
+    {% if ventes_par_agent and selected_supplier %}
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Ventes par Agent - {{ selected_supplier.nom }}</h2>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th class="text-center">Quantité Vendue</th>
+                            <th class="text-right">Chiffre d'Affaires</th>
+                            <th class="text-right">Marge Générée</th>
+                            <th class="text-center">Taux de Marge</th>
+                            <th class="text-center">Produits Vendus</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for agent_data in ventes_par_agent %}
+                        <tr>
+                            <td>
+                                <div class="font-bold">{{ agent_data.agent.full_name }}</div>
+                                <div class="text-sm text-gray-500">{{ agent_data.agent.get_type_agent_display }}</div>
+                            </td>
+                            <td class="text-center font-bold">
+                                {{ agent_data.total_quantite|floatformat:1 }}
+                            </td>
+                            <td class="text-right font-mono font-bold">
+                                {{ agent_data.total_ca|fcfa }} FCFA
+                            </td>
+                            <td class="text-right font-mono font-bold text-success">
+                                {{ agent_data.total_marge|fcfa }} FCFA
+                            </td>
+                            <td class="text-center">
+                                <div class="radial-progress 
+                                    {% if agent_data.taux_marge > 30 %}text-success
+                                    {% elif agent_data.taux_marge > 15 %}text-warning
+                                    {% else %}text-error{% endif %}" 
+                                    style="--value:{{ agent_data.taux_marge|floatformat:0 }}; --size:3rem;">
+                                    {{ agent_data.taux_marge|floatformat:0 }}%
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <div class="flex flex-wrap gap-1 justify-center">
+                                    {% for produit in agent_data.produits_vendus %}
+                                    <span class="badge badge-outline badge-sm">{{ produit }}</span>
+                                    {% endfor %}
+                                    {% if agent_data.nombre_produits > 3 %}
+                                    <span class="badge badge-ghost badge-sm">+{{ agent_data.nombre_produits|add:"-3" }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <div class="flex justify-center mt-6">
+                <div class="join">
+                    {% if page_obj.has_previous %}
+                    <a class="join-item btn" 
+                       href="?page=1{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
+                        «
+                    </a>
+                    <a class="join-item btn" 
+                       href="?page={{ page_obj.previous_page_number }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
+                        ‹
+                    </a>
+                    {% endif %}
+                    
+                    <button class="join-item btn btn-active">
+                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    </button>
+                    
+                    {% if page_obj.has_next %}
+                    <a class="join-item btn" 
+                       href="?page={{ page_obj.next_page_number }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
+                        ›
+                    </a>
+                    <a class="join-item btn" 
+                       href="?page={{ page_obj.paginator.num_pages }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
+                        »
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

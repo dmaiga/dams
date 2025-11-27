@@ -1,0 +1,257 @@
+{% extends 'base_admin.html' %}
+{% load humanize %}
+{% load format_fcfa %}
+
+{% block title %}Tableau de Bord - Agents{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Analyse des Agents</h1>
+        <div class="flex space-x-2">
+            <a href="{% url 'superviseur_list' %}" class="btn btn-primary">
+                <i class="fas fa-users-cog"></i>
+                Superviseurs
+            </a>
+            <a href="{% url 'agent_terrain_list' %}" class="btn btn-secondary">
+                <i class="fas fa-user-tie"></i>
+                Agents Terrain
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Principaux -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <!-- Total Agents -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-primary">
+                    <i class="fas fa-users"></i>
+                    Agents Total
+                </h2>
+                <p class="text-3xl font-bold">{{ kpis.total_agents }}</p>
+            </div>
+        </div>
+
+        <!-- Superviseurs -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-secondary">
+                    <i class="fas fa-user-shield"></i>
+                    Superviseurs
+                </h2>
+                <p class="text-3xl font-bold">{{ kpis.superviseurs }}</p>
+            </div>
+        </div>
+
+        <!-- Agents Terrain -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-accent">
+                    <i class="fas fa-user-tie"></i>
+                    Agents Terrain
+                </h2>
+                <p class="text-3xl font-bold">{{ kpis.agents_terrain }}</p>
+            </div>
+        </div>
+
+        <!-- Stagiaires -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-info">
+                    <i class="fas fa-user-graduate"></i>
+                    Stagiaires
+                </h2>
+                <p class="text-3xl font-bold">{{ kpis.stagiaires_total }}</p>
+                <p class="text-sm">
+                    <span class="text-success">{{ kpis.stagiaires_actifs }} actifs</span> / 
+                    <span class="text-error">{{ kpis.stagiaires_expires }} expirés</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Top 5 Vendeurs par Quantité -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title mb-4">
+                    <i class="fas fa-trophy text-warning"></i>
+                    Top 5 Vendeurs - Quantité
+                </h2>
+                <div class="text-sm text-gray-500 mb-2">
+                    <i class="fas fa-info-circle"></i>
+                    Ventes personnelles uniquement
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra w-full">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th class="text-center">Quantité</th>
+                                <th class="text-center">Gros</th>
+                                <th class="text-center">Détail</th>
+                                <th class="text-center">% Gros</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vendeur in top_quantite %}
+                            <tr>
+                                <td>
+                                    <div class="font-semibold">{{ vendeur.agent.full_name }}</div>
+                                    <div class="text-xs text-gray-500">{{ vendeur.agent.get_type_agent_display }}</div>
+                                </td>
+                                <td class="text-center font-bold">{{ vendeur.total_quantite|intcomma }}</td>
+                                <td class="text-center">{{ vendeur.quantite_gros|intcomma }}</td>
+                                <td class="text-center">{{ vendeur.quantite_detail|intcomma }}</td>
+                                <td class="text-center">
+                                    <span class="badge badge-info">{{ vendeur.pourcentage_gros }}%</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-gray-500 py-4">
+                                    Aucune donnée de vente personnelle
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top 5 Vendeurs par MARGE -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title mb-4">
+                    <i class="fas fa-money-bill-wave text-success"></i>
+                    Top 5 Vendeurs - Marge
+                </h2>
+                <div class="text-sm text-gray-500 mb-2">
+                    <i class="fas fa-info-circle"></i>
+                    Ventes personnelles uniquement - Tri par marge générée
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra w-full">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th class="text-right">Marge</th>
+                                <th class="text-right">CA</th>
+                                <th class="text-center">Taux Marge</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vendeur in top_marge %}
+                            <tr>
+                                <td>
+                                    <div class="font-semibold">{{ vendeur.agent.full_name }}</div>
+                                    <div class="text-xs text-gray-500">{{ vendeur.agent.get_type_agent_display }}</div>
+                                </td>
+                                <td class="text-right font-mono font-bold text-success">
+                                    {{ vendeur.marge_totale|fcfa }}
+                                </td>
+                                <td class="text-right font-mono">{{ vendeur.total_ca|fcfa }}</td>
+                                <td class="text-center">
+                                    <span class="badge 
+                                        {% if vendeur.taux_marge > 25 %}badge-success
+                                        {% elif vendeur.taux_marge > 15 %}badge-warning
+                                        {% else %}badge-error{% endif %}">
+                                        {{ vendeur.taux_marge }}%
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-gray-500 py-4">
+                                    Aucune donnée de vente personnelle
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compétition Stagiaires  -->
+    <!-- Performance Stagiaires  avec Marge -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                <i class="fas fa-medal text-info"></i>
+                Performance des Stagiaires
+            </h2>
+            <div class="text-sm text-gray-500 mb-2">
+                <i class="fas fa-info-circle"></i>
+                Ventes réalisées POUR les stagiaires - Tri par marge générée
+            </div>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Stagiaire</th>
+                            <th class="text-center">Statut</th>
+                            <th class="text-center">Ventes</th>
+                            <th class="text-right">Marge</th>
+                            <th class="text-right">CA</th>
+                            <th class="text-center">Taux Marge</th>
+                            <th class="text-center">Jours Restants</th>
+                            <th class="text-center">Début Stage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stagiaire in competition_stagiaires %}
+                        <tr>
+                            <td class="font-semibold">{{ stagiaire.stagiaire.full_name }}</td>
+                            <td class="text-center">
+                                {% if stagiaire.statut == "🟢 Actif" %}
+                                <span class="badge badge-success">Actif</span>
+                                {% else %}
+                                <span class="badge badge-error">Expiré</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center font-bold">{{ stagiaire.total_quantite|intcomma }}</td>
+                            <td class="text-right font-mono font-bold text-success">
+                                {{ stagiaire.marge_totale|fcfa }}
+                            </td>
+                            <td class="text-right font-mono">{{ stagiaire.total_ca|fcfa }}</td>
+                            <td class="text-center">
+                                <span class="badge 
+                                    {% if stagiaire.taux_marge > 25 %}badge-success
+                                    {% elif stagiaire.taux_marge > 15 %}badge-warning
+                                    {% else %}badge-error{% endif %}">
+                                    {{ stagiaire.taux_marge }}%
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {% if stagiaire.jours_restants != "Expiré" %}
+                                <span class="badge badge-warning">{{ stagiaire.jours_restants }} jours</span>
+                                {% else %}
+                                <span class="badge badge-error">Expiré</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {{ stagiaire.date_mise_service|date:"d/m/Y" }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-gray-500 py-4">
+                                Aucune vente réalisée pour des stagiaires
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+{% endblock %}

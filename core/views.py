@@ -2804,18 +2804,22 @@ def tous_les_bonus(request):
     return render(request, 'core/analyses/tous_les_bonus_admin.html', context)
 
 # core/views/dashboard.py
-from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from core.services.dashboard_service import DashboardService
+
 
 # core/views.py
 
 # core/views/dashboard.py
-from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from core.services.dashboard_service import DashboardService
+from django.contrib.auth.mixins import LoginRequiredMixin
+from core.services.product_analysis_service import ProductAnalysisService
+from django.views.generic import TemplateView, DetailView,ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
+from core.services.agent_analysis_service import AgentAnalysisService
+
 
 # core/views/dashboard.py
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/dashboard.html'
     
@@ -3112,143 +3116,78 @@ class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
         })
         
         return context
-class AnalyseProduitsView(LoginRequiredMixin, TemplateView):
-    template_name = 'core/analyses/analyse_produits.html'
+
+
+class ProductListView(LoginRequiredMixin, ListView):
+    template_name = 'core/analyses/produits/produit_liste.html'
+    context_object_name = 'products_data'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        supplier_id = self.request.GET.get('fournisseur')
+        return ProductAnalysisService.get_products_by_supplier(supplier_id)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        today = timezone.now()
-        debut_mois = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # KPI globaux
+        context['kpis'] = ProductAnalysisService.get_product_kpis()
         
-        # === PERFORMANCE PAR PRODUIT ===
-        produits_data = {}
+        # Liste des fournisseurs pour le filtre
+        context['suppliers'] = ProductAnalysisService.get_suppliers_with_stats()
         
-        for vente in Vente.objects.select_related('detail_distribution__lot__produit', 'client', 'agent'):
-            # Vérification que le produit existe
-            if not vente.detail_distribution or not vente.detail_distribution.lot or not vente.detail_distribution.lot.produit:
-                continue
-                
-            produit = vente.detail_distribution.lot.produit
-            produit_nom = produit.nom
-            
-            if produit_nom not in produits_data:
-                produits_data[produit_nom] = {
-                    'produit': produit,
-                    'total_quantite': 0,
-                    'total_ca': 0,
-                    'ventes_count': 0,
-                    'clients_count': set(),
-                    'agents_count': set(),
-                    'ventes_mois': 0,
-                    'ca_mois': 0,
-                    'quantite_mois': 0,
-                }
-            
-            data = produits_data[produit_nom]
-            data['total_quantite'] += vente.quantite
-            data['total_ca'] += float(vente.quantite * vente.prix_vente_unitaire)
-            data['ventes_count'] += 1
-            
-            # Gestion des clients (peut être None)
-            if vente.client and vente.client.id:
-                data['clients_count'].add(vente.client.id)
-            
-            # Gestion des agents (toujours présent normalement)
-            if vente.agent and vente.agent.id:
-                data['agents_count'].add(vente.agent.id)
-            
-            # Ventes du mois
-            if vente.date_vente >= debut_mois:
-                data['ventes_mois'] += 1
-                data['ca_mois'] += float(vente.quantite * vente.prix_vente_unitaire)
-                data['quantite_mois'] += vente.quantite
+        # Fournisseur sélectionné
+        selected_supplier_id = self.request.GET.get('fournisseur')
+        if selected_supplier_id:
+            try:
+                context['selected_supplier'] = Fournisseur.objects.get(id=selected_supplier_id)
+            except Fournisseur.DoesNotExist:
+                context['selected_supplier'] = None
         
-        # Conversion en liste
-        produits_performance = []
-        for nom, data in produits_data.items():
-            produits_performance.append({
-                'produit': data['produit'],
-                'total_quantite': data['total_quantite'],
-                'total_ca': data['total_ca'],
-                'ventes_count': data['ventes_count'],
-                'clients_count': len(data['clients_count']),
-                'agents_count': len(data['agents_count']),
-                'ventes_mois': data['ventes_mois'],
-                'ca_mois': data['ca_mois'],
-                'quantite_mois': data['quantite_mois'],
-                'panier_moyen': data['total_ca'] / data['ventes_count'] if data['ventes_count'] > 0 else 0,
-                'taux_rotation_mois': (data['quantite_mois'] / data['total_quantite'] * 100) if data['total_quantite'] > 0 else 0,
-            })
+        # Paramètres de filtrage
+        context['current_filters'] = {
+            'fournisseur': selected_supplier_id
+        }
         
-        # Tris multiples
-        produits_par_ca = sorted(produits_performance, key=lambda x: x['total_ca'], reverse=True)
-        produits_par_quantite = sorted(produits_performance, key=lambda x: x['total_quantite'], reverse=True)
-        produits_par_rotation = sorted(produits_performance, key=lambda x: x['taux_rotation_mois'], reverse=True)
+        # Ventes par agent pour le fournisseur sélectionné
+        if selected_supplier_id:
+            context['ventes_par_agent'] = ProductAnalysisService.get_ventes_par_agent(selected_supplier_id)
         
-        # === STOCK VS VENTES ===
-        stock_ventes_data = []
-        for lot in LotEntrepot.objects.filter(quantite_restante__gt=0).select_related('produit'):
-            if not lot.produit:
-                continue
-                
-            produit_nom = lot.produit.nom
-            ventes_produit = next((p for p in produits_performance if p['produit'].nom == produit_nom), None)
-            
-            if ventes_produit:
-                taux_ecoulement = (ventes_produit['quantite_mois'] / lot.quantite_restante * 100) if lot.quantite_restante > 0 else 100
-                jours_stock = (lot.quantite_restante / ventes_produit['quantite_mois'] * 30) if ventes_produit['quantite_mois'] > 0 else 999
-            else:
-                taux_ecoulement = 0
-                jours_stock = 999
-            
-            stock_ventes_data.append({
-                'produit': lot.produit,
-                'stock_restant': lot.quantite_restante,
-                'ventes_mois': ventes_produit['quantite_mois'] if ventes_produit else 0,
-                'taux_ecoulement': taux_ecoulement,
-                'jours_stock': jours_stock,
-                'statut_stock': 'FAIBLE' if jours_stock < 15 else 'NORMAL' if jours_stock < 60 else 'EXCÉDENTAIRE'
-            })
+        # Pagination manuelle
+        products_data = self.get_queryset()
+        paginator = Paginator(products_data, self.paginate_by)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
         
-        # === SAISONNALITÉ PAR PRODUIT ===
-        saisonnalite_data = {}
-        for produit in Produit.objects.all():
-            ventes_produit = Vente.objects.filter(
-                detail_distribution__lot__produit=produit
-            )
-            
-            # Ventilation par mois
-            ventilation_mois = []
-            for i in range(12):  # 12 derniers mois
-                mois_date = today - timedelta(days=30*i)
-                debut_mois_ref = mois_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                fin_mois_ref = (debut_mois_ref + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-                
-                ventes_mois = ventes_produit.filter(date_vente__range=[debut_mois_ref, fin_mois_ref])
-                quantite_mois = sum(vente.quantite for vente in ventes_mois)
-                
-                ventilation_mois.append({
-                    'mois': debut_mois_ref.strftime('%b %Y'),
-                    'quantite': quantite_mois,
-                    'date': debut_mois_ref
-                })
-            
-            ventilation_mois.reverse()
-            saisonnalite_data[produit.nom] = ventilation_mois
-        
-        context.update({
-            'produits_par_ca': produits_par_ca[:20],
-            'produits_par_quantite': produits_par_quantite[:20],
-            'produits_par_rotation': produits_par_rotation[:20],
-            'stock_ventes_data': sorted(stock_ventes_data, key=lambda x: x['jours_stock']),
-            'saisonnalite_data': saisonnalite_data,
-            'total_produits': len(produits_performance),
-            'ca_total_produits': sum(p['total_ca'] for p in produits_performance),
-            'quantite_total_vendue': sum(p['total_quantite'] for p in produits_performance),
-        })
+        context['page_obj'] = page_obj
+        context['products_data'] = page_obj.object_list
+        context['is_paginated'] = page_obj.has_other_pages()
         
         return context
+    
+class ProductDetailView(LoginRequiredMixin, DetailView):
+    template_name = 'core/analyses/produits/produit_detail.html'
+    context_object_name = 'product_data'
+    
+    def get_object(self):
+        product_id = self.kwargs.get('pk')
+        supplier_id = self.request.GET.get('fournisseur')
+        return ProductAnalysisService.get_product_detail(product_id, supplier_id)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['kpis'] = ProductAnalysisService.get_product_kpis()
+        
+        # Passer le fournisseur sélectionné si existant
+        supplier_id = self.request.GET.get('fournisseur')
+        if supplier_id:
+            try:
+                context['selected_supplier'] = Fournisseur.objects.get(id=supplier_id)
+            except Fournisseur.DoesNotExist:
+                context['selected_supplier'] = None
+        
+        return context
+    
 
 class AnalyseClientsView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/analyse_clients.html'
@@ -3445,163 +3384,112 @@ class AnalyseClientsView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class AnalyseAgentsView(LoginRequiredMixin, TemplateView):
-    template_name = 'core/analyses/analyse_agents.html'
+
+class AgentDashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/analyses/agents/agent_dashboard.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        today = timezone.now()
-        debut_mois = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        debut_trimestre = today - timedelta(days=90)
+        # KPI globaux
+        context['kpis'] = AgentAnalysisService.get_agent_kpis()
         
-        # === ANALYSE DÉTAILLÉE DES AGENTS ===
-        agents_analyse = []
+        # Top vendeurs 
+        context['top_quantite'] = AgentAnalysisService.get_top_vendeurs_quantite()
+        context['top_marge'] = AgentAnalysisService.get_top_vendeurs_marge()  
         
-        for agent in Agent.objects.select_related('user').filter(type_agent='terrain'):
-            ventes_agent = Vente.objects.filter(agent=agent)
-            ventes_mois = ventes_agent.filter(date_vente__gte=debut_mois)
-            ventes_trimestre = ventes_agent.filter(date_vente__gte=debut_trimestre)
-            
-            # Calculs détaillés - TOUT en Decimal pour éviter les conflits
-            ca_total = Decimal('0.00')
-            ca_mois = Decimal('0.00')
-            ca_trimestre = Decimal('0.00')
-            quantite_total = Decimal('0.00')
-            clients_servis = set()
-            produits_vendus = set()
-            montants_ventes = []
-            
-            for vente in ventes_agent:
-                montant = vente.quantite * vente.prix_vente_unitaire  # Garder en Decimal
-                ca_total += montant
-                quantite_total += vente.quantite
-                
-                # Gestion des clients (peut être None)
-                if vente.client and vente.client.id:
-                    clients_servis.add(vente.client.id)
-                
-                # Gestion des produits
-                if (vente.detail_distribution and 
-                    vente.detail_distribution.lot and 
-                    vente.detail_distribution.lot.produit):
-                    produits_vendus.add(vente.detail_distribution.lot.produit.nom)
-                
-                montants_ventes.append(float(montant))  # Convertir en float seulement pour la liste
-                
-                if vente.date_vente >= debut_mois:
-                    ca_mois += montant
-                if vente.date_vente >= debut_trimestre:
-                    ca_trimestre += montant
-            
-            # Indicateurs de performance - convertir en float pour les calculs
-            nombre_ventes = ventes_agent.count()
-            panier_moyen = float(ca_total) / nombre_ventes if nombre_ventes > 0 else 0
-            efficacite = float(ca_total) / len(clients_servis) if clients_servis else 0
-            
-            # Taux de conversion (basé sur les distributions)
-            distributions_agent = DistributionAgent.objects.filter(agent_terrain=agent)
-            quantite_distribuee = sum(
-                float(detail.quantite) for dist in distributions_agent 
-                for detail in dist.detaildistribution_set.all()
-            )
-            taux_conversion = (float(quantite_total) / quantite_distribuee * 100) if quantite_distribuee > 0 else 0
-            
-            # Performance temporelle
-            if nombre_ventes > 0:
-                try:
-                    premiere_vente = ventes_agent.earliest('date_vente')
-                    anciennete_jours = (today - premiere_vente.date_vente).days
-                    ventes_par_jour = nombre_ventes / anciennete_jours if anciennete_jours > 0 else 0
-                except Vente.DoesNotExist:
-                    ventes_par_jour = 0
-            else:
-                ventes_par_jour = 0
-            
-            # Dettes et recouvrement
-            dettes_agent = Dette.objects.filter(vente__agent=agent)
-            dettes_actives = dettes_agent.exclude(statut='paye')
-            taux_recouvrement = (
-                (dettes_agent.filter(statut='paye').count() / dettes_agent.count() * 100) 
-                if dettes_agent.count() > 0 else 100
-            )
-            
-            # Score de performance composite - utiliser les valeurs float
-            ca_mois_float = float(ca_mois)
-            score_performance = (
-                (ca_mois_float / max(ca_mois_float, 1)) * 40 +  # Poids CA: 40%
-                (taux_conversion / 100) * 30 +                  # Poids conversion: 30%
-                (taux_recouvrement / 100) * 20 +                # Poids recouvrement: 20%
-                (len(clients_servis) / max(len(clients_servis), 1)) * 10  # Poids clientèle: 10%
-            )
-            
-            agents_analyse.append({
-                'agent': agent,
-                'ca_total': float(ca_total),  # Convertir en float pour le template
-                'ca_mois': float(ca_mois),
-                'ca_trimestre': float(ca_trimestre),
-                'quantite_total': float(quantite_total),
-                'nombre_ventes': nombre_ventes,
-                'clients_servis': len(clients_servis),
-                'produits_vendus': len(produits_vendus),
-                'panier_moyen': panier_moyen,
-                'efficacite': efficacite,
-                'taux_conversion': taux_conversion,
-                'ventes_par_jour': ventes_par_jour,
-                'dettes_actives': dettes_actives.count(),
-                'taux_recouvrement': taux_recouvrement,
-                'score_performance': score_performance,
-                'grade_performance': 'A' if score_performance >= 80 else 'B' if score_performance >= 60 else 'C',
-                'couleur_grade': 'success' if score_performance >= 80 else 'warning' if score_performance >= 60 else 'danger',
-            })
-        
-        # === COMPARAISON ET CLASSEMENT ===
-        agents_par_performance = sorted(agents_analyse, key=lambda x: x['score_performance'], reverse=True)
-        agents_par_ca = sorted(agents_analyse, key=lambda x: x['ca_mois'], reverse=True)
-        agents_par_conversion = sorted(agents_analyse, key=lambda x: x['taux_conversion'], reverse=True)
-        agents_par_clients = sorted(agents_analyse, key=lambda x: x['clients_servis'], reverse=True)
-        
-        # === ANALYSE DES TENDANCES ===
-        tendances_agents = {}
-        for agent_data in agents_analyse[:5]:  # Top 5 agents
-            agent = agent_data['agent']
-            evolution_data = []
-            
-            for i in range(6):  # 6 derniers mois
-                mois_date = today - timedelta(days=30*i)
-                debut_mois_ref = mois_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                fin_mois_ref = (debut_mois_ref + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-                
-                ventes_mois_ref = Vente.objects.filter(
-                    agent=agent,
-                    date_vente__range=[debut_mois_ref, fin_mois_ref]
-                )
-                
-                # Calcul en Decimal puis conversion en float
-                ca_mois_ref = sum(v.quantite * v.prix_vente_unitaire for v in ventes_mois_ref)
-                clients_mois_ref = ventes_mois_ref.values('client').distinct().count()
-                
-                evolution_data.append({
-                    'mois': debut_mois_ref.strftime('%b %Y'),
-                    'ca': float(ca_mois_ref),  # Convertir en float
-                    'clients': clients_mois_ref,
-                    'ventes': ventes_mois_ref.count()
-                })
-            
-            evolution_data.reverse()
-            tendances_agents[agent.user.get_full_name()] = evolution_data
-        
-        context.update({
-            'agents_analyse': agents_analyse,
-            'agents_par_performance': agents_par_performance,
-            'agents_par_ca': agents_par_ca,
-            'agents_par_conversion': agents_par_conversion,
-            'agents_par_clients': agents_par_clients,
-            'tendances_agents': tendances_agents,
-            'moyenne_performance': sum(a['score_performance'] for a in agents_analyse) / len(agents_analyse) if agents_analyse else 0,
-            'top_performer': agents_par_performance[0] if agents_par_performance else None,
-            'meilleur_conversion': agents_par_conversion[0] if agents_par_conversion else None,
-        })
+        # Compétition stagiaires 
+        context['competition_stagiaires'] = AgentAnalysisService.get_competition_stagiaires()
         
         return context
 
+class SuperviseurListView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/analyses/agents/superviseur_list.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Situation financière des superviseurs
+        context['superviseurs'] = AgentAnalysisService.get_superviseurs_finance()
+        
+        return context
+
+class AgentTerrainListView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/analyses/agents/agent_terrain_list.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Récupérer le filtre mois depuis les paramètres GET
+        periode = self.request.GET.get('periode', 'all')
+        
+        # Performance des agents terrain avec filtre
+        context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance(mois=periode)
+        context['current_periode'] = periode
+        context['periodes'] = [
+            {'value': 'all', 'label': 'Toutes périodes'},
+            {'value': '30', 'label': '30 derniers jours'},
+            {'value': '60', 'label': '60 derniers jours'},
+            {'value': '90', 'label': '90 derniers jours'},
+        ]
+        
+        return context
+
+class AgentDetailView(LoginRequiredMixin, DetailView):
+    template_name = 'core/analyses/agents/agent_detail.html'
+    context_object_name = 'agent'
+    model = Agent
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        agent = self.object
+        
+        # VENTES PERSONNELLES uniquement (sans stagiaire)
+        ventes = agent.vente_set.filter(stagiaire__isnull=True)
+        
+        # Calcul des statistiques PERSONNELLES
+        total_quantite = sum(vente.quantite for vente in ventes)
+        total_ca = sum(vente.total_vente for vente in ventes)
+        
+        # Répartition par type de vente
+        ventes_gros = ventes.filter(type_vente='gros')
+        ventes_detail = ventes.filter(type_vente='detail')
+        
+        quantite_gros = sum(vente.quantite for vente in ventes_gros)
+        quantite_detail = sum(vente.quantite for vente in ventes_detail)
+        ca_gros = sum(vente.total_vente for vente in ventes_gros)
+        ca_detail = sum(vente.total_vente for vente in ventes_detail)
+        
+        # Calcul de la marge POUR VENTES PERSONNELLES
+        marge_totale = Decimal('0')
+        for vente in ventes:
+            prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
+            marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
+            marge_totale += marge_vente
+        
+        taux_marge = (marge_totale / total_ca * 100) if total_ca > 0 else 0
+        
+        # Ventes récentes PERSONNELLES
+        ventes_recentes = ventes.order_by('-date_vente')[:10]
+        
+        context.update({
+            'stats': {
+                'total_quantite': total_quantite,
+                'total_ca': total_ca,
+                'marge_totale': marge_totale,
+                'taux_marge': round(taux_marge, 1),
+                'quantite_gros': quantite_gros,
+                'quantite_detail': quantite_detail,
+                'ca_gros': ca_gros,
+                'ca_detail': ca_detail,
+                'pourcentage_gros': (quantite_gros / total_quantite * 100) if total_quantite > 0 else 0,
+                'pourcentage_detail': (quantite_detail / total_quantite * 100) if total_quantite > 0 else 0,
+            },
+            'ventes_recentes': ventes_recentes,
+            'argent_possession': agent.argent_en_possession,
+            'total_recouvre': agent.total_recouvre,
+            'nombre_ventes_personnelles': ventes.count(),
+            'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
+        })
+        
+        return context

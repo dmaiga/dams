@@ -1,0 +1,180 @@
+{% extends 'base_admin.html' %}
+{% load humanize %}
+{% load format_fcfa %}
+
+{% block title %}Détail - {{ agent.full_name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-3xl font-bold">{{ agent.full_name }}</h1>
+            <div class="text-lg text-gray-600 mt-2">
+                <span class="badge 
+                    {% if agent.type_agent == 'entrepot' %}badge-primary
+                    {% elif agent.type_agent == 'terrain' %}badge-secondary
+                    {% else %}badge-accent{% endif %}">
+                    {{ agent.get_type_agent_display }}
+                </span>
+                {% if agent.telephone %}
+                <span class="ml-4">📞 {{ agent.telephone }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <a href="
+            {% if agent.type_agent == 'entrepot' %}{% url 'superviseur_list' %}
+            {% else %}{% url 'agent_terrain_list' %}
+            {% endif %}" 
+           class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i>
+            Retour
+        </a>
+    </div>
+
+    <!-- Statistiques Globales -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- CA Total -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-primary">
+                    <i class="fas fa-chart-bar"></i>
+                    CA Total
+                </h2>
+                <p class="text-2xl font-bold">{{ stats.total_ca|fcfa }}</p>
+            </div>
+        </div>
+
+        <!-- Quantité Vendue -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-secondary">
+                    <i class="fas fa-boxes"></i>
+                    Quantité Vendue
+                </h2>
+                <p class="text-2xl font-bold">{{ stats.total_quantite|intcomma }} unités</p>
+            </div>
+        </div>
+
+        <!-- Marge Générée -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-success">
+                    <i class="fas fa-hand-holding-usd"></i>
+                    Marge Générée
+                </h2>
+                <p class="text-2xl font-bold">{{ stats.marge_totale|fcfa }}</p>
+            </div>
+        </div>
+
+        <!-- Taux de Marge -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-accent">
+                    <i class="fas fa-percentage"></i>
+                    Taux de Marge
+                </h2>
+                <p class="text-2xl font-bold">{{ stats.taux_marge }}%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Situation Financière (pour tous les agents) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-info">Situation Financière</h2>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span>Total Ventes:</span>
+                        <span class="font-mono font-bold">{{ stats.total_ca|fcfa }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Total Recouvré:</span>
+                        <span class="font-mono text-success">{{ total_recouvre|fcfa }}</span>
+                    </div>
+                    <div class="flex justify-between border-t pt-2">
+                        <span class="font-semibold">Argent en Possession:</span>
+                        <span class="font-mono font-bold text-warning">{{ argent_possession|fcfa }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Répartition Ventes -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-warning">Répartition des Ventes</h2>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span>Ventes en Gros:</span>
+                        <span>{{ stats.quantite_gros|intcomma }} unités ({{ stats.pourcentage_gros|floatformat:1 }}%)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Ventes en Détail:</span>
+                        <span>{{ stats.quantite_detail|intcomma }} unités ({{ stats.pourcentage_detail|floatformat:1 }}%)</span>
+                    </div>
+                    <div class="flex justify-between border-t pt-2">
+                        <span class="font-semibold">CA Gros:</span>
+                        <span class="font-mono">{{ stats.ca_gros|fcfa }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-semibold">CA Détail:</span>
+                        <span class="font-mono">{{ stats.ca_detail|fcfa }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ventes Récentes -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title mb-4">10 Dernières Ventes</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Produit</th>
+                            <th class="text-center">Type</th>
+                            <th class="text-center">Quantité</th>
+                            <th class="text-right">Prix Unitaire</th>
+                            <th class="text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vente in ventes_recentes %}
+                        <tr>
+                            <td>{{ vente.date_vente|date:"d/m/Y" }}</td>
+                            <td>
+                                <div class="font-semibold">{{ vente.produit_nom }}</div>
+                                {% if vente.specification %}
+                                <div class="text-xs text-gray-500">{{ vente.specification }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge 
+                                    {% if vente.type_vente == 'gros' %}badge-primary{% else %}badge-secondary{% endif %}">
+                                    {{ vente.get_type_vente_display }}
+                                </span>
+                            </td>
+                            <td class="text-center">{{ vente.quantite|floatformat:1 }}</td>
+                            <td class="text-right font-mono">{{ vente.prix_vente_unitaire|fcfa }}</td>
+                            <td class="text-right font-mono font-bold">{{ vente.total_vente|fcfa }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-gray-500 py-4">
+                                Aucune vente enregistrée
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

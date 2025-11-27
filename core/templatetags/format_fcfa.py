@@ -13,3 +13,11 @@ def fcfa(value):
     formatted = f"{value:,.0f}".replace(",", " ")
 
     return formatted 
+
+@register.filter
+def multiply(value, arg):
+    """Multiplie la valeur par l'argument"""
+    try:
+        return float(value) * float(arg)
+    except (ValueError, TypeError):
+        return 0

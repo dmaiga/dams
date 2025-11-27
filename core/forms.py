@@ -18,7 +18,26 @@ from django.db.models.functions import Coalesce
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import AuthenticationForm
-from decimal import Decimal
+from decimal import Decimal  
+from django.forms.widgets import FileInput
+from django.core.files.uploadedfile import UploadedFile
+
+class MultiFileInput(forms.FileInput):
+    allow_multiple_selected = True
+
+class MultiFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("widget", MultiFileInput())
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            result = [single_file_clean(d, initial) for d in data]
+        else:
+            result = single_file_clean(data, initial)
+        return result
+
 
 class AgentCreationForm(forms.ModelForm):
     nom = forms.CharField(
@@ -1499,26 +1518,6 @@ class VersementForm(forms.ModelForm):
                 )
 
         return versement
-    
-from django.forms.widgets import FileInput
-from django import forms
-from django.core.files.uploadedfile import UploadedFile
-
-class MultiFileInput(forms.FileInput):
-    allow_multiple_selected = True
-
-class MultiFileField(forms.FileField):
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("widget", MultiFileInput())
-        super().__init__(*args, **kwargs)
-
-    def clean(self, data, initial=None):
-        single_file_clean = super().clean
-        if isinstance(data, (list, tuple)):
-            result = [single_file_clean(d, initial) for d in data]
-        else:
-            result = single_file_clean(data, initial)
-        return result
 
 class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
     versement = forms.ModelChoiceField(

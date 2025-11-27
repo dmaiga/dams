@@ -1,11 +1,18 @@
 # urls.py
 from django.urls import path
 from . import views
-from  .views import DashboardView,PerformanceAgentsView,AnalyseAgentsView,AnalyseClientsView,AnalyseProduitsView
+from  .views import ( 
+                        DashboardView,PerformanceAgentsView,
+                        AnalyseClientsView,ProductDetailView,
+                        ProductListView,AgentDashboardView,
+                        SuperviseurListView,AgentTerrainListView,
+                        AgentDetailView
+                     
+                     )
 urlpatterns = [
     # Dashboard
   
-    path('dashboard/agent/', views.dashboard_agent, name='dashboard_agent'),
+    path('agent/dashboard/', views.dashboard_agent, name='dashboard_agent'),
     # Agents
     path('agents/', views.liste_agents, name='liste_agents'),
     path('agents/<int:agent_id>/', views.detail_agent, name='detail_agent'),
@@ -90,13 +97,20 @@ urlpatterns = [
     path('agent/<int:agent_id>/recouvrement/historique/complet/', views.detail_historique, name='detail_historique'),
 
 #ADMIN
-    path('core/direction/', DashboardView.as_view(), name='dashboard'),
-    path('analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
-    path('analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
-    path('analyses/ventes', views.toutes_les_ventes, name='toutes_les_ventes'),  
-    path('performances/agents/', PerformanceAgentsView.as_view(), name='performance_agents'),
-    path('analyses/produits/', AnalyseProduitsView.as_view(), name='analyse_produits'),
-    path('analyses/clients/', AnalyseClientsView.as_view(), name='analyse_clients'),
-    path('analyses/agents/', AnalyseAgentsView.as_view(), name='analyse_agents'),
-
+    path('direction/dashboard/', DashboardView.as_view(), name='dashboard'),
+    
+    path('direction/analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
+    path('direction/analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
+    path('direction/analyses/ventes', views.toutes_les_ventes, name='toutes_les_ventes'),  
+    
+    path('direction/performances/agents/', PerformanceAgentsView.as_view(), name='performance_agents'),
+    
+    path('direction/analyses/clients/', AnalyseClientsView.as_view(), name='analyse_clients'),
+    
+    path('direction/agents/', AgentDashboardView.as_view(), name='agent_dashboard'),
+    path('direction/agents/superviseurs/', SuperviseurListView.as_view(), name='superviseur_list'),
+    path('direction/agents/terrain/', AgentTerrainListView.as_view(), name='agent_terrain_list'),
+    path('direction/agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
+    path('direction/produits/', ProductListView.as_view(), name='product_list'),
+    path('direction/produits/<int:pk>/', ProductDetailView.as_view(), name='product_detail'),
 ]

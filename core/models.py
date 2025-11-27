@@ -50,7 +50,9 @@ class Fournisseur(models.Model):
         ordering = ['nom']
 
 class LotEntrepot(models.Model):
-    produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
+    produit = models.ForeignKey(Produit,
+                                 on_delete=models.CASCADE,
+                                 related_name="lots")
     fournisseur = models.ForeignKey(
         Fournisseur,
         on_delete=models.SET_NULL,

@@ -1,0 +1,155 @@
+{% extends 'base_admin.html' %}
+{% load humanize %}
+{% load format_fcfa %}
+
+{% block title %}Agents Terrain - Performance{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Agents Terrain - Performance Commerciale</h1>
+        <div class="flex space-x-2">
+            <a href="{% url 'agent_dashboard' %}" class="btn btn-outline">
+                <i class="fas fa-arrow-left"></i>
+                Retour
+            </a>
+            <a href="{% url 'superviseur_list' %}" class="btn btn-primary">
+                <i class="fas fa-users-cog"></i>
+                Superviseurs
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtre Période -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Filtre Temporel</h2>
+            <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="form-control w-full md:w-auto">
+                    <label class="label">
+                        <span class="label-text">Période d'analyse</span>
+                    </label>
+                    <select name="periode" class="select select-bordered w-full">
+                        {% for periode in periodes %}
+                        <option value="{{ periode.value }}" 
+                            {% if current_periode == periode.value %}selected{% endif %}>
+                            {{ periode.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i>
+                    Appliquer
+                </button>
+                {% if current_periode != 'all' %}
+                <a href="{% url 'agent_terrain_list' %}" class="btn btn-outline">
+                    <i class="fas fa-times"></i>
+                    Effacer
+                </a>
+                {% endif %}
+            </form>
+
+            {% if current_periode != 'all' %}
+            <div class="mt-4">
+                <div class="badge badge-info badge-lg">
+                    Filtre actuel: 
+                    {% for periode in periodes %}
+                        {% if periode.value == current_periode %}{{ periode.label }}{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Liste Agents Terrain -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="card-title">Performance des Agents Terrain</h2>
+                <div class="badge badge-primary badge-lg">
+                    {{ agents_terrain|length }} agent(s)
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th class="text-right">CA</th>
+                            <th class="text-right">Marge</th>
+                            <th class="text-center">Quantité</th>
+                            <th class="text-center">Gros/Détail</th>
+                            
+                            <th class="text-center">Ventes Bonus</th>
+                          
+                            <th class="text-center">Produits Restants</th>
+                            <th class="text-right">Argent Possession</th>
+                            <th class="text-center">Disponibilité</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for agent in agents_terrain %}
+                        <tr>
+                            <td>
+                                <div class="font-semibold">{{ agent.agent.full_name }}</div>
+                                <div class="text-xs text-gray-500">
+                                    {{ agent.agent.telephone|default:"Tél: Non renseigné" }}
+                                </div>
+                            </td>
+                            <td class="text-right font-mono font-bold">{{ agent.total_ca|fcfa }}</td>
+                            <td class="text-right font-mono font-bold text-success">
+                                {{ agent.marge_totale|fcfa }}
+                            </td>
+                            <td class="text-center font-bold">{{ agent.total_quantite|intcomma }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-outline">{{ agent.repartition }}</span>
+                            </td>
+                          
+                            <td class="text-center">
+                                <div class="tooltip" data-tip="{{ agent.ventes_avec_bonus }} ventes recouvrées sous 48h">
+                                    <span class="badge badge-success">{{ agent.ventes_avec_bonus }}</span>
+                                </div>
+                            </td>
+
+                           
+                            <td class="text-center">
+                                <div class="tooltip" data-tip="Produits restants à disposition">
+                                    <span class="badge 
+                                        {% if agent.produits_restants > 0 %}badge-warning{% else %}badge-error{% endif %}">
+                                        {{ agent.produits_restants }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="text-right font-mono 
+                                {% if agent.argent_possession > 0 %}text-warning font-bold{% else %}text-success{% endif %}">
+                                {{ agent.argent_possession|fcfa }}
+                            </td>
+                            <td class="text-center">
+                                {% if agent.a_produits_disponibles %}
+                                <span class="badge badge-success"><i class="fas fa-check"></i></span>
+                                {% else %}
+                                <span class="badge badge-error"><i class="fas fa-times"></i></span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'agent_detail' agent.agent.id %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i>
+                                    Détail
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
