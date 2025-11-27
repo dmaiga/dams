@@ -233,3 +233,43 @@ class AgentAnalysisService:
         
         return superviseurs_data
     
+    @staticmethod
+    def get_competition_stagiaires():
+        """Performance des stagiaires - pour ventes réalisées POUR eux"""
+        stagiaires = Agent.objects.filter(type_agent='stagiaire')
+        
+        competition_data = []
+        for stagiaire in stagiaires:
+            # Ventes où le stagiaire est mentionné (réalisées par d'autres agents pour lui)
+            ventes_stagiaire = Vente.objects.filter(stagiaire=stagiaire)
+            total_quantite = sum(vente.quantite for vente in ventes_stagiaire)
+            total_ca = sum(vente.quantite * vente.prix_vente_unitaire for vente in ventes_stagiaire)
+            
+            # Calcul de la MARGE pour les ventes du stagiaire
+            marge_totale = Decimal('0')
+            for vente in ventes_stagiaire:
+                prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
+                marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
+                marge_totale += marge_vente
+            
+            # Taux de marge
+            taux_marge = (marge_totale / total_ca * 100) if total_ca > 0 else 0
+            
+            statut = "🟢 Actif" if stagiaire.est_expire == False else "🔴 Expiré"
+            jours_restants = stagiaire.jours_restants if stagiaire.jours_restants else "Expiré"
+            
+            competition_data.append({
+                'stagiaire': stagiaire,
+                'statut': statut,
+                'total_quantite': total_quantite,
+                'total_ca': total_ca,
+                'marge_totale': marge_totale,
+                'taux_marge': round(taux_marge, 1),
+                'jours_restants': jours_restants,
+                'date_mise_service': stagiaire.date_mise_service,
+                'nombre_ventes': ventes_stagiaire.count()
+            })
+        
+        # Tri par MARGE (plus pertinent que CA)
+        return sorted(competition_data, key=lambda x: x['total_quantite'], reverse=True)
+    

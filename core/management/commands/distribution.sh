@@ -32,89 +32,13 @@ def creer_distributions_multiple():
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
                 {
-                    'date': '15/11/2025', 
+                    'date': '21/11/2025', 
                     'produit': 'ail',
                     'specification': '',
                     'prix_gros': 9000,
                     'prix_detail': 10000,
                     'distributions': [  
                         (fatoumata, 4, "Fatou"),
-                        
-                        ]
-                },
-
-
-                       
-                {
-                    'date': '17/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9000,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                        (sali, 2, "Yirango"),
-                        (fatoumata, 1, "Yirango"),
-
-                        ]
-                },
-                {
-                    'date': '18/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9000,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                      
-                        (fatoumata, 13, "Yirango"),
-                        
-                        (sali, 7, "Yirango"),
-                        (anna, 5, "Yirango"),
-                        
-                        (kadiatou, 5, "Yirango"),
-                        (mankoulako, 10, "Yirango"),
-
-                        ]
-                },
-                 {
-                    'date': '19/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9000,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                       
-                       (fatoumata, 2, "Yirango"),
-                       (sali, 5, "Yirango"),
-                       (kani, 4, "Yirango"),
-
-                        ]
-                },
-                
-                   {
-                    'date': '20/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 9000,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                        (fatoumata, 2, "Yirango"),
-                        (sali, 7, "Yirango"),
-                        (anna, 20, "Yirango"),                        
-                        (djenebaC, 4, "Yirango"),                       
-                        (djenebaY, 2, "Yirango"),                      
-                        (ramata, 3, "Yirango"),
-                        (moussony, 2, "Yirango"),
-                        ]
-                },
-                {
-                    'date': '20/11/2025', 
-                    'produit': 'ail',
-                    'specification': '',
-                    'prix_gros': 8750,
-                    'prix_detail': 10000,
-                    'distributions': [  
-                                    
-                        (mankoulako, 8, "Yirango"), 
                         
                         ]
                 },
