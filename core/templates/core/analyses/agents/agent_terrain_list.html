@@ -21,11 +21,28 @@
         </div>
     </div>
 
-    <!-- Filtre Période -->
+    <!-- Filtres -->
     <div class="card bg-base-100 shadow-xl mb-6">
         <div class="card-body">
-            <h2 class="card-title mb-4">Filtre Temporel</h2>
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-4">
+                <h2 class="card-title">Filtres d'analyse</h2>
+                
+                <!-- Sélection de vue -->
+                <div class="tabs tabs-boxed">
+                    <a href="?vue=globale&periode={{ current_periode }}" 
+                       class="tab {% if current_vue == 'globale' %}tab-active{% endif %}">
+                        Vue Globale
+                    </a>
+                    <a href="?vue=hebdomadaire" 
+                       class="tab {% if current_vue == 'hebdomadaire' %}tab-active{% endif %}">
+                        Semaine en Cours
+                    </a>
+                </div>
+            </div>
+
+            {% if current_vue == 'globale' %}
             <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
+                <input type="hidden" name="vue" value="globale">
                 <div class="form-control w-full md:w-auto">
                     <label class="label">
                         <span class="label-text">Période d'analyse</span>
@@ -44,23 +61,32 @@
                     Appliquer
                 </button>
                 {% if current_periode != 'all' %}
-                <a href="{% url 'agent_terrain_list' %}" class="btn btn-outline">
+                <a href="?vue=globale&periode=all" class="btn btn-outline">
                     <i class="fas fa-times"></i>
                     Effacer
                 </a>
                 {% endif %}
             </form>
+            {% endif %}
 
-            {% if current_periode != 'all' %}
-            <div class="mt-4">
+            <!-- Indicateurs de filtre actif -->
+            <div class="mt-4 flex flex-wrap gap-2">
+                {% if current_vue == 'hebdomadaire' %}
                 <div class="badge badge-info badge-lg">
-                    Filtre actuel: 
+                    <i class="fas fa-calendar-week mr-1"></i>
+                    Vue Hebdomadaire - Semaine en cours
+                </div>
+                {% endif %}
+                
+                {% if current_periode != 'all' and current_vue == 'globale' %}
+                <div class="badge badge-warning badge-lg">
+                    Filtre: 
                     {% for periode in periodes %}
                         {% if periode.value == current_periode %}{{ periode.label }}{% endif %}
                     {% endfor %}
                 </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -68,7 +94,13 @@
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="card-title">Performance des Agents Terrain</h2>
+                <h2 class="card-title">
+                    {% if current_vue == 'hebdomadaire' %}
+                    Performance Hebdomadaire des Agents Terrain
+                    {% else %}
+                    Performance des Agents Terrain
+                    {% endif %}
+                </h2>
                 <div class="badge badge-primary badge-lg">
                     {{ agents_terrain|length }} agent(s)
                 </div>
@@ -79,16 +111,21 @@
                     <thead>
                         <tr>
                             <th>Agent</th>
+                            {% if current_vue == 'hebdomadaire' %}
+                            <th class="text-right">CA Semaine</th>
+                            <th class="text-right">Marge Semaine</th>
+                            <th class="text-center">Quantité Semaine</th>
+                            <th class="text-center">Ventes Semaine</th>
+                            {% else %}
                             <th class="text-right">CA</th>
                             <th class="text-right">Marge</th>
                             <th class="text-center">Quantité</th>
                             <th class="text-center">Gros/Détail</th>
                             
-                            <th class="text-center">Ventes Bonus</th>
-                          
-                            <th class="text-center">Produits Restants</th>
+                            {% endif %}
+                            <th class="text-center">Dernière Vente</th>
+                            <th class="text-center">Jours Inactifs</th>
                             <th class="text-right">Argent Possession</th>
-                            <th class="text-center">Disponibilité</th>
                             <th class="text-center">Actions</th>
                         </tr>
                     </thead>
@@ -101,41 +138,58 @@
                                     {{ agent.agent.telephone|default:"Tél: Non renseigné" }}
                                 </div>
                             </td>
+                            
+                            {% if current_vue == 'hebdomadaire' %}
+                            <td class="text-right font-mono font-bold">{{ agent.total_ca_semaine|fcfa }}</td>
+                            <td class="text-right font-mono font-bold text-success">
+                                {{ agent.marge_semaine|fcfa }}
+                            </td>
+                            <td class="text-center font-bold">{{ agent.total_quantite_semaine|intcomma }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-outline">{{ agent.nombre_ventes_semaine }}</span>
+                            </td>
+                            {% else %}
                             <td class="text-right font-mono font-bold">{{ agent.total_ca|fcfa }}</td>
                             <td class="text-right font-mono font-bold text-success">
                                 {{ agent.marge_totale|fcfa }}
                             </td>
                             <td class="text-center font-bold">{{ agent.total_quantite|intcomma }}</td>
                             <td class="text-center">
-                                <span class="badge badge-outline">{{ agent.repartition }}</span>
+                                <span class="badge badge-outline font-bold">{{ agent.repartition }}</span>
                             </td>
                           
+                            {% endif %}
+                            
+                            <!-- Colonne Dernière Vente -->
                             <td class="text-center">
-                                <div class="tooltip" data-tip="{{ agent.ventes_avec_bonus }} ventes recouvrées sous 48h">
-                                    <span class="badge badge-success">{{ agent.ventes_avec_bonus }}</span>
-                                </div>
+                                {% if agent.derniere_vente %}
+                                    <div class="text-sm font-medium">
+                                        {{ agent.derniere_vente|date:"d/m/Y" }}
+                                    </div>
+                                {% else %}
+                                    <span class="text-gray-400">-</span>
+                                {% endif %}
                             </td>
-
-                           
+                            
+                            <!-- Colonne Jours Inactifs -->
                             <td class="text-center">
-                                <div class="tooltip" data-tip="Produits restants à disposition">
+                                {% if agent.jours_depuis_derniere_vente == "Aucune vente" %}
+                                    <span class="badge badge-error">Aucune vente</span>
+                                {% else %}
                                     <span class="badge 
-                                        {% if agent.produits_restants > 0 %}badge-warning{% else %}badge-error{% endif %}">
-                                        {{ agent.produits_restants }}
+                                        {% if agent.jours_depuis_derniere_vente < 2 %}badge-success
+                                        {% elif agent.jours_depuis_derniere_vente <= 7 %}badge-warning
+                                        {% else %}badge-error{% endif %}">
+                                        {{ agent.jours_depuis_derniere_vente }} jour(s)
                                     </span>
-                                </div>
+                                {% endif %}
                             </td>
+                            
                             <td class="text-right font-mono 
                                 {% if agent.argent_possession > 0 %}text-warning font-bold{% else %}text-success{% endif %}">
                                 {{ agent.argent_possession|fcfa }}
                             </td>
-                            <td class="text-center">
-                                {% if agent.a_produits_disponibles %}
-                                <span class="badge badge-success"><i class="fas fa-check"></i></span>
-                                {% else %}
-                                <span class="badge badge-error"><i class="fas fa-times"></i></span>
-                                {% endif %}
-                            </td>
+
                             <td class="text-center">
                                 <a href="{% url 'agent_detail' agent.agent.id %}" class="btn btn-sm btn-primary">
                                     <i class="fas fa-eye"></i>
@@ -145,10 +199,8 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                
                 </table>
             </div>
-
         </div>
     </div>
 </div>

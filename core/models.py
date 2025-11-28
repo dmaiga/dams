@@ -933,6 +933,9 @@ class Vente(models.Model):
         auto_now_add=True,
         verbose_name="Date d'enregistrement"
     )
+    # Soft delete
+    est_supprime = models.BooleanField(default=False, verbose_name="Supprimé")
+    date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
 
     def save(self, *args, **kwargs):
         # Déterminer automatiquement le prix en fonction du type de vente choisi
@@ -994,18 +997,7 @@ class Vente(models.Model):
     def est_recouverte(self):
         """Vérifie si cette vente a été recouverte"""
         return self.agent.total_recouvre >= self.agent.total_ventes
-    @property
-    def eligible_bonus_vente_comptant(self):
-        """Vérifie si la vente au comptant est éligible au bonus"""
-        return self.mode_paiement == 'comptant'
-    
-    @property
-    def bonus_vente_comptant(self):
-        """Calcule le bonus pour vente au comptant"""
-        if self.eligible_bonus_vente_comptant:
-            return self.quantite * 100  # 100 F par produit
-        return 0
-    
+      
     @property
     def est_retroactive(self):
         """Vérifie si c'est une vente rétroactive"""
@@ -1063,66 +1055,11 @@ class Dette(models.Model):
     # Informations de localisation détaillées
     nom_localite = models.CharField(max_length=100, blank=True)
     
-    # Bonus pour recouvrement rapide
-    bonus_accorde = models.BooleanField(default=False)
-    nombre_produits_bonus = models.PositiveIntegerField(default=0)  # Nombre de produits pour le bonus
-    delai_bonus_heures = models.PositiveIntegerField(default=48)  # 48h = 2 jours par défaut
-    
+
     notes = models.TextField(blank=True)
     
     def __str__(self):
         return f"Dette {self.montant_restant}€ - {self.vente.client.nom} - {self.nom_localite}"
-    
-    @property
-    def delai_bonus_expire(self):
-        """Vérifie si le délai pour le bonus est expiré"""
-        delai_bonus = timedelta(hours=self.delai_bonus_heures)
-        return timezone.now() > self.date_creation + delai_bonus
-    
-    @property
-    def temps_restant_bonus(self):
-        """Retourne le temps restant pour bénéficier du bonus"""
-        if self.bonus_accorde or self.statut == 'paye':
-            return None
-        
-        delai_bonus = timedelta(hours=self.delai_bonus_heures)
-        date_limite = self.date_creation + delai_bonus
-        temps_restant = date_limite - timezone.now()
-        
-        return max(temps_restant, timedelta(0))
-
-    @property
-    def eligible_bonus(self):
-        """Vérifie si la dette est éligible au bonus (recouvrement sous 2 jours)"""
-        if self.bonus_accorde or self.statut == 'paye':
-            return False
-        
-        # Vérifier si le recouvrement a eu lieu dans les 2 jours
-        if self.date_reglement:
-            # Convertir en dates pour comparaison
-            date_creation_date = self.date_creation.date()
-            delai_recouvrement = self.date_reglement - date_creation_date
-            return delai_recouvrement <= timedelta(days=2)
-        
-        # Vérifier le temps restant pour les dettes non encore payées
-        return not self.delai_bonus_expire
-    
-    def accorder_bonus(self):
-        """Accorde le bonus basé sur le nombre de produits"""
-        if self.eligible_bonus and not self.bonus_accorde:
-            self.bonus_accorde = True
-            self.nombre_produits_bonus = self.vente.quantite
-            
-            # Mettre à jour le bonus de l'agent
-            agent_bonus, created = BonusAgent.objects.get_or_create(
-                agent=self.vente.agent,
-                defaults={'nombre_produits_recouverts': 0, 'total_bonus': 0}
-            )
-            agent_bonus.ajouter_produits_recouverts(self.vente.quantite)
-            
-            self.save()
-            return self.vente.quantite
-        return 0
     
     def save(self, *args, **kwargs):
         # Mettre à jour automatiquement le statut
@@ -1130,11 +1067,7 @@ class Dette(models.Model):
             ancien_statut = self.statut
             self.statut = 'paye'
             self.date_reglement = timezone.now().date()
-            
-            # Accorder automatiquement le bonus si payé dans les 2 jours
-            if self.eligible_bonus and ancien_statut != 'paye':
-                self.accorder_bonus()
-                
+
         elif self.montant_restant < self.montant_total:
             self.statut = 'partiellement_paye'
         elif self.date_echeance < timezone.now().date():
@@ -1168,10 +1101,7 @@ class PaiementDette(models.Model):
     reference = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
     
-    # Suivi du bonus
-    bonus_genere = models.BooleanField(default=False)
-    nombre_produits_bonus = models.PositiveIntegerField(default=0)
-    
+
     def __str__(self):
         return f"Paiement {self.montant}€ - {self.dette.vente.client.nom}"
     
@@ -1185,15 +1115,6 @@ class PaiementDette(models.Model):
             ancien_montant_restant = self.dette.montant_restant
             self.dette.montant_restant -= self.montant
             
-            # Vérifier si le paiement règle complètement la dette
-            if self.dette.montant_restant <= 0 and ancien_montant_restant > 0:
-                # Accorder le bonus si éligible
-                if self.dette.eligible_bonus:
-                    nombre_produits = self.dette.accorder_bonus()
-                    self.bonus_genere = True
-                    self.nombre_produits_bonus = nombre_produits
-                    super().save(update_fields=['bonus_genere', 'nombre_produits_bonus'])
-            
             self.dette.save()
 
 class BonusAgent(models.Model):
@@ -1205,114 +1126,40 @@ class BonusAgent(models.Model):
     nombre_produits_recouverts = models.PositiveIntegerField(default=0)
     total_bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     date_mise_a_jour = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return f"Bonus {self.nombre_produits_recouverts} produits - {self.agent.full_name}"
-    
-    def ajouter_produits_recouverts(self, nombre_produits):
-        """Ajoute un nombre de produits recouverts à temps"""
-        self.nombre_produits_recouverts += nombre_produits
-        # Utiliser la nouvelle méthode de calcul
-        self.calculer_bonus_total()
-        self.save()
-    
-    @property
-    def dettes_avec_bonus(self):
-        """Retourne les dettes pour lesquelles l'agent a obtenu un bonus"""
-        return Dette.objects.filter(
-            vente__agent=self.agent,
-            bonus_accorde=True
-        )
 
-    def calculer_bonus_total(self):
-        """Calcule le bonus total: 100 F par produit (vente comptant ou crédit recouvré sous 2j)"""
-        bonus_par_produit = 100  # 100 FCFA par produit
-        
-        # Produits des ventes au comptant
-        ventes_comptant = Vente.objects.filter(
-            agent=self.agent,
-            mode_paiement='comptant'
-        )
-        produits_ventes_comptant = sum(vente.quantite for vente in ventes_comptant)
-        
-        # Produits des crédits recouvrés sous 2 jours avec bonus
-        produits_credits_bonus = sum(
-            dette.nombre_produits_bonus 
-            for dette in Dette.objects.filter(
-                vente__agent=self.agent,
-                bonus_accorde=True
-            )
-        )
-        
-        total_produits = produits_ventes_comptant + produits_credits_bonus
-        self.total_bonus = total_produits * bonus_par_produit
-        return self.total_bonus
-    
-    def get_ventes_avec_bonus(self):
-        """Retourne toutes les ventes éligibles au bonus"""
-        # Ventes au comptant
-        ventes_comptant = Vente.objects.filter(
-            agent=self.agent,
-            mode_paiement='comptant'
-        )
-        
-        # Ventes à crédit avec bonus accordé
-        ventes_credit_bonus = Vente.objects.filter(
-            agent=self.agent,
-            mode_paiement='credit',
-            dette__bonus_accorde=True
-        )
-        
-        return ventes_comptant | ventes_credit_bonus
-    
+    def ajouter_bonus(self, montant, nb_produits):
+        """Ajoute un bonus et le nombre de produits"""
+        self.total_bonus += montant
+        self.nombre_produits_recouverts += nb_produits
+        self.save()
+
+    # 👉 MÉTHODE MANQUANTE (nécessaire au dashboard)
     def get_produits_recouverts_par_mois(self, mois=None, annee=None):
-        """Retourne le nombre de produits recouverts par mois"""
+        """Retourne le nombre de produits recouverts (bonus) pour un mois donné"""
+        from datetime import datetime
+        
         if mois is None:
             mois = timezone.now().month
         if annee is None:
             annee = timezone.now().year
-            
-        dettes_bonus = Dette.objects.filter(
-            vente__agent=self.agent,
-            bonus_accorde=True,
-            date_reglement__month=mois,
-            date_reglement__year=annee
-        )
-        
-        total_produits = 0
-        for dette in dettes_bonus:
-            total_produits += dette.vente.quantite
-            
-        return total_produits
-    
-    @classmethod
-    def calculer_bonus_total_agent(cls, agent):
-        """Calcule le bonus total d'un agent selon la nouvelle logique"""
-        bonus_agent, created = cls.objects.get_or_create(agent=agent)
-        
-        # Réinitialiser et recalculer
-        bonus_agent.nombre_produits_recouverts = 0
-        bonus_agent.total_bonus = 0
-        bonus_agent.save()
-        
-        # Bonus pour ventes au comptant
-        ventes_comptant = Vente.objects.filter(
-            agent=agent,
-            mode_paiement='comptant'
-        )
-        for vente in ventes_comptant:
-            bonus_agent.ajouter_produits_recouverts(vente.quantite)
-        
-        # Bonus pour crédits recouvrés sous 2 jours
-        dettes_bonus = Dette.objects.filter(
-            vente__agent=agent,
-            bonus_accorde=True
-        )
-        for dette in dettes_bonus:
-            bonus_agent.ajouter_produits_recouverts(dette.nombre_produits_bonus)
-        
-        return bonus_agent.total_bonus
 
+        # Trouver les recouvrements éligibles dans ce mois
+        recouvrements = Recouvrement.objects.filter(
+            agent=self.agent,
+            bonus_accorde=True,
+            date_recouvrement__month=mois,
+            date_recouvrement__year=annee
+        )
+
+        # Additionner les quantités des ventes liées
+        total = sum(r.vente.quantite for r in recouvrements)
+
+        return total
+
+ 
 class Recouvrement(models.Model):
     agent = models.ForeignKey(
         Agent,
@@ -1336,7 +1183,8 @@ class Recouvrement(models.Model):
     commentaire = models.TextField(blank=True)
     date_recouvrement = models.DateTimeField(default=timezone.now)
     date_creation = models.DateTimeField(auto_now_add=True)
-
+    bonus_accorde = models.BooleanField(default=False)
+    montant_bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     def __str__(self):
         return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
 

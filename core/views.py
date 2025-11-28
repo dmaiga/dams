@@ -1170,9 +1170,10 @@ def liste_ventes(request):
         messages.error(request, "Aucun agent trouvé.")
         return redirect('liste_ventes')
     
-    # Récupérer les ventes de l'agent
+    # Récupérer les ventes de l'agent (non supprimées)
     ventes = Vente.objects.filter(
-        agent=agent
+        agent=agent,
+        est_supprime=False
     ).select_related(
         'client', 
         'detail_distribution__lot__produit',
@@ -1190,6 +1191,7 @@ def liste_ventes(request):
     
     # ✅ CORRECTION : Gérer les valeurs None
     chiffre_affaires_total = stats_ventes['chiffre_affaires_total'] or Decimal('0.00')
+    quantite_totale = stats_ventes['quantite_totale'] or Decimal('0.00')
     
     # Statistiques par type
     ventes_gros = ventes.filter(type_vente='gros')
@@ -1228,14 +1230,9 @@ def liste_ventes(request):
     if chiffre_affaires_total > 0:
         pourcentage_ca_stagiaires = (chiffre_affaires_stagiaires / chiffre_affaires_total) * 100
     
-    # Calculer les bonus obtenus
-    bonus_obtenus = Decimal('0.00')
-    dettes_avec_bonus = Dette.objects.filter(
-        vente__agent=agent,
-        bonus_accorde=True
-    )
-    for dette in dettes_avec_bonus:
-        bonus_obtenus += dette.montant_bonus or Decimal('0.00')
+    # ✅ CORRECTION : Supprimer la partie bonus qui cause l'erreur
+    # Cette partie utilisait bonus_accorde qui n'existe pas dans Dette
+    bonus_obtenus = Decimal('0.00')  # Valeur par défaut
     
     # Dettes en cours
     dettes_en_cours = Dette.objects.filter(
@@ -1246,17 +1243,27 @@ def liste_ventes(request):
     # ✅ CORRECTION : Requête pour les stagiaires actifs avec gestion des valeurs None
     stagiaires_actifs = Agent.objects.filter(
         type_agent='stagiaire',
-        vente__agent=agent
+        vente__agent=agent,
+        vente__est_supprime=False
     ).distinct().annotate(
         nombre_ventes=Count('vente'),
         total_ventes_ca=Sum(F('vente__quantite') * F('vente__prix_vente_unitaire'))
     ).order_by('-total_ventes_ca')
     
-    # ✅ CORRECTION : Convertir les Decimal en float pour les templates si nécessaire
+    # ✅ CORRECTION : Statistiques des dettes
+    stats_dettes = Dette.objects.filter(
+        vente__agent=agent
+    ).aggregate(
+        total_dettes=Count('id'),
+        montant_dettes_total=Sum('montant_total'),
+        montant_dettes_restant=Sum('montant_restant')
+    )
+    
     context = {
         'ventes': ventes,
         'total_ventes': total_ventes,
         'chiffre_affaires_total': float(chiffre_affaires_total),
+        'quantite_totale': float(quantite_totale),
         'ventes_gros_count': ventes_gros.count(),
         'ventes_detail_count': ventes_detail.count(),
         'ventes_comptant_count': ventes_comptant.count(),
@@ -1276,9 +1283,15 @@ def liste_ventes(request):
         
         # Liste des stagiaires avec leurs performances
         'stagiaires_actifs': stagiaires_actifs,
+        
+        # Statistiques des dettes
+        'total_dettes': stats_dettes['total_dettes'] or 0,
+        'montant_dettes_total': float(stats_dettes['montant_dettes_total'] or Decimal('0.00')),
+        'montant_dettes_restant': float(stats_dettes['montant_dettes_restant'] or Decimal('0.00')),
     }
     
     return render(request, 'core/ventes/liste_ventes.html', context)
+
 
 @login_required
 def detail_dette(request, dette_id):
@@ -1405,8 +1418,8 @@ def consulter_bonus(request):
     bonus_agent, created = BonusAgent.objects.get_or_create(agent=agent)
     
     dettes_bonus = Dette.objects.filter(
-        vente__agent=agent,
-        bonus_accorde=True
+        vente__agent=agent
+        
     ).select_related('vente', 'vente__client')
     
     # Statistiques mensuelles
@@ -3420,11 +3433,18 @@ class AgentTerrainListView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Récupérer le filtre mois depuis les paramètres GET
+        # Récupérer le filtre depuis les paramètres GET
         periode = self.request.GET.get('periode', 'all')
+        vue = self.request.GET.get('vue', 'globale')  # Nouveau paramètre pour la vue
         
         # Performance des agents terrain avec filtre
-        context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance(mois=periode)
+        if vue == 'hebdomadaire':
+            context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance_weekly()
+            context['current_vue'] = 'hebdomadaire'
+        else:
+            context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance(mois=periode)
+            context['current_vue'] = 'globale'
+        
         context['current_periode'] = periode
         context['periodes'] = [
             {'value': 'all', 'label': 'Toutes périodes'},
@@ -3434,6 +3454,15 @@ class AgentTerrainListView(LoginRequiredMixin, TemplateView):
         ]
         
         return context
+    
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import DetailView
+from core.models import Agent
+from core.services.agent_analysis_service import AgentAnalysisService
+
+
+
 
 class AgentDetailView(LoginRequiredMixin, DetailView):
     template_name = 'core/analyses/agents/agent_detail.html'
@@ -3444,52 +3473,13 @@ class AgentDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         agent = self.object
         
-        # VENTES PERSONNELLES uniquement (sans stagiaire)
-        ventes = agent.vente_set.filter(stagiaire__isnull=True)
+        # Récupérer le filtre de période depuis les paramètres GET
+        period_filter = self.request.GET.get('period', 'monthly')
         
-        # Calcul des statistiques PERSONNELLES
-        total_quantite = sum(vente.quantite for vente in ventes)
-        total_ca = sum(vente.total_vente for vente in ventes)
+        # Utilisation du service pour l'analyse détaillée
+        analysis_data = AgentAnalysisService.get_agent_detailed_analysis(agent, period_filter)
         
-        # Répartition par type de vente
-        ventes_gros = ventes.filter(type_vente='gros')
-        ventes_detail = ventes.filter(type_vente='detail')
-        
-        quantite_gros = sum(vente.quantite for vente in ventes_gros)
-        quantite_detail = sum(vente.quantite for vente in ventes_detail)
-        ca_gros = sum(vente.total_vente for vente in ventes_gros)
-        ca_detail = sum(vente.total_vente for vente in ventes_detail)
-        
-        # Calcul de la marge POUR VENTES PERSONNELLES
-        marge_totale = Decimal('0')
-        for vente in ventes:
-            prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
-            marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
-            marge_totale += marge_vente
-        
-        taux_marge = (marge_totale / total_ca * 100) if total_ca > 0 else 0
-        
-        # Ventes récentes PERSONNELLES
-        ventes_recentes = ventes.order_by('-date_vente')[:10]
-        
-        context.update({
-            'stats': {
-                'total_quantite': total_quantite,
-                'total_ca': total_ca,
-                'marge_totale': marge_totale,
-                'taux_marge': round(taux_marge, 1),
-                'quantite_gros': quantite_gros,
-                'quantite_detail': quantite_detail,
-                'ca_gros': ca_gros,
-                'ca_detail': ca_detail,
-                'pourcentage_gros': (quantite_gros / total_quantite * 100) if total_quantite > 0 else 0,
-                'pourcentage_detail': (quantite_detail / total_quantite * 100) if total_quantite > 0 else 0,
-            },
-            'ventes_recentes': ventes_recentes,
-            'argent_possession': agent.argent_en_possession,
-            'total_recouvre': agent.total_recouvre,
-            'nombre_ventes_personnelles': ventes.count(),
-            'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
-        })
+        context.update(analysis_data)
+        context['period_filter'] = period_filter
         
         return context
