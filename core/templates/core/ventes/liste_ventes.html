@@ -256,7 +256,7 @@
                                             <th class="text-center">Paiement</th>
                                             <th class="text-end">Total</th>
                                             <th class="text-center">Stagiaire</th>  <!-- ✅ NOUVEAU : Colonne Stagiaire -->
-                                            <th class="text-center">Statut</th>
+                                       
                                             <th class="text-center">Actions</th>
                                         </tr>
                                     </thead>
@@ -306,40 +306,6 @@
                                                 </span>
                                                 {% else %}
                                                 <span class="badge bg-secondary">Personnel</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center">
-                                                {% if vente.mode_paiement == 'credit' %}
-                                                    {% if vente.dette %}
-                                                        {% if vente.dette.statut == 'paye' %}
-                                                            <span class="badge bg-success" title="Bonus: {{ vente.dette.montant_bonus }} FCFA">
-                                                                <i class="fas fa-check"></i> Payée
-                                                                {% if vente.dette.bonus_accorde %}
-                                                                    <i class="fas fa-gift text-warning ms-1" title="Bonus obtenu"></i>
-                                                                {% endif %}
-                                                            </span>
-                                                        {% elif vente.dette.statut == 'partiellement_paye' %}
-                                                            <span class="badge bg-warning">
-                                                                <i class="fas fa-clock"></i> Partiel
-                                                            </span>
-                                                        {% elif vente.dette.statut == 'en_retard' %}
-                                                            <span class="badge bg-danger">
-                                                                <i class="fas fa-exclamation-triangle"></i> Retard
-                                                            </span>
-                                                        {% else %}
-                                                            <span class="badge bg-secondary">
-                                                                <i class="fas fa-hourglass"></i> En cours
-                                                            </span>
-                                                        {% endif %}
-                                                    {% else %}
-                                                        <span class="badge bg-light text-dark">
-                                                            <i class="fas fa-plus"></i> Dette à créer
-                                                        </span>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-check"></i> Réglée
-                                                    </span>
                                                 {% endif %}
                                             </td>
                                             <td class="text-center">

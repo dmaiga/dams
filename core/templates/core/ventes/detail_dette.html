@@ -147,35 +147,7 @@
                             </div>
 
                             <!-- Informations bonus -->
-                            <div class="card mb-4">
-                                <div class="card-header">
-                                    <h5 class="mb-0">Informations Bonus</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <strong>Bonus accordé:</strong>
-                                            {% if dette.bonus_accorde %}
-                                                <span class="badge bg-success ms-2">OUI</span>
-                                            {% else %}
-                                                <span class="badge bg-secondary ms-2">NON</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="col-md-6">
-                                            <strong>Montant bonus:</strong>
-                                            <span class="fw-bold text-success">{{ dette.montant_bonus }} FCFA</span>
-                                        </div>
-                                    </div>
-                                    {% if not dette.bonus_accorde and dette.montant_restant == 0 %}
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            <i class="fas fa-info-circle"></i>
-                                            Le bonus n'a pas été accordé car le paiement n'a pas été effectué dans les délais.
-                                        </small>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
+                            
                         </div>
 
                         <!-- Actions -->
@@ -201,15 +173,7 @@
                                             <i class="fas fa-list"></i> Retour aux Dettes
                                         </a>
 
-                                        <!-- Lien externe pour règlement (optionnel) -->
-                                        {% if dette.montant_restant > 0 %}
-                                        <div class="mt-3">
-                                            <small class="text-muted d-block text-center">Règlement en ligne</small>
-                                            <button type="button" class="btn btn-outline-info w-100" data-bs-toggle="modal" data-bs-target="#lienPaiementModal">
-                                                <i class="fas fa-external-link-alt"></i> Générer Lien de Paiement
-                                            </button>
-                                        </div>
-                                        {% endif %}
+                                       
                                     </div>
                                 </div>
                             </div>
@@ -253,7 +217,7 @@
                                                     <th>Montant</th>
                                                     <th>Mode</th>
                                                     <th>Référence</th>
-                                                    <th>Bonus Généré</th>
+                                                    
                                                     <th>Notes</th>
                                                     <th>Actions</th>
                                                 </tr>
@@ -275,17 +239,7 @@
                                                         </span>
                                                     </td>
                                                     <td>{{ paiement.reference|default:"-" }}</td>
-                                                    <td>
-                                                        {% if paiement.bonus_genere %}
-                                                            <span class="badge bg-success">
-                                                                <i class="fas fa-check"></i> Oui
-                                                            </span>
-                                                            <br>
-                                                            <small class="text-success">+{{ paiement.montant_bonus }} FCFA</small>
-                                                        {% else %}
-                                                            <span class="badge bg-secondary">Non</span>
-                                                        {% endif %}
-                                                    </td>
+                                                  
                                                     <td>
                                                         {% if paiement.notes %}
                                                             <span title="{{ paiement.notes }}">
@@ -308,13 +262,7 @@
                                                 </tr>
                                                 {% endfor %}
                                             </tbody>
-                                            <tfoot>
-                                                <tr class="table-primary">
-                                                    <td colspan="1" class="text-end"><strong>Total payé:</strong></td>
-{{ dette.montant_total|subtract:dette.montant_restant }}
-                                                    <td colspan="5"></td>
-                                                </tr>
-                                            </tfoot>
+                                          
                                         </table>
                                     </div>
                                     {% else %}

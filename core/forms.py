@@ -14,6 +14,8 @@ import os
 from django.db.models import (
     Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
 )
+
+from datetime import timedelta
 from django.db.models.functions import Coalesce
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
@@ -978,13 +980,13 @@ class VenteForm(forms.ModelForm):
                 distribution__est_supprime=False,
                 est_supprime=False
             ).annotate(
-                quantite_vendue=Coalesce(
+                quantite_vendue_calculee=Coalesce(
                     Sum('vente__quantite'), 
                     Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
                 )
             ).annotate(
                 quantite_restante=ExpressionWrapper(
-                    F('quantite') - F('quantite_vendue'),
+                    F('quantite') - F('quantite_vendue_calculee'),
                     output_field=DecimalField(max_digits=10, decimal_places=2)
                 )
             ).filter(
@@ -1000,7 +1002,8 @@ class VenteForm(forms.ModelForm):
         
         # ✅ FORCER le calcul de la quantité restante
         if hasattr(obj, 'quantite_restante'):
-            quantite_dispo = obj.quantite_restante
+           quantite_dispo = getattr(obj, 'quantite_restante', None)
+
         else:
             # Calcul manuel si l'annotation n'est pas disponible
             from django.db.models import Sum
@@ -1116,21 +1119,10 @@ class DetteForm(forms.ModelForm):
         help_text="Date d'échéance pour le remboursement"
     )
     
-    delai_bonus_heures = forms.IntegerField(
-        required=False,
-        initial=48,
-        min_value=1,
-        max_value=168,  # 7 jours max
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': '48'
-        }),
-        help_text="Délai en heures pour bénéficier du bonus (défaut: 48h)"
-    )
 
     class Meta:
         model = Dette
-        fields = ['nom_localite', 'date_echeance', 'delai_bonus_heures', 'notes']
+        fields = ['nom_localite', 'date_echeance',  'notes']
         widgets = {
             'notes': forms.Textarea(attrs={
                 'class': 'form-control',
@@ -1144,8 +1136,9 @@ class DetteForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         # Définir la date d'échéance par défaut à 30 jours
+        
         if not self.instance.pk:
-            self.fields['date_echeance'].initial = timezone.now().date() + timedelta(days=30)
+            self.fields['date_echeance'].initial = timezone.now().date() + timedelta(days=7)
 
     def clean_date_echeance(self):
         date_echeance = self.cleaned_data['date_echeance']
@@ -1299,7 +1292,16 @@ class RapportDettesForm(forms.Form):
 # === FORMULAIRE RECOUVREMENT ===
 
 
+# === FORMULAIRE RECOUVREMENT ===
+# === FORMULAIRE RECOUVREMENT ===
+# === FORMULAIRE RECOUVREMENT ===
 class RecouvrementForm(forms.ModelForm):
+    vente = forms.ModelChoiceField(
+        queryset=Vente.objects.none(),
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Sélectionner la vente à recouvrer"
+    )
+
     date_recouvrement = forms.DateField(
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         label="Date du recouvrement",
@@ -1308,7 +1310,7 @@ class RecouvrementForm(forms.ModelForm):
     
     class Meta:
         model = Recouvrement
-        fields = ['montant_recouvre', 'date_recouvrement', 'commentaire']
+        fields = ['vente','montant_recouvre', 'date_recouvrement', 'commentaire']
         widgets = {
             'montant_recouvre': forms.NumberInput(attrs={
                 'class': 'form-control form-control-lg',
@@ -1322,18 +1324,65 @@ class RecouvrementForm(forms.ModelForm):
             }),
         }
         labels = {
+            'vente': 'Vente associée',
             'montant_recouvre': 'Montant à recouvrir',
             'commentaire': 'Commentaire (facultatif)',
         }
 
     def __init__(self, *args, **kwargs):
         self.agent = kwargs.pop('agent', None)
+        self.superviseur = kwargs.pop('superviseur', None)
         super().__init__(*args, **kwargs)
         
         if self.agent:
-            # Ajouter une validation dynamique du montant maximum
-            self.fields['montant_recouvre'].widget.attrs['max'] = self.agent.argent_en_possession
+            # Filtrer les ventes selon la règle métier
+            queryset = Vente.objects.filter(
+                agent=self.agent,
+                ancienne_vente=False  # ← SEULEMENT les ventes NON anciennes
+            )
+            
+            # Pour superviseur recouvrant un agent terrain
+            if self.superviseur and self.superviseur.id != self.agent.id:
+                # VENTES COMPTANT : toujours recouvrables
+                ventes_comptant = queryset.filter(mode_paiement='comptant')
+                
+                # VENTES CRÉDIT : seulement si TOTALEMENT payées
+                ventes_credit = queryset.filter(
+                    mode_paiement='credit',
+                    dette__montant_restant=0  # Dette totalement recouvrée
+                )
+                
+                # Combiner les deux querysets
+                self.fields['vente'].queryset = ventes_comptant | ventes_credit
+            else:
+                # AUTO-RECOUVREMENT : toutes les ventes non anciennes
+                self.fields['vente'].queryset = queryset
 
+    def clean_vente(self):
+        vente = self.cleaned_data.get('vente')
+        if not vente:
+            raise forms.ValidationError("Veuillez sélectionner une vente.")
+
+        if vente.agent != self.agent:
+            raise forms.ValidationError("Cette vente n'appartient pas à l'agent.")
+
+        # Vérifier que c'est une vente NON ancienne
+        if vente.ancienne_vente:
+            raise forms.ValidationError(
+                "Les ventes anciennes ne peuvent pas être recouvrées."
+            )
+
+        # Vérification spécifique pour le recouvrement superviseur → agent terrain
+        if self.superviseur and self.superviseur.id != self.agent.id:
+            if vente.mode_paiement == 'credit':
+                if hasattr(vente, 'dette') and vente.dette.montant_restant > 0:
+                    raise forms.ValidationError(
+                        "Cette dette n'est pas encore totalement recouvrée par l'agent auprès du client. "
+                        "Le superviseur ne peut recouvrir que les dettes entièrement recouvrées."
+                    )
+
+        return vente
+    
     def clean_montant_recouvre(self):
         montant = self.cleaned_data.get('montant_recouvre')
         
@@ -1355,7 +1404,57 @@ class RecouvrementForm(forms.ModelForm):
             raise forms.ValidationError("La date ne peut pas être dans le futur.")
             
         return date_recouvrement
-   
+
+    def clean(self):
+        cleaned_data = super().clean()
+        vente = cleaned_data.get('vente')
+        montant = cleaned_data.get('montant_recouvre')
+        
+        if vente and montant:
+            # Vérification pour les superviseurs recouvrant des agents terrain
+            if (self.superviseur and self.superviseur.id != self.agent.id and 
+                vente.mode_paiement == 'credit' and hasattr(vente, 'dette')):
+                
+                if vente.dette.montant_restant > 0:
+                    raise forms.ValidationError(
+                        f"Impossible de recouvrir cette vente à crédit. "
+                        f"La dette chez le client n'est pas encore totalement recouvrée "
+                        f"(reste {vente.dette.montant_restant} FCFA à recouvrir)."
+                    )
+        
+        return cleaned_data
+  
+    # --------------------------
+    # SAUVEGARDE AVEC LOGIQUE BONUS
+    # --------------------------
+
+    def save(self, commit=True):
+        recouvrement = super().save(commit=False)
+        vente = self.cleaned_data['vente']
+        montant = self.cleaned_data['montant_recouvre']
+
+        # Affecter automatiquement l'agent si passé depuis la vue
+        if self.agent:
+            recouvrement.agent = self.agent
+
+        # Lier la vente explicitement
+        recouvrement.vente = vente
+
+        #1️⃣ Enregistrer le recouvrement
+        if commit:
+            recouvrement.save()
+
+        # 2️⃣ Si la vente est à CRÉDIT → mettre à jour la dette
+        if vente.mode_paiement == 'credit' and hasattr(vente, 'dette') and vente.dette:
+            dette = vente.dette
+            dette.montant_restant = max(Decimal('0.00'), dette.montant_restant - montant)
+            dette.save()
+
+        # 3️⃣ Calcul du bonus 48h (pour TOUTE vente)
+        recouvrement.calculer_bonus()
+
+        return recouvrement
+
 # forms.py
 # forms.py
 

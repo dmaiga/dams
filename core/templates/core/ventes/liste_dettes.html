@@ -134,7 +134,7 @@
                                             <th class="text-center">Reste</th>
                                             <th class="text-center">Échéance</th>
                                             <th class="text-center">Statut</th>
-                                            <th class="text-center">Bonus</th>
+                                          
                                             <th class="text-center">Actions</th>
                                         </tr>
                                     </thead>
@@ -211,21 +211,7 @@
                                                     {{ dette.get_statut_display }}
                                                 </span>
                                             </td>
-                                            <td class="text-center">
-                                                {% if dette.bonus_accorde %}
-                                                <span class="badge bg-success" title="Bonus obtenu">
-                                                    <i class="fas fa-gift"></i> {{ dette.montant_bonus }}F
-                                                </span>
-                                                {% elif dette.eligible_bonus %}
-                                                <span class="badge bg-warning" title="Bonus disponible">
-                                                    <i class="fas fa-clock"></i> Disponible
-                                                </span>
-                                                {% else %}
-                                                <span class="badge bg-secondary" title="Bonus non disponible">
-                                                    <i class="fas fa-times"></i> Non
-                                                </span>
-                                                {% endif %}
-                                            </td>
+                                       
                                             <td class="text-center">
                                                 <div class="btn-group btn-group-sm">
                                                     <a href="{% url 'detail_dette' dette.id %}" 
@@ -251,57 +237,6 @@
                                         {% endfor %}
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Résumé détaillé -->
-                    <div class="row mt-4">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Dettes par Statut</h6>
-                                </div>
-                                <div class="card-body">
-                                    <canvas id="statutChart" width="400" height="200"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Prochaines Échéances</h6>
-                                </div>
-                                <div class="card-body">
-                                    {% with prochaines_dettes=dettes.filter.statut__in|slice:":5" %}
-                                    {% if prochaines_dettes %}
-                                    <div class="list-group list-group-flush">
-                                        {% for dette in prochaines_dettes %}
-                                        <div class="list-group-item px-0">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>{{ dette.vente.client.nom }}</strong>
-                                                    <br>
-                                                    <small class="text-muted">{{ dette.montant_restant }} FCFA restant</small>
-                                                </div>
-                                                <div class="text-end">
-                                                    <small class="{% if dette.est_en_retard %}text-danger{% else %}text-warning{% endif %}">
-                                                        {{ dette.date_echeance|date:"d/m/Y" }}
-                                                    </small>
-                                                    <br>
-                                                    <a href="{% url 'enregistrer_paiement_dette' dette.id %}" class="btn btn-sm btn-success">
-                                                        Payer
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                    {% else %}
-                                    <p class="text-muted text-center mb-0">Aucune échéance proche</p>
-                                    {% endif %}
-                                    {% endwith %}
-                                </div>
                             </div>
                         </div>
                     </div>

@@ -762,6 +762,11 @@ class DetailDistribution(models.Model):
                                            decimal_places=2, 
                                            verbose_name="Quantité totale distribuée"
                                            )
+    quantite_vendue = models.DecimalField(
+    max_digits=10,
+    decimal_places=2,
+    default=0
+    )
 
     # Prix fixés par le superviseur
     prix_gros = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -777,7 +782,7 @@ class DetailDistribution(models.Model):
 
     def __str__(self):
         spec_info = f" - {self.specification}" if self.specification else ""
-        return f"{self.quantite} {self.lot.produit.nom}{spec_info}"
+        return f"{self.lot.produit.nom}{spec_info}"
 
     @property
     def quantite_restante_calculee(self):
@@ -927,7 +932,7 @@ class Vente(models.Model):
         default=timezone.now,
         verbose_name="Date de la vente"
     )
-    
+    ancienne_vente = models.BooleanField(default=False)
     # Date d'enregistrement dans le système
     date_creation = models.DateTimeField(
         auto_now_add=True,
@@ -936,27 +941,50 @@ class Vente(models.Model):
     # Soft delete
     est_supprime = models.BooleanField(default=False, verbose_name="Supprimé")
     date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
-
+    def __str__(self):
+         base_str = f"Vente {self.detail_distribution.lot} - {self.quantite} - {self.total_vente} FCFA"
+         if self.stagiaire:
+             return f"{base_str} [Stagiaire: {self.stagiaire.full_name}]"
+         return base_str
+    
     def save(self, *args, **kwargs):
-        # Déterminer automatiquement le prix en fonction du type de vente choisi
+        is_new = self.pk is None
+
+        # 1️⃣ Déterminer automatiquement le prix
         if not self.prix_vente_unitaire:
             if self.type_vente == 'gros':
                 self.prix_vente_unitaire = self.detail_distribution.prix_gros
             else:
                 self.prix_vente_unitaire = self.detail_distribution.prix_detail
-        
+
+        # 2️⃣ Remplir automatiquement la spécification
         if self.detail_distribution and not self.specification:
             self.specification = self.detail_distribution.specification
+
         super().save(*args, **kwargs)
-        
-        # Créer automatiquement une dette si c'est un paiement à crédit
-        if self.mode_paiement == 'credit' and not hasattr(self, 'dette'):
+
+        # 3️⃣ Mise à jour du stock — seulement si nouvelle vente
+        if is_new:
+            dd = self.detail_distribution
+            dd.quantite_vendue = dd.quantite_vendue + self.quantite
+            dd.save(update_fields=['quantite_vendue'])
+
+        # 4️⃣ Création automatique d’une dette
+        if is_new and self.mode_paiement == 'credit' and not hasattr(self, 'dette'):
             Dette.objects.create(
                 vente=self,
                 montant_total=self.total_vente,
                 montant_restant=self.total_vente,
-                date_echeance=self.date_vente.date() + timedelta(days=30)  # Basé sur date_vente
+                date_echeance=self.date_vente.date() + timedelta(days=30)
             )
+
+
+    @property
+    def total_vente(self):
+        return (self.quantite or 0) * (self.prix_vente_unitaire or 0)
+
+    class Meta:
+        ordering = ['-date_vente']    
     @property
     def nom_client(self):
         """Retourne le nom du client ou 'Inconnu' si non spécifié"""
@@ -1019,12 +1047,29 @@ class Vente(models.Model):
         if self.stagiaire:
             return f"{self.stagiaire.full_name} (Stagiaire)"
         return self.agent.full_name
+
+    @property
+    def est_recouvrable_par_superviseur(self):
+        """
+        Vérifie si cette vente peut être recouvrée par un superviseur
+        selon la règle métier : dette totalement recouvrée par l'agent
+        """
+        if self.mode_paiement != 'credit':
+            return True  # Les ventes comptant sont toujours recouvrables
+        
+        if not hasattr(self, 'dette'):
+            return True  # Pas de dette associée
+            
+        # La dette doit être totalement recouvrée (montant_restant = 0)
+        return self.dette.montant_restant == 0
     
-    def __str__(self):
-        base_str = f"Vente #{self.id} - {self.nom_client} - {self.total_vente} FCFA"
-        if self.stagiaire:
-            return f"{base_str} [Stagiaire: {self.stagiaire.full_name}]"
-        return base_str
+    @property
+    def dette_recouvree_par_agent(self):
+        """Montant que l'agent a déjà recouvré auprès du client"""
+        if self.mode_paiement != 'credit' or not hasattr(self, 'dette'):
+            return Decimal('0.00')
+        return self.dette.montant_total - self.dette.montant_restant    
+ 
     
     class Meta:
         ordering = ['-date_vente']
@@ -1171,8 +1216,18 @@ class Recouvrement(models.Model):
         Agent,
         on_delete=models.CASCADE,
         limit_choices_to={'type_agent': 'entrepot'},
-        related_name='recouvrements_effectues'
+        related_name='recouvrements_effectues',
+        null=True,  # ⬅️ AJOUTER NULL=True
+        blank=True  # ⬅️ AJOUTER blank=True
+    
     )
+    vente = models.ForeignKey(
+    Vente,
+    on_delete=models.CASCADE,
+    blank=True,
+    null=True
+    )
+
     
     montant_recouvre = models.DecimalField(
         max_digits=10, 
@@ -1187,11 +1242,26 @@ class Recouvrement(models.Model):
     montant_bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     def __str__(self):
         return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
-
+    
+    def calculer_bonus(self):
+        # Recouvrement ≤ 48h ?
+        if self.date_recouvrement <= self.vente.date_vente + timedelta(hours=48):
+            self.bonus_accorde = True
+            self.montant_bonus = self.vente.quantite * Decimal('100')
+            self.save()
+         # Ajouter au bonus de l’agent
+            bonus_agent, _ = BonusAgent.objects.get_or_create(agent=self.agent)
+            bonus_agent.ajouter_bonus(
+                montant=self.montant_bonus,
+                nb_produits=self.vente.quantite
+                   )
     class Meta:
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
+    
+
+         
 
 class VersementBancaire(models.Model):
     superviseur = models.ForeignKey(

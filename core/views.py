@@ -149,12 +149,23 @@ def dashboard_agent(request):
     dettes_prioritaires = dettes_en_cours.order_by('date_echeance')[:5]
     
     # Stock disponible
-    produits_disponibles = DetailDistribution.objects.filter(
-        distribution__agent_terrain=agent,
-        quantite__gt=0
-    ).select_related('lot', 'lot__produit')
-    total_stock_disponible = sum(detail.quantite for detail in produits_disponibles)
-    
+# Stock disponible – version CORRIGÉE
+    produits_disponibles = (
+        DetailDistribution.objects
+        .filter(
+            distribution__agent_terrain=agent,
+            est_supprime=False,
+            distribution__est_supprime=False,
+        )
+        .annotate(
+            quantite_restante=F('quantite') - F('quantite_vendue')
+        )
+        .filter(quantite_restante__gt=0)
+        .select_related('lot__produit')
+    )
+
+    total_stock_disponible = sum(d.quantite_restante for d in produits_disponibles)
+
     # Statistiques bonus
     mois_courant = timezone.now().month
     annee_courante = timezone.now().year
@@ -1384,14 +1395,10 @@ def enregistrer_paiement_dette(request, dette_id):
                 with transaction.atomic():
                     paiement = form.save()
                     
-                    # Vérifier si un bonus a été généré
-                    bonus_message = ""
-                    if paiement.bonus_genere:
-                        bonus_message = f" Bonus de {paiement.nombre_produits_bonus * 100} FCFA accordé !"
-                    
+                   
                     messages.success(request, 
                         f"Paiement enregistré ! Montant: {paiement.montant} FCFA - "
-                        f"Reste à payer: {dette.montant_restant} FCFA.{bonus_message}"
+                        f"Reste à payer: {dette.montant_restant} FCFA."
                     )
                     return redirect('detail_dette', dette_id=dette.id)
                     
@@ -1493,34 +1500,29 @@ def liste_dettes(request):
     
     return render(request, 'core/ventes/liste_dettes.html', context)
 
-
 @login_required
 def get_info_distribution(request, detail_id):
-    """API pour récupérer les infos d'un détail de distribution - VERSION DEBUG"""
     try:
-        print(f"Recherche détail distribution ID: {detail_id}")
-        
-        # Vérifier si le détail existe
-        if not DetailDistribution.objects.filter(id=detail_id).exists():
-            return JsonResponse({'error': f'Détail distribution {detail_id} non trouvé'}, status=404)
-        
         detail = DetailDistribution.objects.get(id=detail_id)
-        
+
+        # Calcul dynamique correct
+        quantite_restante = detail.quantite_restante_calculee
+
         data = {
             'produit': detail.lot.produit.nom,
-            'quantite_disponible': detail.quantite,
+            'quantite_disponible': float(quantite_restante),
             'prix_gros': float(detail.prix_gros) if detail.prix_gros else None,
             'prix_detail': float(detail.prix_detail) if detail.prix_detail else None,
-            'specification': detail.specification or '',            
+            'specification': detail.specification or '',
             'reference_lot': detail.lot.reference_lot or f"Lot#{detail.lot.id}",
         }
-        
-        print(f"Données retournées: {data}")
+
         return JsonResponse(data)
-        
+
+    except DetailDistribution.DoesNotExist:
+        return JsonResponse({'error': 'Détail introuvable'}, status=404)
     except Exception as e:
-        print(f"Erreur API: {str(e)}")
-        return JsonResponse({'error': f'Erreur: {str(e)}'}, status=500)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required
@@ -1923,30 +1925,38 @@ def creer_recouvrement(request, agent_id):
     if agent_connecte.est_direction:
         if not (agent.est_agent_terrain or agent.est_superviseur):
             messages.error(request, "Vous ne pouvez recouvrir que les agents terrain et superviseurs.")
-            return redirect('tableaulo_de_bord')
+            return redirect('tableau_de_bord')  # Correction du typo ici
     
     if request.method == 'POST':
         form = RecouvrementForm(request.POST, agent=agent)
         if form.is_valid():
-            # Créer le recouvrement avec les données supplémentaires
-            recouvrement = form.save(commit=False)
-            recouvrement.agent = agent
-            recouvrement.superviseur = agent_connecte
-            recouvrement.save()
-            
-            # Message personnalisé selon le type d'agent
-            if agent.est_agent_terrain:
-                message = f"Recouvrement de {recouvrement.montant_recouvre} FCFA effectué auprès de {agent.full_name} avec succès!"
-            else:  # Auto-recouvrement
-                message = f"Auto-recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès!"
-            
-            messages.success(request, message)
-            
-            # Redirection appropriée
-            if agent.est_agent_terrain:
-                return redirect('detail_agent', agent_id=agent.id)
-            else:
-                return redirect('liste_agents_recouvrement')
+            try:
+                # Créer le recouvrement avec les données supplémentaires
+                recouvrement = form.save(commit=False)
+                recouvrement.agent = agent
+                recouvrement.superviseur = agent_connecte  # ← CORRECTION ICI
+                
+                # IMPORTANT: Ne pas réassigner vente ici car déjà fait dans form.save()
+                # recouvrement.vente = form.cleaned_data['vente']  # ← SUPPRIMER CETTE LIGNE
+                
+                recouvrement.save()
+                
+                # Message personnalisé selon le type d'agent
+                if agent.est_agent_terrain:
+                    message = f"Recouvrement de {recouvrement.montant_recouvre} FCFA effectué auprès de {agent.full_name} avec succès!"
+                else:  # Auto-recouvrement
+                    message = f"Auto-recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès!"
+                
+                messages.success(request, message)
+                
+                # Redirection appropriée
+                if agent.est_agent_terrain:
+                    return redirect('detail_agent', agent_id=agent.id)
+                else:
+                    return redirect('liste_agents_recouvrement')
+                    
+            except Exception as e:
+                messages.error(request, f"Erreur lors du recouvrement: {str(e)}")
     else:
         form = RecouvrementForm(agent=agent)
     
@@ -1960,7 +1970,6 @@ def creer_recouvrement(request, agent_id):
     }
     
     return render(request, 'core/recouvrement/creer_recouvrement.html', context)
-
 
 @login_required
 def historique_recouvrement(request, agent_id):

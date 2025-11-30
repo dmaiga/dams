@@ -7,6 +7,8 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
+
+            <!-- HEADER -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
                     <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-3">
@@ -17,7 +19,9 @@
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb mb-0">
                                 <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
-                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">
+                                    {{ agent.full_name }}
+                                </a></li>
                                 <li class="breadcrumb-item active">Recouvrement</li>
                             </ol>
                         </nav>
@@ -63,24 +67,48 @@
                         <i class="fas fa-hand-holding-usd me-2"></i>Nouveau Recouvrement
                     </h5>
                 </div>
+
                 <div class="card-body">
+
                     <form method="post">
                         {% csrf_token %}
-                        
-                        <!-- Affichage des erreurs globales -->
+
+                        <!-- Erreurs globales -->
                         {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for error in form.non_field_errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
                         {% endif %}
-                        
+
                         <div class="row">
+                            <!-- Champ VENTE -->
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-bold">
+                                    Vente concernée
+                                </label>
+                                {{ form.vente }}
+
+                                {% if form.vente.errors %}
+                                    <div class="text-danger small">
+                                        {% for error in form.vente.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+
+                                <div class="form-text">
+                                    Sélectionnez la vente dont le superviseur récupère le montant.
+                                </div>
+                            </div>
+
+                            <!-- Montant + Date -->
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     {{ form.montant_recouvre.label_tag }}
                                     {{ form.montant_recouvre }}
+
                                     {% if form.montant_recouvre.errors %}
                                         <div class="text-danger small">
                                             {% for error in form.montant_recouvre.errors %}
@@ -89,11 +117,11 @@
                                         </div>
                                     {% endif %}
                                     <div class="form-text">
-                                        Maximum: {{ argent_en_possession }} FCFA
+                                        Maximum disponible : <strong>{{ argent_en_possession }} FCFA</strong>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     {{ form.date_recouvrement.label_tag }}
@@ -106,12 +134,13 @@
                                         </div>
                                     {% endif %}
                                     <div class="form-text">
-                                        Date à laquelle l'argent a été récupéré
+                                        Date à laquelle le superviseur a récupéré l'argent.
                                     </div>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- Commentaire -->
                         <div class="mb-3">
                             {{ form.commentaire.label_tag }}
                             {{ form.commentaire }}
@@ -124,10 +153,12 @@
                             {% endif %}
                         </div>
 
+                        <!-- Boutons -->
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-md-2">
                                 <i class="fas fa-times me-1"></i>Annuler
                             </a>
+
                             <button type="submit" class="btn btn-success">
                                 <i class="fas fa-save me-1"></i>Enregistrer le recouvrement
                             </button>
@@ -135,27 +166,25 @@
                     </form>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
 
 <style>
 .card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
     border: 1px solid #e3e6f0;
 }
-
 .form-control-lg {
     font-size: 1.1rem;
     font-weight: 500;
 }
-
+.text-danger small {
+    font-size: 0.85em;
+}
 .btn {
     min-width: 120px;
-}
-
-.text-danger small {
-    font-size: 0.875em;
 }
 </style>
 {% endblock %}
