@@ -1104,8 +1104,9 @@ class Dette(models.Model):
     notes = models.TextField(blank=True)
     
     def __str__(self):
-        return f"Dette {self.montant_restant}€ - {self.vente.client.nom} - {self.nom_localite}"
-    
+        client_nom = self.vente.client.nom if self.vente and self.vente.client else "Client inconnu"
+        return f"Dette {self.montant_restant}€ - {client_nom} - {self.nom_localite}"
+
     def save(self, *args, **kwargs):
         # Mettre à jour automatiquement le statut
         if self.montant_restant <= 0:
@@ -1148,7 +1149,8 @@ class PaiementDette(models.Model):
     
 
     def __str__(self):
-        return f"Paiement {self.montant}€ - {self.dette.vente.client.nom}"
+        client_nom = self.dette.vente.client.nom if self.dette and self.dette.vente and self.dette.vente.client else "Client inconnu"
+        return f"Paiement {self.montant}€ - {client_nom}"
     
     def save(self, *args, **kwargs):
         is_new = self.pk is None

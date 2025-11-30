@@ -172,17 +172,6 @@ from django.contrib import admin
 from .models import BonusAgent
 
 
-@admin.register(BonusAgent)
-class BonusAgentAdmin(admin.ModelAdmin):
-    list_display = ['agent', 'nombre_produits_recouverts', 'total_bonus', 'date_mise_a_jour']
-    list_filter = ['agent']
-    readonly_fields = ['nombre_produits_recouverts', 'total_bonus', 'date_mise_a_jour']
-    
-    # Empêcher l'ajout manuel (se crée automatiquement)
-    def has_add_permission(self, request):
-        return False
-
-
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import VersementBancaire, Depense
@@ -228,3 +217,78 @@ class RecuVersementAdmin(admin.ModelAdmin):
     list_display = ('id', 'versement', 'description', 'date_upload')
     list_filter = ('date_upload', )
     search_fields = ('description', 'versement__id')
+
+
+from django.contrib import admin
+from .models import Dette, PaiementDette, BonusAgent
+
+
+# ==============================
+# INLINE POUR LES PAIEMENTS
+# ==============================
+class PaiementDetteInline(admin.TabularInline):
+    model = PaiementDette
+    extra = 1
+    readonly_fields = ('date_paiement',)
+
+
+# ==============================
+# ADMIN DETTE
+# ==============================
+@admin.register(Dette)
+class DetteAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'vente',
+        'montant_total',
+        'montant_restant',
+        'statut',
+        'date_creation',
+        'date_echeance',
+        'nom_localite',
+    )
+    
+    list_filter = ('statut', 'date_echeance', 'date_creation', 'nom_localite')
+    
+    search_fields = (
+        'vente__client__nom',
+        'nom_localite',
+    )
+
+    readonly_fields = ('date_creation', 'date_reglement')
+
+    inlines = [PaiementDetteInline]
+
+
+# ==============================
+# ADMIN PAIEMENT DETTE
+# ==============================
+@admin.register(PaiementDette)
+class PaiementDetteAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'dette',
+        'montant',
+        'date_paiement',
+        'mode_paiement',
+        'reference',
+    )
+    list_filter = ('mode_paiement', 'date_paiement')
+    search_fields = ('reference', 'dette__vente__client__nom')
+
+
+# ==============================
+# ADMIN BONUS AGENT
+# ==============================
+@admin.register(BonusAgent)
+class BonusAgentAdmin(admin.ModelAdmin):
+    list_display = (
+        'agent',
+        'nombre_produits_recouverts',
+        'total_bonus',
+        'date_mise_a_jour',
+    )
+    
+    search_fields = ('agent__user__username', 'agent__user__first_name', 'agent__user__last_name')
+    
+    readonly_fields = ('date_mise_a_jour',)
