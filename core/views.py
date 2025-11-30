@@ -118,38 +118,23 @@ def custom_403(request, exception=None):
 # views.py
 @login_required
 def dashboard_agent(request):
-    """Tableau de bord pour les agents terrain"""
+    """Tableau de bord simplifié pour les agents terrain"""
     try:
         agent = Agent.objects.get(user=request.user)
     except Agent.DoesNotExist:
         messages.error(request, "Aucun agent trouvé.")
         return redirect('dashboard')
     
-    # Récupérer ou créer le bonus agent
+    # Récupérer le bonus agent
     bonus_agent, created = BonusAgent.objects.get_or_create(agent=agent)
     
-    # Calcul des indicateurs
-    ventes = Vente.objects.filter(agent=agent)
-    ventes_mois = ventes.filter(date_vente__month=timezone.now().month)
-    ventes_comptant_mois = ventes_mois.filter(mode_paiement='comptant')
-    ventes_credit_mois = ventes_mois.filter(mode_paiement='credit')
-    
-    # Chiffre d'affaires
-    chiffre_affaires_total = sum(vente.total_vente for vente in ventes)
-    chiffre_affaires_mois = sum(vente.total_vente for vente in ventes_mois)
-    
-    # Dettes
-    dettes_en_cours = Dette.objects.filter(
-        vente__agent=agent,
-        statut__in=['en_cours', 'partiellement_paye', 'en_retard']
+    # Données essentielles uniquement
+    ventes_mois = Vente.objects.filter(
+        agent=agent, 
+        date_vente__month=timezone.now().month
     )
-    total_a_recouvrer = sum(dette.montant_restant for dette in dettes_en_cours)
     
-    # Dettes prioritaires (en retard ou échéance proche)
-    dettes_prioritaires = dettes_en_cours.order_by('date_echeance')[:5]
-    
-    # Stock disponible
-# Stock disponible – version CORRIGÉE
+    # Stock disponible simplifié
     produits_disponibles = (
         DetailDistribution.objects
         .filter(
@@ -162,54 +147,37 @@ def dashboard_agent(request):
         )
         .filter(quantite_restante__gt=0)
         .select_related('lot__produit')
+        .order_by('lot__produit__nom')[:10]  # Limiter à 10 produits
     )
 
     total_stock_disponible = sum(d.quantite_restante for d in produits_disponibles)
 
-    # Statistiques bonus
-    mois_courant = timezone.now().month
-    annee_courante = timezone.now().year
-    produits_recouverts_mois = bonus_agent.get_produits_recouverts_par_mois(mois_courant, annee_courante)
-    bonus_mois = produits_recouverts_mois * 100
-    
-    # Clients servis ce mois
-    clients_servis_mois = ventes_mois.values('client').distinct().count()
-    
-    # Activité récente
-    ventes_recentes = ventes.select_related(
+    # Dettes à recouvrer
+    dettes_prioritaires = Dette.objects.filter(
+        vente__agent=agent,
+        statut__in=['en_cours', 'partiellement_paye', 'en_retard']
+    ).order_by('date_echeance')[:3]  # Seulement 3 dettes prioritaires
+
+    total_a_recouvrer = sum(dette.montant_restant for dette in dettes_prioritaires)
+
+    # Activité récente (5 dernières ventes)
+    ventes_recentes = ventes_mois.select_related(
         'client', 'detail_distribution__lot__produit'
     ).order_by('-date_vente')[:5]
-    
-    # Calcul de la croissance (exemple simplifié)
-    ventes_mois_dernier = ventes.filter(
-        date_vente__month=timezone.now().month-1 if timezone.now().month > 1 else 12,
-        date_vente__year=timezone.now().year if timezone.now().month > 1 else timezone.now().year-1
-    )
-    ca_mois_dernier = sum(vente.total_vente for vente in ventes_mois_dernier)
-    
-    if ca_mois_dernier > 0:
-        pourcentage_croissance = ((chiffre_affaires_mois - ca_mois_dernier) / ca_mois_dernier) * 100
-    else:
-        pourcentage_croissance = 100 if chiffre_affaires_mois > 0 else 0
-    
+
+    # Statistiques simples
+    nombre_ventes_mois = ventes_mois.count()
+    clients_servis_mois = ventes_mois.values('client').distinct().count()
+
     context = {
         'agent': agent,
-        'bonus_agent': bonus_agent,
-        'chiffre_affaires_total': chiffre_affaires_total,
-        'chiffre_affaires_mois': chiffre_affaires_mois,
+        'nombre_ventes_mois': nombre_ventes_mois,
+        'clients_servis_mois': clients_servis_mois,
         'total_a_recouvrer': total_a_recouvrer,
-        'dettes_en_cours': dettes_en_cours,
         'dettes_prioritaires': dettes_prioritaires,
         'produits_disponibles': produits_disponibles,
         'total_stock_disponible': total_stock_disponible,
-        'produits_recouverts_mois': produits_recouverts_mois,
-        'bonus_mois': bonus_mois,
-        'ventes_mois': ventes_mois,
-        'ventes_comptant_mois': ventes_comptant_mois,
-        'ventes_credit_mois': ventes_credit_mois,
-        'clients_servis_mois': clients_servis_mois,
         'ventes_recentes': ventes_recentes,
-        'pourcentage_croissance': round(pourcentage_croissance, 1),
     }
     
     return render(request, 'core/dashboard/dashboard_agent.html', context)
@@ -615,50 +583,50 @@ def detail_lot(request, lot_id):
         'title': f'Lot {lot.reference_lot}'
     })
 
-
-# views.py
 @login_required
 def mon_stock(request):
-    """Vue permettant à l'agent de consulter son stock personnel"""
+    """Vue simplifiée pour consulter le stock personnel de l'agent"""
     try:
         agent = request.user.agent
     except Agent.DoesNotExist:
         return redirect('login')
     
     # Vérifier que l'utilisateur est un agent terrain
-    if agent.type_agent not in ['terrain', 'entrepot','stagiaire']:
+    if agent.type_agent not in ['terrain', 'entrepot', 'stagiaire']:
         return redirect('login')
     
-    # Calcul du stock actuel de l'agent
+    # Calcul du stock actuel de l'agent (version simplifiée)
     stock_agent = calculer_stock_agent(agent)
     
-    # Distributions reçues (30 derniers jours)
+    # Filtrer uniquement les produits avec stock positif
+    stock_positif = [p for p in stock_agent if p['quantite_restante'] > 0]
+    stock_negatif = [p for p in stock_agent if p['quantite_restante'] < 0]
+    
+    # Distributions récentes (simplifié - 15 derniers jours)
     distributions_recentes = DistributionAgent.objects.filter(
         agent_terrain=agent,
         est_supprime=False,
-        date_distribution__gte=timezone.now() - timedelta(days=30)
-    ).select_related('superviseur').prefetch_related('detaildistribution_set__lot__produit').order_by('-date_distribution')
+        date_distribution__gte=timezone.now() - timedelta(days=15)
+    ).select_related('superviseur')[:5]  # Limiter à 5 distributions
     
-    # Ventes récentes (7 derniers jours)
+    # Ventes récentes (simplifié - 5 derniers jours)
     ventes_recentes = Vente.objects.filter(
         agent=agent,
-        date_vente__gte=timezone.now() - timedelta(days=7)
-    ).select_related('client', 'detail_distribution__lot__produit').order_by('-date_vente')[:10]
+        date_vente__gte=timezone.now() - timedelta(days=5)
+    ).select_related('client', 'detail_distribution__lot__produit')[:5]  # Limiter à 5 ventes
     
-    # Alertes stock faible
-    alertes_stock_faible = []
-    for produit_data in stock_agent:
-        if produit_data['quantite_restante'] <= produit_data.get('seuil_alerte', 5):
-            alertes_stock_faible.append(produit_data)
+    # Alertes stock faible (seulement pour stock positif)
+    alertes_stock_faible = [p for p in stock_positif if p['quantite_restante'] <= 5]
     
     # Calcul des totaux CORRIGÉS
-    total_quantite = sum(p['quantite_restante'] for p in stock_agent)
-    total_valeur_stock = sum(p['valeur_totale'] for p in stock_agent if p['quantite_restante'] > 0)
-    total_produits = len([p for p in stock_agent if p['quantite_restante'] != 0])
+    total_quantite = sum(p['quantite_restante'] for p in stock_positif)
+    total_valeur_stock = sum(p['valeur_totale'] for p in stock_positif)
+    total_produits = len(stock_positif)
     
     context = {
         'agent': agent,
-        'stock_agent': stock_agent,
+        'stock_agent': stock_positif,  # Uniquement le stock positif
+        'stock_negatif': stock_negatif,  # Stock négatif séparé
         'distributions_recentes': distributions_recentes,
         'ventes_recentes': ventes_recentes,
         'alertes_stock_faible': alertes_stock_faible,
@@ -669,6 +637,7 @@ def mon_stock(request):
     }
     
     return render(request, 'core/entrepot/mon_stock.html', context)
+
 
 def calculer_stock_agent(agent):
     """
@@ -1038,79 +1007,70 @@ def stats_superviseurs(request):
 
 @login_required
 def mes_distributions(request):
-    """Vue permettant à l'agent de voir toutes ses distributions"""
+    """Vue optimisée avec filtres et pagination"""
     try:
         agent = request.user.agent
     except Agent.DoesNotExist:
         return redirect('access_denied')
     
+    # Récupérer le paramètre de filtre mensuel
+    mois_filtre = request.GET.get('mois')
+    annee_filtre = request.GET.get('annee')
+    
+    # Définir la période par défaut (3 derniers mois)
+    date_debut = timezone.now() - timedelta(days=90)
+    date_fin = timezone.now()
+    
+    if mois_filtre and annee_filtre:
+        try:
+            date_debut = timezone.datetime(int(annee_filtre), int(mois_filtre), 1)
+            date_fin = (date_debut + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            date_fin = timezone.make_aware(timezone.datetime.combine(date_fin, timezone.datetime.max.time()))
+        except (ValueError, TypeError):
+            pass
+    
+    # Requête optimisée
     distributions = DistributionAgent.objects.filter(
         agent_terrain=agent,
-        est_supprime=False
-    ).select_related('superviseur').prefetch_related('detaildistribution_set__lot__produit').order_by('-date_distribution')
+        est_supprime=False,
+        date_distribution__range=[date_debut, date_fin]
+    ).select_related('superviseur').prefetch_related(
+        'detaildistribution_set__lot__produit'
+    ).order_by('-date_distribution')
+    
+    # Pagination
+    paginator = Paginator(distributions, 10)  # 10 distributions par page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
     
     # Calcul des statistiques
-    total_produits_distribues = sum(dist.quantite_totale for dist in distributions)
-    total_valeur_distribuee = sum(dist.valeur_detail_totale for dist in distributions)
+    total_distributions = distributions.count()
+    total_produits = distributions.aggregate(total=Sum('quantite_totale'))['total'] or 0
     
-    # Superviseurs distincts
-    superviseurs_distincts = distributions.values('superviseur').distinct().count()
-    
-    # Statistiques par superviseur
-    stats_superviseurs = distributions.values(
-        'superviseur__user__first_name', 
-        'superviseur__user__last_name'
-    ).annotate(
-        total_distributions=Count('id'),
-        total_quantite=Sum('quantite_totale')
-    ).order_by('-total_distributions')
-    
-    # Évolution mensuelle (6 derniers mois)
-    evolution_mensuelle = []
-    for i in range(6):
-        mois_date = timezone.now() - timedelta(days=30*i)
-        debut_mois = mois_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        fin_mois = (debut_mois + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-        
-        distributions_mois = distributions.filter(
-            date_distribution__range=[debut_mois, fin_mois]
-        )
-        
-        quantite_totale = sum(dist.quantite_totale for dist in distributions_mois)
-        
-        evolution_mensuelle.append({
-            'mois': debut_mois.strftime('%b %Y'),
-            'quantite_totale': quantite_totale,
-            'nombre_distributions': distributions_mois.count()
+    # Générer les options de mois pour le filtre
+    mois_options = []
+    current_date = timezone.now()
+    for i in range(12):  # 12 derniers mois
+        date_option = current_date - timedelta(days=30*i)
+        mois_options.append({
+            'mois': date_option.month,
+            'annee': date_option.year,
+            'label': date_option.strftime('%B %Y'),
+            'selected': mois_filtre == str(date_option.month) and annee_filtre == str(date_option.year)
         })
-    
-    evolution_mensuelle.reverse()
-    
-    # Ajouter des propriétés aux distributions pour le template
-    for distribution in distributions:
-        # Couleur du statut
-        if distribution.est_supprime:
-            distribution.couleur_statut = 'danger'
-            distribution.statut_display = 'Supprimée'
-        elif distribution.est_modifie:
-            distribution.couleur_statut = 'warning'
-            distribution.statut_display = 'Modifiée'
-        else:
-            distribution.couleur_statut = 'success'
-            distribution.statut_display = 'Active'
     
     context = {
         'agent': agent,
-        'distributions': distributions,
-        'total_produits_distribues': total_produits_distribues,
-        'total_valeur_distribuee': total_valeur_distribuee,
-        'superviseurs_distincts': superviseurs_distincts,
-        'stats_superviseurs': stats_superviseurs,
-        'evolution_mensuelle': evolution_mensuelle,
+        'page_obj': page_obj,
+        'total_distributions': total_distributions,
+        'total_produits': total_produits,
+        'mois_options': mois_options,
+        'mois_filtre': mois_filtre,
+        'annee_filtre': annee_filtre,
+        'periode_affichee': f"{date_debut.strftime('%d/%m/%Y')} - {date_fin.strftime('%d/%m/%Y')}",
     }
     
     return render(request, 'core/distribution/mes_distributions.html', context)
-
 #=====
 #VENTE
 #=====
@@ -1173,136 +1133,47 @@ def enregistrer_vente(request):
 
 @login_required
 def liste_ventes(request):
-    """Lister les ventes de l'agent avec statistiques"""
-    # Récupérer l'agent connecté
+    """Lister les ventes de l'agent (version simplifiée)"""
     try:
         agent = Agent.objects.get(user=request.user)
     except Agent.DoesNotExist:
         messages.error(request, "Aucun agent trouvé.")
-        return redirect('liste_ventes')
+        return redirect('login')
     
-    # Récupérer les ventes de l'agent (non supprimées)
+    # Récupérer les ventes récentes (3 derniers mois)
+    trois_mois = timezone.now() - timedelta(days=90)
     ventes = Vente.objects.filter(
         agent=agent,
-        est_supprime=False
+        est_supprime=False,
+        date_vente__gte=trois_mois
     ).select_related(
         'client', 
-        'detail_distribution__lot__produit',
-        'stagiaire'
-    ).prefetch_related('dette').order_by('-date_vente')
+        'detail_distribution__lot__produit'
+    ).order_by('-date_vente')
     
-    # Calculer les statistiques
+    # Pagination
+    paginator = Paginator(ventes, 15)  # 15 ventes par page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Statistiques basiques
     total_ventes = ventes.count()
+    ventes_comptant = ventes.filter(mode_paiement='comptant').count()
+    ventes_credit = ventes.filter(mode_paiement='credit').count()
     
-    # Calculer le chiffre d'affaires avec F() expressions
-    stats_ventes = ventes.aggregate(
-        chiffre_affaires_total=Sum(F('quantite') * F('prix_vente_unitaire')),
-        quantite_totale=Sum('quantite')
-    )
-    
-    # ✅ CORRECTION : Gérer les valeurs None
-    chiffre_affaires_total = stats_ventes['chiffre_affaires_total'] or Decimal('0.00')
-    quantite_totale = stats_ventes['quantite_totale'] or Decimal('0.00')
-    
-    # Statistiques par type
-    ventes_gros = ventes.filter(type_vente='gros')
-    ventes_detail = ventes.filter(type_vente='detail')
-    ventes_comptant = ventes.filter(mode_paiement='comptant')
-    ventes_credit = ventes.filter(mode_paiement='credit')
-    
-    # Statistiques des stagiaires
-    ventes_avec_stagiaire = ventes.filter(stagiaire__isnull=False)
-    ventes_sans_stagiaire = ventes.filter(stagiaire__isnull=True)
-    
-    # Statistiques détaillées des stagiaires
-    stats_stagiaires = ventes_avec_stagiaire.aggregate(
-        total_ventes_stagiaires=Count('id'),
-        chiffre_affaires_stagiaires=Sum(F('quantite') * F('prix_vente_unitaire')),
-        nombre_stagiaires_distincts=Count('stagiaire', distinct=True)
-    )
-    
-    # Statistiques des ventes personnelles
-    stats_personnel = ventes_sans_stagiaire.aggregate(
-        chiffre_affaires_personnel=Sum(F('quantite') * F('prix_vente_unitaire'))
-    )
-    
-    # ✅ CORRECTION : Gérer les valeurs None pour les statistiques stagiaires
-    ventes_avec_stagiaire_count = stats_stagiaires['total_ventes_stagiaires'] or 0
-    chiffre_affaires_stagiaires = stats_stagiaires['chiffre_affaires_stagiaires'] or Decimal('0.00')
-    nombre_stagiaires_distincts = stats_stagiaires['nombre_stagiaires_distincts'] or 0
-    chiffre_affaires_personnel = stats_personnel['chiffre_affaires_personnel'] or Decimal('0.00')
-    
-    # ✅ CORRECTION : Calcul sécurisé des pourcentages
-    pourcentage_ventes_stagiaires = 0
-    if total_ventes > 0:
-        pourcentage_ventes_stagiaires = (ventes_avec_stagiaire_count / total_ventes) * 100
-    
-    pourcentage_ca_stagiaires = 0
-    if chiffre_affaires_total > 0:
-        pourcentage_ca_stagiaires = (chiffre_affaires_stagiaires / chiffre_affaires_total) * 100
-    
-    # ✅ CORRECTION : Supprimer la partie bonus qui cause l'erreur
-    # Cette partie utilisait bonus_accorde qui n'existe pas dans Dette
-    bonus_obtenus = Decimal('0.00')  # Valeur par défaut
-    
-    # Dettes en cours
-    dettes_en_cours = Dette.objects.filter(
-        vente__agent=agent,
-        statut__in=['en_cours', 'partiellement_paye', 'en_retard']
-    ).count()
-    
-    # ✅ CORRECTION : Requête pour les stagiaires actifs avec gestion des valeurs None
-    stagiaires_actifs = Agent.objects.filter(
-        type_agent='stagiaire',
-        vente__agent=agent,
-        vente__est_supprime=False
-    ).distinct().annotate(
-        nombre_ventes=Count('vente'),
-        total_ventes_ca=Sum(F('vente__quantite') * F('vente__prix_vente_unitaire'))
-    ).order_by('-total_ventes_ca')
-    
-    # ✅ CORRECTION : Statistiques des dettes
-    stats_dettes = Dette.objects.filter(
-        vente__agent=agent
-    ).aggregate(
-        total_dettes=Count('id'),
-        montant_dettes_total=Sum('montant_total'),
-        montant_dettes_restant=Sum('montant_restant')
-    )
+    # Calcul du chiffre d'affaires total
+    chiffre_affaires_total = sum(vente.total_vente for vente in ventes)
     
     context = {
-        'ventes': ventes,
+        'page_obj': page_obj,
         'total_ventes': total_ventes,
-        'chiffre_affaires_total': float(chiffre_affaires_total),
-        'quantite_totale': float(quantite_totale),
-        'ventes_gros_count': ventes_gros.count(),
-        'ventes_detail_count': ventes_detail.count(),
-        'ventes_comptant_count': ventes_comptant.count(),
-        'ventes_credit_count': ventes_credit.count(),
-        'bonus_obtenus': float(bonus_obtenus),
-        'dettes_en_cours': dettes_en_cours,
+        'chiffre_affaires_total': chiffre_affaires_total,
+        'ventes_comptant': ventes_comptant,
+        'ventes_credit': ventes_credit,
         'agent': agent,
-        
-        # Statistiques des stagiaires
-        'ventes_avec_stagiaire_count': ventes_avec_stagiaire_count,
-        'ventes_sans_stagiaire_count': ventes_sans_stagiaire.count(),
-        'chiffre_affaires_stagiaires': float(chiffre_affaires_stagiaires),
-        'chiffre_affaires_personnel': float(chiffre_affaires_personnel),
-        'nombre_stagiaires_distincts': nombre_stagiaires_distincts,
-        'pourcentage_ventes_stagiaires': pourcentage_ventes_stagiaires,
-        'pourcentage_ca_stagiaires': pourcentage_ca_stagiaires,
-        
-        # Liste des stagiaires avec leurs performances
-        'stagiaires_actifs': stagiaires_actifs,
-        
-        # Statistiques des dettes
-        'total_dettes': stats_dettes['total_dettes'] or 0,
-        'montant_dettes_total': float(stats_dettes['montant_dettes_total'] or Decimal('0.00')),
-        'montant_dettes_restant': float(stats_dettes['montant_dettes_restant'] or Decimal('0.00')),
     }
     
     return render(request, 'core/ventes/liste_ventes.html', context)
-
 
 @login_required
 def detail_dette(request, dette_id):
@@ -1414,6 +1285,7 @@ def enregistrer_paiement_dette(request, dette_id):
         'dette': dette
     })
 
+
 @login_required
 def consulter_bonus(request):
     try:
@@ -1424,35 +1296,49 @@ def consulter_bonus(request):
     
     bonus_agent, created = BonusAgent.objects.get_or_create(agent=agent)
     
-    dettes_bonus = Dette.objects.filter(
-        vente__agent=agent
-        
-    ).select_related('vente', 'vente__client')
+    # Filtres temporels
+    periode = request.GET.get('periode', 'mois_courant')  # mois_courant, 30j, 90j
+    maintenant = timezone.now()
     
-    # Statistiques mensuelles
-    mois_courant = timezone.now().month
-    annee_courante = timezone.now().year
+    if periode == '30j':
+        date_debut = maintenant - timedelta(days=30)
+    elif periode == '90j':
+        date_debut = maintenant - timedelta(days=90)
+    else:  # mois_courant par défaut
+        date_debut = maintenant.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    produits_recouverts_mois = bonus_agent.get_produits_recouverts_par_mois(mois_courant, annee_courante)
-    bonus_mois = produits_recouverts_mois * 100
-
-    # ✅ Moyenne par dette
-    moyenne_par_dette = 0
-    if dettes_bonus.exists():
-        moyenne_par_dette = bonus_agent.total_bonus / dettes_bonus.count()
-
+    # Récupérer les recouvrements avec bonus dans la période
+    recouvrements_bonus = Recouvrement.objects.filter(
+        agent=agent,
+        bonus_accorde=True,
+        date_recouvrement__gte=date_debut
+    ).select_related('vente', 'vente__client', 'vente__detail_distribution__lot__produit')
+    
+    # Calcul des statistiques
+    produits_recouverts = recouvrements_bonus.aggregate(
+        total_produits=Sum('vente__quantite')
+    )['total_produits'] or 0
+    
+    bonus_periode = produits_recouverts * 100
+    
+    # Statistiques détaillées
+    stats_recouvrements = recouvrements_bonus.aggregate(
+        total_montant=Sum('montant_recouvre'),
+        total_bonus=Sum('montant_bonus'),
+        nombre_recouvrements=Count('id')
+    )
+    
     context = {
         'bonus_agent': bonus_agent,
-        'dettes_bonus': dettes_bonus,
-        'produits_recouverts_mois': produits_recouverts_mois,
-        'bonus_mois': bonus_mois,
-        'mois_courant': mois_courant,
-        'annee_courante': annee_courante,
-        'moyenne_par_dette': moyenne_par_dette,  # ✅ ajouté
+        'recouvrements_bonus': recouvrements_bonus,
+        'produits_recouverts': produits_recouverts,
+        'bonus_periode': bonus_periode,
+        'periode_actuelle': periode,
+        'date_debut': date_debut,
+        'stats_recouvrements': stats_recouvrements,
     }
     
     return render(request, 'core/ventes/consulter_bonus.html', context)
-
 
 @login_required
 def liste_dettes(request):
@@ -1462,39 +1348,41 @@ def liste_dettes(request):
         messages.error(request, "Aucun agent trouvé.")
         return redirect('dashboard')
     
+    # Récupérer les dettes (6 derniers mois)
+    six_mois = timezone.now() - timedelta(days=180)
     dettes = Dette.objects.filter(
-        vente__agent=agent
+        vente__agent=agent,
+        date_creation__gte=six_mois
     ).select_related(
-        'vente',
         'vente__client',
         'vente__detail_distribution__lot__produit'
     ).order_by('-date_creation')
     
-    # Filtres
+    # Filtres simples
     statut = request.GET.get('statut')
     if statut:
         dettes = dettes.filter(statut=statut)
     
-    # Compteurs
-    total_dettes = dettes.count()
-    dettes_en_cours = dettes.filter(statut="en_cours").count()
-    dettes_partiel = dettes.filter(statut="partiellement_paye").count()
-    dettes_retard = dettes.filter(statut="en_retard").count()
-    dettes_payees = dettes.filter(statut="paye").count()
-
-    # Total montant restant
-    total_restant = dettes.exclude(statut="paye").aggregate(
+    # Pagination
+    paginator = Paginator(dettes, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Calcul des totaux uniquement pour les dettes actives
+    dettes_actives = dettes.exclude(statut="paye")
+    total_restant = dettes_actives.aggregate(
         total=models.Sum("montant_restant")
     )["total"] or 0
+    
+    # Compteurs basiques
+    total_dettes = dettes.count()
+    dettes_actives_count = dettes_actives.count()
 
     context = {
-        'dettes': dettes,
+        'page_obj': page_obj,
         'statut_actuel': statut,
         'total_dettes': total_dettes,
-        'dettes_en_cours': dettes_en_cours,
-        'dettes_partiel': dettes_partiel,
-        'dettes_retard': dettes_retard,
-        'dettes_payees': dettes_payees,
+        'dettes_actives_count': dettes_actives_count,
         'total_restant': total_restant,
     }
     
@@ -2685,6 +2573,7 @@ def detail_stagiaire(request, stagiaire_id):
     }
     
     return render(request, 'core/dashboard/detail_stagiaire.html', context)
+
 #=========
 # #ADMIN
 #=========

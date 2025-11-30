@@ -1,395 +1,318 @@
-<!-- templates/core/agent/mes_distributions.html -->
 {% extends 'base.html' %}
-{% load humanize %}
-
-{% block title %}Mes Distributions - {{ agent.full_name }}{% endblock %}
-
-{% block page_title %}Mes Distributions Reçues{% endblock %}
-{% block page_subtitle %}Historique complet des produits qui m'ont été distribués{% endblock %}
+{% load static %}
 
 {% block content %}
 <div class="container-fluid">
-    
-    <!-- Cartes de résumé -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card text-white bg-primary">
-                <div class="card-body text-center">
-                    <h3>{{ distributions.count|intcomma }}</h3>
-                    <p class="mb-0">Distributions Total</p>
-                </div>
-            </div>
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Mes Distributions</h2>
+            <p class="text-muted mb-0">{{ periode_affichee }}</p>
         </div>
-        <div class="col-md-3">
-            <div class="card text-white bg-success">
-                <div class="card-body text-center">
-                    <h3>{{ total_produits_distribues|default:0|intcomma }}</h3>
-                    <p class="mb-0">Produits Reçus</p>
-                </div>
-            </div>
+        <div class="text-end">
+            <div class="h4 text-primary">{{ total_distributions }}</div>
+            <small class="text-muted">Distributions</small>
         </div>
-        <div class="col-md-3">
-            <div class="card text-white bg-warning">
-                <div class="card-body text-center">
-                    <h3>{{ total_valeur_distribuee|default:0|floatformat:0|intcomma }} FCFA</h3>
-                    <p class="mb-0">Valeur Distribuée</p>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label"><strong>Filtrer par mois :</strong></label>
+                    <select class="form-select" id="moisFilter" onchange="appliquerFiltre()">
+                        <option value="">3 derniers mois</option>
+                        {% for mois in mois_options %}
+                        <option value="?mois={{ mois.mois }}&annee={{ mois.annee }}" 
+                                {% if mois.selected %}selected{% endif %}>
+                            {{ mois.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-white bg-info">
-                <div class="card-body text-center">
-                    <h3>{{ superviseurs_distincts|default:0 }}</h3>
-                    <p class="mb-0">Superviseurs</p>
+                <div class="col-md-6">
+                    <div class="d-flex gap-2 align-items-center">
+                        <span class="badge bg-primary">{{ total_distributions }} distributions</span>
+                        <span class="badge bg-success">{{ total_produits }} produits</span>
+                        {% if mois_filtre %}
+                        <a href="?" class="btn btn-sm btn-outline-secondary">Réinitialiser</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-2 text-end">
+                    <small class="text-muted">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</small>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tableau des distributions -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-truck-loading"></i> Historique des Distributions
-                    </h5>
-                    <span class="badge bg-light text-primary">
-                        {{ distributions.count }} distribution{{ distributions.count|pluralize }}
-                    </span>
+    <!-- Liste des distributions -->
+    {% if page_obj %}
+    <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-truck-loading text-primary me-2"></i>
+                Liste des Distributions
+            </h5>
+            <span class="badge bg-primary">{{ page_obj.paginator.count }} résultats</span>
+        </div>
+        <div class="card-body p-0">
+            {% for distribution in page_obj %}
+            <div class="list-group-item border-bottom">
+                <!-- En-tête distribution -->
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <strong class="text-primary h5">#{{ distribution.id }}</strong>
+                        <small class="text-muted ms-2">{{ distribution.date_distribution|date:"d/m/Y H:i" }}</small>
+                        <div class="mt-1">
+                            <small class="text-muted">Superviseur :</small>
+                            <strong>{{ distribution.superviseur.full_name }}</strong>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-primary rounded-pill fs-6">{{ distribution.quantite_totale }} unités</div>
+                        <div class="badge bg-info rounded-pill mt-1">{{ distribution.nombre_produits_differents }} produits</div>
+                    </div>
                 </div>
-                <div class="card-body">
-                    {% if distributions %}
+                
+                <!-- Détails des produits -->
+                <div class="products-details">
                     <div class="table-responsive">
-                        <table class="table table-hover" id="tableDistributions">
+                        <table class="table table-sm table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="100">Date</th>
-                                    <th>Superviseur</th>
-                                    <th width="120">Type</th>
-                                    <th width="100">Produits</th>
-                                    <th width="120">Quantité Totale</th>
-                                    <th width="120">Valeur Gros</th>
-                                    <th width="120">Valeur Détail</th>
-                                    <th width="100">Statut</th>
-                                    <th width="120">Actions</th>
+                                    <th>Produit</th>
+                                    <th class="text-center">Quantité</th>
+                                    <th class="text-center">Vendu</th>
+                                    <th class="text-center">Restant</th>
+                                    <th class="text-end">Prix Détail</th>
+                                    <th class="text-end">Prix Gros</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for distribution in distributions %}
+                                {% for detail in distribution.detaildistribution_set.all %}
+                                {% if not detail.est_supprime %}
                                 <tr>
                                     <td>
-                                        <strong>{{ distribution.date_distribution|date:"d/m/Y" }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ distribution.date_distribution|date:"H:i" }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar-sm bg-info rounded-circle d-flex align-items-center justify-content-center me-2"
-                                                 style="width: 35px; height: 35px;">
-                                                <span class="text-white fw-bold">
-                                                    {{ distribution.superviseur.user.first_name|first }}{{ distribution.superviseur.user.last_name|first }}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <strong>{{ distribution.superviseur.full_name }}</strong>
-                                                <br>
-                                                <small class="text-muted">
-                                                    {{ distribution.superviseur.telephone|default:"Tél. non renseigné" }}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{% if distribution.type_distribution == 'AUTO' %}warning{% else %}primary{% endif %}">
-                                            {{ distribution.get_type_distribution_display }}
-                                        </span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-secondary">{{ distribution.nombre_produits_differents }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-primary fs-6">{{ distribution.quantite_totale }}</span>
-                                    </td>
-                                    <td class="text-end text-success">
-                                        <strong>{{ distribution.valeur_gros_totale|floatformat:0|intcomma }} FCFA</strong>
-                                    </td>
-                                    <td class="text-end text-info">
-                                        <strong>{{ distribution.valeur_detail_totale|floatformat:0|intcomma }} FCFA</strong>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{{ distribution.couleur_statut }}">
-                                            {{ distribution.statut_display }}
-                                        </span>
-                                        {% if distribution.est_modifie %}
-                                        <br>
-                                        <small class="text-warning">
-                                            <i class="fas fa-edit"></i> Modifiée
-                                        </small>
+                                        <strong>{{ detail.lot.produit.nom }}</strong>
+                                        {% if detail.specification %}
+                                        <br><small class="text-muted">{{ detail.specification }}</small>
+                                        {% endif %}
+                                        {% if detail.lot.reference_lot %}
+                                        <br><small class="text-muted">Lot: {{ detail.lot.reference_lot }}</small>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <button class="btn btn-outline-primary" 
-                                                    onclick="voirDetails({{ distribution.id }})"
-                                                    data-bs-toggle="tooltip" title="Voir détails">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-outline-info"
-                                                    onclick="exporterDistribution({{ distribution.id }})"
-                                                    data-bs-toggle="tooltip" title="Exporter PDF">
-                                                <i class="fas fa-file-pdf"></i>
-                                            </button>
-                                        </div>
+                                    <td class="text-center">
+                                        <span class="badge bg-secondary">{{ detail.quantite }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-success">{{ detail.quantite_vendue }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge {% if detail.quantite_restante_calculee > 0 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ detail.quantite_restante_calculee }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        {% if detail.prix_detail %}
+                                        <strong class="text-success">{{ detail.prix_detail }} FCFA</strong>
+                                        {% else %}
+                                        <small class="text-muted">-</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if detail.prix_gros %}
+                                        <strong class="text-primary">{{ detail.prix_gros }} FCFA</strong>
+                                        {% else %}
+                                        <small class="text-muted">-</small>
+                                        {% endif %}
                                     </td>
                                 </tr>
+                                {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-truck-loading fa-4x text-muted mb-3"></i>
-                        <h4 class="text-muted">Aucune distribution reçue</h4>
-                        <p class="text-muted">Les distributions apparaîtront ici lorsqu'elles vous seront attribuées.</p>
+                </div>
+                
+                <!-- Totaux -->
+                <div class="distribution-totals mt-3 pt-3 border-top">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <small class="text-muted d-block">Valeur détail totale</small>
+                            <strong class="text-success fs-5">{{ distribution.valeur_detail_totale|floatformat:0 }} FCFA</strong>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted d-block">Valeur gros totale</small>
+                            <strong class="text-primary fs-5">{{ distribution.valeur_gros_totale|floatformat:0 }} FCFA</strong>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted d-block">Statut</small>
+                            <span class="badge {% if distribution.est_modifie %}bg-warning{% else %}bg-success{% endif %}">
+                                {% if distribution.est_modifie %}Modifiée{% else %}Active{% endif %}
+                            </span>
+                        </div>
                     </div>
-                    {% endif %}
                 </div>
             </div>
+            {% endfor %}
         </div>
     </div>
 
-    <!-- Statistiques par superviseur -->
-    {% if distributions %}
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-pie"></i> Répartition par Superviseur
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="chartSuperviseurs" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-line"></i> Évolution Mensuelle
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="chartEvolution" height="250"></canvas>
-                </div>
-            </div>
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="Pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if mois_filtre %}&mois={{ mois_filtre }}&annee={{ annee_filtre }}{% endif %}">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if mois_filtre %}&mois={{ mois_filtre }}&annee={{ annee_filtre }}{% endif %}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if mois_filtre %}&mois={{ mois_filtre }}&annee={{ annee_filtre }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if mois_filtre %}&mois={{ mois_filtre }}&annee={{ annee_filtre }}{% endif %}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if mois_filtre %}&mois={{ mois_filtre }}&annee={{ annee_filtre }}{% endif %}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">Aucune distribution trouvée</h5>
+            <p class="text-muted">Aucune distribution ne correspond à vos critères de recherche</p>
+            {% if mois_filtre %}
+            <a href="?" class="btn btn-primary">Réinitialiser les filtres</a>
+            {% endif %}
         </div>
     </div>
     {% endif %}
 </div>
 
-<!-- Modal pour détails distribution -->
-<div class="modal fade" id="modalDetails" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Détails de la Distribution</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="modalDetailsBody">
-                <!-- Contenu chargé dynamiquement -->
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
 <script>
-$(document).ready(function() {
-    // Initialisation DataTable
-    $('#tableDistributions').DataTable({
-        pageLength: 25,
-        order: [[0, 'desc']], // Tri par date décroissant
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
-        },
-        dom: '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
-    });
+function appliquerFiltre() {
+    const select = document.getElementById('moisFilter');
+    const url = select.value;
+    if (url) {
+        window.location.href = url;
+    }
+}
 
-    // Graphique de répartition par superviseur
-    {% if stats_superviseurs %}
-    var ctxSuperviseurs = document.getElementById('chartSuperviseurs').getContext('2d');
-    var chartSuperviseurs = new Chart(ctxSuperviseurs, {
-        type: 'doughnut',
-        data: {
-            labels: [{% for stat in stats_superviseurs %}'{{ stat.superviseur__user__first_name }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
-            datasets: [{
-                data: [{% for stat in stats_superviseurs %}{{ stat.total_distributions }}{% if not forloop.last %}, {% endif %}{% endfor %}],
-                backgroundColor: ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c'],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                title: {
-                    display: true,
-                    text: 'Distributions par superviseur'
-                }
-            }
+// Initialiser le sélecteur avec la valeur actuelle
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mois = urlParams.get('mois');
+    const annee = urlParams.get('annee');
+    
+    if (mois && annee) {
+        const select = document.getElementById('moisFilter');
+        const option = select.querySelector(`option[value="?mois=${mois}&annee=${annee}"]`);
+        if (option) {
+            option.selected = true;
         }
-    });
-    {% endif %}
-
-    // Graphique d'évolution mensuelle
-    {% if evolution_mensuelle %}
-    var ctxEvolution = document.getElementById('chartEvolution').getContext('2d');
-    var chartEvolution = new Chart(ctxEvolution, {
-        type: 'line',
-        data: {
-            labels: [{% for mois in evolution_mensuelle %}'{{ mois.mois }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
-            datasets: [{
-                label: 'Quantité distribuée',
-                data: [{% for mois in evolution_mensuelle %}{{ mois.quantite_totale }}{% if not forloop.last %}, {% endif %}{% endfor %}],
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: true,
-                    text: 'Évolution des distributions'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Quantité de produits'
-                    }
-                }
-            }
-        }
-    });
-    {% endif %}
+    }
 });
-
-function voirDetails(distributionId) {
-    // Charger les détails via AJAX
-    fetch(`/api/distributions/${distributionId}/details/`)
-        .then(response => response.json())
-        .then(data => {
-            $('#modalDetailsBody').html(`
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Informations Générales</h6>
-                        <p><strong>Date:</strong> ${new Date(data.date_distribution).toLocaleDateString('fr-FR')} à ${new Date(data.date_distribution).toLocaleTimeString('fr-FR')}</p>
-                        <p><strong>Superviseur:</strong> ${data.superviseur_nom}</p>
-                        <p><strong>Type:</strong> <span class="badge bg-${data.type_color}">${data.type}</span></p>
-                        <p><strong>Statut:</strong> <span class="badge bg-${data.statut_color}">${data.statut}</span></p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Totaux</h6>
-                        <p><strong>Produits différents:</strong> ${data.nombre_produits}</p>
-                        <p><strong>Quantité totale:</strong> ${data.quantite_totale}</p>
-                        <p><strong>Valeur gros:</strong> <span class="text-success">${data.valeur_gros} FCFA</span></p>
-                        <p><strong>Valeur détail:</strong> <span class="text-info">${data.valeur_detail} FCFA</span></p>
-                    </div>
-                </div>
-                
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <h6>Détail des Produits</h6>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>Produit</th>
-                                        <th>Lot</th>
-                                        <th>Quantité</th>
-                                        <th>Prix Gros</th>
-                                        <th>Prix Détail</th>
-                                        <th>Valeur Gros</th>
-                                        <th>Valeur Détail</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${data.produits.map(produit => `
-                                        <tr>
-                                            <td><strong>${produit.nom}</strong></td>
-                                            <td><small class="text-muted">${produit.lot}</small></td>
-                                            <td class="text-center"><span class="badge bg-primary">${produit.quantite}</span></td>
-                                            <td class="text-end">${produit.prix_gros} FCFA</td>
-                                            <td class="text-end">${produit.prix_detail} FCFA</td>
-                                            <td class="text-end text-success">${produit.valeur_gros} FCFA</td>
-                                            <td class="text-end text-info">${produit.valeur_detail} FCFA</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                                <tfoot class="table-secondary">
-                                    <tr>
-                                        <th colspan="5" class="text-end">TOTAUX:</th>
-                                        <th class="text-end text-success">${data.valeur_gros} FCFA</th>
-                                        <th class="text-end text-info">${data.valeur_detail} FCFA</th>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                
-                ${data.notes ? `
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <div class="alert alert-info">
-                            <strong><i class="fas fa-sticky-note"></i> Notes:</strong>
-                            <p class="mb-0">${data.notes}</p>
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
-            `);
-            $('#modalDetails').modal('show');
-        })
-        .catch(error => {
-            console.error('Erreur:', error);
-            $('#modalDetailsBody').html('<div class="alert alert-danger">Erreur lors du chargement des détails</div>');
-            $('#modalDetails').modal('show');
-        });
-}
-
-function exporterDistribution(distributionId) {
-    // Export PDF de la distribution
-    window.open(`/distributions/${distributionId}/export-pdf/`, '_blank');
-}
 </script>
 
 <style>
-.avatar-sm {
-    font-size: 0.8rem;
+.card {
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
+
+.list-group-item {
+    padding: 1.5rem;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+
 .table th {
     border-top: none;
     font-weight: 600;
+    font-size: 0.8rem;
+    color: #6c757d;
+    background-color: #f8f9fa;
 }
-.card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    border: 1px solid rgba(0, 0, 0, 0.125);
+
+.distribution-totals {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.page-link {
+    color: #3498db;
+    border-color: #dee2e6;
+}
+
+.page-item.active .page-link {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+@media (max-width: 768px) {
+    .list-group-item {
+        padding: 1rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .distribution-totals .fs-5 {
+        font-size: 1rem !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .table th, .table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .badge {
+        font-size: 0.7rem;
+    }
 }
 </style>
 {% endblock %}

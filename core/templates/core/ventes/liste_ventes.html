@@ -1,351 +1,258 @@
-<!-- templates/core/ventes/liste_ventes.html -->
 {% extends 'base.html' %}
 {% load static %}
-{% load format_fcfa %}
-{% block title %}Mes Ventes{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4 class="mb-0">Mes Ventes</h4>
-                    <div>
-                        <a href="{% url 'enregistrer_vente' %}" class="btn btn-success">
-                            <i class="fas fa-plus"></i> Nouvelle Vente
-                        </a>
-                       
-                        <a href="{% url 'consulter_bonus' %}" class="btn btn-outline-secondary btn-sm">
-                            <i class="fas fa-shopping-cart"></i> Voir Mes Bonus
-                        </a>
-                    </div>
+<div class="container-fluid">
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Mes Ventes</h2>
+            <p class="text-muted mb-0">Historique de mes ventes</p>
+        </div>
+        <div class="text-end">
+            <div class="h4 text-primary">{{ total_ventes }}</div>
+            <small class="text-muted">Ventes totales</small>
+        </div>
+    </div>
+
+    <!-- Cartes statistiques simples -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center py-3">
+                    <div class="h4 text-primary mb-1">{{ total_ventes }}</div>
+                    <small class="text-muted">Total ventes</small>
                 </div>
-                <div class="card-body">
-                    <!-- Indicateurs de performance -->
-                    <div class="row mb-4">
-                        <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="card bg-primary text-white">
-                                <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ total_ventes }}</h4>
-                                    <small class="opacity-8">Ventes Total</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="card bg-success text-white">
-                                <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ chiffre_affaires_total|fcfa }} F</h4>
-                                    <small class="opacity-8">Chiffre d'Affaires</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="card bg-info text-white">
-                                <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ ventes_gros_count }}</h4>
-                                    <small class="opacity-8">Ventes en Gros</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="card bg-warning text-white">
-                                <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ ventes_credit_count }}</h4>
-                                    <small class="opacity-8">Ventes Crédit</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="card bg-danger text-white">
-                                <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ dettes_en_cours }}</h4>
-                                    <small class="opacity-8">Dettes en Cours</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-xl-2 col-md-4 col-6 mb-3">
-                            <div class="card bg-dark text-white">
-                                <div class="card-body text-center p-3">
-                                    <h4 class="mb-1">{{ bonus_obtenus|floatformat:0 }} F</h4>
-                                    <small class="opacity-8">Bonus Obtenus</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ✅ NOUVEAU : Indicateurs Stagiaires -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card border-info">
-                                <div class="card-header bg-info text-white">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-users"></i> Activité des Stagiaires
-                                        {% if nombre_stagiaires_distincts > 0 %}
-                                        <span class="badge bg-light text-info ms-2">{{ nombre_stagiaires_distincts }} stagiaire(s)</span>
-                                        {% endif %}
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row text-center">
-                                        <div class="col-md-3">
-                                            <div class="border rounded p-3 bg-light">
-                                                <h4 class="text-info mb-1">{{ ventes_avec_stagiaire_count }}</h4>
-                                                <small class="text-muted">Ventes avec Stagiaires</small>
-                                                <br>
-                                                <small class="text-info fw-bold">{{ pourcentage_ventes_stagiaires|floatformat:1 }}% du total</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="border rounded p-3 bg-light">
-                                                <h4 class="text-success mb-1">{{ chiffre_affaires_stagiaires|fcfa }} F</h4>
-                                                <small class="text-muted">CA des Stagiaires</small>
-                                                <br>
-                                                <small class="text-success fw-bold">{{ pourcentage_ca_stagiaires|floatformat:1 }}% du CA</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="border rounded p-3 bg-light">
-                                                <h4 class="text-primary mb-1">{{ ventes_sans_stagiaire_count }}</h4>
-                                                <small class="text-muted">Ventes Personnelles</small>
-                                                <br>
-                                                <small class="text-primary fw-bold">{{ chiffre_affaires_personnel|fcfa }} F</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="border rounded p-3 bg-light">
-                                                <h4 class="text-warning mb-1">
-                                                    {% if nombre_stagiaires_distincts > 0 %}
-                                                    {{ nombre_stagiaires_distincts }}
-                                                    {% else %}
-                                                    0
-                                                    {% endif %}
-                                                </h4>
-                                                <small class="text-muted">Stagiaires Actifs</small>
-                                                <br>
-                                                <small class="text-warning fw-bold">Supervisés</small>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Répartition visuelle -->
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Répartition par Type</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Ventes en Gros</span>
-                                        <span class="fw-bold">{{ ventes_gros_count }} ({% widthratio ventes_gros_count total_ventes 100 %}%)</span>
-                                    </div>
-                                    <div class="progress mb-3" style="height: 10px;">
-                                        <div class="progress-bar bg-info" style="width: {% widthratio ventes_gros_count total_ventes 100 %}%"></div>
-                                    </div>
-                                    
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Ventes au Détail</span>
-                                        <span class="fw-bold">{{ ventes_detail_count }} ({% widthratio ventes_detail_count total_ventes 100 %}%)</span>
-                                    </div>
-                                    <div class="progress mb-3" style="height: 10px;">
-                                        <div class="progress-bar bg-success" style="width: {% widthratio ventes_detail_count total_ventes 100 %}%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Répartition Paiement</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Paiement Comptant</span>
-                                        <span class="fw-bold">{{ ventes_comptant_count }} ({% widthratio ventes_comptant_count total_ventes 100 %}%)</span>
-                                    </div>
-                                    <div class="progress mb-3" style="height: 10px;">
-                                        <div class="progress-bar bg-success" style="width: {% widthratio ventes_comptant_count total_ventes 100 %}%"></div>
-                                    </div>
-                                    
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>Paiement Crédit</span>
-                                        <span class="fw-bold">{{ ventes_credit_count }} ({% widthratio ventes_credit_count total_ventes 100 %}%)</span>
-                                    </div>
-                                    <div class="progress mb-3" style="height: 10px;">
-                                        <div class="progress-bar bg-warning" style="width: {% widthratio ventes_credit_count total_ventes 100 %}%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ✅ NOUVEAU : Répartition Stagiaires vs Personnel -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">Répartition Stagiaires vs Personnel</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="text-center">Par Nombre de Ventes</h6>
-                                            <div class="d-flex justify-content-between mb-2">
-                                                <span>Ventes Personnelles</span>
-                                                <span class="fw-bold">{{ ventes_sans_stagiaire_count }} ({% widthratio ventes_sans_stagiaire_count total_ventes 100 %}%)</span>
-                                            </div>
-                                            <div class="progress mb-3" style="height: 10px;">
-                                                <div class="progress-bar bg-primary" style="width: {% widthratio ventes_sans_stagiaire_count total_ventes 100 %}%"></div>
-                                            </div>
-                                            
-                                            <div class="d-flex justify-content-between mb-2">
-                                                <span>Ventes Stagiaires</span>
-                                                <span class="fw-bold">{{ ventes_avec_stagiaire_count }} ({% widthratio ventes_avec_stagiaire_count total_ventes 100 %}%)</span>
-                                            </div>
-                                            <div class="progress mb-3" style="height: 10px;">
-                                                <div class="progress-bar bg-info" style="width: {% widthratio ventes_avec_stagiaire_count total_ventes 100 %}%"></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <h6 class="text-center">Par Chiffre d'Affaires</h6>
-                                            <div class="d-flex justify-content-between mb-2">
-                                                <span>CA Personnel</span>
-                                                <span class="fw-bold">{{ chiffre_affaires_personnel|floatformat:0 }} F ({% widthratio chiffre_affaires_personnel chiffre_affaires_total 100 %}%)</span>
-                                            </div>
-                                            <div class="progress mb-3" style="height: 10px;">
-                                                <div class="progress-bar bg-success" style="width: {% widthratio chiffre_affaires_personnel chiffre_affaires_total 100 %}%"></div>
-                                            </div>
-                                            
-                                            <div class="d-flex justify-content-between mb-2">
-                                                <span>CA Stagiaires</span>
-                                                <span class="fw-bold">{{ chiffre_affaires_stagiaires|floatformat:0 }} F ({% widthratio chiffre_affaires_stagiaires chiffre_affaires_total 100 %}%)</span>
-                                            </div>
-                                            <div class="progress mb-3" style="height: 10px;">
-                                                <div class="progress-bar bg-warning" style="width: {% widthratio chiffre_affaires_stagiaires chiffre_affaires_total 100 %}%"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Liste des ventes -->
-                    {% if ventes %}
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">Historique des Ventes</h5>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover table-striped mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Client</th>
-                                            <th>Produit</th>
-                                            <th class="text-center">Quantité</th>
-                                            <th class="text-center">Type</th>
-                                            <th class="text-center">Paiement</th>
-                                            <th class="text-end">Total</th>
-                                            <th class="text-center">Stagiaire</th>  <!-- ✅ NOUVEAU : Colonne Stagiaire -->
-                                       
-                                            <th class="text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for vente in ventes %}
-                                        <tr>
-                                            <td>
-                                                <small class="text-muted">{{ vente.date_vente|date:"d/m/Y" }}</small>
-                                                <br>
-                                                <small class="text-muted">{{ vente.date_vente|date:"H:i" }}</small>
-                                            </td>
-                                            <td>
-                                                <strong>{{ vente.client.nom }}</strong>
-                                                {% if vente.client.contact %}
-                                                <br>
-                                                <small class="text-muted">{{ vente.client.contact }}</small>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {{ vente.detail_distribution.lot.produit.nom }}
-                                                <br>
-                                                <small class="text-muted">Lot: {{ vente.detail_distribution.lot.reference_lot|default:"N/A" }}</small>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge bg-primary rounded-pill">{{ vente.quantite }}</span>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge bg-{% if vente.type_vente == 'gros' %}info{% else %}success{% endif %}">
-                                                    {{ vente.get_type_vente_display }}
-                                                </span>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge bg-{% if vente.mode_paiement == 'comptant' %}success{% else %}warning{% endif %}">
-                                                    {{ vente.get_mode_paiement_display }}
-                                                </span>
-                                            </td>
-                                            <td class="text-end">
-                                                <strong>{{ vente.total_vente|fcfa }} FCFA</strong>
-                                                <br>
-                                                <small class="text-muted">{{ vente.prix_vente_unitaire|fcfa }} F/u</small>
-                                            </td>
-                                            <!-- ✅ NOUVEAU : Colonne Stagiaire -->
-                                            <td class="text-center">
-                                                {% if vente.stagiaire %}
-                                                <span class="badge bg-info" title="Vente réalisée par {{ vente.stagiaire.full_name }}">
-                                                    <i class="fas fa-user-graduate"></i> {{ vente.stagiaire.full_name|truncatechars:15 }}
-                                                </span>
-                                                {% else %}
-                                                <span class="badge bg-secondary">Personnel</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-center">
-                                                <div class="btn-group btn-group-sm">
-                                                    <a href="{% url 'detail_vente' vente.id %}" 
-                                                       class="btn btn-outline-primary" 
-                                                       title="Voir détails">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
-                                                    {% if vente.mode_paiement == 'credit' and vente.dette %}
-                                                    <a href="{% url 'detail_dette' vente.dette.id %}" 
-                                                       class="btn btn-outline-warning" 
-                                                       title="Voir dette">
-                                                        <i class="fas fa-file-invoice-dollar"></i>
-                                                    </a>
-                                                    {% endif %}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-5">
-                        <div class="mb-4">
-                            <i class="fas fa-shopping-cart fa-4x text-muted"></i>
-                        </div>
-                        <h4 class="text-muted">Aucune vente enregistrée</h4>
-                        <p class="text-muted mb-4">Commencez par enregistrer votre première vente</p>
-                        <a href="{% url 'enregistrer_vente' %}" class="btn btn-primary btn-lg">
-                            <i class="fas fa-plus"></i> Première Vente
-                        </a>
-                    </div>
-                    {% endif %}
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center py-3">
+                    <div class="h4 text-success mb-1">{{ chiffre_affaires_total|floatformat:0 }}</div>
+                    <small class="text-muted">Chiffre d'affaires</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center py-3">
+                    <div class="h4 text-info mb-1">{{ ventes_comptant }}</div>
+                    <small class="text-muted">Ventes comptant</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 bg-light">
+                <div class="card-body text-center py-3">
+                    <div class="h4 text-warning mb-1">{{ ventes_credit }}</div>
+                    <small class="text-muted">Ventes crédit</small>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Bouton nouvelle vente -->
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end mb-4">
+        <a href="{% url 'enregistrer_vente' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Nouvelle Vente
+        </a>
+    </div>
+
+    <!-- Liste des ventes -->
+    <div class="card">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list me-2"></i>
+                Liste des Ventes
+            </h5>
+            <span class="badge bg-primary">{{ page_obj.paginator.count }} ventes</span>
+        </div>
+        <div class="card-body p-0">
+            {% if page_obj %}
+            <div class="list-group list-group-flush">
+                {% for vente in page_obj %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <!-- Produit et informations -->
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <strong class="h6 text-primary">{{ vente.detail_distribution.lot.produit.nom }}</strong>
+                                <small class="text-muted">{{ vente.date_vente|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            
+                            <!-- Détails de la vente -->
+                            <div class="row g-2 mb-2">
+                                <div class="col-12 col-md-4">
+                                    <small class="text-muted">Quantité:</small>
+                                    <strong class="ms-1">{{ vente.quantite }} unités</strong>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <small class="text-muted">Prix unitaire:</small>
+                                    <strong class="ms-1">{{ vente.prix_vente_unitaire }} FCFA</strong>
+                                </div>
+                                <div class="col-12 col-md-4">
+                                    <small class="text-muted">Type:</small>
+                                    <span class="badge {% if vente.type_vente == 'gros' %}bg-primary{% else %}bg-info{% endif %} ms-1">
+                                        {{ vente.get_type_vente_display }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Client et paiement -->
+                            <div class="row g-2">
+                                <div class="col-12 col-md-6">
+                                    <small class="text-muted">Client:</small>
+                                    <strong class="ms-1">{{ vente.client.nom|default:"Non spécifié" }}</strong>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <small class="text-muted">Paiement:</small>
+                                    <span class="badge {% if vente.mode_paiement == 'comptant' %}bg-success{% else %}bg-warning{% endif %} ms-1">
+                                        {{ vente.get_mode_paiement_display }}
+                                    </span>
+                                    {% if vente.mode_paiement == 'credit' and vente.dette %}
+                                    <small class="text-muted ms-2">(Reste: {{ vente.dette.montant_restant }} FCFA)</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Spécification si disponible -->
+                            {% if vente.specification %}
+                            <div class="mt-2">
+                                <small class="text-muted">Spécification:</small>
+                                <small class="ms-1">{{ vente.specification }}</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Montant total -->
+                        <div class="text-end ms-3">
+                            <div class="h5 text-success">{{ vente.total_vente|floatformat:0 }} FCFA</div>
+                            {% if vente.stagiaire %}
+                            <small class="text-muted">Par {{ vente.stagiaire.full_name }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                <p class="text-muted">Aucune vente enregistrée</p>
+                <a href="{% url 'enregistrer_vente' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Créer ma première vente
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="Pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">
+                    <i class="fas fa-angle-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">
+                    <i class="fas fa-angle-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
+
+<style>
+.card {
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.list-group-item {
+    padding: 1.25rem;
+    border-bottom: 1px solid #f8f9fa;
+    transition: background-color 0.2s ease;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.list-group-item:last-child {
+    border-bottom: none;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.page-link {
+    color: #3498db;
+    border-color: #dee2e6;
+}
+
+.page-item.active .page-link {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+@media (max-width: 768px) {
+    .list-group-item {
+        padding: 1rem;
+    }
+    
+    .h6 {
+        font-size: 0.9rem;
+    }
+    
+    .h5 {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .list-group-item {
+        padding: 0.75rem;
+    }
+    
+    .row.g-2 {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
 {% endblock %}
