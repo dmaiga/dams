@@ -1,0 +1,134 @@
+<div class="overflow-x-auto">
+    <table class="table table-zebra w-full">
+        <thead>
+            <tr>
+                <th>Produit</th>
+                <th class="text-center">Stock</th>
+                <th class="text-right">Valeur Stock</th>
+                <th class="text-center">Ventes Total</th>
+                <th class="text-right">Marge Total</th>
+                <th class="text-center">Taux Marge</th>
+                <th class="text-center">Pertes</th>
+                <th class="text-center">Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product_data in products_data %}
+            <tr>
+                <td>
+                    <div class="font-bold">{{ product_data.product.nom }}</div>
+                    {% if product_data.fournisseur_specifique %}
+                    <div class="text-sm text-gray-500">
+                        Fournisseur: {{ product_data.fournisseur_specifique.nom }}
+                    </div>
+                    {% endif %}
+                </td>
+
+                <td class="text-center">
+                    <div class="font-bold">{{ product_data.total_stock|floatformat:1 }}</div>
+                </td>
+
+                <td class="text-right font-mono font-bold">
+                    {{ product_data.total_valeur_stock_disponible|fcfa }} FCFA
+                </td>
+
+                <td class="text-center">
+                    <div>{{ product_data.total_sales_quantity|floatformat:1 }} unités</div>
+                    <div class="text-xs text-success">
+                        {{ product_data.total_sales_revenue|fcfa }} FCFA
+                    </div>
+                </td>
+
+                <td class="text-right font-mono font-bold text-success">
+                    {{ product_data.marge_totale|fcfa }} FCFA
+                </td>
+
+                <td class="text-center">
+                    <div class="radial-progress 
+                        {% if product_data.taux_marge > 30 %}text-success
+                        {% elif product_data.taux_marge > 15 %}text-warning
+                        {% else %}text-error{% endif %}" 
+                        style="--value:{{ product_data.taux_marge|floatformat:0 }}; --size:3rem;">
+                        {{ product_data.taux_marge|floatformat:0 }}%
+                    </div>
+                </td>
+
+                <td class="text-center">
+                    {% if product_data.total_losses_quantite > 0 %}
+                    <span class="badge badge-error">
+                        {{ product_data.total_losses_valeur|fcfa }} FCFA
+                    </span>
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+
+                <td class="text-center">
+                    <span class="badge 
+                        {% if product_data.stock_status == 'CRITIQUE' %}badge-error
+                        {% elif product_data.stock_status == 'EXCÉDENTAIRE' %}badge-warning
+                        {% elif product_data.stock_status == 'RUPTURE' %}badge-secondary
+                        {% else %}badge-success{% endif %}">
+                        {{ product_data.stock_status }}
+                    </span>
+                </td>
+
+                <td>
+                    <a href="{% url 'product_detail' product_data.product.id %}{% if current_filters.fournisseur %}?fournisseur={{ current_filters.fournisseur }}{% endif %}" 
+                    class="btn btn-sm btn-primary">
+                        <i class="fas fa-eye"></i>
+                        Détails
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="text-center text-gray-500 py-4">
+                    Aucun produit trouvé
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- PAGINATION -->
+{% if is_paginated %}
+<div class="flex justify-center mt-6">
+    <div class="join">
+
+        {% if page_obj.has_previous %}
+        <button 
+            hx-get="?page=1{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}"
+            hx-target="#product-table-container"
+            hx-indicator="#spinner"
+            class="join-item btn">«</button>
+
+        <button 
+            hx-get="?page={{ page_obj.previous_page_number }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}"
+            hx-target="#product-table-container"
+            hx-indicator="#spinner"
+            class="join-item btn">‹</button>
+        {% endif %}
+
+        <button class="join-item btn btn-active">
+            Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </button>
+
+        {% if page_obj.has_next %}
+        <button 
+            hx-get="?page={{ page_obj.next_page_number }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}"
+            hx-target="#product-table-container"
+            hx-indicator="#spinner"
+            class="join-item btn">›</button>
+
+        <button 
+            hx-get="?page={{ page_obj.paginator.num_pages }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}"
+            hx-target="#product-table-container"
+            hx-indicator="#spinner"
+            class="join-item btn">»</button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

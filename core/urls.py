@@ -3,8 +3,7 @@ from django.urls import path
 from . import views
 from  .views import ( 
                         DashboardView,PerformanceAgentsView,
-                        AnalyseClientsView,ProductDetailView,
-                        ProductListView,AgentDashboardView,
+                        AnalyseClientsView,AgentDashboardView,
                         SuperviseurListView,AgentTerrainListView,
                         AgentDetailView
                      
@@ -111,6 +110,5 @@ urlpatterns = [
     path('direction/agents/superviseurs/', SuperviseurListView.as_view(), name='superviseur_list'),
     path('direction/agents/terrain/', AgentTerrainListView.as_view(), name='agent_terrain_list'),
     path('direction/agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
-    path('direction/produits/', ProductListView.as_view(), name='product_list'),
-    path('direction/produits/<int:pk>/', ProductDetailView.as_view(), name='product_detail'),
+   
 ]

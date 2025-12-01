@@ -1,16 +1,15 @@
 from django.urls import path
-from . import views, htmx_views
 
-app_name = "direction"
+from  direction.views import ( 
+                      ProductListView, ProductDetailView,ProductListPartialView
+                     
+                     )
 
 urlpatterns = [
-    path("", views.dashboard, name="dashboard_direction"),
-
-    # HTMX endpoints
-    path("kpis/", htmx_views.kpis, name="kpis"),
-    path("stock/", htmx_views.stock, name="stock"),
-    path("ventes/", htmx_views.ventes, name="ventes"),
-    path("agents/", htmx_views.agents, name="agents"),
-    path("dettes/", htmx_views.dettes, name="dettes"),
-    path("depenses/", htmx_views.depenses, name="depenses"),
+    
+    path('direction/produits/', ProductListView.as_view(), name='product_list'),
+    path('direction/produits/<int:pk>/', ProductDetailView.as_view(), name='product_detail'),
+    path('direction/produits/table/', ProductListPartialView.as_view(), name='product_list_partial'),
 ]
+
+

@@ -1,0 +1,230 @@
+{% extends 'direction/base_admin.html' %}
+{% load humanize %}
+{%load format_fcfa%}
+
+{% block title %}{{ product_data.product.nom|upper }} - Détails{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-3xl font-bold">{{ product_data.product.nom }}</h1>
+            {% if product_data.fournisseur_specifique %}
+            <div class="text-lg text-gray-600 mt-2">
+                Fournisseur: <span class="font-semibold">{{ product_data.fournisseur_specifique.nom }}</span>
+            </div>
+            {% endif %}
+            {% if product_data.product.description %}
+            <p class="text-gray-500 mt-2">{{ product_data.product.description }}</p>
+            {% endif %}
+        </div>
+        <a href="{% url 'product_list' %}{% if selected_supplier %}?fournisseur={{ selected_supplier.id }}{% endif %}" 
+           class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i>
+            Retour
+        </a>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <!-- Ventes Totales -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-primary">
+                    <i class="fas fa-shopping-cart"></i>
+                    Ventes Totales
+                </h2>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.total_quantity|floatformat:1 }} unités</p>
+            </div>
+        </div>
+
+        <!-- Chiffre d'Affaires -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-secondary">
+                    <i class="fas fa-chart-bar"></i>
+                    Chiffre d'Affaires
+                </h2>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.total_revenue|fcfa }}</p>
+            </div>
+        </div>
+
+        <!-- Marge Générée -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-success">
+                    <i class="fas fa-hand-holding-usd"></i>
+                    Marge Générée
+                </h2>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.total_marge|fcfa }}</p>
+            </div>
+        </div>
+
+
+
+    <!-- Taux de Marge -->
+    
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-accent">
+                    <i class="fas fa-percentage"></i>
+                    Taux de Marge
+                </h2>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.taux_marge|default:0|floatformat:1 }}%</p>
+            </div>
+        </div>
+        
+            <!-- Pertes -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Pertes
+                </h2>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.pertes_valeur|fcfa }}</p>
+                <p class="text-sm text-gray-500">{{ product_data.sales_stats.pertes_quantite|floatformat:1 }} unités</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Détails des lots -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Détails des Lots</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Fournisseur</th>
+                            <th class="text-center">Quantité Initiale</th>
+                            <th class="text-center">Quantité Restante</th>
+                            <th class="text-right">Prix d'Achat</th>
+                            <th class="text-right">Valeur Stock</th>
+                            <th class="text-right">Marge</th>
+                            <th>Date Réception</th>
+                            <th class="text-center">Pertes</th>
+                            <th class="text-center">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lot_data in product_data.lots_avec_marge %}
+                        {% with lot=lot_data.lot %}
+                        <tr>
+                            <td>
+                                {% if lot.fournisseur %}
+                                <div class="font-semibold">{{ lot.fournisseur.nom }}</div>
+                                {% if lot.reference_lot %}
+                                <div class="text-xs text-gray-500">Ref: {{ lot.reference_lot }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-gray-400">Non spécifié</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {{ lot.quantite_initiale|floatformat:1 }}
+                            </td>
+                            <td class="text-center">
+                                <span class="font-bold {% if lot.quantite_restante < 5 %}text-error{% endif %}">
+                                    {{ lot.quantite_restante|floatformat:1 }}
+                                </span>
+                            </td>
+                            <td class="text-right font-mono">
+                                {{ lot.prix_achat_unitaire|fcfa }}
+                            </td>
+                            <td class="text-right font-mono font-bold">
+                                {{ lot.valeur_actuelle_stock|fcfa }}
+                            </td>
+                            <td class="text-right font-mono font-bold {% if lot_data.marge > 0 %}text-success{% else %}text-error{% endif %}">
+                                {{ lot_data.marge|fcfa }}
+                            </td>
+                            <td>
+                                {{ lot.date_reception|date:"d/m/Y" }}
+                            </td>
+                            <td class="text-center">
+                                {% if lot.pertes.exists %}
+                                <div class="tooltip" data-tip="Pertes: {{ lot.quantite_perdue_totale|floatformat:1 }} unités - {{ lot.quantite_perdue_totale|multiply:lot.prix_achat_unitaire|fcfa }}">
+                                    <span class="badge badge-error">
+                                        {{ lot.quantite_perdue_totale|floatformat:1 }}
+                                    </span>
+                                </div>
+                                {% else %}
+                                <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge 
+                                    {% if lot.quantite_restante == 0 %}badge-secondary
+                                    {% elif lot.quantite_restante < 30 %}badge-error
+                                    {% elif lot.quantite_restante > 200 %}badge-warning
+                                    {% else %}badge-success{% endif %}">
+                                    {% if lot.quantite_restante == 0 %}ÉPUISÉ
+                                    {% elif lot.quantite_restante < 20 %}FAIBLE
+                                    {% elif lot.quantite_restante > 200 %}ÉLEVÉ
+                                    {% else %}NORMAL{% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center text-gray-500 py-4">
+                                Aucun lot trouvé pour ce produit
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ventes mensuelles -->
+    {% if product_data.monthly_sales %}
+    <div class="card bg-base-100 shadow-xl mt-6">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Ventes Mensuelles</h2>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Mois</th>
+                            <th class="text-center">Quantité Vendue</th>
+                            <th class="text-right">Chiffre d'Affaires</th>
+                            <th class="text-right">Marge Obtenue</th>
+                            <th class="text-center">Taux Marge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mois in product_data.monthly_sales %}
+                        <tr>
+                            <td class="font-semibold">{{ mois.month_name }}</td>
+                            <td class="text-center">{{ mois.total_quantity|floatformat:1 }} unités</td>
+                            <td class="text-right font-mono">{{ mois.total_revenue|fcfa }}</td>
+                            <td class="text-right font-mono {% if mois.total_marge > 0 %}text-success{% else %}text-error{% endif %}">
+                                {{ mois.total_marge|fcfa }}
+                            </td>
+                            <td class="text-center">
+                                {% if mois.total_revenue > 0 %}
+                                {% widthratio mois.total_marge mois.total_revenue 100 as taux_marge %}
+                                <span class="badge 
+                                    {% if taux_marge > 30 %}badge-success
+                                    {% elif taux_marge > 15 %}badge-warning
+                                    {% else %}badge-error{% endif %}">
+                                    {{ taux_marge|floatformat:1 }}%
+                                </span>
+                                {% else %}
+                                <span class="badge badge-secondary">0%</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

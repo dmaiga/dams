@@ -1,0 +1,169 @@
+{% extends 'direction/base_admin.html' %}
+{% load humanize %}
+{% load format_fcfa %}
+
+{% block title %}Analyse des Produits{% endblock %}
+
+{% block content %}
+
+<!-- HTMX CDN -->
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+<style>
+.htmx-indicator {
+    display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    display: inline-block;
+}
+</style>
+
+<div class="container mx-auto p-4">
+
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Analyse des Produits</h1>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-primary text-sm">
+                    <i class="fas fa-boxes"></i>
+                    Stock Total
+                </h2>
+                <p class="text-xl font-bold">{{ kpis.total_stock|floatformat:1 }} unités</p>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-secondary text-sm">
+                    <i class="fas fa-warehouse"></i>
+                    Valeur Stock
+                </h2>
+                <p class="text-xl font-bold">{{ kpis.total_valeur_stock_disponible|fcfa }} FCFA</p>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-accent text-sm">
+                    <i class="fas fa-money-bill-wave"></i>
+                    Investissement
+                </h2>
+                <p class="text-xl font-bold">{{ kpis.valeur_achat_total|fcfa }} FCFA</p>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-info text-sm">
+                    <i class="fas fa-chart-line"></i>
+                    Chiffre d'Affaires
+                </h2>
+                <p class="text-xl font-bold">{{ kpis.ca_total|fcfa }} FCFA</p>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-error text-sm">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Pertes
+                </h2>
+                <p class="text-xl font-bold">{{ kpis.pertes_valeur|fcfa }} FCFA</p>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title text-success text-sm">
+                    <i class="fas fa-hand-holding-usd"></i>
+                    Marge Générée
+                </h2>
+                <p class="text-xl font-bold">{{ kpis.marge_totale|fcfa }} FCFA</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+
+            <h2 class="card-title">Filtres</h2>
+
+            <form 
+                hx-get="{% url 'product_list_partial' %}"
+                hx-target="#produit-table-container"
+                hx-trigger="change delay:500ms"
+                hx-indicator="#spinner"
+                class="flex flex-col md:flex-row gap-4 items-end"
+            >
+                <div class="form-control w-full md:w-auto">
+                    <label class="label">
+                        <span class="label-text">Fournisseur</span>
+                    </label>
+
+                    <select name="fournisseur" class="select select-bordered w-full">
+                        <option value="">Tous les fournisseurs</option>
+                        {% for supplier in suppliers %}
+                            <option value="{{ supplier.id }}"
+                                {% if current_filters.fournisseur == supplier.id|stringformat:"i" %}
+                                selected
+                                {% endif %}
+                            >
+                                {{ supplier.nom }} ({{ supplier.total_stock|floatformat:1 }} unités)
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <a href="{% url 'product_list' %}" class="btn btn-outline">
+                    <i class="fas fa-times"></i>
+                    Effacer
+                </a>
+
+            </form>
+
+            {% if selected_supplier %}
+            <div class="mt-4">
+                <div class="badge badge-info badge-lg">
+                    Fournisseur : {{ selected_supplier.nom }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Liste des produits (HTMX) -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="card-title">Liste des Produits</h2>
+                <div class="badge badge-primary badge-lg">
+                    {{ page_obj.paginator.count }} produit(s)
+                </div>
+            </div>
+
+            <!-- Conteneur rempli par HTMX -->
+            <div 
+                id="produit-table-container"
+                hx-get="{% url 'product_list_partial' %}"
+                hx-trigger="load"
+                hx-indicator="#spinner"
+            ></div>
+
+            <div id="spinner" class="htmx-indicator text-center mt-4">
+                <span class="loading loading-spinner loading-lg"></span>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

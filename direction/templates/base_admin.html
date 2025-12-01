@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="corporate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAMS – Backoffice</title>
+
+    <!-- DaisyUI + Tailwind -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Optionnel : Spinner / Loading -->
+    <style>
+    .htmx-indicator {
+        display:none;
+    }
+    .htmx-request .htmx-indicator {
+        display:inline-block;
+    }
+    </style>
+
+
+</head>
+
+<body class="bg-base-200">
+
+    <div class="drawer lg:drawer-open">
+        <input id="drawer-toggle" type="checkbox" class="drawer-toggle" />
+
+        <!-- ============================= -->
+        <!--          CONTENU             -->
+        <!-- ============================= -->
+        <div class="drawer-content flex flex-col">
+
+
+            <!-- CONTENU PAGE -->
+            <main class="p-4">
+                {% block content %}
+                {% endblock %}
+            </main>
+        </div>
+
+        <!-- ============================= -->
+        <!--            SIDEBAR            -->
+        <!-- ============================= -->
+        <div class="drawer-side is-drawer-close:overflow-visible">
+            <label for="drawer-toggle" class="drawer-overlay"></label>
+
+            <aside class="flex min-h-full flex-col bg-base-100 
+                           is-drawer-close:w-16 is-drawer-open:w-72 
+                           border-r border-base-300">
+
+                <!-- LOGO -->
+                <div class="p-5 border-b border-base-300 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-primary text-primary-content rounded-lg flex items-center justify-center">
+                        <i class="fa fa-warehouse"></i>
+                    </div>
+                    <span class="font-bold text-xl is-drawer-close:hidden">
+                        DAMS – Direction
+                    </span>
+                </div>
+
+                <!-- MENU -->
+                <ul class="menu p-4 w-full text-base grow">
+
+                    {% if request.user.agent.type_agent == 'direction' %}
+
+                    <!-- 🌐 VUE D'ENSEMBLE -->
+                    <li class="menu-title is-drawer-close:hidden">Vue d’Ensemble</li>
+
+                    <li>
+                        <a href="{% url 'dashboard' %}"
+                           class="{% if request.resolver_match.url_name == 'dashboard' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-tachometer-alt w-5"></i>
+                            <span class="is-drawer-close:hidden">Tableau de Bord</span>
+                        </a>
+                    </li>
+
+                    <!-- 🔍 ANALYSES -->
+                    <li class="menu-title is-drawer-close:hidden">Analyses Détaillées</li>
+
+                    <li>
+                        <a href="{% url 'agent_dashboard' %}"
+                           class="{% if request.resolver_match.url_name == 'analyse_agents' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-user-tie w-5"></i>
+                            <span class="is-drawer-close:hidden">Analyse Agents</span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{% url 'product_list' %}"
+                           class="{% if request.resolver_match.url_name == 'analyse_produits' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-cube w-5"></i>
+                            <span class="is-drawer-close:hidden">Analyse Produits</span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{% url 'analyse_clients' %}"
+                           class="{% if request.resolver_match.url_name == 'analyse_clients' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-users w-5"></i>
+                            <span class="is-drawer-close:hidden">Analyse Clients</span>
+                        </a>
+                    </li>
+
+                    <!-- 🏆 PERFORMANCES -->
+                    <li class="menu-title is-drawer-close:hidden">Performances</li>
+
+                    <li>
+                        <a href="{% url 'performance_agents' %}"
+                           class="{% if request.resolver_match.url_name == 'performance_agents' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-trophy w-5"></i>
+                            <span class="is-drawer-close:hidden">Performance Agents</span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{% url 'tous_les_bonus' %}"
+                           class="{% if request.resolver_match.url_name == 'tous_les_bonus' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-gift w-5"></i>
+                            <span class="is-drawer-close:hidden">Bonus & Primes</span>
+                        </a>
+                    </li>
+
+                    <!-- 💰 TRANSACTIONS -->
+                    <li class="menu-title is-drawer-close:hidden">Transactions</li>
+
+                    <li>
+                        <a href="{% url 'toutes_les_ventes' %}"
+                           class="{% if request.resolver_match.url_name == 'toutes_les_ventes' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-shopping-cart w-5"></i>
+                            <span class="is-drawer-close:hidden">Toutes les Ventes</span>
+                        </a>
+                    </li>
+
+                    <li>
+                        <a href="{% url 'toutes_les_dettes' %}"
+                           class="{% if request.resolver_match.url_name == 'toutes_les_dettes' %}active bg-primary text-primary-content{% endif %}
+                                  flex items-center gap-3">
+                            <i class="fas fa-file-invoice-dollar w-5"></i>
+                            <span class="is-drawer-close:hidden">Dettes & Crédits</span>
+                        </a>
+                    </li>
+
+                    {% endif %}
+                </ul>
+
+                <!-- FOOTER -->
+                <div class="p-4 border-t border-base-300 text-center text-sm opacity-70">
+<h1>DAM'S V 0.0.1</h1>
+                </div>
+
+            </aside>
+        </div>
+    </div>
+
+</body>
+</html>
