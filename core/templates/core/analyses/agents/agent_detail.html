@@ -27,7 +27,7 @@
                     </div>
                     <span class="text-sm font-medium">
                         {% if global_data.regularity_status == 'green' %}Régulier
-                        {% elif global_data.regularity_status == 'orange' %}Inactif 2-7 jours
+                        {% elif global_data.regularity_status == 'orange' %}Inactif 3-7 jours
                         {% else %}Inactif 7+ jours{% endif %}
                     </span>
                 </div>
@@ -41,20 +41,76 @@
     </div>
 
     <!-- Filtres périodiques -->
-    <div class="tabs tabs-boxed bg-base-200 p-1 justify-center">
-        <a href="?period=daily" class="tab {% if period_filter == 'daily' %}tab-active{% endif %}">
-            Journalier
-        </a>
-        <a href="?period=weekly" class="tab {% if period_filter == 'weekly' %}tab-active{% endif %}">
-            Hebdomadaire
-        </a>
-        <a href="?period=monthly" class="tab {% if period_filter == 'monthly' %}tab-active{% endif %}">
-            Mensuel
-        </a>
-        <a href="?period=yearly" class="tab {% if period_filter == 'yearly' %}tab-active{% endif %}">
-            Annuel
-        </a>
+<div class="bg-base-100 rounded-lg shadow-sm border p-4 mb-6">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div class="tabs tabs-boxed bg-base-200 p-1">
+            <a href="?period=yearly" class="tab {% if period_filter == 'yearly' %}tab-active{% endif %}">
+                Annuel
+            </a>
+            <a href="?period=monthly" class="tab {% if period_filter == 'monthly' %}tab-active{% endif %}">
+                Mensuel
+            </a>
+            <a href="?period=weekly" class="tab {% if period_filter == 'weekly' %}tab-active{% endif %}">
+                Hebdomadaire
+            </a>
+            <a href="?period=daily" class="tab {% if period_filter == 'daily' %}tab-active{% endif %}">
+                Journalier
+            </a>
+            <a href="?period=custom" 
+               class="tab {% if period_filter == 'custom' %}tab-active{% endif %}">
+                Personnalisé
+            </a>
+        </div>
+        
+        <!-- Formulaire pour période personnalisée -->
+        {% if period_filter == 'custom' %}
+        <form method="get" class="flex flex-wrap gap-2">
+            <input type="hidden" name="period" value="custom">
+            
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text text-sm">Du</span>
+                </label>
+                <input type="date" name="date_debut" 
+                       value="{{ custom_date_debut }}"
+                       class="input input-sm input-bordered" required>
+            </div>
+            
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text text-sm">Au</span>
+                </label>
+                <input type="date" name="date_fin" 
+                       value="{{ custom_date_fin }}"
+                       class="input input-sm input-bordered" required>
+            </div>
+            
+            <div class="form-control self-end">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="fas fa-filter mr-1"></i> Filtrer
+                </button>
+            </div>
+        </form>
+        {% endif %}
     </div>
+    
+    <!-- Période affichée -->
+    <div class="mt-3 text-sm text-gray-600">
+        <i class="fas fa-calendar-alt mr-1"></i>
+        Période :
+        {% if period_filter == 'custom' %}
+            Du {{ period_data.date_debut|date:"d/m/Y" }} au {{ period_data.date_fin|date:"d/m/Y" }}
+        {% elif period_filter == 'yearly' %}
+            Année {{ period_data.date_debut|date:"Y" }}
+        {% elif period_filter == 'monthly' %}
+            {{ period_data.date_debut|date:"F Y" }}
+        {% elif period_filter == 'weekly' %}
+            Semaine du {{ period_data.date_debut|date:"d/m/Y" }}
+        {% elif period_filter == 'daily' %}
+            {{ period_data.date_debut|date:"d/m/Y" }}
+        {% endif %}
+    </div>
+</div>
 
     <!-- Indicateurs Principaux -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -251,12 +307,12 @@
                 
                 <div class="space-y-4">
                     <div class="flex justify-between items-center p-3 bg-base-200 rounded-lg">
-                        <span class="font-medium">CA Total (vie)</span>
+                        <span class="font-medium">CA Total</span>
                         <span class="font-mono font-bold">{{ global_data.total_ca|fcfa }}</span>
                     </div>
                     
                     <div class="flex justify-between items-center p-3 bg-success/10 rounded-lg">
-                        <span class="font-medium">Marge Totale (vie)</span>
+                        <span class="font-medium">Marge Totale</span>
                         <span class="font-mono font-bold text-success">{{ period_data.marge_totale|fcfa }}</span>
                     </div>
                     

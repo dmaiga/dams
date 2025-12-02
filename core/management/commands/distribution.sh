@@ -31,17 +31,24 @@ def creer_distributions_multiple():
             sira = Agent.objects.get(user__username='sira.sidibe')
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
-                {
-                    'date': '21/11/2025', 
+
+                 {
+                    'date': '26/11/2025', 
                     'produit': 'ail',
+                    'lot_reference':'20251129-0001',
                     'specification': '',
                     'prix_gros': 9000,
                     'prix_detail': 10000,
+                    
                     'distributions': [  
-                        (fatoumata, 4, "Fatou"),
-                        
+                       (ramata, 1, "Fatou"),                        
+
                         ]
-                },
+                }
+               
+
+                	
+
              
                 
             ]
@@ -63,57 +70,70 @@ def creer_distributions_multiple():
                 
                 distributions_crees = []
 
-                
                 for agent, quantite, nom in config['distributions']:
-                    print(f"\n🎯 Distribution à {nom}: {quantite} unités de {config['produit']} ({config['specification']})...")
-                    
-                    # Trouver un lot disponible (sans filtrer par spécification car elle n'existe pas dans LotEntrepot)
-                    lot = LotEntrepot.objects.filter(
-                        produit__nom=config['produit'],
-                        quantite_restante__gte=quantite
-                    ).order_by('date_reception').first()
-                    
-                    if lot:
-                        # Créer distribution avec date rétroactive si nécessaire
-                        est_retroactive = date_distribution.date() < timezone.now().date()
-                        
-                        distrib = DistributionAgent.objects.create(
-                            superviseur=superviseur,
-                            agent_terrain=agent,
-                            date_distribution=date_distribution,
-                            est_retroactive=est_retroactive
-                        )
-                        
-                        # Créer détail AVEC la spécification
-                        DetailDistribution.objects.create(
-                            distribution=distrib,
-                            lot=lot,
-                            quantite=quantite,
-                            prix_gros=config['prix_gros'],
-                            prix_detail=config['prix_detail'],
-                            specification=config['specification']  # Spécification ajoutée ici
-                        )
-                        
-                        # Mettre à jour stock
-                        lot.quantite_restante -= quantite
-                        lot.save()
-                        
-                        # Mettre à jour totaux
-                        distrib._mettre_a_jour_totaux()
-                        
-                        distributions_crees.append(distrib)
-                        print(f"✅ Succès - Stock restant du lot: {lot.quantite_restante}")
-                        
-                        # Afficher info auto-distribution
-                        if agent == superviseur:
-                            print("   🤖 AUTO-DISTRIBUTION du superviseur")
-                            
-                        # Afficher info rétroactive
-                        if est_retroactive:
-                            print("   📅 DISTRIBUTION RÉTROACTIVE")
+
+                    print(f"\n🎯 Distribution à {nom}: {quantite} unités de {config['produit']}...")
+
+                    # --- SELECTION DU LOT ---
+                    if config.get('lot_reference'):
+                        lot = LotEntrepot.objects.filter(
+                            reference_lot=config['lot_reference'],
+                            quantite_restante__gte=quantite
+                        ).first()
                     else:
-                        print(f"❌ Échec - Stock insuffisant de {config['produit']} pour {nom}")
-                
+                        lot = LotEntrepot.objects.filter(
+                            produit__nom=config['produit'],
+                            quantite_restante__gte=quantite
+                        ).order_by('date_reception').first()
+
+                    if not lot:
+                        print(f"❌ Aucun lot disponible ou quantité insuffisante pour {nom}")
+                        continue
+
+                    # --- CREATION DISTRIBUTION ---
+                    est_retroactive = date_distribution.date() < timezone.now().date()
+
+                    distrib = DistributionAgent.objects.create(
+                        superviseur=superviseur,
+                        agent_terrain=agent,
+                        date_distribution=date_distribution,
+                        est_retroactive=est_retroactive
+                    )
+
+                    # --- DETAIL DISTRIBUTION ---
+                    detail = DetailDistribution.objects.create(
+                        distribution=distrib,
+                        lot=lot,
+                        quantite=quantite,
+                        prix_gros=config['prix_gros'],
+                        prix_detail=config['prix_detail'],
+                        specification=config['specification']
+                    )
+
+                    # --- MISE À JOUR STOCK ---
+                    lot.quantite_restante -= quantite
+                    lot.save()
+
+                    # --- GENERATION DU MOUVEMENT STOCK ---
+                    from core.models import MouvementStock
+
+                    MouvementStock.objects.create(
+                        type_mouvement="DISTRIBUTION",
+                        produit=lot.produit,
+                        lot=lot,
+                        agent=agent,
+                        quantite=quantite,
+                        detail_distribution=detail,
+                        date_mouvement=date_distribution
+                    )
+
+                    # --- MAJ TOTAUX ---
+                    distrib._mettre_a_jour_totaux()
+
+                    distributions_crees.append(distrib)
+
+                    print(f"✅ Distribution OK (Lot : {lot.reference_lot}) - Stock restant : {lot.quantite_restante}")
+
                 toutes_distributions.extend(distributions_crees)
                 
                 # Récapitulatif pour cette date

@@ -1,4 +1,4 @@
-{% extends 'direction/base_admin.html' %}
+{% extends 'base_admin.html' %}
 {% load humanize %}
 {% load format_fcfa %}
 
@@ -97,7 +97,7 @@
 
             <form 
                 hx-get="{% url 'product_list_partial' %}"
-                hx-target="#produit-table-container"
+                hx-target="#product-table-container"
                 hx-trigger="change delay:500ms"
                 hx-indicator="#spinner"
                 class="flex flex-col md:flex-row gap-4 items-end"
@@ -151,7 +151,7 @@
 
             <!-- Conteneur rempli par HTMX -->
             <div 
-                id="produit-table-container"
+                id="product-table-container"
                 hx-get="{% url 'product_list_partial' %}"
                 hx-trigger="load"
                 hx-indicator="#spinner"

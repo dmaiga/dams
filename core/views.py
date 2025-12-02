@@ -2737,14 +2737,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Récupération des paramètres de filtre
-        periode_type = self.request.GET.get('periode', 'mois')
+        # 🔵 Récupération des paramètres de filtre - ANNÉE par défaut
+        periode_type = self.request.GET.get('periode', 'annee')  # Changé 'mois' -> 'annee'
         annee = self.request.GET.get('annee')
         mois = self.request.GET.get('mois')
         
         # Conversion des paramètres
         if annee:
             annee = int(annee)
+        else:
+            # Si pas d'année spécifiée, prendre l'année courante
+            annee = timezone.now().year
+        
         if mois:
             mois = int(mois)
         
@@ -2812,7 +2816,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         })
         
         return context
-    
+
 class PerformanceAgentsView(LoginRequiredMixin, TemplateView):
     template_name = 'core/analyses/stat_agents.html'
     
@@ -3289,7 +3293,8 @@ from core.models import Agent
 from core.services.agent_analysis_service import AgentAnalysisService
 
 
-
+from django.utils import timezone
+from datetime import datetime
 
 class AgentDetailView(LoginRequiredMixin, DetailView):
     template_name = 'core/analyses/agents/agent_detail.html'
@@ -3300,13 +3305,39 @@ class AgentDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         agent = self.object
         
-        # Récupérer le filtre de période depuis les paramètres GET
-        period_filter = self.request.GET.get('period', 'monthly')
+        # Récupérer les paramètres de filtre
+        period_filter = self.request.GET.get('period', 'yearly')  # Par défaut: yearly
+        
+        # Pour le filtre personnalisé
+        date_debut = None
+        date_fin = None
+        
+        if period_filter == 'custom':
+            # Récupérer les dates du formulaire
+            date_debut_str = self.request.GET.get('date_debut')
+            date_fin_str = self.request.GET.get('date_fin')
+            
+            if date_debut_str and date_fin_str:
+                try:
+                    date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+                    date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+                    # Ajouter un jour pour inclure la date de fin
+                    date_fin = date_fin + timezone.timedelta(days=1)
+                except ValueError:
+                    period_filter = 'yearly'  # Retour au filtre annuel si dates invalides
         
         # Utilisation du service pour l'analyse détaillée
-        analysis_data = AgentAnalysisService.get_agent_detailed_analysis(agent, period_filter)
+        analysis_data = AgentAnalysisService.get_agent_detailed_analysis(
+            agent, period_filter, date_debut, date_fin
+        )
         
         context.update(analysis_data)
         context['period_filter'] = period_filter
         
+        # Passer les dates pour le formulaire personnalisé
+        if period_filter == 'custom':
+            context['custom_date_debut'] = self.request.GET.get('date_debut', '')
+            context['custom_date_fin'] = self.request.GET.get('date_fin', '')
+        
         return context
+

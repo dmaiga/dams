@@ -86,7 +86,7 @@ class LotEntrepot(models.Model):
     )
 
     def __str__(self):
-        return f"{self.produit.nom} - {self.reference_lot} - {self.quantite_restante} restants"
+        return f"{self.produit.nom} "
     
     def save(self, *args, **kwargs):
         # Si la valeur initiale n'est pas encore enregistrée, on la calcule UNE SEULE FOIS
@@ -782,7 +782,7 @@ class DetailDistribution(models.Model):
 
     def __str__(self):
         spec_info = f" - {self.specification}" if self.specification else ""
-        return f"{self.lot.produit.nom}{spec_info}"
+        return f"{self.lot.produit.nom} : Qt - {self.quantite} {spec_info}"
 
     @property
     def quantite_restante_calculee(self):
@@ -941,11 +941,18 @@ class Vente(models.Model):
     # Soft delete
     est_supprime = models.BooleanField(default=False, verbose_name="Supprimé")
     date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
+
     def __str__(self):
-         base_str = f"Vente {self.detail_distribution.lot} - {self.quantite} - {self.total_vente} FCFA"
-         if self.stagiaire:
-             return f"{base_str} [Stagiaire: {self.stagiaire.full_name}]"
-         return base_str
+        montant = int(self.total_vente)  # Supprime .0000
+        date_str = self.date_vente.strftime("%Y-%m-%d %H:%M")
+    
+        base_str = f"vente {self.detail_distribution.lot} - {self.quantite} - {montant} FCFA - {date_str}"
+    
+        if self.stagiaire:
+            return f"{base_str} [Stagiaire: {self.stagiaire.full_name}]"
+    
+        return base_str
+    
     
     def save(self, *args, **kwargs):
         is_new = self.pk is None

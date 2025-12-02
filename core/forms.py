@@ -1338,7 +1338,7 @@ class RecouvrementForm(forms.ModelForm):
             # Filtrer les ventes selon la règle métier
             queryset = Vente.objects.filter(
                 agent=self.agent,
-                ancienne_vente=False  # ← SEULEMENT les ventes NON anciennes
+                ancienne_vente=False 
             )
             
             # Pour superviseur recouvrant un agent terrain
@@ -1432,29 +1432,36 @@ class RecouvrementForm(forms.ModelForm):
         recouvrement = super().save(commit=False)
         vente = self.cleaned_data['vente']
         montant = self.cleaned_data['montant_recouvre']
-
-        # Affecter automatiquement l'agent si passé depuis la vue
+    
         if self.agent:
             recouvrement.agent = self.agent
-
-        # Lier la vente explicitement
+    
         recouvrement.vente = vente
-
-        #1️⃣ Enregistrer le recouvrement
+    
         if commit:
             recouvrement.save()
-
-        # 2️⃣ Si la vente est à CRÉDIT → mettre à jour la dette
+    
+        # 2️⃣ Mise à jour dette si crédit
         if vente.mode_paiement == 'credit' and hasattr(vente, 'dette') and vente.dette:
             dette = vente.dette
             dette.montant_restant = max(Decimal('0.00'), dette.montant_restant - montant)
             dette.save()
-
-        # 3️⃣ Calcul du bonus 48h (pour TOUTE vente)
+    
+        # 3️⃣ Bonus 48h
         recouvrement.calculer_bonus()
-
+    
+        # 4️⃣ Marquer la vente comme ANCIENNE si totalement recouvrée
+        if vente.mode_paiement == 'comptant':
+            vente.ancienne_vente = True
+            vente.save(update_fields=['ancienne_vente'])
+    
+        elif vente.mode_paiement == 'credit' and hasattr(vente, 'dette'):
+            if vente.dette.montant_restant == 0:
+                vente.ancienne_vente = True
+                vente.save(update_fields=['ancienne_vente'])
+    
         return recouvrement
-
+    
 # forms.py
 # forms.py
 

@@ -15,6 +15,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import Paginator
 
 
+
+
 class ProductListView(LoginRequiredMixin, ListView):
     template_name = 'core/analyses/produits/produit_liste.html'
     context_object_name = 'products_data'

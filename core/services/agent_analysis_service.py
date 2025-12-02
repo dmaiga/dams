@@ -1,3 +1,4 @@
+#/core/services/
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta, datetime
@@ -21,9 +22,9 @@ class AgentAnalysisService:
         if jours_inactifs == "Aucune vente":
             return 'red'
         
-        if jours_inactifs < 2:
+        if jours_inactifs < 3:
             return 'green'
-        elif 2 <= jours_inactifs <= 7:  
+        elif 3 <= jours_inactifs <= 7:  
             return 'orange'
         else:
             return 'red'
@@ -98,23 +99,6 @@ class AgentAnalysisService:
             'stock_details': stock_data,
             'total_produits_disponibles': total_produits,
         }
-
-    @staticmethod
-    def get_agent_detailed_analysis(agent, period_filter='monthly'):
-        """Analyse détaillée complète"""
-        period_data = AgentAnalysisService.get_agent_period_data(agent, period_filter)
-        global_data = AgentAnalysisService.get_agent_global_data(agent)
-        stock_data = AgentAnalysisService.get_agent_current_stock(agent)
-        
-        return {
-            'period_data': period_data,
-            'global_data': global_data,
-            'stock_data': stock_data,
-            'argent_possession': agent.argent_en_possession,
-            'total_recouvre': agent.total_recouvre,
-            'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
-        }
-
 
     @staticmethod
     def get_period_dates(period_type='monthly'):
@@ -502,3 +486,80 @@ class AgentAnalysisService:
             })
         
         return sorted(agents_data, key=lambda x: x['total_ca_semaine'], reverse=True)
+    
+    @staticmethod
+    def get_custom_period_data(agent, date_debut, date_fin):
+        """Retourne les données pour une période personnalisée"""
+        # Ventes personnelles pour la période personnalisée
+        ventes_periode = Vente.objects.filter(
+            agent=agent,
+            stagiaire__isnull=True,
+            date_vente__gte=date_debut,
+            date_vente__lt=date_fin
+        )
+
+        # Calculs de base
+        nombre_ventes = ventes_periode.count()
+        quantite_vendue = sum(vente.quantite for vente in ventes_periode)
+        ca_total = sum(vente.total_vente for vente in ventes_periode)
+
+        # Calcul de la marge
+        marge_totale = Decimal('0')
+        for vente in ventes_periode:
+            prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
+            marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
+            marge_totale += marge_vente
+
+        taux_marge = (marge_totale / ca_total * 100) if ca_total > 0 else 0
+
+        # Répartition par type de vente
+        ventes_gros = ventes_periode.filter(type_vente='gros')
+        ventes_detail = ventes_periode.filter(type_vente='detail')
+
+        quantite_gros = sum(vente.quantite for vente in ventes_gros)
+        quantite_detail = sum(vente.quantite for vente in ventes_detail)
+        ca_gros = sum(vente.total_vente for vente in ventes_gros)
+        ca_detail = sum(vente.total_vente for vente in ventes_detail)
+
+        pourcentage_gros = (quantite_gros / quantite_vendue * 100) if quantite_vendue > 0 else 0
+        pourcentage_detail = (quantite_detail / quantite_vendue * 100) if quantite_vendue > 0 else 0
+
+        return {
+            'period_type': 'custom',
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+            'nombre_ventes': nombre_ventes,
+            'quantite_vendue': quantite_vendue,
+            'ca_total': ca_total,
+            'marge_totale': marge_totale,
+            'taux_marge': round(taux_marge, 1),
+            'quantite_gros': quantite_gros,
+            'quantite_detail': quantite_detail,
+            'ca_gros': ca_gros,
+            'ca_detail': ca_detail,
+            'pourcentage_gros': round(pourcentage_gros, 1),
+            'pourcentage_detail': round(pourcentage_detail, 1),
+        }
+
+    @staticmethod
+    def get_agent_detailed_analysis(agent, period_filter='yearly', date_debut=None, date_fin=None):
+        """Analyse détaillée complète avec support période personnalisée"""
+        if period_filter == 'custom' and date_debut and date_fin:
+            period_data = AgentAnalysisService.get_custom_period_data(agent, date_debut, date_fin)
+        else:
+            period_data = AgentAnalysisService.get_agent_period_data(agent, period_filter)
+
+        global_data = AgentAnalysisService.get_agent_global_data(agent)
+        stock_data = AgentAnalysisService.get_agent_current_stock(agent)
+
+        return {
+            'period_data': period_data,
+            'global_data': global_data,
+            'stock_data': stock_data,
+            'argent_possession': agent.argent_en_possession,
+            'total_recouvre': agent.total_recouvre,
+            'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
+        }
+
+
+
