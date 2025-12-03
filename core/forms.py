@@ -1292,9 +1292,6 @@ class RapportDettesForm(forms.Form):
 # === FORMULAIRE RECOUVREMENT ===
 
 
-# === FORMULAIRE RECOUVREMENT ===
-# === FORMULAIRE RECOUVREMENT ===
-# === FORMULAIRE RECOUVREMENT ===
 class RecouvrementForm(forms.ModelForm):
     vente = forms.ModelChoiceField(
         queryset=Vente.objects.none(),

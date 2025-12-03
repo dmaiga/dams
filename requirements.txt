@@ -1,2 +1,4 @@
 django-mathfilters
 django-tinymce
+openpyxl
+reportlab

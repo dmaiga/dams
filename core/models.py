@@ -43,6 +43,30 @@ class Fournisseur(models.Model):
     email = models.EmailField(blank=True, null=True)
     date_ajout = models.DateTimeField(auto_now_add=True)
 
+    def get_dette_actuelle(self, date_debut=None, date_fin=None):
+        """Dette actuelle du fournisseur (produits écoulés seulement)"""
+        from .services.fournisseur_service import FournisseurAnalyseService
+        return FournisseurAnalyseService.get_dette_fournisseur(self.id, date_debut, date_fin)
+    
+    def get_stats_periode(self, date_debut=None, date_fin=None):
+        """Statistiques du fournisseur pour une période"""
+        from .services.fournisseur_service import FournisseurAnalyseService
+        return FournisseurAnalyseService.get_detail_fournisseur(self.id, date_debut, date_fin)
+    
+    @property
+    def nombre_lots_actifs(self):
+        """Nombre de lots actifs (avec stock restant)"""
+        return self.lotentrepot_set.filter(quantite_restante__gt=0).count()
+    
+    @property
+    def valeur_stock_total(self):
+        """Valeur totale du stock actuel"""
+        from django.db.models import Sum
+        result = self.lotentrepot_set.aggregate(
+            total=Sum(F('quantite_restante') * F('prix_achat_unitaire'))
+        )
+        return result['total'] or Decimal('0.00')
+    
     def __str__(self):
         return self.nom
 
@@ -1253,17 +1277,35 @@ class Recouvrement(models.Model):
         return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
     
     def calculer_bonus(self):
-        # Recouvrement ≤ 48h ?
-        if self.date_recouvrement <= self.vente.date_vente + timedelta(hours=48):
+        """
+        Bonus applicable UNIQUEMENT pour :
+        - ventes au détail
+        - recouvrement effectué dans les 48h
+        """
+
+        # 1️⃣ Le bonus ne concerne que les ventes détail
+        if self.vente.type_vente != "detail":
+            self.bonus_accorde = False
+            self.montant_bonus = Decimal("0.00")
+            self.save(update_fields=["bonus_accorde", "montant_bonus"])
+            return
+        
+        # 2️⃣ Vérifier la règle des 48h
+        limite_bonus = self.vente.date_vente + timedelta(hours=48)
+
+        if self.date_recouvrement <= limite_bonus:
             self.bonus_accorde = True
-            self.montant_bonus = self.vente.quantite * Decimal('100')
-            self.save()
-         # Ajouter au bonus de l’agent
+            self.montant_bonus = self.vente.quantite * Decimal("100")
+            self.save(update_fields=["bonus_accorde", "montant_bonus"])
+
+            # 3️⃣ Ajout au bonus de l’agent
             bonus_agent, _ = BonusAgent.objects.get_or_create(agent=self.agent)
             bonus_agent.ajouter_bonus(
                 montant=self.montant_bonus,
                 nb_produits=self.vente.quantite
-                   )
+            )
+
+
     class Meta:
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement"

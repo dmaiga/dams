@@ -1,0 +1,390 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block title %}Détail Fournisseur - {{ fournisseur.nom }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Bouton retour -->
+    <div class="mb-6">
+        <a href="{% url 'liste_fournisseurs' %}" class="btn btn-sm btn-outline btn-neutral">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Retour à la liste
+        </a>
+    </div>
+
+    <!-- En-tête -->
+    <div class="mb-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                    <span class=" p-2 rounded-lg">🏢</span>
+                    {{ fournisseur.nom }}
+                </h1>
+                <div class="flex flex-wrap gap-4 mt-3 text-gray-600">
+                    <div class="flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <span class="font-medium">Contact:</span> {{ fournisseur.contact|default:"Non spécifié" }}
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <span class="font-medium">Email:</span> {{ fournisseur.email|default:"Non spécifié" }}
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span class="font-medium">Ajouté le:</span> {{ fournisseur.date_ajout|date:"d/m/Y" }}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filtre période -->
+            <div class="bg-white p-4 rounded-lg shadow border border-gray-100">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="text-sm font-medium">Filtrer par période</span>
+                </div>
+                <form method="get" class="flex flex-col sm:flex-row gap-2">
+                    <div class="flex-1">
+                        <input type="date" name="date_debut" value="{{ date_debut }}" 
+                               class="input input-bordered input-sm w-full" placeholder="Début">
+                    </div>
+                    <div class="flex-1">
+                        <input type="date" name="date_fin" value="{{ date_fin }}" 
+                               class="input input-bordered input-sm w-full" placeholder="Fin">
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            Filtrer
+                        </button>
+                        <a href="?" class="btn btn-sm btn-outline btn-neutral">Tout</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- KPI Fournisseur - Version améliorée -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
+            <!-- Dette -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
+                <div class="text-sm text-gray-500 font-medium mb-1">Dette Totale</div>
+                <div class="text-2xl font-bold text-gray-800 mb-1">{{ kpi_fournisseur.dette_totale|fcfa }}</div>
+                <div class="text-xs text-gray-400">Montant écoulé</div>
+            </div>
+            
+            <!-- Stock restant -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
+                <div class="text-sm text-gray-500 font-medium mb-1">Stock Restant</div>
+                <div class="text-2xl font-bold text-gray-800 mb-1">{{ kpi_fournisseur.stock_restant|floatformat:0 }}</div>
+                <div class="text-xs text-gray-400">{{ kpi_fournisseur.valeur_stock_restant|fcfa }}</div>
+            </div>
+            
+            <!-- Pertes totales -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
+                <div class="text-sm text-gray-500 font-medium mb-1">Pertes Totales</div>
+                <div class="text-2xl font-bold text-gray-800 mb-1 
+                    {% if kpi_fournisseur.total_perdu > 0 %}text-red-600{% else %}text-gray-600{% endif %}">
+                    {{ kpi_fournisseur.total_perdu|floatformat:0 }}
+                </div>
+                <div class="text-xs text-gray-400">{{ kpi_fournisseur.taux_perte_moyen }}% moyenne</div>
+            </div>
+            
+            <!-- Écoulement -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
+                <div class="text-sm text-gray-500 font-medium mb-1">Écoulement</div>
+                <div class="text-2xl font-bold text-gray-800 mb-1 
+                    {% if kpi_fournisseur.taux_ecoulement_moyen >= 80 %}text-green-600
+                    {% elif kpi_fournisseur.taux_ecoulement_moyen >= 50 %}text-yellow-600
+                    {% else %}text-red-600{% endif %}">
+                    {{ kpi_fournisseur.taux_ecoulement_moyen }}%
+                </div>
+                <div class="text-xs text-gray-400">Moyenne des lots</div>
+            </div>
+            
+            <!-- Nombre de lots -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
+                <div class="text-sm text-gray-500 font-medium mb-1">Lots</div>
+                <div class="text-2xl font-bold text-gray-800 mb-1">{{ kpi_fournisseur.nombre_lots }}</div>
+                <div class="text-xs text-gray-400">Dans la période</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tableau des lots -->
+    <div class="mb-12">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <span class=" p-2 rounded-lg">📦</span>
+                Lots reçus
+            </h2>
+            <div class="text-sm text-gray-500">
+                {{ analyse_lots|length }} lot{{ analyse_lots|pluralize }}
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="font-semibold text-gray-700">Produit</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté reçue</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté vendue</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté perdue</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté restante</th>
+                            <th class="font-semibold text-gray-700 text-right">Prix achat</th>
+                            <th class="font-semibold text-gray-700 text-right">Dette lot</th>
+                            <th class="font-semibold text-gray-700">Date réception</th>
+                            <th class="font-semibold text-gray-700 text-center">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lot in analyse_lots %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                            <td class="font-medium">{{ lot.produit.nom }}</td>
+                            <td class="text-right font-semibold">{{ lot.quantite_recue|floatformat:0 }}</td>
+                            
+                            <!-- Quantité vendue -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="font-semibold">{{ lot.quantite_vendue|floatformat:0 }}</span>
+                                    <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
+                                                        {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
+                                                        {% else %}text-red-600{% endif %}">
+                                        {{ lot.ecoulement_pct }}%
+                                    </span>
+                                </div>
+                            </td>
+                            
+                            <!-- Quantité perdue -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="{% if lot.quantite_perdue > 0 %}font-semibold text-red-600{% else %}text-gray-600{% endif %}">
+                                        {{ lot.quantite_perdue|floatformat:0 }}
+                                    </span>
+                                    {% if lot.pourcentage_perte > 0 %}
+                                    <span class="text-xs text-red-500">{{ lot.pourcentage_perte }}%</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            
+                            <!-- Quantité restante -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="{% if lot.quantite_restante == 0 %}text-green-600 font-semibold
+                                                {% elif lot.quantite_restante < lot.quantite_recue|multiply:0.2 %}text-orange-600 font-semibold
+                                                {% else %}font-semibold{% endif %}">
+                                        {{ lot.quantite_restante|floatformat:0 }}
+                                    </span>
+                                    <span class="text-xs text-gray-500">{{ lot.prix_achat|fcfa }}/u</span>
+                                </div>
+                            </td>
+                            
+                            <td class="text-right">{{ lot.prix_achat|fcfa }}</td>
+                            
+                            <!-- Dette lot -->
+                            <td class="text-right">
+                                <span class="{% if lot.dette_lot > 0 %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
+                                    {{ lot.dette_lot|fcfa }}
+                                </span>
+                            </td>
+                            
+                            <td class="text-gray-600">{{ lot.date_reception|date:"d/m/Y" }}</td>
+                            
+                            <!-- Statut -->
+                            <td class="text-center">
+                                {% if lot.statut == "Épuisé" %}
+                                <span class="badge badge-success bg-green-100 text-green-800 border-green-200">Épuisé</span>
+                                {% elif lot.statut == "Faible stock" %}
+                                <span class="badge badge-warning bg-orange-100 text-orange-800 border-orange-200">Faible stock</span>
+                                {% else %}
+                                <span class="badge badge-info bg-blue-100 text-blue-800 border-blue-200">En stock</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-8 text-gray-500">
+                                <div class="flex flex-col items-center justify-center py-8">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                    <p class="text-lg font-medium">Aucun lot trouvé pour cette période</p>
+                                    <p class="text-sm mt-1">Modifiez les filtres pour voir plus de résultats</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Analyse commerciale -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <span class="p-2 rounded-lg">📈</span>
+                Analyse commerciale
+            </h2>
+            <div class="text-sm text-gray-500">
+                {{ produits_analyses|length }} produit{{ produits_analyses|pluralize }}
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="font-semibold text-gray-700">Produit</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté livrée</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté vendue</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté restante</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté perdue</th>
+                            <th class="font-semibold text-gray-700 text-right">CA généré</th>
+                            <th class="font-semibold text-gray-700 text-right">Marge brute</th>
+                            <th class="font-semibold text-gray-700 text-right">Écoulement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for produit in produits_analyses %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                            <td class="font-medium">{{ produit.produit.nom }}</td>
+                            
+                            <!-- Quantité livrée -->
+                            <td class="text-right font-semibold">{{ produit.quantite_livree|floatformat:0 }}</td>
+                            
+                            <!-- Quantité vendue -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="font-semibold">{{ produit.quantite_vendue|floatformat:0 }}</span>
+                                    <span class="text-xs {% if produit.pourcentage_ecoulement >= 80 %}text-green-600
+                                                        {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
+                                                        {% else %}text-red-600{% endif %}">
+                                        {{ produit.pourcentage_ecoulement }}%
+                                    </span>
+                                </div>
+                            </td>
+                            
+                            <!-- Quantité restante -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="{% if produit.quantite_restante == 0 %}text-green-600 font-semibold
+                                                {% elif produit.pourcentage_restant > 50 %}text-orange-600 font-semibold
+                                                {% else %}font-semibold{% endif %}">
+                                        {{ produit.quantite_restante|floatformat:0 }}
+                                    </span>
+                                    <span class="text-xs text-gray-500">{{ produit.pourcentage_restant }}%</span>
+                                </div>
+                            </td>
+                            
+                            <!-- Quantité perdue -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="{% if produit.quantite_perdue > 0 %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
+                                        {{ produit.quantite_perdue|floatformat:0 }}
+                                    </span>
+                                    {% if produit.pourcentage_perte > 0 %}
+                                    <span class="text-xs text-red-500">{{ produit.pourcentage_perte }}%</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            
+                            <!-- CA généré -->
+                            <td class="text-right">
+                                <span class="font-semibold">{{ produit.ca_genere|fcfa }}</span>
+                            </td>
+                            
+                            <!-- Marge brute -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="{% if produit.marge_brute > 0 %}text-green-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">
+                                        {{ produit.marge_brute|fcfa }}
+                                    </span>
+                                    <span class="text-xs {% if produit.taux_marge >= 30 %}text-green-600
+                                                        {% elif produit.taux_marge >= 15 %}text-yellow-600
+                                                        {% else %}text-red-600{% endif %}">
+                                        {{ produit.taux_marge }}%
+                                    </span>
+                                </div>
+                            </td>
+                            
+                            <!-- Écoulement avec barre de progression -->
+                            <td class="text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <span class="text-sm {% if produit.pourcentage_ecoulement >= 80 %}text-green-600
+                                                        {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
+                                                        {% else %}text-red-600{% endif %}">
+                                        {{ produit.pourcentage_ecoulement }}%
+                                    </span>
+                                    <progress 
+                                        class="progress w-16 h-2 {% if produit.pourcentage_ecoulement >= 80 %}progress-success
+                                                               {% elif produit.pourcentage_ecoulement >= 50 %}progress-warning
+                                                               {% else %}progress-error{% endif %}" 
+                                        value="{{ produit.pourcentage_ecoulement }}" 
+                                        max="100">
+                                    </progress>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-8 text-gray-500">
+                                <div class="flex flex-col items-center justify-center py-8">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                    <p class="text-lg font-medium">Aucune vente trouvée pour cette période</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pied de page -->
+    <div class="mt-12 pt-6 border-t border-gray-200">
+        <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Données mises à jour : {{ "now"|date:"d/m/Y H:i" }}
+            </div>
+            <a href="{% url 'liste_fournisseurs' %}" class="btn btn-outline btn-neutral">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Retour à la liste des fournisseurs
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.progress::-webkit-progress-bar {
+    background-color: #f3f4f6;
+    border-radius: 9999px;
+}
+.progress::-webkit-progress-value {
+    border-radius: 9999px;
+}
+.progress::-moz-progress-bar {
+    border-radius: 9999px;
+}
+</style>
+{% endblock %}

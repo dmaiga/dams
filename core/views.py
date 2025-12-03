@@ -2584,60 +2584,6 @@ def detail_stagiaire(request, stagiaire_id):
 #DASHBOARD
 #========
 
-@login_required
-def toutes_les_ventes(request):
-    """Voir toutes les ventes (pour administration)"""
-    ventes = Vente.objects.select_related(
-        'agent', 'client', 'detail_distribution__lot__produit'
-    ).order_by('-date_vente')
-    
-    # Filtres
-    date_debut = request.GET.get('date_debut')
-    date_fin = request.GET.get('date_fin')
-    agent_id = request.GET.get('agent')
-    type_vente = request.GET.get('type')
-    
-    if date_debut:
-        ventes = ventes.filter(date_vente__gte=date_debut)
-    if date_fin:
-        ventes = ventes.filter(date_vente__lte=date_fin)
-    if agent_id:
-        ventes = ventes.filter(agent_id=agent_id)
-    if type_vente:
-        ventes = ventes.filter(type_vente=type_vente)
-    
-    # Statistiques
-    total_ca = sum(vente.total_vente for vente in ventes)
-    clients_count = ventes.values('client').distinct().count()
-    agents_count = ventes.values('agent').distinct().count()
-    
-    ventes_gros = ventes.filter(type_vente='gros').count()
-    ventes_detail = ventes.filter(type_vente='detail').count()
-    
-    # Top agents par CA
-    top_agents = ventes.values(
-        'agent__user__first_name', 
-        'agent__user__last_name'
-    ).annotate(
-        total_ca=Sum(F('quantite') * F('prix_vente_unitaire'))
-    ).order_by('-total_ca')[:5]
-    
-    # Liste des agents pour le filtre
-    agents_list = Agent.objects.filter(type_agent='terrain')
-    
-    context = {
-        'ventes': ventes,
-        'total_ca': total_ca,
-        'clients_count': clients_count,
-        'agents_count': agents_count,
-        'ventes_gros': ventes_gros,
-        'ventes_detail': ventes_detail,
-        'top_agents': top_agents,
-        'agents_list': agents_list,
-        'toutes_ventes': True,
-    }
-    
-    return render(request, 'core/analyses/liste_ventes_admin.html', context)
 
 @login_required
 def toutes_les_dettes(request):

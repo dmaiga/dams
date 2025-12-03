@@ -1,0 +1,376 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block title %}Analyse des Ventes{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-4">
+    <!-- En-tête compact -->
+    <div class="mb-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+            <div class="flex items-center gap-3">
+                <a href="{% url 'dashboard' %}" class="btn btn-xs btn-outline btn-neutral">
+                    <i class="fas fa-arrow-left mr-1"></i>Retour
+                </a>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">Analyse des Ventes</h1>
+                    <p class="text-sm text-gray-600 mt-1">Ventes réalisées par les agents</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Export</span>
+                <button onclick="exportToExcel()" class="btn btn-xs btn-outline">
+                    <i class="fas fa-file-excel"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres compacts -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4">
+        <form method="get" class="space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <!-- Période -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Période</label>
+                    <select name="periode" id="periode-select" class="select select-sm select-bordered w-full" onchange="togglePeriodFields(this.value)">
+                        <option value="annee" {% if periode == 'annee' %}selected{% endif %}>Année</option>
+                        <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Mois</option>
+                        <option value="perso" {% if periode == 'perso' %}selected{% endif %}>Perso</option>
+                    </select>
+                </div>
+
+                <!-- Année -->
+                <div id="annee-field">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Année</label>
+                    <select name="annee" class="select select-sm select-bordered w-full">
+                        {% for year in years %}
+                        <option value="{{ year }}" {% if request.GET.annee|add:"0" == year or not request.GET.annee and year == current_year %}selected{% endif %}>
+                            {{ year }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Mois -->
+                <div id="mois-field" class="{% if periode != 'mois' %}hidden{% endif %}">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Mois</label>
+                    <select name="mois" class="select select-sm select-bordered w-full">
+                        {% for num, name in months %}
+                        <option value="{{ num }}" {% if request.GET.mois|add:"0" == num or not request.GET.mois and num == current_month %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Dates perso -->
+                <div id="perso-fields" class="{% if periode != 'perso' %}hidden{% endif %} md:col-span-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Début</label>
+                            <input type="date" name="date_debut" value="{{ request.GET.date_debut }}" 
+                                   class="input input-sm input-bordered w-full">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Fin</label>
+                            <input type="date" name="date_fin" value="{{ request.GET.date_fin }}" 
+                                   class="input input-sm input-bordered w-full">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Agent</label>
+                    <select name="agent" class="select select-sm select-bordered w-full">
+                        <option value="">Tous</option>
+                        {% for agent in agents_list %}
+                        <option value="{{ agent.id }}" {% if request.GET.agent == agent.id|stringformat:"i" %}selected{% endif %}>
+                            {{ agent.full_name|truncatechars:15 }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+                <!-- Type de vente -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                    <select name="type" class="select select-sm select-bordered w-full">
+                        <option value="">Tous</option>
+                        <option value="gros" {% if request.GET.type == 'gros' %}selected{% endif %}>Gros</option>
+                        <option value="detail" {% if request.GET.type == 'detail' %}selected{% endif %}>Détail</option>
+                    </select>
+                </div>
+
+                <!-- Boutons -->
+                <div class="md:col-span-3 flex items-end gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary flex-1">
+                        <i class="fas fa-search mr-1"></i>Filtrer
+                    </button>
+                    <a href="?" class="btn btn-sm btn-outline">
+                        <i class="fas fa-redo"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        <!-- Période active -->
+        {% if date_debut and date_fin %}
+        <div class="mt-3 p-2 bg-blue-50 rounded text-center">
+            <span class="text-xs font-medium text-blue-700">
+                {% if periode == 'annee' %}
+                    Année {{ request.GET.annee|default:current_year }}
+                {% elif periode == 'mois' %}
+                    {% for num, name in months %}
+                        {% if num == request.GET.mois|add:"0" or not request.GET.mois and num == current_month %}
+                            {{ name }}
+                        {% endif %}
+                    {% endfor %} {{ request.GET.annee|default:current_year }}
+                {% else %}
+                    {{ date_debut|date:"d/m/Y" }} → {{ date_fin|date:"d/m/Y" }}
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- KPI compacts -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <!-- CA -->
+        <div class="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-xs text-gray-500 font-medium">CA Total</div>
+                <i class="fas fa-money-bill-wave text-green-500 text-sm"></i>
+            </div>
+            <div class="text-lg font-bold text-gray-800">{{ total_ca|fcfa }}</div>
+            <div class="text-xs text-gray-500">{{ ventes_gros|add:ventes_detail }} ventes</div>
+        </div>
+
+        <!-- Marge -->
+        <div class="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-xs text-gray-500 font-medium">Marge</div>
+                <i class="fas fa-chart-line text-blue-500 text-sm"></i>
+            </div>
+            <div class="text-lg font-bold {% if total_marge > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                {{ total_marge|fcfa }}
+            </div>
+            <div class="text-xs text-gray-500">{{ taux_marge }}% de marge</div>
+        </div>
+
+        <!-- Quantité -->
+        <div class="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-xs text-gray-500 font-medium">Quantité</div>
+                <i class="fas fa-box text-purple-500 text-sm"></i>
+            </div>
+            <div class="text-lg font-bold text-gray-800">{{ total_quantite|floatformat:0 }}</div>
+            <div class="text-xs text-gray-500">unités vendues</div>
+        </div>
+
+        <!-- Agents -->
+        <div class="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-1">
+                <div class="text-xs text-gray-500 font-medium">Agents</div>
+                <i class="fas fa-users text-orange-500 text-sm"></i>
+            </div>
+            <div class="text-lg font-bold text-gray-800">{{ agents_count }}</div>
+            <div class="text-xs text-gray-500">{{ clients_count }} clients</div>
+        </div>
+    </div>
+
+    <!-- Tableau compact -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-3 border-b border-gray-100">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-700">Liste des Ventes</h3>
+                    <p class="text-xs text-gray-500 mt-1">{{ ventes.paginator.count }} résultats</p>
+                </div>
+                
+                <!-- Pagination compacte -->
+                {% if ventes.paginator.num_pages > 1 %}
+                <div class="flex items-center gap-1">
+                    {% if ventes.has_previous %}
+                    <a href="?page={{ ventes.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       class="btn btn-xs">«</a>
+                    {% endif %}
+                    
+                    <span class="text-xs text-gray-600 px-2">
+                        Page {{ ventes.number }} / {{ ventes.paginator.num_pages }}
+                    </span>
+                    
+                    {% if ventes.has_next %}
+                    <a href="?page={{ ventes.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       class="btn btn-xs">»</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="table table-sm table-zebra">
+                <thead class="bg-gray-50 text-xs">
+                    <tr>
+                        <th class="font-medium text-gray-700 px-3 py-2">Date</th>
+                        <th class="font-medium text-gray-700 px-3 py-2">Agent</th>
+                        <th class="font-medium text-gray-700 px-3 py-2">Produit</th>
+                        <th class="font-medium text-gray-700 px-3 py-2 text-right">Qté</th>
+                        <th class="font-medium text-gray-700 px-3 py-2 text-right">Prix</th>
+                        <th class="font-medium text-gray-700 px-3 py-2 text-right">CA</th>
+                        <th class="font-medium text-gray-700 px-3 py-2 text-right">Marge</th>
+                        <th class="font-medium text-gray-700 px-3 py-2">Type</th>
+                        
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for vente in ventes %}
+                    <tr class="hover:bg-gray-50">
+                        <!-- Date -->
+                        <td class="px-3 py-2">
+                            <div class="font-medium">{{ vente.date_vente|date:"d/m" }}</div>
+                            <div class="text-xs text-gray-500">{{ vente.date_vente|date:"H:i" }}</div>
+                        </td>
+                        
+                        <!-- Agent -->
+                        <td class="px-3 py-2">
+                            <div class="flex items-center gap-1">
+                                <div class="min-w-0">
+                                    <div class="font-medium truncate max-w-[100px]" title="{{ vente.agent.full_name }}">
+                                        {{ vente.agent.full_name }}
+                                    </div>
+                                    </div>
+                                {% if vente.stagiaire %}
+                                <span class="text-xs text-yellow-600" title="Stagiaire: {{ vente.stagiaire.full_name }}">👤</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        
+                        <!-- Produit -->
+                        <td class="px-3 py-2">
+                            <div class="font-medium truncate max-w-[120px]" title="{{ vente.produit_nom }}">
+                                {{ vente.produit_nom|truncatechars:15 }}
+                            </div>
+                            {% if vente.specification %}
+                            <div class="text-xs text-gray-500 truncate max-w-[120px]">{{ vente.specification|truncatechars:12 }}</div>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Quantité -->
+                        <td class="px-3 py-2 text-right">
+                            <span class="font-semibold">{{ vente.quantite|floatformat:1 }}</span>
+                        </td>
+                        
+                        <!-- Prix unitaire -->
+                        <td class="px-3 py-2 text-right">
+                            <span class="font-medium">{{ vente.prix_vente_unitaire|fcfa }}</span>
+                        </td>
+                        
+                        <!-- CA -->
+                        <td class="px-3 py-2 text-right">
+                            <span class="font-bold text-gray-800">{{ vente.total_vente|fcfa }}</span>
+                        </td>
+                        
+                        <!-- Marge -->
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex flex-col items-end">
+                                <span class="font-bold {% if vente.marge > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {{ vente.marge|default:0|fcfa }}
+                                </span>
+                                {% if vente.taux_marge %}
+                                <span class="text-xs {% if vente.taux_marge > 20 %}text-green-500{% elif vente.taux_marge > 0 %}text-yellow-500{% else %}text-red-500{% endif %}">
+                                    {{ vente.taux_marge|floatformat:0 }}%
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        
+                        <!-- Type -->
+                        <td class="px-3 py-2">
+                            {% if vente.type_vente == 'gros' %}
+                            <span class="badge badge-xs bg-blue-100 text-blue-800 border-blue-200">G</span>
+                            {% else %}
+                            <span class="badge badge-xs bg-purple-100 text-purple-800 border-purple-200">D</span>
+                            {% endif %}
+                        </td>
+                        
+                       
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center py-8 px-3">
+                            <div class="flex flex-col items-center justify-center">
+                                <i class="fas fa-shopping-cart text-gray-300 text-3xl mb-2"></i>
+                                <p class="text-sm font-medium text-gray-500">Aucune vente trouvée</p>
+                                <p class="text-xs text-gray-400 mt-1">Modifiez vos filtres</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pied de tableau -->
+        {% if ventes %}
+        <div class="p-3 border-t border-gray-100 bg-gray-50">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
+                <div class="text-gray-600">
+                    {{ ventes.start_index }}-{{ ventes.end_index }} sur {{ ventes.paginator.count }}
+                </div>
+
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Gestion des champs de période
+function togglePeriodFields(periode) {
+    const anneeField = document.getElementById('annee-field');
+    const moisField = document.getElementById('mois-field');
+    const persoFields = document.getElementById('perso-fields');
+    
+    // Masquer tous
+    [anneeField, moisField, persoFields].forEach(field => field?.classList.add('hidden'));
+    
+    // Afficher selon la période
+    if (periode === 'annee') {
+        anneeField?.classList.remove('hidden');
+    } else if (periode === 'mois') {
+        anneeField?.classList.remove('hidden');
+        moisField?.classList.remove('hidden');
+    } else if (periode === 'perso') {
+        persoFields?.classList.remove('hidden');
+    }
+}
+
+// Initialisation
+document.addEventListener('DOMContentLoaded', function() {
+    togglePeriodFields(document.getElementById('periode-select')?.value || 'annee');
+});
+
+// Export
+function exportToExcel() {
+    alert('Export disponible prochainement');
+}
+</script>
+
+<style>
+/* Styles pour rendre plus compact */
+.table-sm td, .table-sm th {
+    padding: 0.5rem 0.75rem;
+}
+.max-w-\[100px\] {
+    max-width: 100px;
+}
+.max-w-\[120px\] {
+    max-width: 120px;
+}
+</style>
+{% endblock %}

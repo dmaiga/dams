@@ -58,7 +58,7 @@ urlpatterns = [
     path('bonus/', views.consulter_bonus, name='consulter_bonus'),
     
     # Administration (toutes les données)
-    path('admin/ventes/', views.toutes_les_ventes, name='toutes_les_ventes'),
+
     path('admin/dettes/', views.toutes_les_dettes, name='toutes_les_dettes'),
     path('admin/bonus/', views.tous_les_bonus, name='tous_les_bonus'),
     
@@ -100,7 +100,7 @@ urlpatterns = [
     
     path('direction/analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
     path('direction/analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
-    path('direction/analyses/ventes', views.toutes_les_ventes, name='toutes_les_ventes'),  
+
     
     path('direction/performances/agents/', PerformanceAgentsView.as_view(), name='performance_agents'),
     
