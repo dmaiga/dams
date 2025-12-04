@@ -266,12 +266,12 @@
                             <td class="font-medium">{{ produit.produit.nom }}</td>
                             
                             <!-- Quantité livrée -->
-                            <td class="text-right font-semibold">{{ produit.quantite_livree|floatformat:0 }}</td>
+                            <td class="text-right font-semibold">{{ produit.quantite_livree|floatformat:2 }}</td>
                             
                             <!-- Quantité vendue -->
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
-                                    <span class="font-semibold">{{ produit.quantite_vendue|floatformat:0 }}</span>
+                                    <span class="font-semibold">{{ produit.quantite_vendue|floatformat:2 }}</span>
                                     <span class="text-xs {% if produit.pourcentage_ecoulement >= 80 %}text-green-600
                                                         {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
                                                         {% else %}text-red-600{% endif %}">
@@ -286,7 +286,7 @@
                                     <span class="{% if produit.quantite_restante == 0 %}text-green-600 font-semibold
                                                 {% elif produit.pourcentage_restant > 50 %}text-orange-600 font-semibold
                                                 {% else %}font-semibold{% endif %}">
-                                        {{ produit.quantite_restante|floatformat:0 }}
+                                        {{ produit.quantite_restante|floatformat:2 }}
                                     </span>
                                     <span class="text-xs text-gray-500">{{ produit.pourcentage_restant }}%</span>
                                 </div>
@@ -296,7 +296,7 @@
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
                                     <span class="{% if produit.quantite_perdue > 0 %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
-                                        {{ produit.quantite_perdue|floatformat:0 }}
+                                        {{ produit.quantite_perdue|floatformat:2 }}
                                     </span>
                                     {% if produit.pourcentage_perte > 0 %}
                                     <span class="text-xs text-red-500">{{ produit.pourcentage_perte }}%</span>

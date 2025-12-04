@@ -19,12 +19,13 @@
             </div>
             <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">Export</span>
-                <button onclick="exportToExcel()" class="btn btn-xs btn-outline">
+                <a href="{% url 'export_ventes_excel' %}?{{ request.GET.urlencode }}" class="btn btn-xs btn-outline">
                     <i class="fas fa-file-excel"></i>
-                </button>
+                </a>
             </div>
         </div>
     </div>
+
 
     <!-- Filtres compacts -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4">
@@ -87,7 +88,7 @@
                         <option value="">Tous</option>
                         {% for agent in agents_list %}
                         <option value="{{ agent.id }}" {% if request.GET.agent == agent.id|stringformat:"i" %}selected{% endif %}>
-                            {{ agent.full_name|truncatechars:15 }}
+                            {{ agent.full_name }}
                         </option>
                         {% endfor %}
                     </select>
@@ -115,6 +116,9 @@
                     </a>
                 </div>
             </div>
+            
+            <!-- Champs cachés pour conserver la pagination -->
+            <input type="hidden" name="page" value="1">
         </form>
 
         <!-- Période active -->
@@ -182,30 +186,60 @@
         </div>
     </div>
 
+
+
     <!-- Tableau compact -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
         <div class="p-3 border-b border-gray-100">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
                     <h3 class="text-sm font-semibold text-gray-700">Liste des Ventes</h3>
-                    <p class="text-xs text-gray-500 mt-1">{{ ventes.paginator.count }} résultats</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Affichage de {{ ventes.start_index }} à {{ ventes.end_index }} sur {{ ventes.paginator.count }} résultats
+                    </p>
                 </div>
                 
                 <!-- Pagination compacte -->
                 {% if ventes.paginator.num_pages > 1 %}
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-2">
+                    <!-- Bouton précédent -->
                     {% if ventes.has_previous %}
-                    <a href="?page={{ ventes.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
-                       class="btn btn-xs">«</a>
+                    <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ ventes.previous_page_number }}" 
+                       class="btn btn-xs btn-outline px-2">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% else %}
+                    <button class="btn btn-xs btn-outline px-2 disabled" disabled>
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
                     {% endif %}
                     
-                    <span class="text-xs text-gray-600 px-2">
-                        Page {{ ventes.number }} / {{ ventes.paginator.num_pages }}
-                    </span>
+                    <!-- Numéros de page -->
+                    <div class="flex items-center gap-1">
+                        {% for i in ventes.paginator.page_range %}
+                            {% if i == ventes.number %}
+                                <span class="px-2 py-1 text-xs font-medium bg-blue-500 text-white rounded">{{ i }}</span>
+                            {% elif i > ventes.number|add:"-3" and i < ventes.number|add:"3" %}
+                                <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ i }}" 
+                                   class="px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded">
+                                    {{ i }}
+                                </a>
+                            {% elif i == ventes.number|add:"-3" or i == ventes.number|add:"3" %}
+                                <span class="px-1 text-gray-400">...</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                     
+                    <!-- Bouton suivant -->
                     {% if ventes.has_next %}
-                    <a href="?page={{ ventes.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
-                       class="btn btn-xs">»</a>
+                    <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ ventes.next_page_number }}" 
+                       class="btn btn-xs btn-outline px-2">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% else %}
+                    <button class="btn btn-xs btn-outline px-2 disabled" disabled>
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -224,7 +258,6 @@
                         <th class="font-medium text-gray-700 px-3 py-2 text-right">CA</th>
                         <th class="font-medium text-gray-700 px-3 py-2 text-right">Marge</th>
                         <th class="font-medium text-gray-700 px-3 py-2">Type</th>
-                        
                     </tr>
                 </thead>
                 <tbody class="text-sm">
@@ -238,14 +271,14 @@
                         
                         <!-- Agent -->
                         <td class="px-3 py-2">
-                            <div class="flex items-center gap-1">
-                                <div class="min-w-0">
-                                    <div class="font-medium truncate max-w-[100px]" title="{{ vente.agent.full_name }}">
-                                        {{ vente.agent.full_name }}
-                                    </div>
-                                    </div>
-                                {% if vente.stagiaire %}
-                                <span class="text-xs text-yellow-600" title="Stagiaire: {{ vente.stagiaire.full_name }}">👤</span>
+                            <div class="flex flex-col">
+                                <div class="font-medium  max-w-[120px]" title="{{ vente.agent.full_name }}">
+                                    {{ vente.agent.full_name}}
+                                </div>
+                                {% if vente.stagiaire_nom_complet %}
+                                <div class="text-xs text-yellow-600  max-w-[120px]" title="Stagiaire: {{ vente.stagiaire_nom_complet }}">
+                                    👤 {{ vente.stagiaire_nom_complet }}
+                                </div>
                                 {% endif %}
                             </div>
                         </td>
@@ -297,12 +330,10 @@
                             <span class="badge badge-xs bg-purple-100 text-purple-800 border-purple-200">D</span>
                             {% endif %}
                         </td>
-                        
-                       
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center py-8 px-3">
+                        <td colspan="8" class="text-center py-8 px-3">
                             <div class="flex flex-col items-center justify-center">
                                 <i class="fas fa-shopping-cart text-gray-300 text-3xl mb-2"></i>
                                 <p class="text-sm font-medium text-gray-500">Aucune vente trouvée</p>
@@ -320,9 +351,37 @@
         <div class="p-3 border-t border-gray-100 bg-gray-50">
             <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
                 <div class="text-gray-600">
-                    {{ ventes.start_index }}-{{ ventes.end_index }} sur {{ ventes.paginator.count }}
+                    Page {{ ventes.number }} sur {{ ventes.paginator.num_pages }}
                 </div>
-
+                
+                <!-- Pagination bas de page -->
+                {% if ventes.paginator.num_pages > 1 %}
+                <div class="flex items-center gap-2">
+                    <!-- Bouton précédent -->
+                    {% if ventes.has_previous %}
+                    <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ ventes.previous_page_number }}" 
+                       class="btn btn-xs btn-outline">
+                        <i class="fas fa-chevron-left mr-1"></i>Précédent
+                    </a>
+                    {% else %}
+                    <button class="btn btn-xs btn-outline disabled" disabled>
+                        <i class="fas fa-chevron-left mr-1"></i>Précédent
+                    </button>
+                    {% endif %}
+                    
+                    <!-- Bouton suivant -->
+                    {% if ventes.has_next %}
+                    <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ ventes.next_page_number }}" 
+                       class="btn btn-xs btn-outline">
+                        Suivant<i class="fas fa-chevron-right ml-1"></i>
+                    </a>
+                    {% else %}
+                    <button class="btn btn-xs btn-outline disabled" disabled>
+                        Suivant<i class="fas fa-chevron-right ml-1"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -354,11 +413,6 @@ function togglePeriodFields(periode) {
 document.addEventListener('DOMContentLoaded', function() {
     togglePeriodFields(document.getElementById('periode-select')?.value || 'annee');
 });
-
-// Export
-function exportToExcel() {
-    alert('Export disponible prochainement');
-}
 </script>
 
 <style>
@@ -366,11 +420,9 @@ function exportToExcel() {
 .table-sm td, .table-sm th {
     padding: 0.5rem 0.75rem;
 }
-.max-w-\[100px\] {
-    max-width: 100px;
-}
 .max-w-\[120px\] {
     max-width: 120px;
 }
 </style>
 {% endblock %}
+[file content end]

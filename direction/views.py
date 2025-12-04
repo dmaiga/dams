@@ -232,8 +232,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
     template_name = "direction/analyses/ventes/liste_ventes_admin.html"
     context_object_name = "ventes"
-    paginate_by = 30
-
+  
     def test_func(self):
         return (
             self.request.user.agent.est_direction
@@ -269,56 +268,52 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        ventes = self.filtered_queryset
         params = self.request.GET
+        ventes_filtrees = self.filtered_queryset
+        page_obj = context["ventes"]
 
-        # Stats avec marge
-        stats = VenteAnalyseService.compute_stats(ventes)
-
-        # Top agents
-        top_agents = VenteAnalyseService.compute_top_agents(ventes)
-
-        # Liste des agents (pour le filtre)
+        # --------------------------
+        # Stats globales (toutes ventes filtrées)
+        # --------------------------
+        stats = VenteAnalyseService.compute_stats(ventes_filtrees)
+        top_agents = VenteAnalyseService.compute_top_agents(ventes_filtrees)
         agents_list = VenteAnalyseService.get_agents_list()
 
-        # Années pour le filtre
+        # --------------------------
+        # Marge pour la page ACTIVE SEULEMENT
+        # --------------------------
+        for vente in page_obj:
+            prix_achat = getattr(
+                vente.detail_distribution.lot, 
+                'prix_achat_unitaire', 
+                Decimal('0.00')
+            )
+
+            cout_total = vente.quantite * prix_achat
+            marge = vente.total_vente - cout_total
+            taux_marge = (marge / vente.total_vente * 100) if vente.total_vente > 0 else 0
+
+            vente.marge = marge
+            vente.taux_marge = taux_marge
+            
+            # Ajouter le nom complet du stagiaire si présent
+            if vente.stagiaire:
+                vente.stagiaire_nom_complet = vente.stagiaire.full_name
+            else:
+                vente.stagiaire_nom_complet = None
+
+        # --------------------------
+        # Mise en contexte
+        # --------------------------
         current_year = datetime.now().year
-        years = list(range(current_year - 2, current_year + 3))
-        
-        # Mois pour le filtre
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),
             (5, 'Mai'), (6, 'Juin'), (7, 'Juil'), (8, 'Août'),
             (9, 'Sep'), (10, 'Oct'), (11, 'Nov'), (12, 'Déc')
         ]
 
-        # Calculer la marge pour chaque vente (plus simple que dans le service)
-        ventes_avec_marge = []
-        for vente in context['ventes']:
-            # Calculer la marge pour chaque vente
-            prix_achat = getattr(vente.detail_distribution.lot, 'prix_achat_unitaire', Decimal('0.00'))
-            cout_total = vente.quantite * prix_achat
-            marge = vente.total_vente - cout_total
-            
-            # Calculer le taux de marge (éviter division par zéro)
-            taux_marge = Decimal('0.00')
-            if vente.total_vente > 0:
-                taux_marge = (marge / vente.total_vente) * 100
-            
-            # Ajouter les attributs à la vente
-            vente.marge = marge
-            vente.taux_marge = taux_marge
-            vente.prix_achat = prix_achat
-            ventes_avec_marge.append(vente)
-        
-        # Remplacer le queryset par notre liste avec marge
-        context['ventes'] = ventes_avec_marge
-
-        # Calculer les totaux de la page
-        page_total_ca = sum(v.total_vente for v in ventes_avec_marge)
-        page_total_marge = sum(v.marge for v in ventes_avec_marge)
-
         context.update({
+            # KPI globaux
             "total_ca": stats["total_ca"],
             "total_marge": stats["total_marge"],
             "taux_marge": round(stats["taux_marge"], 1),
@@ -327,21 +322,21 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "total_quantite": stats["total_quantite"],
             "clients_count": stats["clients_count"],
             "agents_count": stats["agents_count"],
+
+            # Autres
             "top_agents": top_agents,
             "agents_list": agents_list,
-            "years": years,
+            "years": list(range(current_year - 2, current_year + 3)),
             "months": months,
             "current_year": current_year,
             "current_month": datetime.now().month,
             "periode": self.periode,
             "date_debut": self.date_debut,
             "date_fin": self.date_fin,
-            "page_total_ca": page_total_ca,
-            "page_total_marge": page_total_marge,
         })
 
         return context
-    
+
 class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
 
