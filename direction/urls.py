@@ -19,12 +19,12 @@ urlpatterns = [
     # Liste des fournisseurs
     path('direction/fournisseurs/liste/', 
          AnalyseFournisseursView.as_view(), 
-         name='liste_fournisseurs'),
+         name='liste_fournisseurs_direction'),
     
     # Détail d'un fournisseur
     path('direction/fournisseurs/<int:pk>/detail/', 
          DetailFournisseurView.as_view(), 
-         name='detail_fournisseur'),
+         name='detail_fournisseur_direction'),
     
      path('direction/ventes', ToutesLesVentesView.as_view(), name='toutes_les_ventes'),  
 

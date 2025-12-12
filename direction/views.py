@@ -33,29 +33,46 @@ from core.models import Vente
 from direction.services.vente_export import VenteExportService
 from datetime import datetime
 
-
-
-
 #Product
 
 class ProductListView(LoginRequiredMixin, ListView):
+    """
+    View to display a paginated list of products with filtering options by supplier.
+    Provides additional context data such as KPIs and sales statistics.
+    """
+
     template_name = 'core/analyses/produits/produit_liste.html'
     context_object_name = 'products_data'
     paginate_by = 20
-    
+
     def get_queryset(self):
+        """
+        Retrieve the list of products filtered by the selected supplier.
+
+        Returns:
+            QuerySet: A list of products filtered by supplier if provided.
+        """
         supplier_id = self.request.GET.get('fournisseur')
         return ProductAnalysisService.get_products_by_supplier(supplier_id)
-    
+
     def get_context_data(self, **kwargs):
+        """
+        Add additional context data to the template, including KPIs, suppliers, and sales statistics.
+
+        Args:
+            **kwargs: Additional keyword arguments passed to the context.
+
+        Returns:
+            dict: The context data for the template.
+        """
         context = super().get_context_data(**kwargs)
-        
+
         # KPI globaux
         context['kpis'] = ProductAnalysisService.get_product_kpis()
-        
+
         # Liste des fournisseurs pour le filtre
         context['suppliers'] = ProductAnalysisService.get_suppliers_with_stats()
-        
+
         # Fournisseur sélectionné
         selected_supplier_id = self.request.GET.get('fournisseur')
         if selected_supplier_id:
@@ -63,26 +80,26 @@ class ProductListView(LoginRequiredMixin, ListView):
                 context['selected_supplier'] = Fournisseur.objects.get(id=selected_supplier_id)
             except Fournisseur.DoesNotExist:
                 context['selected_supplier'] = None
-        
+
         # Paramètres de filtrage
         context['current_filters'] = {
             'fournisseur': selected_supplier_id
         }
-        
+
         # Ventes par agent pour le fournisseur sélectionné
         if selected_supplier_id:
             context['ventes_par_agent'] = ProductAnalysisService.get_ventes_par_agent(selected_supplier_id)
-        
+
         # Pagination manuelle
         products_data = self.get_queryset()
         paginator = Paginator(products_data, self.paginate_by)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        
+
         context['page_obj'] = page_obj
         context['products_data'] = page_obj.object_list
         context['is_paginated'] = page_obj.has_other_pages()
-        
+
         return context
     
 class ProductDetailView(LoginRequiredMixin, DetailView):
@@ -249,6 +266,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         # 2) filtres agent + type
         agent_id = params.get("agent")
         type_vente = params.get("type")
+        produit_id = params.get("produit") 
 
         # 3) appel service
         qs = VenteAnalyseService.filter_ventes(
@@ -256,6 +274,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             date_fin=date_fin,
             agent_id=agent_id,
             type_vente=type_vente,
+            produit_id=produit_id
         )
 
         self.filtered_queryset = qs
@@ -323,6 +342,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "clients_count": stats["clients_count"],
             "agents_count": stats["agents_count"],
 
+
             # Autres
             "top_agents": top_agents,
             "agents_list": agents_list,
@@ -333,6 +353,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "periode": self.periode,
             "date_debut": self.date_debut,
             "date_fin": self.date_fin,
+            "produits_list": Produit.objects.all().order_by("nom"),
         })
 
         return context

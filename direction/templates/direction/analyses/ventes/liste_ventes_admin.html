@@ -80,6 +80,18 @@
                         </div>
                     </div>
                 </div>
+                <!-- Produit -->
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Produit</label>
+                    <select name="produit" class="select select-sm select-bordered w-full">
+                        <option value="">Tous</option>
+                        {% for p in produits_list %}
+                        <option value="{{ p.id }}" {% if request.GET.produit == p.id|stringformat:"i" %}selected{% endif %}>
+                            {{ p.nom|upper }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                 </div>
 
                 <!-- Agent -->
                 <div>

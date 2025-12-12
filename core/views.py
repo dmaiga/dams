@@ -386,7 +386,7 @@ def detail_fournisseur(request, fournisseur_id):
     produits_populaires = lots.values('produit__nom').annotate(
         total_achete=Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
         nb_lots=Count('id')
-    ).order_by('-total_achete')[:5]
+    ).order_by('-total_achete')
     
     # Évolution des achats (3 derniers mois)
     date_limite = timezone.now() - timedelta(days=90)
@@ -875,14 +875,15 @@ def restaurer_distribution(request, distribution_id):
     
     return render(request, 'core/distribution/restaurer_distribution.html', context)
 
-
 @login_required
 def liste_distributions(request):
     """Liste toutes les distributions - Vue épurée"""
+    
     # Filtres
     show_deleted = request.GET.get('show_deleted') == 'true'
     type_filter = request.GET.get('type')
     agent_filter = request.GET.get('agent')
+    lot_filter = request.GET.get('lot')  # ⬅ Nouveau filtre
     date_debut = request.GET.get('date_debut')
     date_fin = request.GET.get('date_fin')
     
@@ -904,8 +905,13 @@ def liste_distributions(request):
         distributions = distributions.filter(date_distribution__gte=date_debut)
     if date_fin:
         distributions = distributions.filter(date_distribution__lte=date_fin)
-    
-    # Calcul des totaux globaux
+    if lot_filter:
+        distributions = distributions.filter(
+            detaildistribution__lot_id=lot_filter
+        ).distinct()
+
+
+    # Calcul des totaux
     total_distributions = distributions.count()
     total_quantite = sum(dist.quantite_totale for dist in distributions)
     total_valeur_gros = sum(dist.valeur_gros_totale for dist in distributions)
@@ -917,7 +923,11 @@ def liste_distributions(request):
         'total_quantite': total_quantite,
         'total_valeur_gros': total_valeur_gros,
         'total_valeur_detail': total_valeur_detail,
+
+        # Filtres
         'agents_terrain': Agent.objects.filter(type_agent='terrain'),
+        'lots': LotEntrepot.objects.select_related("produit", "fournisseur").all(),
+        'filter_lot': lot_filter,
         'filter_type': type_filter,
         'filter_agent': agent_filter,
         'date_debut': date_debut,
@@ -2687,7 +2697,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         periode_type = self.request.GET.get('periode', 'annee')  # Changé 'mois' -> 'annee'
         annee = self.request.GET.get('annee')
         mois = self.request.GET.get('mois')
-        
+        agents_inactifs = DashboardService.get_agents_inactifs(depuis_jours=3)
+
         # Conversion des paramètres
         if annee:
             annee = int(annee)
@@ -2731,7 +2742,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context.update({
             # KPI Globaux
             **kpis_globaux,
-            
+            "agents_inactifs": agents_inactifs,
             # Stock ESSENTIEL avec fournisseurs
             'stock_essentiel': stock_essentiel,
             

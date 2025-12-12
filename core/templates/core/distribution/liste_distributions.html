@@ -41,6 +41,19 @@
                         {% endfor %}
                     </select>
                 </div>
+<div class="col-auto">
+    <select name="lot" class="form-select form-select-sm" style="width: 200px;">
+        <option value="">Tous les lots</option>
+        {% for lot in lots %}
+        <option value="{{ lot.id }}" {% if filter_lot == lot.id|stringformat:"s" %}selected{% endif %}>
+            {{ lot.produit.nom }} - 
+            {{ lot.fournisseur.nom|default:"" }} - 
+            {{ lot.date_reception|date:"d/m/Y" }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+
                 <div class="col-auto">
                     <input type="date" name="date_debut" class="form-control form-control-sm" 
                            value="{{ date_debut }}" placeholder="Début" style="width: 140px;">
@@ -147,13 +160,13 @@
                         <tr>
                             <th class="ps-3" style="width: 80px;">ID</th>
                             <th style="width: 120px;">Date</th>
-                            <th>Superviseur</th>
+                            <th>Produits</th>
                             <th>Destinataire</th>
-                            <th class="text-center" style="width: 100px;">Type</th>
-                            <th class="text-center" style="width: 100px;">Quantité</th>
-                            <th class="text-end" style="width: 130px;">Valeur Gros</th>
-                            <th class="text-end" style="width: 130px;">Valeur Détail</th>
-                            <th class="text-center" style="width: 100px;">Actions</th>
+
+                            <th class="text-center">Quantité</th>
+                            <th class="text-end" >Valeur Gros</th>
+                            <th class="text-end" >Valeur Détail</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -174,14 +187,20 @@
                             </td>
                             
                             <!-- Superviseur -->
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-xs bg-primary bg-opacity-10 text-primary rounded-circle me-2 d-flex align-items-center justify-content-center">
-                                        <i class="fas fa-user-tie fs-6"></i>
-                                    </div>
-                                    <span class="fw-medium">{{ dist.superviseur.full_name|truncatechars:18 }}</span>
-                                </div>
-                            </td>
+<td>
+    {% for det in dist.detaildistribution.all %}
+        <div class="d-flex align-items-center mb-1">
+            <div class="avatar-xs bg-primary bg-opacity-10 text-primary rounded-circle me-2 d-flex align-items-center justify-content-center">
+                <i class="fas fa-box fs-6"></i>
+            </div>
+            <span class="fw-medium">
+                {{ det.lot.produit.nom|truncatechars:20 }}
+            </span>
+        </div>
+    {% endfor %}
+</td>
+
+
                             
                             <!-- Destinataire -->
                             <td>
@@ -200,14 +219,7 @@
                                 </div>
                             </td>
                             
-                            <!-- Type -->
-                            <td class="text-center">
-                                {% if dist.type_distribution == 'AUTO' %}
-                                <span >Auto</span>
-                                {% else %}
-                                <span >Terrain</span>
-                                {% endif %}
-                            </td>
+
                             
                             <!-- Quantité -->
                             <td class="text-center">

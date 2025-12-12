@@ -10,7 +10,43 @@ from core.models import Vente, Agent
 
 class VenteAnalyseService:
     """Service d'analyse des ventes pour filtres, stats et top agents."""
-
+    
+    @staticmethod
+    def get_agents_inactifs(depuis_jours=3):
+        """Retourne la liste des agents qui n'ont pas fait de ventes depuis X jours."""
+        seuil = timezone.now() - timedelta(days=depuis_jours)
+    
+        agents = Agent.objects.filter(type_agent__in=["terrain", "entrepot"])
+        agents_inactifs = []
+    
+        for agent in agents:
+            # Dernière vente
+            derniere_vente = (
+                Vente.objects.filter(agent=agent)
+                .order_by('-date_vente')
+                .first()
+            )
+    
+            if derniere_vente:
+                if derniere_vente.date_vente < seuil:
+                    agents_inactifs.append({
+                        "nom": agent.full_name,
+                        "jours_depuis": (timezone.now() - derniere_vente.date_vente).days,
+                        "derniere_vente": derniere_vente.date_vente,
+                    })
+            else:
+                # Aucun historique de vente
+                agents_inactifs.append({
+                    "nom": agent.full_name,
+                    "jours_depuis": None,
+                    "derniere_vente": None,
+                })
+    
+        # Trier : ceux sans ventes d'abord, puis les plus anciens
+        agents_inactifs.sort(key=lambda x: (x["jours_depuis"] is not None, x["jours_depuis"]))
+        return agents_inactifs
+    
+    
     @staticmethod
     def normalize_period(periode, params):
         """Retourne date_debut, date_fin en fonction du type de période."""
@@ -49,8 +85,10 @@ class VenteAnalyseService:
         return date_debut, date_fin
 
     # ----------------------------------------------------------------------
+   
     @staticmethod
-    def filter_ventes(date_debut, date_fin, agent_id=None, type_vente=None):
+    def filter_ventes(date_debut, date_fin, agent_id=None, type_vente=None, produit_id=None):
+
         """Retourne le queryset filtré selon période + filtres agent / type."""
         qs = Vente.objects.select_related(
             "agent",
@@ -66,6 +104,8 @@ class VenteAnalyseService:
             qs = qs.filter(agent_id=agent_id)
         if type_vente:
             qs = qs.filter(type_vente=type_vente)
+        if produit_id:
+            qs = qs.filter(detail_distribution__lot__produit_id=produit_id)
 
         return qs
 

@@ -339,6 +339,50 @@
         </div>
     </div>
 
+{% if agents_inactifs %}
+<div class="card bg-base-100 shadow-xl mb-8">
+    <div class="card-body">
+        <h2 class="card-title text-lg mb-4 text-warning">
+            <i class="fas fa-user-clock mr-2"></i>
+            Agents inactifs depuis plus de 3 jours
+        </h2>
+
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                    <tr class="bg-base-200">
+                        <th>Agent</th>
+                        <th class="text-center">Dernière vente</th>
+                        <th class="text-center">Jours sans vente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in agents_inactifs %}
+                    <tr>
+                        <td class="font-semibold">{{ a.nom }}</td>
+                        <td class="text-center">
+                            {% if a.derniere_vente %}
+                                {{ a.derniere_vente|date:"d/m/Y H:i" }}
+                            {% else %}
+                                <span class="badge badge-error">Aucune vente</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if a.jours_depuis %}
+                                <span class="badge badge-warning">{{ a.jours_depuis }} jours</span>
+                            {% else %}
+                                <span class="badge badge-error">Jamais</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
     <!-- Tendance des Ventes 7 jours -->
     {% if tendance_7j %}
     <div class="card bg-base-100 shadow-xl mb-8">

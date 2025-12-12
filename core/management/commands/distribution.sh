@@ -29,26 +29,51 @@ def creer_distributions_multiple():
             kani = Agent.objects.get(user__username='kani.traore')
             ramata = Agent.objects.get(user__username='ramata.sangare')
             sira = Agent.objects.get(user__username='sira.sidibe')
+            noumoutene =  Agent.objects.get(user__username='noumoutene.toure')
+
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
 
                  {
-                    'date': '26/11/2025', 
+                    'date': '09/12/2025', 
                     'produit': 'ail',
-                    'lot_reference':'20251129-0001',
+                    'lot_reference':'20251205-0001',
                     'specification': '',
-                    'prix_gros': 9000,
+                    'prix_gros': 8750,
                     'prix_detail': 10000,
                     
                     'distributions': [  
-                       (ramata, 1, "Fatou"),                        
-
+                       
+                       (fatoumata, 3, "Fatou"),  
+                     (ramata, 1, "Ramata"), 
+                        (alpha, 1, "Alpha"), 
+                           
+                
                         ]
-                }
-               
-
-                	
-
+                },
+                
+                 {
+                    'date': '10/12/2025', 
+                    'produit': 'ail',
+                    'lot_reference':'20251205-0001',
+                    'specification': '',
+                    'prix_gros': 8750,
+                    'prix_detail': 10000,
+                    
+                    'distributions': [  
+                       
+                       (fatoumata, 5, "Fatou"),  
+                     (abdoulaye, 9, "Abdoulaye"), 
+                        (djenebaS, 10, "Djeneba S."), 
+                        (moussony, 4, "Moussony"), 
+                           (djenebaC, 6, "Djeneba C."), 
+                        (noumoutene, 3, "Noumoutene"), 
+                        
+                
+                        ]
+                },
+                
+                
              
                 
             ]

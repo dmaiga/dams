@@ -110,7 +110,7 @@ class LotEntrepot(models.Model):
     )
 
     def __str__(self):
-        return f"{self.produit.nom} "
+        return f"{self.produit.nom} - {self.fournisseur} - {self.quantite_restante} restants"
     
     def save(self, *args, **kwargs):
         # Si la valeur initiale n'est pas encore enregistrée, on la calcule UNE SEULE FOIS
@@ -1277,34 +1277,30 @@ class Recouvrement(models.Model):
         return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
     
     def calculer_bonus(self):
-        """
-        Bonus applicable UNIQUEMENT pour :
-        - ventes au détail
-        - recouvrement effectué dans les 48h
-        """
-
-        # 1️⃣ Le bonus ne concerne que les ventes détail
+    
+        # ⚠️ Empêche l’erreur : si pk n’existe pas, on sauvegarde d’abord
+        if not self.pk:
+            super().save()
+    
         if self.vente.type_vente != "detail":
             self.bonus_accorde = False
             self.montant_bonus = Decimal("0.00")
             self.save(update_fields=["bonus_accorde", "montant_bonus"])
             return
-        
-        # 2️⃣ Vérifier la règle des 48h
+    
         limite_bonus = self.vente.date_vente + timedelta(hours=48)
-
+    
         if self.date_recouvrement <= limite_bonus:
             self.bonus_accorde = True
             self.montant_bonus = self.vente.quantite * Decimal("100")
             self.save(update_fields=["bonus_accorde", "montant_bonus"])
-
-            # 3️⃣ Ajout au bonus de l’agent
+    
             bonus_agent, _ = BonusAgent.objects.get_or_create(agent=self.agent)
             bonus_agent.ajouter_bonus(
                 montant=self.montant_bonus,
                 nb_produits=self.vente.quantite
             )
-
+    
 
     class Meta:
         ordering = ['-date_recouvrement']

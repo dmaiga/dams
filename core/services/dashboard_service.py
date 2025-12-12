@@ -15,6 +15,42 @@ from core.models import (
 class DashboardService:
     
     @staticmethod
+    def get_agents_inactifs(depuis_jours=3):
+        """Retourne la liste des agents qui n'ont pas fait de ventes depuis X jours."""
+        seuil = timezone.now() - timedelta(days=depuis_jours)
+    
+        agents = Agent.objects.filter(type_agent__in=["terrain", "entrepot"])
+        agents_inactifs = []
+    
+        for agent in agents:
+            # Dernière vente
+            derniere_vente = (
+                Vente.objects.filter(agent=agent)
+                .order_by('-date_vente')
+                .first()
+            )
+    
+            if derniere_vente:
+                if derniere_vente.date_vente < seuil:
+                    agents_inactifs.append({
+                        "nom": agent.full_name,
+                        "jours_depuis": (timezone.now() - derniere_vente.date_vente).days,
+                        "derniere_vente": derniere_vente.date_vente,
+                    })
+            else:
+                # Aucun historique de vente
+                agents_inactifs.append({
+                    "nom": agent.full_name,
+                    "jours_depuis": None,
+                    "derniere_vente": None,
+                })
+    
+        # Trier : ceux sans ventes d'abord, puis les plus anciens
+        agents_inactifs.sort(key=lambda x: (x["jours_depuis"] is not None, x["jours_depuis"]))
+        return agents_inactifs
+    
+    
+    @staticmethod
     def get_periodes(periode_type='mois', annee=None, mois=None):
         """Retourne les dates de début et fin selon le type de période"""
         today = timezone.now()
