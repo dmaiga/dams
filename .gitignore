@@ -144,3 +144,6 @@ requirements/*.txt
 !requirements/base.txt
 !requirements/development.txt
 !requirements/production.txt
+
+
+*.exe
