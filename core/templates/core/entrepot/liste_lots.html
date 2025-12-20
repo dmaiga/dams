@@ -24,287 +24,278 @@
                     </div>
                     <p class="text-sm mb-0">Tous les lots reçus de l'entrepôt</p>
                 </div>
-                <div class="card-body">
-                    <!-- Filtres -->
-                    <div class="row mb-4">
-                        <div class="col-md-4">
-                            <input type="text" class="form-control" placeholder="Filtrer par produit..." 
-                                   name="produit" value="{{ request.GET.produit }}" id="produit-filter">
-                        </div>
-                        <div class="col-md-3">
-                            <input type="text" class="form-control" placeholder="Filtrer par fournisseur..." 
-                                   name="fournisseur" value="{{ request.GET.fournisseur }}" id="fournisseur-filter">
-                        </div>
-                        <div class="col-md-3">
-                            <select class="form-select" name="statut" id="statut-filter">
-                                <option value="">Tous les statuts</option>
-                                <option value="disponible" {% if request.GET.statut == 'disponible' %}selected{% endif %}>Disponible</option>
-                                <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>Épuisé</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <button type="button" class="btn btn-outline-primary w-100" onclick="appliquerFiltres()">Filtrer</button>
-                        </div>
-                    </div>
-
-                    <!-- KPI Améliorés -->
-                    <div class="row mb-4 g-3 justify-content-between">
-    
-    <!-- Total Lots -->
-    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-        <div class="card border-left-primary shadow h-100 py-2">
             <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Lots</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_lots|intcomma }}</div>
+                <!-- Filtres -->
+                <form method="get" class="row mb-4">
+                    <div class="col-md-4">
+                        <input
+                            type="text"
+                            class="form-control"
+                            name="produit"
+                            placeholder="Filtrer par produit..."
+                            value="{{ request.GET.produit }}"
+                        >
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                
+                    <div class="col-md-3">
+                        <input
+                            type="text"
+                            class="form-control"
+                            name="fournisseur"
+                            placeholder="Filtrer par fournisseur..."
+                            value="{{ request.GET.fournisseur }}"
+                        >
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                
+                    <div class="col-md-3">
+                        <select class="form-select" name="statut">
+                            <option value="">Tous les statuts</option>
+                            <option value="disponible" {% if request.GET.statut == 'disponible' %}selected{% endif %}>
+                                Disponible
+                            </option>
+                            <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>
+                                Épuisé
+                            </option>
+                        </select>
+                    </div>
+                
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-outline-primary w-100">
+                            Filtrer
+                        </button>
+                    </div>
+                </form>
 
-    <!-- Valeur Stock Initiale -->
-    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-        <div class="card border-left-success shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Prix d'Achat Total</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_valeur_initiale|floatformat:0|intcomma }} F</div>
-                        <div class="text-xs text-muted">Investissement initial</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Valeur Actuelle -->
-    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-        <div class="card border-left-info shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Valeur Actuelle</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_valeur_actuelle|floatformat:0|intcomma }} F</div>
-                        <div class="text-xs {% if total_valeur_actuelle < total_valeur_initiale %}text-danger{% else %}text-success{% endif %}">
-                            {% if total_valeur_initiale > 0 %}
-                                {{ total_valeur_actuelle|div:total_valeur_initiale|mul:100|floatformat:1 }}% restant
-                            {% endif %}
+                <!-- KPI Améliorés -->
+                <div class="row mb-4 g-3 justify-content-between">
+
+                    <!-- Total Lots -->
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
+                        <div class="card border-left-primary shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Lots</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_lots|intcomma }}</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-<!-- Stock Total -->
-<div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-    <div class="card border-left-warning shadow h-100 py-2">
-        <div class="card-body">
-            <div class="row no-gutters align-items-center">
-                <div class="col mr-2">
-                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Stock Total</div>
-                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_stock_actuel|floatformat:2|intcomma }}</div>
-                    <div class="text-xs text-muted">
-                        <div>Quantité disponible</div>
-                        <div class="text-info">Initial: {{ total_stock_initial|floatformat:0|intcomma }}</div>
-                    </div>
-                </div>
-                <div class="col-auto">
-                    <i class="fas fa-cubes fa-2x text-gray-300"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-    <!-- Lots Épuisés -->
-    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-        <div class="card border-left-danger shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Lots Épuisés</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ lots_epuises|intcomma }}</div>
-                        <div class="text-xs text-muted">
-                            {% if total_lots > 0 %}
-                                {{ lots_epuises|div:total_lots|mul:100|floatformat:1 }}% du total
-                            {% endif %}
+                
+                    <!-- Valeur Stock Initiale -->
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
+                        <div class="card border-left-success shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Prix d'Achat Total</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_valeur_initiale|floatformat:0|intcomma }} F</div>
+                                        <div class="text-xs text-muted">Investissement initial</div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-
-                    <!-- Tableau des lots amélioré -->
-                    <div class="table-responsive">
-                        <table class="table table-hover table-flush" id="lots-table">
-                            <thead class="thead-light">
-                                <tr>
-                                    <th>Référence</th>
-                                    <th>Produit</th>
-                                    <th>Fournisseur</th>
-                                    <th>Stock</th>
-                                    <th>Prix d'achat</th>
-                                    <th>Valeur Initiale</th>
-                                    <th>Valeur Actuelle</th>
-                                    <th>Date réception</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for lot in lots %}
-                                <tr class="{% if lot.quantite_restante == 0 %}table-secondary{% endif %}">
-                                    <td class="font-weight-bold">
-                                        {% if lot.reference_lot %}
-                                            <span class="badge bg-primary">{{ lot.reference_lot }}</span>
-                                        {% else %}
-                                            <span class="text-muted">Lot #{{ lot.id }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <strong>{{ lot.produit.nom }}</strong>
-                                    </td>
-                                    <td>
-                                        {% if lot.fournisseur %}
-                                            <span class="badge bg-light text-dark">{{ lot.fournisseur.nom }}</span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="me-3 text-center">
-                                                <small class="text-muted d-block">Restant</small>
-                                                <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
-                                                    {{ lot.quantite_restante|floatformat:2 }}
-                                                </strong>
-                                            </div>
-                                            <div class="flex-grow-1">
-                                                <div class="progress" style="height: 6px;">
-                                                    {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress_percent %}
-                                                    <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-gradient-success{% else %}bg-gradient-danger{% endif %}" 
-                                                         role="progressbar" 
-                                                         style="width: {{ progress_percent }}%" 
-                                                         aria-valuenow="{{ lot.quantite_restante }}" 
-                                                         aria-valuemin="0" 
-                                                         aria-valuemax="{{ lot.quantite_initiale }}">
-                                                    </div>
-                                                </div>
-                                                <small class="text-muted d-block text-center">
-                                                    Initial: {{ lot.quantite_initiale|floatformat:2 }}
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <strong class="text-primary">{{ lot.prix_achat_unitaire|fcfa }}</strong>
-                                        <small class="d-block text-muted">FCFA/unité</small>
-                                    </td>
-                                    <td>
-                                        <strong class="text-success">{{ lot.valeur_stock_initiale|fcfa }}</strong>
-                                        <small class="d-block text-muted">FCFA</small>
-                                    </td>
-                                    <td>
-                                        <strong class="text-info">{{ lot.valeur_actuelle_stock|fcfa }}</strong>
-                                        <small class="d-block text-muted">FCFA</small>
-                                    </td>
-                                    <td>
-                                        <small class="text-muted d-block">{{ lot.date_reception|date:"d/m/Y" }}</small>
-                                        <small class="text-muted">{{ lot.date_reception|date:"H:i" }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <!-- Voir détail du lot -->
-                                            <a href="{% url 'detail_lot' lot.id %}" 
-                                               class="btn btn-outline-info" 
-                                               data-bs-toggle="tooltip" 
-                                               title="Voir détails">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-
-                                            {% if lot.quantite_restante > 0 %}
-                                            <!-- Distribuer -->
-                                            <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}" 
-                                               class="btn btn-outline-primary" 
-                                               data-bs-toggle="tooltip" 
-                                               title="Distribuer">
-                                                <i class="fas fa-share"></i>
-                                            </a>
+                
+                    <!-- Valeur Actuelle -->
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
+                        <div class="card border-left-info shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Valeur Actuelle</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_valeur_actuelle|floatformat:0|intcomma }} F</div>
+                                        <div class="text-xs {% if total_valeur_actuelle < total_valeur_initiale %}text-danger{% else %}text-success{% endif %}">
+                                            {% if total_valeur_initiale > 0 %}
+                                                {{ total_valeur_actuelle|div:total_valeur_initiale|mul:100|floatformat:1 }}% restant
                                             {% endif %}
                                         </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="9" class="text-center py-4">
-                                        <i class="fas fa-box-open fa-3x mb-3 text-muted"></i>
-                                        <p class="text-muted">Aucun lot enregistré</p>
-                                        <a href="{% url 'reception_lot' %}" class="btn btn-primary">
-                                            <i class="fas fa-plus me-2"></i>Ajouter le premier lot
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                    <!-- Stock Total -->
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
+                        <div class="card border-left-warning shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Stock Total</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_stock_actuel|floatformat:2|intcomma }}</div>
+                                        <div class="text-xs text-muted">
+                                            <div>Quantité disponible</div>
+                                            <div class="text-info">Initial: {{ total_stock_initial|floatformat:0|intcomma }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-cubes fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <!-- Lots Épuisés -->
+                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
+                        <div class="card border-left-danger shadow h-100 py-2">
+                            <div class="card-body">
+                                <div class="row no-gutters align-items-center">
+                                    <div class="col mr-2">
+                                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Lots Épuisés</div>
+                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ lots_epuises|intcomma }}</div>
+                                        <div class="text-xs text-muted">
+                                            {% if total_lots > 0 %}
+                                                {{ lots_epuises|div:total_lots|mul:100|floatformat:1 }}% du total
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                
                 </div>
+
+
+                <!-- Tableau des lots amélioré -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-flush" id="lots-table">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Référence</th>
+                                <th>Produit</th>
+                                <th>Fournisseur</th>
+                                <th>Stock</th>
+                                <th>Prix d'achat</th>
+                                <th>Valeur Initiale</th>
+                                <th>Valeur Actuelle</th>
+                                <th>Date réception</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lot in lots %}
+                            <tr class="{% if lot.quantite_restante == 0 %}table-secondary{% endif %}">
+                                <td class="font-weight-bold">
+                                    {% if lot.reference_lot %}
+                                        <span class="badge bg-primary">{{ lot.reference_lot }}</span>
+                                    {% else %}
+                                        <span class="text-muted">Lot #{{ lot.id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ lot.produit.nom }}</strong>
+                                </td>
+                                <td>
+                                    {% if lot.fournisseur %}
+                                        <span class="badge bg-light text-dark">{{ lot.fournisseur.nom }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3 text-center">
+                                            <small class="text-muted d-block">Restant</small>
+                                            <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+                                                {{ lot.quantite_restante|floatformat:2 }}
+                                            </strong>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="progress" style="height: 6px;">
+                                                {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress_percent %}
+                                                <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-gradient-success{% else %}bg-gradient-danger{% endif %}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ progress_percent }}%" 
+                                                     aria-valuenow="{{ lot.quantite_restante }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="{{ lot.quantite_initiale }}">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted d-block text-center">
+                                                Initial: {{ lot.quantite_initiale|floatformat:2 }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong class="text-primary">{{ lot.prix_achat_unitaire|fcfa }}</strong>
+                                    <small class="d-block text-muted">FCFA/unité</small>
+                                </td>
+                                <td>
+                                    <strong class="text-success">{{ lot.valeur_stock_initiale|fcfa }}</strong>
+                                    <small class="d-block text-muted">FCFA</small>
+                                </td>
+                                <td>
+                                    <strong class="text-info">{{ lot.valeur_actuelle_stock|fcfa }}</strong>
+                                    <small class="d-block text-muted">FCFA</small>
+                                </td>
+                                <td>
+                                    <small class="text-muted d-block">{{ lot.date_reception|date:"d/m/Y" }}</small>
+                                    <small class="text-muted">{{ lot.date_reception|date:"H:i" }}</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <!-- Voir détail du lot -->
+                                        <a href="{% url 'detail_lot' lot.id %}" 
+                                           class="btn btn-outline-info" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Voir détails">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if lot.quantite_restante > 0 %}
+                                        <!-- Distribuer -->
+                                        <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}" 
+                                           class="btn btn-outline-primary" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Distribuer">
+                                            <i class="fas fa-share"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <i class="fas fa-box-open fa-3x mb-3 text-muted"></i>
+                                    <p class="text-muted">Aucun lot enregistré</p>
+                                    <a href="{% url 'reception_lot' %}" class="btn btn-primary">
+                                        <i class="fas fa-plus me-2"></i>Ajouter le premier lot
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+               
             </div>
         </div>
+        
     </div>
+    
+</div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-function appliquerFiltres() {
-    const produit = document.getElementById('produit-filter').value;
-    const fournisseur = document.getElementById('fournisseur-filter').value;
-    const statut = document.getElementById('statut-filter').value;
-    
-    const params = new URLSearchParams();
-    if (produit) params.append('produit', produit);
-    if (fournisseur) params.append('fournisseur', fournisseur);
-    if (statut) params.append('statut', statut);
-    
-    window.location.href = '{% url "liste_lots" %}' + (params.toString() ? '?' + params.toString() : '');
-}
 
-// Appliquer les filtres avec Enter
-document.addEventListener('DOMContentLoaded', function() {
-    const inputs = document.querySelectorAll('#produit-filter, #fournisseur-filter');
-    inputs.forEach(input => {
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                appliquerFiltres();
-            }
-        });
-    });
-    
-    // Initialiser les tooltips Bootstrap
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-});
-</script>
 
 <style>
 .progress {

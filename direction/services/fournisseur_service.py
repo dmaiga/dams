@@ -1,3 +1,4 @@
+
 # services/fournisseur_service.py
 from collections import defaultdict
 from decimal import Decimal
@@ -14,6 +15,7 @@ from core.models import (
     LotEntrepot,
     Vente,
     Perte,
+    PaiementFournisseur,
 )
 
 # Constantes
@@ -23,12 +25,6 @@ DEC_ZERO = Decimal('0.00')
 class FournisseurAnalyseService:
     """
     Service optimisé pour l'analyse fournisseur.
-
-    Principes :
-    - DETTE = somme(quantité vendue * prix_achat_unitaire) pour les ventes liées aux lots du fournisseur
-      (=> conforme à ta logique métier).
-    - Toutes les agrégations lourdes se font par requêtes groupées SQL (values().annotate()).
-    - Minimisation des objets en mémoire : on récupère uniquement ce qui est nécessaire.
     """
 
     @staticmethod
@@ -51,6 +47,111 @@ class FournisseurAnalyseService:
         date_debut = timezone.make_aware(date_debut) if date_debut.tzinfo is None else date_debut
         date_fin = timezone.make_aware(date_fin) if date_fin.tzinfo is None else date_fin
         return date_debut, date_fin
+
+    @staticmethod
+    def get_dette_fournisseur(fournisseur_id, date_debut=None, date_fin=None):
+        """Récupère la dette actuelle d'un fournisseur"""
+        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
+        
+        # Calcul de la dette basée sur les ventes
+        total = (
+            Vente.objects.filter(
+                detail_distribution__lot__fournisseur_id=fournisseur_id,
+                date_vente__gte=date_debut,
+                date_vente__lte=date_fin
+            )
+            .aggregate(
+                total=Coalesce(
+                    Sum(
+                        F('quantite') *
+                        F('detail_distribution__lot__prix_achat_unitaire')
+                    ),
+                    DEC_ZERO
+                )
+            )['total']
+        )
+        
+        return total or DEC_ZERO
+
+    @staticmethod
+    def get_reste_a_payer_fournisseur(fournisseur_id, date_debut=None, date_fin=None):
+        """Calcule le reste à payer pour un fournisseur"""
+        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
+        
+        # Calculer la dette (coût des ventes)
+        dette = FournisseurAnalyseService.get_dette_fournisseur(fournisseur_id, date_debut, date_fin)
+        
+        # Calculer le total payé
+        total_paye = PaiementFournisseur.objects.filter(
+            fournisseur_id=fournisseur_id,
+            date_paiement__gte=date_debut,
+            date_paiement__lte=date_fin
+        ).aggregate(
+            total=Coalesce(Sum('montant'), DEC_ZERO)
+        )['total']
+        
+        return max(dette - total_paye, DEC_ZERO)
+
+    @staticmethod
+    def get_lots_fournisseur(fournisseur_id, date_debut=None, date_fin=None):
+        """
+        Récupère les lots d'un fournisseur pour une période donnée.
+        """
+        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
+        
+        lots = LotEntrepot.objects.filter(
+            fournisseur_id=fournisseur_id,
+            date_reception__gte=date_debut,
+            date_reception__lte=date_fin
+        ).select_related('produit').order_by('-date_reception')
+        
+        return lots
+
+    @staticmethod
+    def get_lots_impayes(fournisseur_id, date_debut=None, date_fin=None):
+        """
+        Récupère les lots avec dette impayée d'un fournisseur
+        """
+        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
+        
+        # Récupérer tous les lots du fournisseur dans la période
+        lots = FournisseurAnalyseService.get_lots_fournisseur(fournisseur_id, date_debut, date_fin)
+        
+        lots_impayes = []
+        for lot in lots:
+            # Calculer la dette du lot (coût des ventes)
+            ventes_lot = Vente.objects.filter(
+                detail_distribution__lot=lot
+            ).aggregate(
+                total_cout=Coalesce(
+                    Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
+                    DEC_ZERO
+                ),
+                total_qte=Coalesce(Sum('quantite'), DEC_ZERO)
+            )
+            
+            dette_lot = ventes_lot['total_cout']
+            
+            # Calculer les paiements pour ce lot
+            paiements_lot = PaiementFournisseur.objects.filter(
+                lot=lot
+            ).aggregate(
+                total_paye=Coalesce(Sum('montant'), DEC_ZERO)
+            )
+            
+            total_paye = paiements_lot['total_paye']
+            reste_a_payer = max(dette_lot - total_paye, DEC_ZERO)
+            
+            if reste_a_payer > 0:
+                lots_impayes.append({
+                    'lot': lot,
+                    'dette_lot': dette_lot,
+                    'total_paye': total_paye,
+                    'reste_a_payer': reste_a_payer,
+                    'quantite_vendue': ventes_lot['total_qte']
+                })
+        
+        return lots_impayes
 
     @staticmethod
     def get_analyse_annuelle(annee=None):
@@ -82,17 +183,12 @@ class FournisseurAnalyseService:
     def get_analyse_periode(date_debut=None, date_fin=None):
         """
         Analyse par fournisseur pour une période donnée.
-        Retour :
-        {
-            'analyse_data': [ {fournisseur, quantite_livree, montant_livre, quantite_ecoulee,
-                               montant_ecoule, dette_actuelle, ...}, ... ],
-            'kpi_globaux': {...},
-            'periode': {...}
-        }
+        Ajout du calcul de la dette réelle et paiements.
         """
         date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
+        now = timezone.now()
 
-        # 1) Agrégats sur les lots par fournisseur : quantite_livree, valeur_livree, quantite_restante, valeur_stock_restant, nombre_lots
+        # 1) Agrégats sur les lots par fournisseur
         lots_agg = (
             LotEntrepot.objects.filter(date_reception__gte=date_debut, date_reception__lte=date_fin)
             .values('fournisseur')
@@ -101,13 +197,13 @@ class FournisseurAnalyseService:
                 valeur_livree=Coalesce(Sum(F('quantite_initiale') * F('prix_achat_unitaire')), DEC_ZERO),
                 stock_restant=Coalesce(Sum('quantite_restante'), DEC_ZERO),
                 valeur_stock_restant=Coalesce(Sum(F('quantite_restante') * F('prix_achat_unitaire')), DEC_ZERO),
-                nombre_lots=Coalesce(Sum(Value(1)), 0)  # simple count approximation
+                nombre_lots=Coalesce(Sum(Value(1)), 0)
             )
         )
 
         lots_by_fournisseur = {item['fournisseur']: item for item in lots_agg}
 
-        # 2) Agrégats sur les ventes (CA et coût achat) groupés par fournisseur (via lot -> fournisseur)
+        # 2) Ventes groupées par fournisseur (CA et coût achat)
         ventes_agg = (
             Vente.objects.filter(
                 detail_distribution__lot__date_reception__gte=date_debut,
@@ -125,7 +221,7 @@ class FournisseurAnalyseService:
 
         ventes_by_fournisseur = {item['fournisseur_id']: item for item in ventes_agg}
 
-        # 3) Agrégats pertes groupés par fournisseur (via lot -> fournisseur)
+        # 3) Pertes groupées par fournisseur
         pertes_agg = (
             Perte.objects.filter(
                 lot__date_reception__gte=date_debut,
@@ -139,50 +235,91 @@ class FournisseurAnalyseService:
             )
         )
         pertes_by_fournisseur = {item['fournisseur_id']: item for item in pertes_agg}
+        
+        # 4) Paiements DEPUIS LE DÉBUT jusqu'à aujourd'hui (tous les paiements)
+        paiements_agg = (
+            PaiementFournisseur.objects.filter(
+                fournisseur__isnull=False,
+                date_paiement__lte=now  # Tous les paiements jusqu'à aujourd'hui
+            )
+            .values('fournisseur')
+            .annotate(
+                total_paye=Coalesce(Sum('montant'), DEC_ZERO)
+            )
+        )
+        paiements_by_fournisseur = {item['fournisseur']: item['total_paye'] for item in paiements_agg}
 
-        # 4) Récupérer la liste des fournisseurs concernés (ceux qui ont lots dans période OU ventes)
+        # 5) DETTE TOTALE RÉELLE: coût d'achat de tous les produits vendus jusqu'à aujourd'hui
+        dette_reelle_agg = (
+            Vente.objects.filter(
+                detail_distribution__lot__fournisseur__isnull=False,
+                date_vente__lte=now  # Toutes les ventes jusqu'à aujourd'hui
+            )
+            .values('detail_distribution__lot__fournisseur')
+            .annotate(
+                fournisseur_id=F('detail_distribution__lot__fournisseur'),
+                dette_reelle=Coalesce(
+                    Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
+                    DEC_ZERO
+                )
+            )
+        )
+        dette_reelle_by_fournisseur = {item['fournisseur_id']: item['dette_reelle'] for item in dette_reelle_agg}
+
+        # 6) Liste des fournisseurs
         fournisseur_ids = set()
         fournisseur_ids.update([k for k in lots_by_fournisseur.keys() if k is not None])
         fournisseur_ids.update([k for k in ventes_by_fournisseur.keys() if k is not None])
         fournisseur_ids.update([k for k in pertes_by_fournisseur.keys() if k is not None])
+        fournisseur_ids.update([k for k in paiements_by_fournisseur.keys() if k is not None])
+        fournisseur_ids.update([k for k in dette_reelle_by_fournisseur.keys() if k is not None])
 
         fournisseurs = Fournisseur.objects.filter(id__in=list(fournisseur_ids)).order_by('nom')
-
+        
         analyse_data = []
-
+        
         for f in fournisseurs:
             lid = f.id
             lots_info = lots_by_fournisseur.get(lid, {})
             ventes_info = ventes_by_fournisseur.get(lid, {})
             pertes_info = pertes_by_fournisseur.get(lid, {})
-
+        
             quantite_livree = lots_info.get('quantite_livree', DEC_ZERO)
             montant_livre = lots_info.get('valeur_livree', DEC_ZERO)
             stock_restant = lots_info.get('stock_restant', DEC_ZERO)
             valeur_stock_restant = lots_info.get('valeur_stock_restant', DEC_ZERO)
             nombre_lots = lots_info.get('nombre_lots', 0)
-
+        
             quantite_ecoulee = ventes_info.get('total_qte_vendue', DEC_ZERO)
             montant_ecoule = ventes_info.get('total_ca', DEC_ZERO)
             cout_achat_des_vendus = ventes_info.get('total_cout_achat', DEC_ZERO)
-
-            # Dette = coût d'achat des quantités vendues (conforme à ta logique métier)
-            dette_actuelle = cout_achat_des_vendus
-
+        
+            # DETTE RÉELLE (toutes les ventes jusqu'à aujourd'hui)
+            dette_reelle = dette_reelle_by_fournisseur.get(lid, DEC_ZERO)
+            
+            # Paiements totaux (tous les paiements jusqu'à aujourd'hui)
+            total_paye = paiements_by_fournisseur.get(lid, DEC_ZERO)
+        
+            # Reste réel à payer
+            reste_reel_a_payer = max(dette_reelle - total_paye, DEC_ZERO)
+            
+            # Pourcentage payé
+            pourcentage_paye = (total_paye / dette_reelle * 100) if dette_reelle > 0 else 100
+        
             quantite_perdue = pertes_info.get('total_pertes', DEC_ZERO)
-
-            pourcentage_ecoulement = 0
-            if quantite_livree and quantite_livree != 0:
-                try:
-                    pourcentage_ecoulement = (quantite_ecoulee / quantite_livree) * 100
-                except Exception:
-                    pourcentage_ecoulement = 0
-
-            # Marge brute réelle = CA - cout_achat_des_vendus
+        
+            pourcentage_ecoulement = (
+                (quantite_ecoulee / quantite_livree) * 100
+                if quantite_livree else 0
+            )
+        
             marge_brute = montant_ecoule - cout_achat_des_vendus
-
-            taux_pertes = round(((quantite_perdue / quantite_livree) * 100) if quantite_livree and quantite_livree != 0 else 0, 2)
-
+        
+            taux_pertes = (
+                (quantite_perdue / quantite_livree) * 100
+                if quantite_livree else 0
+            )
+        
             analyse_data.append({
                 'fournisseur': f,
                 'quantite_livree': quantite_livree,
@@ -190,34 +327,50 @@ class FournisseurAnalyseService:
                 'quantite_ecoulee': quantite_ecoulee,
                 'montant_ecoule': montant_ecoule,
                 'cout_achat_des_vendus': cout_achat_des_vendus,
-                'dette_actuelle': dette_actuelle,
+                'dette_reelle': dette_reelle,  # NOUVEAU: dette réelle totale
+                'dette_periode': cout_achat_des_vendus,  # dette sur la période
+                'total_paye': total_paye,  # paiements totaux
+                'reste_reel_a_payer': reste_reel_a_payer,  # NOUVEAU: reste réel
+                'pourcentage_paye': round(pourcentage_paye, 2),  # NOUVEAU: % payé
                 'pourcentage_ecoulement': round(pourcentage_ecoulement, 2),
                 'quantite_perdue': quantite_perdue,
-                'taux_pertes': taux_pertes,
+                'taux_pertes': round(taux_pertes, 2),
                 'stock_restant': stock_restant,
                 'valeur_stock_restant': valeur_stock_restant,
                 'marge_brute': marge_brute,
                 'nombre_lots': nombre_lots,
             })
-
-        # KPI globaux (agrégats simples)
+        
+        # KPI GLOBAUX MIS À JOUR
         if analyse_data:
-            dette_totale = sum(item['dette_actuelle'] for item in analyse_data)
+            dette_reelle_totale = sum(item['dette_reelle'] for item in analyse_data)
+            dette_periode_totale = sum(item['dette_periode'] for item in analyse_data)
+            total_paye_global = sum(item['total_paye'] for item in analyse_data)
+            reste_reel_global = sum(item['reste_reel_a_payer'] for item in analyse_data)
             marge_brute_totale = sum(item['marge_brute'] for item in analyse_data)
             stock_total_restant = sum(item['stock_restant'] for item in analyse_data)
             valeur_stock_total = sum(item['valeur_stock_restant'] for item in analyse_data)
             taux_perte_moyen = round(sum(item['taux_pertes'] for item in analyse_data) / len(analyse_data), 2)
             ecoulement_moyen = round(sum(item['pourcentage_ecoulement'] for item in analyse_data) / len(analyse_data), 2)
+            pourcentage_paye_global = round((total_paye_global / dette_reelle_totale * 100) if dette_reelle_totale > 0 else 100, 2)
         else:
-            dette_totale = DEC_ZERO
+            dette_reelle_totale = DEC_ZERO
+            dette_periode_totale = DEC_ZERO
+            total_paye_global = DEC_ZERO
+            reste_reel_global = DEC_ZERO
             marge_brute_totale = DEC_ZERO
             stock_total_restant = DEC_ZERO
             valeur_stock_total = DEC_ZERO
             taux_perte_moyen = 0
             ecoulement_moyen = 0
+            pourcentage_paye_global = 0
 
         kpi_globaux = {
-            'dette_totale': dette_totale,
+            'dette_reelle_totale': dette_reelle_totale,  # NOUVEAU: dette réelle totale
+            'dette_periode_totale': dette_periode_totale,  # dette de la période
+            'total_paye': total_paye_global,  # paiements totaux
+            'reste_reel_global': reste_reel_global,  # NOUVEAU: reste réel à payer
+            'pourcentage_paye_global': pourcentage_paye_global,  # NOUVEAU: % global payé
             'marge_brute_totale': marge_brute_totale,
             'stock_total_restant': stock_total_restant,
             'valeur_stock_total': valeur_stock_total,
@@ -226,19 +379,15 @@ class FournisseurAnalyseService:
         }
 
         return {
-            'analyse_data': sorted(analyse_data, key=lambda x: x['dette_actuelle'], reverse=True),
+            'analyse_data': sorted(analyse_data, key=lambda x: x['reste_reel_a_payer'], reverse=True),
             'kpi_globaux': kpi_globaux,
             'periode': {'debut': date_debut, 'fin': date_fin, 'type': 'personnalise'}
         }
-
-
+    
     @staticmethod
     def get_detail_fournisseur(fournisseur_id, date_debut=None, date_fin=None):
         """
-        Détail complet pour un fournisseur avec :
-        - Quantité de pertes dans les lots
-        - Quantité restante dans l'analyse commerciale
-        - Indicateurs couleur pour la quantité restante
+        Détail complet pour un fournisseur
         """
         date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
 
@@ -269,9 +418,24 @@ class FournisseurAnalyseService:
         pertes_par_lot_qs = (
             Perte.objects.filter(lot_id__in=lot_ids)
             .values('lot_id')
-            .annotate(total_pertes=Coalesce(Sum('quantite_perdue'), DEC_ZERO))
+            .annotate(total_pertes=Coalesce(Sum('quantite_perdue'), DEC_ZERO)
+            )
         )
         pertes_par_lot = {p['lot_id']: p['total_pertes'] for p in pertes_par_lot_qs}
+       
+        # Paiements agrégés par lot
+        paiements_par_lot_qs = (
+            PaiementFournisseur.objects.filter(
+                lot_id__in=lot_ids,
+            )
+            .values('lot_id')
+            .annotate(total_paye=Coalesce(Sum('montant'), DEC_ZERO))
+        )
+
+        paiements_par_lot = {
+            p['lot_id']: p['total_paye']
+            for p in paiements_par_lot_qs
+        }
 
         # Construire l'analyse par lot
         analyse_lots = []
@@ -283,6 +447,9 @@ class FournisseurAnalyseService:
             pertes = pertes_par_lot.get(lot.id, DEC_ZERO)
 
             dette_lot = cout_vendue  # dette basée sur ventes réalisées
+            
+            total_paye_lot = paiements_par_lot.get(lot.id, DEC_ZERO)
+            reste_lot = max(dette_lot - total_paye_lot, DEC_ZERO)
 
             # Déterminer le statut avec couleur
             if lot.quantite_restante == 0:
@@ -326,6 +493,8 @@ class FournisseurAnalyseService:
                 'pourcentage_perte': round(perte_pct, 2),
                 'prix_achat': lot.prix_achat_unitaire,
                 'dette_lot': dette_lot,
+                'total_paye_lot': total_paye_lot,
+                'reste_a_payer_lot': reste_lot,
                 'ca_vendue': ca_vendue,
                 'cout_vendue': cout_vendue,
                 'date_reception': lot.date_reception,
@@ -340,12 +509,12 @@ class FournisseurAnalyseService:
                 'pourcentage_perte_classe': FournisseurAnalyseService._get_perte_classe(perte_pct),
             })
 
-        # Analyse par produit (regroupement) - AJOUT DE LA QUANTITÉ RESTANTE
+        # Analyse par produit (regroupement)
         produit_data = defaultdict(lambda: {
             'produit': None,
             'quantite_vendue': DEC_ZERO,
-            'quantite_restante': DEC_ZERO,  # NOUVEAU
-            'quantite_perdue': DEC_ZERO,    # NOUVEAU
+            'quantite_restante': DEC_ZERO,
+            'quantite_perdue': DEC_ZERO,
             'ca_genere': DEC_ZERO,
             'quantite_livree': DEC_ZERO,
             'valeur_livree': DEC_ZERO,
@@ -358,8 +527,8 @@ class FournisseurAnalyseService:
             pid = pr.id
             produit_data[pid]['produit'] = pr
             produit_data[pid]['quantite_vendue'] += lot_info['quantite_vendue']
-            produit_data[pid]['quantite_restante'] += lot_info['quantite_restante']  # NOUVEAU
-            produit_data[pid]['quantite_perdue'] += lot_info['quantite_perdue']      # NOUVEAU
+            produit_data[pid]['quantite_restante'] += lot_info['quantite_restante']
+            produit_data[pid]['quantite_perdue'] += lot_info['quantite_perdue']
             produit_data[pid]['ca_genere'] += lot_info['ca_vendue']
             produit_data[pid]['quantite_livree'] += lot_info['quantite_recue']
             produit_data[pid]['valeur_livree'] += (lot_info['quantite_recue'] * lot_info['prix_achat'])
@@ -370,8 +539,8 @@ class FournisseurAnalyseService:
         for data in produit_data.values():
             qlv = data['quantite_livree']
             qv = data['quantite_vendue']
-            qr = data['quantite_restante']  # NOUVEAU
-            qp = data['quantite_perdue']    # NOUVEAU
+            qr = data['quantite_restante']
+            qp = data['quantite_perdue']
             ca = data['ca_genere']
             cout_vendu = data['cout_vendu']
 
@@ -399,13 +568,13 @@ class FournisseurAnalyseService:
             produits_analyses.append({
                 'produit': data['produit'],
                 'quantite_vendue': qv,
-                'quantite_restante': qr,          # NOUVEAU
-                'quantite_perdue': qp,            # NOUVEAU
+                'quantite_restante': qr,
+                'quantite_perdue': qp,
                 'ca_genere': ca,
                 'marge_brute': marge_brute,
                 'pourcentage_ecoulement': round(pourcentage_ecoulement, 2),
-                'pourcentage_restant': round(pourcentage_restant, 2),  # NOUVEAU
-                'pourcentage_perte': round(pourcentage_perte, 2),      # NOUVEAU
+                'pourcentage_restant': round(pourcentage_restant, 2),
+                'pourcentage_perte': round(pourcentage_perte, 2),
                 'taux_marge': round(taux_marge, 2),
                 'quantite_livree': qlv,
                 'nombre_lots': len(data['lots']),
@@ -424,16 +593,22 @@ class FournisseurAnalyseService:
         stock_restant = sum(item['quantite_restante'] for item in analyse_lots) if analyse_lots else DEC_ZERO
         valeur_stock_restant = sum(item['quantite_restante'] * item['prix_achat'] for item in analyse_lots) if analyse_lots else DEC_ZERO
         total_perdu = sum(item['quantite_perdue'] for item in analyse_lots) if analyse_lots else DEC_ZERO
+        total_paye_fournisseur = sum(item['total_paye_lot'] for item in analyse_lots) if analyse_lots else DEC_ZERO
 
-        taux_perte_moyen = round(
-            sum((item['pourcentage_perte']) for item in analyse_lots if item['quantite_recue'] and item['quantite_recue'] != 0) / len(analyse_lots)
-            if analyse_lots else 0, 2
-        )
+        # Calculer les pourcentages
+        if analyse_lots:
+            taux_perte_moyen = round(
+                sum(item['pourcentage_perte'] for item in analyse_lots) / len(analyse_lots), 2
+            )
+            taux_ecoulement_moyen = round(
+                sum(item['ecoulement_pct'] for item in analyse_lots) / len(analyse_lots), 2
+            )
+        else:
+            taux_perte_moyen = 0
+            taux_ecoulement_moyen = 0
 
-        taux_ecoulement_moyen = round(
-            sum(item['ecoulement_pct'] for item in analyse_lots) / len(analyse_lots)
-            if analyse_lots else 0, 2
-        )
+        reste_a_payer_fournisseur = max(dette_totale - total_paye_fournisseur, DEC_ZERO)
+        pourcentage_paye = round((total_paye_fournisseur / dette_totale * 100) if dette_totale > 0 else 100, 1)
 
         kpi_fournisseur = {
             'dette_totale': dette_totale,
@@ -443,6 +618,10 @@ class FournisseurAnalyseService:
             'taux_perte_moyen': taux_perte_moyen,
             'taux_ecoulement_moyen': taux_ecoulement_moyen,
             'nombre_lots': len(analyse_lots),
+            'total_paye': total_paye_fournisseur,
+            'reste_a_payer': reste_a_payer_fournisseur,
+            'pourcentage_paye': pourcentage_paye,
+            'deja_paye': total_paye_fournisseur,  # Alias pour compatibilité avec le template
         }
 
         return {

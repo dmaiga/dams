@@ -4,16 +4,34 @@
 {% block title %}Détail Fournisseur - {{ fournisseur.nom }}{% endblock %}
 
 {% block content %}
+
 <div class="container mx-auto px-4 py-6">
     <!-- Bouton retour -->
-    <div class="mb-6">
-        <a href="{% url 'liste_fournisseurs_direction' %}" class="btn btn-sm btn-outline btn-neutral">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Retour à la liste
+ <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+    <!-- Bouton retour -->
+    <a href="{% url 'liste_fournisseurs_direction' %}"
+       class="btn btn-sm btn-outline btn-neutral w-fit">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+             viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+        Retour à la liste
+    </a>
+
+    <!-- Actions -->
+    <div class="flex flex-col sm:flex-row gap-2">
+        <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}"
+           class="btn btn-primary w-full sm:w-auto">
+            Voir les paiements
         </a>
+
+       
     </div>
+
+</div>
+
 
     <!-- En-tête -->
     <div class="mb-8">
@@ -44,6 +62,7 @@
                     </div>
                 </div>
             </div>
+
             
             <!-- Filtre période -->
             <div class="bg-white p-4 rounded-lg shadow border border-gray-100">
@@ -73,6 +92,7 @@
                     </div>
                 </form>
             </div>
+
         </div>
         
         <!-- KPI Fournisseur - Version améliorée -->
@@ -83,7 +103,14 @@
                 <div class="text-2xl font-bold text-gray-800 mb-1">{{ kpi_fournisseur.dette_totale|fcfa }}</div>
                 <div class="text-xs text-gray-400">Montant écoulé</div>
             </div>
-            
+            <!-- Montant payé -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="text-sm text-gray-500 font-medium mb-1">Montant payé</div>
+                <div class="text-2xl font-bold text-green-600 mb-1">
+                    {{ kpi_fournisseur.total_paye|fcfa }}
+                </div>
+                <div class="text-xs text-gray-400">Paiements validés</div>
+            </div>
             <!-- Stock restant -->
             <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
                 <div class="text-sm text-gray-500 font-medium mb-1">Stock Restant</div>
@@ -91,15 +118,7 @@
                 <div class="text-xs text-gray-400">{{ kpi_fournisseur.valeur_stock_restant|fcfa }}</div>
             </div>
             
-            <!-- Pertes totales -->
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
-                <div class="text-sm text-gray-500 font-medium mb-1">Pertes Totales</div>
-                <div class="text-2xl font-bold text-gray-800 mb-1 
-                    {% if kpi_fournisseur.total_perdu > 0 %}text-red-600{% else %}text-gray-600{% endif %}">
-                    {{ kpi_fournisseur.total_perdu|floatformat:0 }}
-                </div>
-                <div class="text-xs text-gray-400">{{ kpi_fournisseur.taux_perte_moyen }}% moyenne</div>
-            </div>
+        
             
             <!-- Écoulement -->
             <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow transition-shadow duration-200">
@@ -121,124 +140,155 @@
             </div>
         </div>
     </div>
-    
-    <!-- Tableau des lots -->
-    <div class="mb-12">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                <span class=" p-2 rounded-lg">📦</span>
-                Lots reçus
-            </h2>
-            <div class="text-sm text-gray-500">
-                {{ analyse_lots|length }} lot{{ analyse_lots|pluralize }}
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <div class="overflow-x-auto">
-                <table class="table">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="font-semibold text-gray-700">Produit</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté reçue</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté vendue</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté perdue</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté restante</th>
-                            <th class="font-semibold text-gray-700 text-right">Prix achat</th>
-                            <th class="font-semibold text-gray-700 text-right">Dette lot</th>
-                            <th class="font-semibold text-gray-700">Date réception</th>
-                            <th class="font-semibold text-gray-700 text-center">Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for lot in analyse_lots %}
-                        <tr class="hover:bg-gray-50 transition-colors duration-150">
-                            <td class="font-medium">{{ lot.produit.nom }}</td>
-                            <td class="text-right font-semibold">{{ lot.quantite_recue|floatformat:0 }}</td>
-                            
-                            <!-- Quantité vendue -->
-                            <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="font-semibold">{{ lot.quantite_vendue|floatformat:0 }}</span>
-                                    <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
-                                                        {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
-                                                        {% else %}text-red-600{% endif %}">
-                                        {{ lot.ecoulement_pct }}%
-                                    </span>
-                                </div>
-                            </td>
-                            
-                            <!-- Quantité perdue -->
-                            <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="{% if lot.quantite_perdue > 0 %}font-semibold text-red-600{% else %}text-gray-600{% endif %}">
-                                        {{ lot.quantite_perdue|floatformat:0 }}
-                                    </span>
-                                    {% if lot.pourcentage_perte > 0 %}
-                                    <span class="text-xs text-red-500">{{ lot.pourcentage_perte }}%</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            
-                            <!-- Quantité restante -->
-                            <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="{% if lot.quantite_restante == 0 %}text-green-600 font-semibold
-                                                {% elif lot.quantite_restante < lot.quantite_recue|multiply:0.2 %}text-orange-600 font-semibold
-                                                {% else %}font-semibold{% endif %}">
-                                        {{ lot.quantite_restante|floatformat:0 }}
-                                    </span>
-                                    <span class="text-xs text-gray-500">{{ lot.prix_achat|fcfa }}/u</span>
-                                </div>
-                            </td>
-                            
-                            <td class="text-right">{{ lot.prix_achat|fcfa }}</td>
-                            
-                            <!-- Dette lot -->
-                            <td class="text-right">
-                                <span class="{% if lot.dette_lot > 0 %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
-                                    {{ lot.dette_lot|fcfa }}
-                                </span>
-                            </td>
-                            
-                            <td class="text-gray-600">{{ lot.date_reception|date:"d/m/Y" }}</td>
-                            
-                            <!-- Statut -->
-                            <td class="text-center">
-                                {% if lot.statut == "Épuisé" %}
-                                <span class="badge badge-success bg-green-100 text-green-800 border-green-200">Épuisé</span>
-                                {% elif lot.statut == "Faible stock" %}
-                                <span class="badge badge-warning bg-orange-100 text-orange-800 border-orange-200">Faible stock</span>
-                                {% else %}
-                                <span class="badge badge-info bg-blue-100 text-blue-800 border-blue-200">En stock</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="9" class="text-center py-8 text-gray-500">
-                                <div class="flex flex-col items-center justify-center py-8">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                    </svg>
-                                    <p class="text-lg font-medium">Aucun lot trouvé pour cette période</p>
-                                    <p class="text-sm mt-1">Modifiez les filtres pour voir plus de résultats</p>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+
+
+<!-- Tableau des lots avec actions de paiement -->
+<div class="mb-8">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <span class="p-2 rounded-lg">📦</span>
+            Détail des lots
+        </h2>
+        <div class="text-sm text-gray-500">
+            {{ analyse_lots|length }} lot{{ analyse_lots|pluralize }}
         </div>
     </div>
     
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+        <div class="overflow-x-auto">
+            <table class="table">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="font-semibold text-gray-700">Produit</th>
+                        <th class="font-semibold text-gray-700 text-center">Date réception</th>
+                        <th class="font-semibold text-gray-700 text-right">Prix unitaire</th>
+                        <th class="font-semibold text-gray-700 text-right">Qté reçue</th>
+                        <th class="font-semibold text-gray-700 text-right">Qté vendue</th>
+                        <th class="font-semibold text-gray-700 text-right">Qté restante</th>
+                        <th class="font-semibold text-gray-700 text-right">Dette lot</th>
+                        <th class="font-semibold text-gray-700 text-right">Payé</th>
+                        <th class="font-semibold text-gray-700 text-right">Reste</th>
+                        <th class="font-semibold text-gray-700 text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lot in analyse_lots %}
+                    <tr class="hover:bg-gray-50 transition-colors duration-150">
+                        <!-- Produit avec infos détaillées -->
+                        <td>
+                            <div class="font-medium">{{ lot.lot.produit.nom }}</div>
+                            <div class="text-xs text-gray-500 mt-1">
+                  
+                            </div>
+                        </td>
+                        
+                        <!-- Date de réception -->
+                        <td class="text-center">
+                            <div class="flex flex-col items-center">
+                                <span class="font-medium">{{ lot.lot.date_reception|date:"d/m/Y" }}</span>
+                                <span class="text-xs text-gray-500">{{ lot.lot.date_reception|date:"H:i" }}</span>
+                            </div>
+                        </td>
+                        
+                        <!-- Prix unitaire d'acquisition -->
+                        <td class="text-right">
+                            <span class="font-semibold">{{ lot.lot.prix_achat_unitaire|fcfa }}</span>
+                        </td>
+                        
+                        <!-- Quantité reçue -->
+                        <td class="text-right">
+                            <span class="font-semibold">{{ lot.quantite_recue|floatformat:2 }}</span>
+                        </td>
+                        
+                        <!-- Quantité vendue -->
+                        <td class="text-right">
+                            <div class="flex flex-col items-end">
+                                <span class="font-semibold">{{ lot.quantite_vendue|floatformat:2 }}</span>
+                                <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
+                                                    {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
+                                                    {% else %}text-red-600{% endif %}">
+                                    {{ lot.ecoulement_pct }}%
+                                </span>
+                            </div>
+                        </td>
+                        
+                        <!-- Quantité restante -->
+                        <td class="text-right">
+                            <div class="flex flex-col items-end">
+                                <span class="{{ lot.quantite_classe }}">
+                                    {{ lot.quantite_restante|floatformat:2 }}
+                                </span>
+                                <span class="text-xs {{ lot.statut_classe }} px-2 py-0.5 rounded-full mt-1">
+                                    {{ lot.statut }}
+                                </span>
+                            </div>
+                        </td>
+                        
+                        <!-- Dette -->
+                        <td class="text-right font-bold">
+                            {{ lot.dette_lot|fcfa }}
+                        </td>
+                        
+                        <!-- Payé -->
+                        <td class="text-right text-green-600 font-bold">
+                            {{ lot.total_paye_lot|fcfa }}
+                        </td>
+                        
+                        <!-- Reste -->
+                        <td class="text-right {% if lot.reste_a_payer_lot > 0 %}text-red-600 font-bold{% else %}text-gray-500{% endif %}">
+                            {{ lot.reste_a_payer_lot|fcfa }}
+                        </td>
+                        
+                        <!-- Actions -->
+                        <td class="text-center">
+                            <div class="flex justify-center gap-2">
+                             {% if lot.reste_a_payer_lot > 0 %}
+<a href="{% url 'creer_paiement_fournisseur' fournisseur.id %}?lot={{ lot.lot.id }}&montant={{ lot.reste_a_payer_lot }}"
+   class="btn btn-xs btn-success"
+   title="Payer ce lot">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+         viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+    </svg>
+    Payer
+</a>
+   {% else %}
+                                <span class="text-green-600 text-sm flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Payé
+                                </span>
+                                {% endif %}
+                                
+                                
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center py-8 text-gray-500">
+                            <div class="flex flex-col items-center justify-center py-8">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                </svg>
+                                <p class="text-lg font-medium">Aucun lot trouvé pour cette période</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
     <!-- Analyse commerciale -->
     <div class="mb-8">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
                 <span class="p-2 rounded-lg">📈</span>
-                Analyse commerciale
+                Analyse commerciale par produit
             </h2>
             <div class="text-sm text-gray-500">
                 {{ produits_analyses|length }} produit{{ produits_analyses|pluralize }}
@@ -263,7 +313,12 @@
                     <tbody>
                         {% for produit in produits_analyses %}
                         <tr class="hover:bg-gray-50 transition-colors duration-150">
-                            <td class="font-medium">{{ produit.produit.nom }}</td>
+                            <td class="font-medium">
+                                <div>{{ produit.produit.nom }}</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    {{ produit.nombre_lots }} lot{{ produit.nombre_lots|pluralize }}
+                                </div>
+                            </td>
                             
                             <!-- Quantité livrée -->
                             <td class="text-right font-semibold">{{ produit.quantite_livree|floatformat:2 }}</td>
@@ -365,7 +420,7 @@
             <div class="text-sm text-gray-500">
                 Données mises à jour : {{ "now"|date:"d/m/Y H:i" }}
             </div>
-            <a href="{% url 'liste_fournisseurs' %}" class="btn btn-outline btn-neutral">
+            <a href="{% url 'liste_fournisseurs_direction' %}" class="btn btn-outline btn-neutral">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
@@ -374,6 +429,21 @@
         </div>
     </div>
 </div>
+
+<!-- Modal pour afficher les détails d'un lot -->
+<dialog id="lotModal" class="modal">
+    <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-4">Détails du lot</h3>
+        <div id="lotDetails" class="mb-6">
+            <!-- Les détails seront chargés ici via AJAX -->
+        </div>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-sm btn-neutral">Fermer</button>
+            </form>
+        </div>
+    </div>
+</dialog>
 
 <style>
 .progress::-webkit-progress-bar {
@@ -387,4 +457,117 @@
     border-radius: 9999px;
 }
 </style>
+
+<script>
+function showLotDetails(lotId) {
+    // Charger les détails du lot via AJAX
+    fetch(`/direction/api/lot/${lotId}/details/`)
+        .then(response => response.json())
+        .then(data => {
+            const modal = document.getElementById('lotModal');
+            const detailsDiv = document.getElementById('lotDetails');
+            
+            // Afficher les détails du lot
+            detailsDiv.innerHTML = `
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-2">Informations du lot</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Produit:</span>
+                                <span class="font-medium">${data.produit}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Date réception:</span>
+                                <span class="font-medium">${data.date_reception}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Prix unitaire:</span>
+                                <span class="font-medium">${data.prix_achat}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Quantité initiale:</span>
+                                <span class="font-medium">${data.quantite_initiale}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Quantité restante:</span>
+                                <span class="font-medium ${data.quantite_restante == 0 ? 'text-green-600' : data.quantite_restante < data.quantite_initiale * 0.2 ? 'text-orange-600' : 'text-blue-600'}">${data.quantite_restante}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-2">Statistiques financières</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Quantité vendue:</span>
+                                <span class="font-medium">${data.quantite_vendue}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Dette totale:</span>
+                                <span class="font-bold">${data.dette_lot}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Montant payé:</span>
+                                <span class="font-bold text-green-600">${data.total_paye}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Reste à payer:</span>
+                                <span class="font-bold ${data.reste_a_payer > 0 ? 'text-red-600' : 'text-gray-500'}">${data.reste_a_payer}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Taux d'écoulement:</span>
+                                <span class="font-medium ${data.ecoulement_pct >= 80 ? 'text-green-600' : data.ecoulement_pct >= 50 ? 'text-yellow-600' : 'text-red-600'}">${data.ecoulement_pct}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700 mb-2">Paiements effectués</h4>
+                    ${data.paiements && data.paiements.length > 0 ? 
+                        `<div class="bg-white border rounded-lg overflow-hidden">
+                            <table class="table table-xs">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Montant</th>
+                                        <th>Mode</th>
+                                        <th>Référence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.paiements.map(paiement => `
+                                        <tr>
+                                            <td>${paiement.date}</td>
+                                            <td class="font-bold">${paiement.montant}</td>
+                                            <td>${paiement.mode}</td>
+                                            <td class="text-gray-500">${paiement.reference || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>` : 
+                        `<p class="text-gray-500 text-center py-4">Aucun paiement enregistré pour ce lot.</p>`
+                    }
+                </div>
+                
+                <div class="text-center">
+                    <a href="/direction/fournisseurs/paiement/nouveau/?fournisseur=${data.fournisseur_id}&lot=${lotId}&montant=${data.reste_a_payer}" 
+                       class="btn btn-primary ${data.reste_a_payer == 0 ? 'hidden' : ''}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Payer ce lot (${data.reste_a_payer})
+                    </a>
+                </div>
+            `;
+            
+            modal.showModal();
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors du chargement des détails du lot');
+        });
+}
+</script>
 {% endblock %}

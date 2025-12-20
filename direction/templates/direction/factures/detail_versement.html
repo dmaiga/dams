@@ -1,0 +1,259 @@
+<!-- direction/factures/detail_versement.html -->
+{% extends 'base_admin.html' %}
+{% load static %}
+{% load format_fcfa %}
+{% block title %}Versement #{{ versement.id }} - Direction{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-4">
+    <!-- Navigation -->
+    <div class="text-sm breadcrumbs mb-6">
+        <ul>
+            <li><a href="{% url 'dashboard' %}">Dashboard</a></li> 
+            <li><a href="{% url 'versements_direction' %}">Versements</a></li> 
+            <li class="text-primary">Versement #{{ versement.id }}</li>
+        </ul>
+    </div>
+
+    <!-- En-tête -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-3xl font-bold mb-2">
+                <i class="fas fa-money-bill-wave text-primary mr-2"></i>
+                Versement #{{ versement.id }}
+            </h1>
+            <p class="text-gray-600">
+                Superviseur: <span class="badge badge-primary">{{ versement.superviseur.full_name }}</span>
+                • Date: {{ versement.date_versement_reelle|date:"d/m/Y H:i" }}
+            </p>
+        </div>
+        <a href="{% url 'versements_direction' %}" class="btn btn-outline">
+            <i class="fas fa-arrow-left mr-2"></i> Retour
+        </a>
+    </div>
+
+    <!-- Cartes d'information -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Informations de base -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title text-primary mb-4">
+                    <i class="fas fa-info-circle mr-2"></i>Informations
+                </h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span class="font-semibold">Type:</span>
+                        <span class="badge 
+                            {% if versement.type_versement == 'vente' %}badge-success
+                            {% elif versement.type_versement == 'mixte' %}badge-primary
+                            {% else %}badge-info{% endif %}">
+                            {{ versement.type_versement|title }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-semibold">Superviseur:</span>
+                        <span>{{ versement.superviseur.full_name }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-semibold">Date:</span>
+                        <span>{{ versement.date_versement_reelle|date:"d/m/Y H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Montants -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title text-primary mb-4">
+                    <i class="fas fa-chart-bar mr-2"></i>Montants
+                </h2>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span>Ventes:</span>
+                        <span class="font-bold text-success">{{ versement.montant_vente|fcfa }} FCFA</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Hors vente:</span>
+                        <span class="font-bold text-info">{{ versement.montant_hors_vente|fcfa }} FCFA</span>
+                    </div>
+                    <div class="divider my-2"></div>
+                    <div class="flex justify-between items-center text-lg font-bold">
+                        <span>Total versé:</span>
+                        <span class="text-primary">{{ versement.montant_total|fcfa }} FCFA</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Description -->
+    {% if versement.description %}
+    <div class="card bg-base-100 shadow mb-6">
+        <div class="card-body">
+            <h2 class="card-title text-primary mb-4">
+                <i class="fas fa-align-left mr-2"></i>Description
+            </h2>
+            <div class="prose max-w-none">
+                {{ versement.description|safe }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Dépenses associées -->
+    <div class="card bg-base-100 shadow mb-6">
+        <div class="card-body">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="card-title text-primary">
+                    <i class="fas fa-receipt mr-2"></i>
+                    Dépenses associées
+                    <span class="badge badge-warning ml-2">{{ depenses.count }}</span>
+                </h2>
+                <span class="badge badge-lg badge-error">
+                    Total: {{ total_depenses|fcfa}} FCFA
+                </span>
+            </div>
+
+            {% if depenses %}
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th class="text-right">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for depense in depenses %}
+                        <tr>
+                            <td>{{ depense.date_depense|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <div class="max-w-xs truncate">{{ depense.description|safe }}</div>
+                            </td>
+                            <td class="text-right">
+                                <span class="badge badge-error">{{ depense.montant|fcfa }} FCFA</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="2" class="text-right">Total dépenses:</th>
+                            <th class="text-right text-error">{{ total_depenses|fcfa }} FCFA</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-receipt fa-3x text-gray-300 mb-4"></i>
+                <p class="text-gray-500">Aucune dépense associée</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Reçus bancaires -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title text-primary mb-4">
+                <i class="fas fa-file-invoice mr-2"></i>
+                Reçus bancaires
+                <span class="badge badge-success ml-2">{{ recus.count }}</span>
+            </h2>
+
+            {% if recus %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for recu in recus %}
+                <div class="card bg-base-200 border border-base-300">
+                    <div class="card-body p-4">
+                        <div class="flex items-start mb-3">
+                            <i class="fas fa-file-pdf text-error text-xl mr-3"></i>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-sm">Reçu #{{ recu.id }}</h3>
+                                <p class="text-xs text-gray-500">
+                                    <i class="fas fa-calendar-alt mr-1"></i>
+                                    {{ recu.date_upload|date:"d/m/Y" }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {% if recu.description %}
+                        <p class="text-sm mb-4">{{ recu.description|truncatechars:60 }}</p>
+                        {% endif %}
+                        
+                        <div class="flex justify-between items-center">
+                            <span class="badge badge-outline">
+                                {{ recu.fichier.name|slice:"-4:"|upper }}
+                            </span>
+                            <div class="space-x-2">
+                                <a href="{{ recu.fichier.url }}" target="_blank" 
+                                   class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ recu.fichier.url }}" download 
+                                   class="btn btn-sm btn-outline">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-file-invoice fa-3x text-gray-300 mb-4"></i>
+                <p class="text-gray-500">Aucun reçu associé</p>
+                <p class="text-warning text-sm mt-2">
+                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                    Opération sans justificatif bancaire
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Résumé financier -->
+    <div class="card bg-base-100 shadow mt-6">
+        <div class="card-body">
+            <h2 class="card-title text-primary mb-4">
+                <i class="fas fa-calculator mr-2"></i>Résumé financier
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="stats shadow bg-base-200">
+                    <div class="stat">
+                        <div class="stat-title">Total Versé</div>
+                        <div class="stat-value text-primary">
+                            {{ versement.montant_total|fcfa }}<span class="text-sm">FCFA</span>
+                        </div>
+                        <div class="stat-desc">Somme versée à la banque</div>
+                    </div>
+                </div>
+                
+                <div class="stats shadow bg-base-200">
+                    <div class="stat">
+                        <div class="stat-title">Dépenses</div>
+                        <div class="stat-value text-error">
+                            - {{ total_depenses|fcfa }}<span class="text-sm">FCFA</span>
+                        </div>
+                        <div class="stat-desc">Frais associés</div>
+                    </div>
+                </div>
+                
+                <div class="stats shadow bg-primary text-primary-content">
+                    <div class="stat">
+                        <div class="stat-title">Montant Net</div>
+                        <div class="stat-value">
+                            {{ montant_net|fcfa }}<span class="text-sm">FCFA</span>
+                        </div>
+                        <div class="stat-desc">Montant effectif</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

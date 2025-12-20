@@ -1,0 +1,304 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block title %}Paiements - {{ fournisseur.nom }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- En-tête -->
+    <div class="mb-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+            <div>
+                <a href="{% url 'detail_fournisseur_direction' fournisseur.id %}" 
+                   class="inline-flex items-center text-blue-600 hover:text-blue-800 mb-2">
+                    <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    Retour au fournisseur
+                </a>
+                <h1 class="text-2xl font-bold text-gray-900">Paiements - {{ fournisseur.nom }}</h1>
+            </div>
+            <a href="{% url 'creer_paiement_fournisseur' fournisseur.id %}" 
+               class="btn btn-primary mt-4 md:mt-0">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Nouveau paiement
+            </a>
+        </div>
+        
+        <!-- Statistiques améliorées -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            <!-- Total payé -->
+            <div class="bg-gradient-to-br from-blue-50 to-white p-5 rounded-lg border border-blue-100">
+                <div class="flex items-center mb-3">
+                    <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                    <h3 class="text-sm font-semibold text-gray-700">Total payé</h3>
+                </div>
+                <p class="text-2xl font-bold text-gray-900">{{ total_paye|fcfa }}</p>
+                <div class="flex items-center justify-between mt-3">
+                    <span class="text-sm text-gray-500">{{ paiements_actifs.count }} paiement{{ paiements_actifs.count|pluralize }}</span>
+                    <span class="text-sm font-medium text-blue-600">
+                        {{ stats.kpi_fournisseur.pourcentage_paye|default:"0" }}% payé
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Dette restante -->
+            <div class="bg-gradient-to-br from-red-50 to-white p-5 rounded-lg border border-red-100">
+                <div class="flex items-center mb-3">
+                    <div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                    <h3 class="text-sm font-semibold text-gray-700">Reste à payer</h3>
+                </div>
+                <p class="text-2xl font-bold {% if stats.kpi_fournisseur.reste_a_payer > 0 %}text-red-700{% else %}text-green-600{% endif %}">
+                    {{ stats.kpi_fournisseur.reste_a_payer|fcfa }}
+                </p>
+                <div class="mt-3">
+                    {% if stats.kpi_fournisseur.reste_a_payer > 0 %}
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                        À régler
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Tout réglé
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Paiements supprimés -->
+            <div class="bg-gradient-to-br from-gray-50 to-white p-5 rounded-lg border border-gray-100">
+                <div class="flex items-center mb-3">
+                    <div class="w-3 h-3 bg-gray-400 rounded-full mr-2"></div>
+                    <h3 class="text-sm font-semibold text-gray-700">Paiements supprimés</h3>
+                </div>
+                <p class="text-2xl font-bold text-gray-500">{{ total_supprime|fcfa }}</p>
+                <div class="flex items-center justify-between mt-3">
+                    <span class="text-sm text-gray-500">{{ paiements_supprimes.count }} paiement{{ paiements_supprimes.count|pluralize }}</span>
+                    {% if paiements_supprimes.count > 0 %}
+                    <a href="#supprimes" class="text-xs font-medium text-gray-600 hover:text-gray-900">
+                        Voir détails ↓
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Paiements actifs -->
+    <div class="mb-10">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">Paiements enregistrés</h2>
+                <p class="text-sm text-gray-600 mt-1">Liste des paiements actifs pour ce fournisseur</p>
+            </div>
+            <div class="flex items-center mt-3 sm:mt-0">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {{ paiements_actifs.count }} actif{{ paiements_actifs.count|pluralize }}
+                </span>
+            </div>
+        </div>
+        
+        {% if paiements_actifs %}
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Date paiement
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Informations lot
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Superviseur
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Montant
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% for paiement in paiements_actifs %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                            <!-- Date -->
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">{{ paiement.date_paiement|date:"d/m/Y" }}</div>
+                                <div class="text-xs text-gray-500">{{ paiement.created_at|date:"H:i" }}</div>
+                            </td>
+                            
+                            <!-- Informations lot détaillées -->
+                            <td class="px-6 py-4">
+                                {% if paiement.lot %}
+                                <div class="space-y-1">
+                                    <div class="flex items-center">
+                                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-50 text-blue-700 mr-2">
+                                            Lot
+                                        </span>
+                                        <span class="text-sm font-medium text-gray-900">#{{ paiement.lot.id }}</span>
+                                    </div>
+                                    <div class="text-sm text-gray-900">{{ paiement.lot.produit.nom }}</div>
+                                    <div class="text-xs text-gray-500 space-y-0.5">
+                                        <div class="flex items-center">
+                                            <svg class="w-3 h-3 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                            </svg>
+                                            Réception : {{ paiement.lot.date_reception|date:"d/m/Y" }}
+                                        </div>
+                                        <div class="flex items-center">
+                                            <svg class="w-3 h-3 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            Prix unitaire : {{ paiement.lot.prix_achat_unitaire|fcfa }}
+                                        </div>
+                                        <div class="flex items-center">
+                                            <svg class="w-3 h-3 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                            </svg>
+                                            Stock restant : {{ paiement.lot.quantite_restante }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="text-gray-400 italic">Aucun lot spécifié</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Superviseur -->
+                            <td class="px-6 py-4">
+                                {% if paiement.superviseur %}
+                                <div class="text-sm text-gray-900">{{ paiement.superviseur.full_name }}</div>
+                                <div class="text-xs text-gray-500">{{ paiement.superviseur.get_type_agent_display }}</div>
+                                {% else %}
+                                <span class="text-gray-400 italic">Non spécifié</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Montant -->
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <div class="text-lg font-bold text-blue-700">{{ paiement.montant|fcfa }}</div>
+                                <div class="text-xs text-gray-500">{{ paiement.get_mode_display }}</div>
+                                {% if paiement.reference %}
+                                <div class="text-xs text-gray-500">Ref: {{ paiement.reference }}</div>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Actions -->
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <div class="flex justify-center space-x-2">
+                                    <a href="{% url 'detail_paiement_fournisseur' paiement.id %}" 
+                                       class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        Voir
+                                    </a>
+                                    <a href="{% url 'modifier_paiement_fournisseur' paiement.id %}" 
+                                       class="inline-flex items-center px-3 py-1.5 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100">
+                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                        </svg>
+                                        Modifier
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <!-- État vide -->
+        <div class="bg-white rounded-lg border border-gray-200 p-8 text-center">
+            <div class="w-16 h-16 mx-auto mb-4 text-gray-300">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-700 mb-2">Aucun paiement enregistré</h3>
+            <p class="text-gray-500 mb-6 max-w-md mx-auto">Ce fournisseur n'a encore reçu aucun paiement.</p>
+            <a href="{% url 'creer_paiement_fournisseur' fournisseur.id %}" class="btn btn-primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Ajouter un paiement
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Paiements supprimés -->
+    {% if paiements_supprimes %}
+    <div id="supprimes" class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">Paiements supprimés</h2>
+                <p class="text-sm text-gray-600">Historique des paiements annulés</p>
+            </div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                {{ paiements_supprimes.count }} supprimé{{ paiements_supprimes.count|pluralize }}
+            </span>
+        </div>
+        
+        <div class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Date paiement</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Lot</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Montant</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Supprimé le</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Par</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for paiement in paiements_supprimes %}
+                        <tr class="text-sm">
+                            <td class="px-4 py-3">{{ paiement.date_paiement|date:"d/m/Y" }}</td>
+                            <td class="px-4 py-3">
+                                {% if paiement.lot %}
+                                <div class="text-xs">{{ paiement.lot.produit.nom }}</div>
+                                <div class="text-xs text-gray-500">Lot #{{ paiement.lot.id }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 font-medium text-gray-600">{{ paiement.montant|fcfa }}</td>
+                            <td class="px-4 py-3 text-gray-500">{{ paiement.date_suppression|date:"d/m/Y H:i" }}</td>
+                            <td class="px-4 py-3">
+                                {% if paiement.supprime_par %}
+                                <div class="text-xs">{{ paiement.supprime_par.get_full_name }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                <a href="{% url 'restaurer_paiement_fournisseur' paiement.id %}" 
+                                   class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100"
+                                   onclick="return confirm('Restaurer ce paiement ?')">
+                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                                    </svg>
+                                    Restaurer
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

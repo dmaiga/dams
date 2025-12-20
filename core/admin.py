@@ -276,6 +276,15 @@ class PaiementDetteAdmin(admin.ModelAdmin):
     list_filter = ('mode_paiement', 'date_paiement')
     search_fields = ('reference', 'dette__vente__client__nom')
 
+# admin.py
+from django.contrib import admin
+from django.utils.html import format_html
+from django.db.models import Sum
+
+from .models import PaiementFournisseur
+
+
+
 
 # ==============================
 # ADMIN BONUS AGENT
@@ -292,3 +301,5 @@ class BonusAgentAdmin(admin.ModelAdmin):
     search_fields = ('agent__user__username', 'agent__user__first_name', 'agent__user__last_name')
     
     readonly_fields = ('date_mise_a_jour',)
+
+

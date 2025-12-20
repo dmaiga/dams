@@ -1,0 +1,96 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block title %}Supprimer paiement{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-md">
+    <!-- Navigation -->
+    <div class="mb-6">
+        <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}" 
+           class="btn btn-sm btn-outline btn-neutral">
+            ← Retour aux paiements
+        </a>
+    </div>
+    
+    <!-- Confirmation -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Confirmer la suppression</h2>
+            <p class="text-gray-600">Vous êtes sur le point de supprimer un paiement.</p>
+        </div>
+        
+        <!-- Détails du paiement -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <div class="text-sm text-gray-500">Date</div>
+                    <div class="font-medium">{{ paiement.date_paiement|date:"d/m/Y" }}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Montant</div>
+                    <div class="font-bold text-lg">{{ paiement.montant|fcfa }}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Fournisseur</div>
+                    <div class="font-medium">{{ paiement.fournisseur.nom }}</div>
+                </div>
+                <div>
+                    <div class="text-sm text-gray-500">Mode</div>
+                    <div>{{ paiement.get_mode_display }}</div>
+                </div>
+            </div>
+            
+            {% if paiement.lot %}
+            <div class="mt-3 pt-3 border-t border-gray-200">
+                <div class="text-sm text-gray-500">Lot concerné</div>
+                <div class="font-medium">{{ paiement.lot.produit.nom }}</div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Formulaire de suppression -->
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="form-control mb-6">
+                <label class="label">
+                    <span class="label-text font-semibold">Raison de la suppression (optionnel)</span>
+                </label>
+                <textarea name="raison_suppression" 
+                          class="textarea textarea-bordered w-full" 
+                          rows="3" 
+                          placeholder="Pourquoi supprimez-vous ce paiement ?"></textarea>
+            </div>
+            
+            <div class="flex justify-between gap-4">
+                <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}" 
+                   class="btn btn-outline btn-neutral flex-1">
+                    Annuler
+                </a>
+                <button type="submit" class="btn btn-error flex-1">
+                    Confirmer la suppression
+                </button>
+            </div>
+        </form>
+        
+        <!-- Information -->
+        <div class="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+            <div class="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <div class="text-sm text-yellow-700">
+                    <p class="font-semibold">Note :</p>
+                    <p class="mt-1">Cette suppression est réversible (soft delete). Le paiement sera archivé et pourra être restauré ultérieurement si nécessaire.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

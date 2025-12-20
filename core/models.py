@@ -1,6 +1,8 @@
 from django.db import models
+from django import forms
 from django.contrib.auth.models import User
 from django.utils import timezone
+from environs import ValidationError
 from tinymce.models import HTMLField
 from datetime import timedelta
 
@@ -72,6 +74,29 @@ class Fournisseur(models.Model):
 
     class Meta:
         ordering = ['nom']
+    
+    @property
+    def dette_totale(self):
+        """Dette totale (ventes * prix achat)"""
+        total = 0
+        for lot in self.lots.all():
+            for vente in lot.ventes.all():
+                total += vente.quantite * lot.prix_achat_unitaire
+        return Decimal(total)
+    
+    @property
+    def total_paye(self):
+        """Somme de tous les paiements"""
+        total = self.paiements.aggregate(
+            total=models.Sum('montant')
+        )['total'] or 0
+        return Decimal(total)
+    
+    @property
+    def dette_restante(self):
+        """Ce qu'il reste à payer"""
+        return max(self.dette_totale - self.total_paye, Decimal(0))
+
 
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit,
@@ -83,6 +108,7 @@ class LotEntrepot(models.Model):
         null=True,
         blank=True,
         default=None,
+        related_name="lots",
         verbose_name="Fournisseur (optionnel)"
     )
     quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
@@ -167,7 +193,43 @@ class LotEntrepot(models.Model):
             produit__nom=produit_nom,
             quantite_restante__gt=0
         ).order_by("date_reception")
+   
     
+    @property
+    def total_paye_lot(self):
+        """Somme des paiements pour ce lot"""
+        total = self.paiements.aggregate(
+            total=models.Sum('montant')
+        )['total'] or 0
+        return Decimal(total)
+    
+    @property
+    def reste_a_payer_lot(self):
+        """Ce qu'il reste à payer pour ce lot"""
+        return max(self.dette_lot - self.total_paye_lot, Decimal(0))
+
+    @property
+    def dette_lot(self):
+        """
+        Dette du lot basée sur les ventes réalisées
+        """
+        from django.db.models import Sum, F
+        from django.db.models.functions import Coalesce
+        from decimal import Decimal
+        from core.models import Vente
+
+        total = Vente.objects.filter(
+            detail_distribution__lot=self
+        ).aggregate(
+            total=Coalesce(
+                Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
+                Decimal('0.00')
+            )
+        )['total']
+
+        return total or Decimal('0.00')
+
+
 # core/models.py
 class Perte(models.Model):
     lot = models.ForeignKey(
@@ -779,7 +841,10 @@ class DistributionAgent(models.Model):
         verbose_name_plural = "Distributions"
 
 class DetailDistribution(models.Model):
-    distribution = models.ForeignKey(DistributionAgent, on_delete=models.CASCADE)
+    distribution = models.ForeignKey(
+        DistributionAgent, 
+        on_delete=models.CASCADE
+        )
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
     quantite = models.DecimalField(default=0, 
                                            max_digits=10, 
@@ -885,29 +950,6 @@ class JournalModificationDistribution(models.Model):
         ordering = ['-date_action']
         verbose_name = "Journal des modifications"
         verbose_name_plural = "Journal des modifications"
-
-class Facture(models.Model):
-
-    TYPE_FACTURE_CHOICES = [
-        ('entree', 'Facture Entrée - Fournisseur'),
-        ('depot', 'Dépôt Banque - Versement'),
-    ]
-    
-    type_facture = models.CharField(max_length=50, choices=TYPE_FACTURE_CHOICES)
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='factures_deposees')
-    montant = models.DecimalField(max_digits=10, decimal_places=2)
-    fichier_facture = models.FileField(upload_to='factures_depots/')
-    date_depot = models.DateTimeField(default=timezone.now)
-    description = models.TextField(blank=True)
-    
-    def __str__(self):
-        type_str = "Entrepôt" if self.type_facture == 'entree' else "Dépôt Agent"
-        return f"Facture {type_str} - {self.agent} - {self.montant} FCFA"
-    
-    class Meta:
-        verbose_name = "Facture"
-        verbose_name_plural = "Factures"
-
 
 class Vente(models.Model):
     TYPE_VENTE_CHOICES = (
@@ -1306,9 +1348,7 @@ class Recouvrement(models.Model):
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
-    
-
-         
+          
 
 class VersementBancaire(models.Model):
     superviseur = models.ForeignKey(
@@ -1446,3 +1486,133 @@ class Depense(models.Model):
         ordering = ['-date_depense']
         verbose_name = "Dépense"
         verbose_name_plural = "Dépenses"
+
+
+class Facture(models.Model):
+
+    TYPE_FACTURE_CHOICES = [
+        ('entree', 'Facture Entrée - Fournisseur'),
+        ('depot', 'Dépôt Banque - Versement'),
+    ]
+    
+    type_facture = models.CharField(max_length=50, choices=TYPE_FACTURE_CHOICES)
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='factures_deposees')
+    versement = models.ForeignKey(
+        VersementBancaire,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recus_bancaires'
+    )
+
+    montant = models.DecimalField(max_digits=10, decimal_places=2)
+    fichier_facture = models.FileField(upload_to='factures_depots/')
+    date_depot = models.DateTimeField(default=timezone.now)
+    description = models.TextField(blank=True)
+    
+    def __str__(self):
+        type_str = "Entrepôt" if self.type_facture == 'entree' else "Dépôt Agent"
+        return f"Facture {type_str} - {self.agent} - {self.montant} FCFA"
+    
+    class Meta:
+        verbose_name = "Facture"
+        verbose_name_plural = "Factures"
+
+class PaiementFournisseur(models.Model):
+    """
+    Paiement simple au fournisseur
+    Objectif : traçabilité claire, pas de sur-modélisation
+    """
+
+    fournisseur = models.ForeignKey(
+        'Fournisseur',
+        on_delete=models.CASCADE,
+        related_name='paiements'
+    )
+
+    lot = models.ForeignKey(
+        'LotEntrepot',
+        on_delete=models.CASCADE,
+        related_name='paiements',
+        null=True,
+        blank=True,
+        help_text="Optionnel : paiement rattaché à un lot précis"
+    )
+
+    superviseur = models.ForeignKey(
+        'Agent',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='paiements_fournisseurs',
+        limit_choices_to={'type_agent': 'entrepot'},
+        verbose_name="Superviseur responsable"
+    )
+
+    montant = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Montant payé"
+    )
+
+    # Date réelle du paiement (peut être rétroactive)
+    date_paiement = models.DateField(
+        verbose_name="Date du paiement"
+    )
+
+    # Métadonnées système
+    cree_par = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='paiements_fournisseurs_crees'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    # Soft delete
+    est_supprime = models.BooleanField(default=False)
+    supprime_par = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='paiements_fournisseurs_supprimes'
+    )
+    date_suppression = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-date_paiement', '-created_at']
+        verbose_name = "Paiement fournisseur"
+        verbose_name_plural = "Paiements fournisseurs"
+
+    def __str__(self):
+        return f"{self.montant} FCFA – {self.fournisseur.nom} ({self.date_paiement})"
+
+    def clean(self):
+        if self.montant <= 0:
+            raise ValidationError("Le montant doit être strictement positif.")
+
+    def soft_delete(self, user=None, raison=""):
+        """Soft delete du paiement"""
+        self.est_supprime = True
+        self.date_suppression = timezone.now()
+        self.raison_suppression = raison
+        if user:
+            self.supprime_par = user
+        self.save()
+    
+    def restaurer(self, user=None):
+        """Restaurer un paiement supprimé"""
+        self.est_supprime = False
+        self.date_suppression = None
+        self.raison_suppression = ""
+        if user:
+            self.supprime_par = None
+        self.save()
+    
+    @property
+    def statut(self):
+        """Retourne le statut du paiement"""
+        if self.est_supprime:
+            return "supprime"
+        return "actif"

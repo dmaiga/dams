@@ -158,7 +158,7 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th class="ps-3" style="width: 80px;">ID</th>
+                     
                             <th style="width: 120px;">Date</th>
                             <th>Produits</th>
                             <th>Destinataire</th>
@@ -172,13 +172,7 @@
                     <tbody>
                         {% for dist in distributions %}
                         <tr class="{% if dist.est_supprime %}table-light text-muted{% endif %}">
-                            <!-- ID -->
-                            <td class="ps-3">
-                                <div class="fw-semibold text-dark">#{{ dist.id }}</div>
-                                {% if dist.est_retroactive %}
-                                <small class="text-warning">rétro</small>
-                                {% endif %}
-                            </td>
+                         
                             
                             <!-- Date -->
                             <td>
@@ -186,9 +180,9 @@
                                 <small class="text-muted">{{ dist.date_distribution|date:"H:i" }}</small>
                             </td>
                             
-                            <!-- Superviseur -->
+                            <!-- Produits -->
 <td>
-    {% for det in dist.detaildistribution.all %}
+    {% for det in dist.detaildistribution_set.all %}
         <div class="d-flex align-items-center mb-1">
             <div class="avatar-xs bg-primary bg-opacity-10 text-primary rounded-circle me-2 d-flex align-items-center justify-content-center">
                 <i class="fas fa-box fs-6"></i>

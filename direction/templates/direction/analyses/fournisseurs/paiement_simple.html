@@ -1,0 +1,64 @@
+
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block content %}
+<div class="max-w-md mx-auto mt-8">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">💰 Paiement fournisseur</h1>
+        {% if fournisseur %}
+        <p class="text-gray-600 mt-2">
+            Fournisseur: <span class="font-semibold">{{ fournisseur.nom }}</span>
+            {% if reste > 0 %}
+            <br>Reste à payer: <span class="font-bold text-red-600">{{ reste|fcfa }}</span>
+            {% endif %}
+        </p>
+        {% endif %}
+    </div>
+    
+    <div class="bg-white p-6 rounded-lg border">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            
+            {{ form.fournisseur }}
+            {{ form.lot }}
+            
+            <div>
+                <label class="block mb-1">Montant (FCFA)</label>
+                {{ form.montant }}
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block mb-1">Mode</label>
+                    {{ form.mode }}
+                </div>
+                <div>
+                    <label class="block mb-1">Date</label>
+                    {{ form.date }}
+                </div>
+            </div>
+            
+            <div>
+                <label class="block mb-1">Référence (optionnel)</label>
+                {{ form.reference }}
+            </div>
+            
+            <div>
+                <label class="block mb-1">Notes (optionnel)</label>
+                {{ form.notes }}
+            </div>
+            
+            <div class="flex gap-3 pt-4">
+                <a href="{% if fournisseur %}{% url 'detail_fournisseur_direction' pk=fournisseur.id %}{% else %}{% url 'liste_fournisseurs_direction' %}{% endif %}" 
+                   class="btn btn-outline flex-1">
+                    Annuler
+                </a>
+                <button type="submit" class="btn btn-primary flex-1">
+                    ✅ Enregistrer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

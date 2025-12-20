@@ -5,7 +5,7 @@ from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
     DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
     MouvementStock,Recouvrement,VersementBancaire,Fournisseur,
-    Depense,Perte,RecuVersement
+    Depense,Perte,RecuVersement,PaiementFournisseur
 )
 
 from django.contrib.auth.models import User
@@ -1671,3 +1671,75 @@ class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
 
         return recus_crees
     
+class PaiementFournisseurForm(forms.ModelForm):
+
+    class Meta:
+        model = PaiementFournisseur
+        fields = [
+            'superviseur',
+            'lot',
+            'montant',
+            'date_paiement',
+        ]
+        widgets = {
+            'date_paiement': forms.DateInput(
+                attrs={'type': 'date', 'class': 'input input-bordered w-full'}
+            ),
+            'montant': forms.NumberInput(
+                attrs={'class': 'input input-bordered w-full'}
+            ),
+            'superviseur': forms.Select(
+                attrs={'class': 'select select-bordered w-full'}
+            ),
+            'lot': forms.Select(
+                attrs={'class': 'select select-bordered w-full'}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.fournisseur = kwargs.pop('fournisseur', None)
+        super().__init__(*args, **kwargs)
+
+        # Filtrer les lots du fournisseur
+        if self.fournisseur:
+            self.fields['lot'].queryset = LotEntrepot.objects.filter(
+                fournisseur=self.fournisseur
+            ).order_by('-date_reception')
+
+        # Plafond dynamique si lot sélectionné
+        lot = self._get_selected_lot()
+        if lot:
+            reste = self._get_reste_lot(lot)
+            self.fields['montant'].widget.attrs.update({
+                'max': reste,
+                'placeholder': f'Max : {reste} FCFA'
+            })
+
+    def _get_selected_lot(self):
+        if self.data.get('lot'):
+            return LotEntrepot.objects.filter(id=self.data.get('lot')).first()
+        if isinstance(self.initial.get('lot'), LotEntrepot):
+            return self.initial.get('lot')
+        return None
+
+    def _get_reste_lot(self, lot):
+        total_paye = PaiementFournisseur.objects.filter(
+            lot=lot,
+            est_supprime=False
+        ).aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
+
+        return max(lot.dette_lot - total_paye, Decimal('0.00'))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        lot = cleaned_data.get('lot')
+        montant = cleaned_data.get('montant')
+
+        if lot and montant:
+            reste = self._get_reste_lot(lot)
+            if montant > reste:
+                raise forms.ValidationError(
+                    f"Montant supérieur au reste à payer du lot ({reste} FCFA)."
+                )
+
+        return cleaned_data

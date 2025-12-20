@@ -30,53 +30,54 @@ def creer_distributions_multiple():
             ramata = Agent.objects.get(user__username='ramata.sangare')
             sira = Agent.objects.get(user__username='sira.sidibe')
             noumoutene =  Agent.objects.get(user__username='noumoutene.toure')
+            safiatou =  Agent.objects.get(user__username='safiatou.coulibaly')
 
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
 
+           
                  {
-                    'date': '09/12/2025', 
-                    'produit': 'ail',
-                    'lot_reference':'20251205-0001',
+                    'date': '17/12/2025', 
+                    'produit': 'oignon',
+                    'lot_reference': '20251216-0001',
                     'specification': '',
-                    'prix_gros': 8750,
-                    'prix_detail': 10000,
+                    'prix_gros': 10000,
+                    'prix_detail': 11250,
                     
                     'distributions': [  
                        
-                       (fatoumata, 3, "Fatou"),  
-                     (ramata, 1, "Ramata"), 
-                        (alpha, 1, "Alpha"), 
-                           
-                
-                        ]
+                   
+                       (safiatou, 1, "Fatou"),  
+                       (abdoulaye, 2, "Fatou"),  
+                       
+                       
+                       ]
                 },
                 
                  {
-                    'date': '10/12/2025', 
-                    'produit': 'ail',
-                    'lot_reference':'20251205-0001',
+                    'date': '18/12/2025', 
+                    'produit': 'oignon',
+                    'lot_reference': '20251216-0001',
                     'specification': '',
-                    'prix_gros': 8750,
-                    'prix_detail': 10000,
+                    'prix_gros': 10000,
+                    'prix_detail': 11250,
                     
                     'distributions': [  
                        
-                       (fatoumata, 5, "Fatou"),  
-                     (abdoulaye, 9, "Abdoulaye"), 
-                        (djenebaS, 10, "Djeneba S."), 
-                        (moussony, 4, "Moussony"), 
-                           (djenebaC, 6, "Djeneba C."), 
-                        (noumoutene, 3, "Noumoutene"), 
-                        
-                
-                        ]
+                   
+                       (fatoumata, 1, "Fatou"),  
+                       (safiatou, 1, "Fatou"),  
+                       
+                       
+                       ]
                 },
+
+                 
+                 
+           
                 
-                
-             
-                
-            ]
+
+                ]
             
             toutes_distributions = []
             

@@ -1,0 +1,128 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block title %}{{ action|title }} paiement – {{ fournisseur.nom }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-3xl px-4 py-6">
+
+    <!-- Retour -->
+    <div class="mb-4">
+        <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}"
+           class="text-sm text-gray-600 hover:text-primary">
+            ← Retour aux paiements
+        </a>
+    </div>
+
+    <!-- Titre -->
+    <div class="mb-6">
+        <h1 class="text-xl font-bold text-gray-900">
+            {{ action|title }} un paiement
+        </h1>
+        <p class="text-sm text-gray-600">
+            Fournisseur : <span class="font-semibold">{{ fournisseur.nom }}</span>
+        </p>
+    </div>
+
+    <!-- Info montant -->
+    <div class="mb-6 p-4 border rounded-lg bg-gray-50">
+        <p class="text-sm text-gray-600">
+            {% if form.lot.value %}
+                Montant maximum pour ce lot
+            {% else %}
+                Dette totale restante
+            {% endif %}
+        </p>
+        <p class="text-2xl font-bold text-gray-900">
+            {{ form.fields.montant.widget.attrs.max|default:reste_a_payer|fcfa }}
+        </p>
+    </div>
+
+    <!-- Formulaire -->
+    <form method="post" class="bg-white border rounded-lg p-6 space-y-6">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="text-sm text-red-600">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <!-- 2 colonnes -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- Superviseur -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Superviseur *
+                </label>
+                {{ form.superviseur }}
+                {% if form.superviseur.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.superviseur.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Date paiement -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Date du paiement *
+                </label>
+                {{ form.date_paiement }}
+                {% if form.date_paiement.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.date_paiement.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Lot -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Lot (optionnel)
+                </label>
+                {{ form.lot }}
+                {% if form.lot.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.lot.errors }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Montant -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Montant à payer *
+                </label>
+                {{ form.montant }}
+                {% if form.montant.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.montant.errors }}</p>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <!-- Actions -->
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}"
+               class="px-4 py-2 text-sm border rounded text-gray-600 hover:bg-gray-50">
+                Annuler
+            </a>
+            <button type="submit"
+                    class="px-5 py-2 text-sm font-medium text-white bg-primary rounded hover:bg-primary/90">
+                Enregistrer
+            </button>
+        </div>
+    </form>
+
+</div>
+
+<style>
+input, select {
+    width: 100%;
+    padding: .6rem .5rem;
+    border: 1px solid #d1d5db;
+    border-radius: .375rem;
+    font-size: .95rem;
+}
+input:focus, select:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends 'base_admin.html' %}
+{% block title %}Factures Fournisseurs - Direction{% endblock %}
+{% load format_fcfa %}
+{% block content %}
+<div class="p-6">
+    <h1 class="text-2xl font-bold mb-6 flex items-center gap-2">
+        <i class="fas fa-file-invoice-dollar"></i>
+        Factures Fournisseurs
+    </h1>
+    
+    <!-- Filtres -->
+    <div class="card bg-base-100 shadow-sm mb-6">
+        <div class="card-body">
+            <form method="get" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <div class="md:col-span-3">
+                    <label class="label">
+                        <span class="label-text font-semibold">Fournisseur</span>
+                    </label>
+                    <select name="fournisseur" class="select select-bordered w-full">
+                        <option value="">Tous les fournisseurs</option>
+                        {% for lot in lots_avec_facture|dictsort:"fournisseur.nom" %}
+                        <option value="{{ lot.fournisseur.id }}">{{ lot.fournisseur.nom }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="label">
+                        <span class="label-text font-semibold">Date début</span>
+                    </label>
+                    <input type="date" name="date_debut" class="input input-bordered w-full">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="label">
+                        <span class="label-text font-semibold">Date fin</span>
+                    </label>
+                    <input type="date" name="date_fin" class="input input-bordered w-full">
+                </div>
+                <div class="md:col-span-2 flex items-end">
+                    <button type="submit" class="btn btn-primary w-full">
+                        <i class="fas fa-filter mr-2"></i>
+                        Filtrer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Résumé -->
+    <div class="alert alert-info mb-6">
+        <div class="flex items-center">
+            <i class="fas fa-info-circle mr-3"></i>
+            <div>
+                <strong>Total Factures : {{ total_montant|fcfa }} FCFA</strong> 
+                <span class="mx-2">•</span>
+                <span>{{ lots_avec_facture.count }} facture(s)</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Liste -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr class="bg-base-200">
+                            <th>Date</th>
+                            <th>Fournisseur</th>
+                            <th>Produit</th>
+                            <th>Quantité</th>
+                            <th>Montant</th>
+                            <th>Facture</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for lot in lots_avec_facture %}
+                        <tr class="hover">
+                            <td>{{ lot.date_reception|date:"d/m/Y" }}</td>
+                            <td>
+                                <div class="font-semibold">{{ lot.fournisseur.nom }}</div>
+                            </td>
+                            <td>{{ lot.produit.nom }}</td>
+                            <td>
+                                <span class="badge badge-outline">{{ lot.quantite_initiale }}</span>
+                            </td>
+                            <td>
+                                <span class="font-semibold text-primary">{{ lot.valeur_stock_initiale|floatformat:0 }} FCFA</span>
+                            </td>
+                            <td>
+                                {% if lot.facture %}
+                                <a href="{{ lot.facture.url }}" target="_blank" class="btn btn-sm btn-outline btn-primary">
+                                    <i class="fas fa-eye mr-2"></i>
+                                    Voir
+                                </a>
+                                {% else %}
+                                <span class="badge badge-warning gap-1">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Non fournie
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-8">
+                                <div class="text-gray-400">
+                                    <i class="fas fa-file-invoice text-4xl mb-3"></i>
+                                    <p class="text-lg">Aucune facture trouvée</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

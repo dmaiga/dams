@@ -1,0 +1,307 @@
+{% extends 'base_admin.html' %}
+{% block title %}Versements Bancaires - Direction{% endblock %}
+{% load static %}
+{% load format_fcfa %}
+{% block content %}
+<div class="p-4 md:p-6">
+    <h1 class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-money-check-alt"></i>
+        Versements Bancaires
+    </h1>
+    
+    <!-- Filtres avancés - Version compacte -->
+    <div class="card bg-base-100 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <form method="get" class="space-y-4">
+                <!-- Ligne 1 des filtres -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Filtre par superviseur -->
+                    <div>
+                        <label class="label label-text font-semibold py-1">Superviseur</label>
+                        <select name="superviseur" class="select select-bordered select-sm w-full">
+                            <option value="">Tous les superviseurs</option>
+                            {% for superviseur in superviseurs %}
+                            <option value="{{ superviseur.id }}" 
+                                    {% if filtres_actifs.superviseur|stringformat:"s" == superviseur.id|stringformat:"s" %}selected{% endif %}>
+                                {{ superviseur.full_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Filtre périodique -->
+                    <div>
+                        <label class="label label-text font-semibold py-1">Période</label>
+                        <select name="periode" class="select select-bordered select-sm w-full" id="periode-select">
+                            {% for value, label in periodes_disponibles %}
+                            <option value="{{ value }}" 
+                                    {% if request.GET.periode == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Filtre par type -->
+                    <div>
+                        <label class="label label-text font-semibold py-1">Type</label>
+                        <select name="type_versement" class="select select-bordered select-sm w-full">
+                            {% for value, label in types_versement %}
+                            <option value="{{ value }}" 
+                                    {% if request.GET.type_versement == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Filtre montant minimum -->
+                    <div>
+                        <label class="label label-text font-semibold py-1">Montant min (FCFA)</label>
+                        <input type="number" name="montant_min" class="input input-bordered input-sm w-full" 
+                               value="{{ request.GET.montant_min|default:'' }}" min="0" step="1000" placeholder="0">
+                    </div>
+                </div>
+                
+                <!-- Ligne 2 - Dates personnalisées -->
+                <div id="custom-dates-container" class="{% if request.GET.periode != 'custom' %}hidden{% endif %} grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="label label-text font-semibold py-1">Date début</label>
+                        <input type="date" name="date_debut" class="input input-bordered input-sm w-full" 
+                               value="{{ request.GET.date_debut|default:'' }}">
+                    </div>
+                    
+                    <div>
+                        <label class="label label-text font-semibold py-1">Date fin</label>
+                        <input type="date" name="date_fin" class="input input-bordered input-sm w-full" 
+                               value="{{ request.GET.date_fin|default:'' }}">
+                    </div>
+                </div>
+                
+                <!-- Boutons -->
+                <div class="flex flex-wrap gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-filter mr-1"></i>
+                        Filtrer
+                    </button>
+                    <a href="{% url 'versements_direction' %}" class="btn btn-outline btn-sm">
+                        <i class="fas fa-redo mr-1"></i>
+                        Réinitialiser
+                    </a>
+                </div>
+            </form>
+            
+            <!-- Résumé des filtres actifs -->
+            {% if filtres_actifs %}
+            <div class="mt-3 p-2 bg-base-200 rounded text-base">
+                <div class="flex flex-wrap items-center gap-1">
+                    <span class="font-semibold">Filtres :</span>
+                    {% for key, value in filtres_actifs.items %}
+                    {% if value %}
+                    <span class="badge badge-primary badge-sm">
+                        {% if key == 'superviseur' %}
+                            {% for superviseur in superviseurs %}
+                                {% if superviseur.id|stringformat:"s" == value|stringformat:"s" %}
+                                {{ superviseur.full_name|truncatechars:15 }}
+                                {% endif %}
+                            {% endfor %}
+                        {% elif key == 'type_versement' %}
+                            {% if value == 'vente' %}Vente
+                            {% elif value == 'hors_vente' %}Hors vente
+                            {% elif value == 'mixte' %}Mixte
+                            {% else %}{{ value|title }}{% endif %}
+                        {% elif key == 'periode' %}
+                            {{ value }}
+                        {% elif key == 'montant_min' %}
+                            Min: {{ value }}
+                        {% elif key == 'date_debut' %}
+                            Du {{ value }}
+                        {% elif key == 'date_fin' %}
+                            Au {{ value }}
+                        {% else %}
+                            {{ key }}: {{ value }}
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Statistiques compactes -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        <div class="card bg-primary text-primary-content shadow-sm">
+            <div class="card-body p-3">
+                <h3 class="card-title text-base">Ventes</h3>
+                <p class="text-lg font-bold">{{ total_vente|fcfa }}</p>
+                <p class="text-xs opacity-80">{{ nombre_versements_filtres }} vers.</p>
+            </div>
+        </div>
+        <div class="card bg-info text-info-content shadow-sm">
+            <div class="card-body p-3">
+                <h3 class="card-title text-base">Hors Vente</h3>
+                <p class="text-lg font-bold">{{ total_hors_vente|fcfa }}</p>
+                <p class="text-xs opacity-80">Moy: {{ moyenne_hors_vente|fcfa }}</p>
+            </div>
+        </div>
+        <div class="card bg-success text-success-content shadow-sm">
+            <div class="card-body p-3">
+                <h3 class="card-title text-base">Total Général</h3>
+                <p class="text-lg font-bold">{{ total_general|fcfa }}</p>
+                <p class="text-xs opacity-80">Net: {{ net_verse|fcfa }}</p>
+            </div>
+        </div>
+        <div class="card bg-secondary text-secondary-content shadow-sm">
+            <div class="card-body p-3">
+                <h3 class="card-title text-base">Dépenses</h3>
+                <p class="text-lg font-bold">{{ total_depenses|fcfa }}</p>
+                <p class="text-xs opacity-80">Associées</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tableau des versements -->
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-4">
+            <div class="overflow-x-auto -mx-2">
+                <table class="table table-zebra w-full text-sm md:text-base">
+                    <thead>
+                        <tr class="bg-base-200 text-base">
+                            <th class="py-2 px-2">Date</th>
+                            <th class="py-2 px-2">Superviseur</th>
+                            <th class="py-2 px-2">Type</th>
+                            <th class="py-2 px-2">Vente</th>
+                            <th class="py-2 px-2">H.Vente</th>
+                            <th class="py-2 px-2">Total</th>
+                            <th class="py-2 px-2">Dépenses</th>
+                            <th class="py-2 px-2">Reçus</th>
+                            <th class="py-2 px-2">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for versement in versements %}
+                       <tr class="hover text-sm md:text-base">
+                            <td class="py-2 px-2 whitespace-nowrap">
+                                <div class="font-medium">{{ versement.date_versement_reelle|date:"d/m/y" }}</div>
+                                <div class="text-xs text-gray-500">{{ versement.date_versement_reelle|date:"H:i" }}</div>
+                            </td>
+                            <td class="py-2 px-2 max-w-[120px] truncate">
+                                {{ versement.superviseur.full_name }}
+                            </td>
+                            <td class="py-2 px-2">
+                                {% if versement.type_versement == 'vente' %}
+                                    <span class="badge badge-success badge-sm gap-1">
+                                        <i class="fas fa-shopping-cart text-[10px]"></i>
+                                        Vente
+                                    </span>
+                                {% elif versement.type_versement == 'mixte' %}
+                                    <span class="badge badge-primary badge-sm gap-1">
+                                        <i class="fas fa-random text-[10px]"></i>
+                                        Mixte
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-info badge-sm gap-1">
+                                        <i class="fas fa-money-bill-wave text-[10px]"></i>
+                                        H.Vente
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-2 font-medium">
+                                {{ versement.montant_vente|fcfa }}
+                            </td>
+                            <td class="py-2 px-2 font-medium">
+                                {{ versement.montant_hors_vente|fcfa }}
+                            </td>
+                            <td class="py-2 px-2 font-bold text-primary">
+                                {{ versement.montant_total|fcfa }}
+                            </td>
+                            <td class="py-2 px-2 font-medium">
+                                {{ versement.total_depenses_associees|fcfa }}
+                            </td>
+                            <td class="py-2 px-2">
+                                {% if versement.recus_count > 0 %}
+                                <span class="badge badge-success badge-sm gap-1">
+                                    <i class="fas fa-receipt text-[10px]"></i>
+                                    {{ versement.recus_count }}
+                                </span>
+                                {% else %}
+                                <span class="badge badge-warning badge-sm gap-1">
+                                    <i class="fas fa-times text-[10px]"></i>
+                                    0
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-2">
+                                <a href="{% url 'detail_versement_direction' versement.id %}" 
+                                   class="btn btn-sm btn-outline btn-primary">
+                                    <i class="fas fa-eye text-[10px]"></i>
+                                    Détail
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center py-6">
+                                <div class="text-gray-400">
+                                    <i class="fas fa-money-bill-transfer text-3xl mb-2"></i>
+                                    <p class="text-base">Aucun versement trouvé</p>
+                                    {% if filtres_actifs %}
+                                    <p class="text-base mt-1">Essayez de modifier vos filtres</p>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if versements.has_other_pages %}
+            <div class="mt-4 flex justify-center">
+                <div class="join">
+                    {% if versements.has_previous %}
+                    <a href="?page={{ versements.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       class="join-item btn btn-outline btn-sm">«</a>
+                    {% endif %}
+                    
+                    <span class="join-item btn btn-disabled btn-sm">
+                        Page {{ versements.number }} sur {{ versements.paginator.num_pages }}
+                    </span>
+                    
+                    {% if versements.has_next %}
+                    <a href="?page={{ versements.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+                       class="join-item btn btn-outline btn-sm">»</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Script pour gérer l'affichage conditionnel des dates -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodeSelect = document.getElementById('periode-select');
+    const customDatesContainer = document.getElementById('custom-dates-container');
+    
+    function toggleCustomDates() {
+        const isCustom = periodeSelect.value === 'custom';
+        if (isCustom) {
+            customDatesContainer.classList.remove('hidden');
+        } else {
+            customDatesContainer.classList.add('hidden');
+        }
+    }
+    
+    // Initialiser
+    toggleCustomDates();
+    
+    // Écouter les changements
+    periodeSelect.addEventListener('change', toggleCustomDates);
+});
+</script>
+{% endblock %}
