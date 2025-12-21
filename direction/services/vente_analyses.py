@@ -46,43 +46,6 @@ class VenteAnalyseService:
         agents_inactifs.sort(key=lambda x: (x["jours_depuis"] is not None, x["jours_depuis"]))
         return agents_inactifs
     
-    
-    @staticmethod
-    def normalize_period(periode, params):
-        """Retourne date_debut, date_fin en fonction du type de période."""
-        now = timezone.now()
-
-        if periode == "annee":
-            annee = int(params.get("annee", now.year))
-            date_debut = timezone.make_aware(datetime(annee, 1, 1))
-            date_fin = timezone.make_aware(datetime(annee, 12, 31, 23, 59, 59))
-
-        elif periode == "mois":
-            annee = int(params.get("annee", now.year))
-            mois = int(params.get("mois", now.month))
-            date_debut = timezone.make_aware(datetime(annee, mois, 1))
-            if mois == 12:
-                date_fin = timezone.make_aware(datetime(annee + 1, 1, 1)) - timedelta(seconds=1)
-            else:
-                date_fin = timezone.make_aware(datetime(annee, mois + 1, 1)) - timedelta(seconds=1)
-
-        elif periode == "perso":
-            d1 = params.get("date_debut")
-            d2 = params.get("date_fin")
-            if d1 and d2:
-                date_debut = timezone.make_aware(datetime.strptime(d1, "%Y-%m-%d"))
-                date_fin = timezone.make_aware(datetime.strptime(d2, "%Y-%m-%d")) + timedelta(days=1, seconds=-1)
-            else:
-                # Valeurs par défaut si dates manquantes
-                date_debut = timezone.make_aware(datetime(now.year, 1, 1))
-                date_fin = now
-
-        else:
-            annee = now.year
-            date_debut = timezone.make_aware(datetime(annee, 1, 1))
-            date_fin = timezone.make_aware(datetime(annee, 12, 31, 23, 59, 59))
-
-        return date_debut, date_fin
 
     # ----------------------------------------------------------------------
    
@@ -202,3 +165,41 @@ class VenteAnalyseService:
         """Retourne les ventes avec marge calculée."""
         # On va calculer la marge dans la vue pour éviter les problèmes de requêtes complexes
         return ventes_qs
+    
+    # ----------------------------------------------------------------------
+    @staticmethod
+    def normalize_period(periode, params):
+        """Retourne date_debut, date_fin en fonction du type de période."""
+        now = timezone.now()
+
+        if periode == "annee":
+            annee = int(params.get("annee", now.year))
+            date_debut = timezone.make_aware(datetime(annee, 1, 1))
+            date_fin = timezone.make_aware(datetime(annee, 12, 31, 23, 59, 59))
+
+        elif periode == "mois":
+            annee = int(params.get("annee", now.year))
+            mois = int(params.get("mois", now.month))
+            date_debut = timezone.make_aware(datetime(annee, mois, 1))
+            if mois == 12:
+                date_fin = timezone.make_aware(datetime(annee + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                date_fin = timezone.make_aware(datetime(annee, mois + 1, 1)) - timedelta(seconds=1)
+
+        elif periode == "perso":
+            d1 = params.get("date_debut")
+            d2 = params.get("date_fin")
+            if d1 and d2:
+                date_debut = timezone.make_aware(datetime.strptime(d1, "%Y-%m-%d"))
+                date_fin = timezone.make_aware(datetime.strptime(d2, "%Y-%m-%d")) + timedelta(days=1, seconds=-1)
+            else:
+                # Valeurs par défaut si dates manquantes
+                date_debut = timezone.make_aware(datetime(now.year, 1, 1))
+                date_fin = now
+
+        else:
+            annee = now.year
+            date_debut = timezone.make_aware(datetime(annee, 1, 1))
+            date_fin = timezone.make_aware(datetime(annee, 12, 31, 23, 59, 59))
+
+        return date_debut, date_fin

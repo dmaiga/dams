@@ -198,6 +198,8 @@ class AgentAnalysisService:
             'stagiaires_expires': stagiaires.filter(date_expiration__lte=timezone.now()).count(),
         }
 
+
+
     @staticmethod
     def get_top_vendeurs_quantite(limit=5):
         """Top vendeurs par quantité vendue (VENTES PERSONNELLES uniquement)"""
@@ -559,57 +561,5 @@ class AgentAnalysisService:
             'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
         }
 
-    @staticmethod
-    def get_agents_with_stock():
-        """
-        Liste des agents terrain avec les produits encore en leur possession
-        """
-        agents = Agent.objects.filter(type_agent='terrain')
-
-        data = []
-
-        for agent in agents:
-            stock = AgentAnalysisService.get_agent_current_stock(agent)
-
-            if stock['total_produits_disponibles'] > 0:
-                data.append({
-                    'agent': agent,
-                    'total_produits': stock['total_produits_disponibles'],
-                    'details': stock['stock_details']
-                })
-
-        return data
-
-    @staticmethod
-    def get_agents_vendu_derniere_72h():
-        """
-        Agents terrain ayant vendu dans les dernières 72 heures
-        """
-        limite = timezone.now() - timedelta(hours=72)
-    
-        agents = Agent.objects.filter(type_agent='terrain')
-    
-        data = []
-    
-        for agent in agents:
-            ventes = Vente.objects.filter(
-                agent=agent,
-                stagiaire__isnull=True,
-                date_vente__gte=limite
-            )
-    
-            if ventes.exists():
-                total_quantite = sum(v.quantite for v in ventes)
-                total_ca = sum(v.total_vente for v in ventes)
-    
-                data.append({
-                    'agent': agent,
-                    'nombre_ventes': ventes.count(),
-                    'quantite': total_quantite,
-                    'ca': total_ca,
-                    'derniere_vente': ventes.order_by('-date_vente').first().date_vente
-                })
-    
-        return data
 
 

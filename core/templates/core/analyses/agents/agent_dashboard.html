@@ -72,6 +72,108 @@
         </div>
     </div>
 
+<!-- Agents avec Produits en Possession -->
+<div class="card bg-base-100 shadow-xl mt-8">
+    <div class="card-body">
+        <h2 class="card-title mb-4">
+            <i class="fas fa-boxes text-warning"></i>
+            Agents avec Produits en Possession
+        </h2>
+
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+
+<th>Date Distribution</th>
+             <th>Agent</th>
+<th>Produit</th>
+<th>Quantité Restante</th>
+<th>Lot</th>
+
+                    </tr>
+                </thead>
+                <tbody>
+{% for item in agents_stock %}
+    {% for p in item.details %}
+    <tr>
+                <td>
+            {{ p.distribution_date|date:"d/m/Y" }}
+        </td>
+        <td class="font-semibold">
+            {{ item.agent.full_name }}
+        </td>
+
+        <!-- 🆕 Date de distribution -->
+
+
+        <td>
+            {{ p.produit }}
+        </td>
+
+        <td class="font-bold text-warning">
+            {{ p.quantite_restante }}
+        </td>
+
+        <td>
+            {{ p.lot }}
+        </td>
+    </tr>
+    {% endfor %}
+{% empty %}
+<tr>
+    <td colspan="5" class="text-center text-gray-500 py-4">
+        Aucun produit en circulation
+    </td>
+</tr>
+{% endfor %}
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Agents Actifs - Dernières 72h -->
+<div class="card bg-base-100 shadow-xl mt-8">
+    <div class="card-body">
+        <h2 class="card-title mb-4">
+            <i class="fas fa-bolt text-success"></i>
+            Agents Actifs (Dernières 72h)
+        </h2>
+
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>Agent</th>
+                        <th>Ventes</th>
+                        <th>Quantité</th>
+                        <th>CA</th>
+                        <th>Dernière Vente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in agents_actifs_72h %}
+                    <tr>
+                        <td class="font-semibold">{{ a.agent.full_name }}</td>
+                        <td class="text-center">{{ a.nombre_ventes }}</td>
+                        <td class="text-center">{{ a.quantite }}</td>
+                        <td class="font-bold">{{ a.ca|fcfa }}</td>
+                        <td>{{ a.derniere_vente|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-gray-500 py-4">
+                            Aucun agent n’a vendu ces dernières 72 heures
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <!-- Top 5 Vendeurs par Quantité -->

@@ -40,6 +40,22 @@ class MultiFileField(forms.FileField):
             result = single_file_clean(data, initial)
         return result
 
+class TelephoneOrUsernameLoginForm(AuthenticationForm):
+    username = forms.CharField(
+        label="Téléphone ou Nom d'utilisateur",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Téléphone ou Nom d’utilisateur'
+        })
+    )
+    password = forms.CharField(
+        label="Mot de passe",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Mot de passe'
+        })
+    )
+
 
 class AgentCreationForm(forms.ModelForm):
     nom = forms.CharField(
@@ -76,10 +92,16 @@ class AgentCreationForm(forms.ModelForm):
         label="Date de mise en service (optionnel)",
         help_text="Laisser vide pour utiliser la date actuelle"
     )
+    est_actif = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Agent actif",
+        help_text="Décochez pour créer l’agent sans accès à la plateforme"
+    )
 
     class Meta:
         model = Agent
-        fields = ['telephone', 'type_agent','date_mise_service']
+        fields = ['telephone', 'type_agent','date_mise_service','est_actif']
 
     def clean_telephone(self):
         telephone = self.cleaned_data.get('telephone')
@@ -121,7 +143,8 @@ class AgentCreationForm(forms.ModelForm):
         
         # ✅ Générer un username unique
         username = self.generate_unique_username(nom, prenom)
-        
+        est_actif = self.cleaned_data.get('est_actif', True)
+
         # ✅ Créer l'utilisateur avec mot de passe par défaut
         user = User.objects.create_user(
             username=username,  # ✅ prenom.nom (unique)
@@ -129,7 +152,7 @@ class AgentCreationForm(forms.ModelForm):
             first_name=prenom,   # ✅ CORRECTION: first_name = prénom
             last_name=nom,       # ✅ CORRECTION: last_name = nom
             email=f"{username}@example.com",  # Email optionnel
-            is_active=True
+            is_active=est_actif
         )
         
         # ✅ Créer l'agent
@@ -142,24 +165,13 @@ class AgentCreationForm(forms.ModelForm):
             agent.date_mise_service = date_mise_service
         if commit:
             agent.save()
-            
+            # ✅ sécurité : forcer cohérence
+            if est_actif:
+                agent.activer()
+            else:
+                agent.desactiver()
         return agent
 
-class TelephoneOrUsernameLoginForm(AuthenticationForm):
-    username = forms.CharField(
-        label="Téléphone ou Nom d'utilisateur",
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Téléphone ou Nom d’utilisateur'
-        })
-    )
-    password = forms.CharField(
-        label="Mot de passe",
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Mot de passe'
-        })
-    )
 
 # forms.py
 class AgentModificationForm(forms.ModelForm):
@@ -186,13 +198,20 @@ class AgentModificationForm(forms.ModelForm):
         ],
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+    est_actif = forms.BooleanField(
+        required=False,
+        label="Agent actif sur la plateforme"
+    )
 
     class Meta:
         model = Agent
-        fields = ['telephone', 'type_agent']
+        fields = ['telephone', 'type_agent','est_actif']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance:
+            self.fields['est_actif'].initial = self.instance.est_actif
+        
         if self.instance and self.instance.user:
             self.fields['nom'].initial = self.instance.user.first_name
             self.fields['prenom'].initial = self.instance.user.last_name
@@ -211,14 +230,28 @@ class AgentModificationForm(forms.ModelForm):
         if Agent.objects.filter(telephone=telephone).exclude(pk=self.instance.pk).exists():
             raise ValidationError("Ce numéro de téléphone est déjà utilisé.")
         return telephone
-
+    
     def save(self, commit=True):
-        if self.instance and self.instance.user:
-            self.instance.user.first_name = self.cleaned_data['nom']
-            self.instance.user.last_name = self.cleaned_data['prenom']
-            self.instance.user.save()
-        
-        return super().save(commit=commit)
+        agent = super().save(commit=False)
+    
+        if agent.user:
+            agent.user.first_name = self.cleaned_data['nom']
+            agent.user.last_name = self.cleaned_data['prenom']
+            agent.user.save()
+    
+        est_actif = self.cleaned_data.get('est_actif', True)
+    
+        if commit:
+            agent.save()
+    
+            # ✅ ACTIVER / DÉSACTIVER VIA MÉTHODES
+            if est_actif:
+                agent.activer()
+            else:
+                agent.desactiver()
+    
+        return agent
+    
 
 class FournisseurForm(forms.ModelForm):
     class Meta:
@@ -1670,7 +1703,14 @@ class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
             recus_crees.append(recu)
 
         return recus_crees
-    
+ 
+
+from decimal import Decimal
+from django import forms
+from django.db.models import Sum
+from .models import PaiementFournisseur, LotEntrepot
+
+
 class PaiementFournisseurForm(forms.ModelForm):
 
     class Meta:
@@ -1700,20 +1740,27 @@ class PaiementFournisseurForm(forms.ModelForm):
         self.fournisseur = kwargs.pop('fournisseur', None)
         super().__init__(*args, **kwargs)
 
-        # Filtrer les lots du fournisseur
+        # 🔹 Filtrer les lots du fournisseur (logique direction)
         if self.fournisseur:
             self.fields['lot'].queryset = LotEntrepot.objects.filter(
                 fournisseur=self.fournisseur
             ).order_by('-date_reception')
 
-        # Plafond dynamique si lot sélectionné
+        # 🔹 UX dynamique : afficher le plafond réel
         lot = self._get_selected_lot()
         if lot:
-            reste = self._get_reste_lot(lot)
+            reste = self._get_reste_a_payer(lot)
             self.fields['montant'].widget.attrs.update({
                 'max': reste,
-                'placeholder': f'Max : {reste} FCFA'
+                'placeholder': (
+                    f"Max : {reste} FCFA "
+                    f"(sur {lot.valeur_stock_initiale} FCFA)"
+                )
             })
+
+    # =========================
+    # LOGIQUE MÉTIER
+    # =========================
 
     def _get_selected_lot(self):
         if self.data.get('lot'):
@@ -1722,24 +1769,45 @@ class PaiementFournisseurForm(forms.ModelForm):
             return self.initial.get('lot')
         return None
 
-    def _get_reste_lot(self, lot):
-        total_paye = PaiementFournisseur.objects.filter(
-            lot=lot,
-            est_supprime=False
-        ).aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
+    def _get_total_paye(self, lot):
+        return (
+            PaiementFournisseur.objects.filter(
+                lot=lot,
+                est_supprime=False
+            )
+            .aggregate(total=Sum('montant'))['total']
+            or Decimal('0.00')
+        )
 
-        return max(lot.dette_lot - total_paye, Decimal('0.00'))
+    def _get_reste_a_payer(self, lot):
+        return max(
+            lot.valeur_stock_initiale - self._get_total_paye(lot),
+            Decimal('0.00')
+        )
+
+    # =========================
+    # VALIDATION FINALE
+    # =========================
 
     def clean(self):
         cleaned_data = super().clean()
         lot = cleaned_data.get('lot')
         montant = cleaned_data.get('montant')
 
-        if lot and montant:
-            reste = self._get_reste_lot(lot)
-            if montant > reste:
-                raise forms.ValidationError(
-                    f"Montant supérieur au reste à payer du lot ({reste} FCFA)."
-                )
+        if not lot or not montant:
+            return cleaned_data
+
+        reste = self._get_reste_a_payer(lot)
+
+        if montant <= 0:
+            raise forms.ValidationError(
+                "Le montant du paiement doit être strictement positif."
+            )
+
+        if montant > reste:
+            raise forms.ValidationError(
+                f"Paiement refusé : reste à payer {reste} FCFA "
+                f"sur un total de {lot.valeur_stock_initiale} FCFA."
+            )
 
         return cleaned_data

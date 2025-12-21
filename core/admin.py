@@ -3,10 +3,13 @@ from django.contrib import admin
 from .models import (
     Agent, Produit, Client, LotEntrepot, Fournisseur,
     DistributionAgent, DetailDistribution, Vente, 
-    MouvementStock, Facture,Recouvrement,VersementBancaire
+    MouvementStock, Facture,Recouvrement,VersementBancaire,PaiementFournisseur
 )
+from django.db.models import Sum
+from decimal import Decimal
+from django.core.exceptions import ValidationError
 
-from .models import Fournisseur
+
 
 @admin.register(Fournisseur)
 class FournisseurAdmin(admin.ModelAdmin):
@@ -93,17 +96,21 @@ class RecouvrementAdmin(admin.ModelAdmin):
     readonly_fields = ('date_creation',)
 
 
+
+
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     list_display = [
         'nom_complet',
         'type_agent',
         'telephone',
+        'statut_actif',
         'ajustement_solde',
         'statistiques_agent',
     ]
+
     list_editable = ['ajustement_solde']
-    list_filter = ['type_agent']
+    list_filter = ['type_agent', 'est_actif']
     search_fields = [
         'user__first_name',
         'user__last_name',
@@ -111,32 +118,59 @@ class AgentAdmin(admin.ModelAdmin):
         'telephone',
     ]
 
+    actions = ['activer_agents', 'desactiver_agents']
+
+    # =========================
+    # AFFICHAGES
+    # =========================
+
     def nom_complet(self, obj):
         return obj.full_name
     nom_complet.short_description = "Nom complet"
+
+    def statut_actif(self, obj):
+        if obj.est_actif:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">✔ Actif</span>'
+            )
+        return format_html(
+            '<span style="color: red; font-weight: bold;">✖ Inactif</span>'
+        )
+    statut_actif.short_description = "Statut"
+    statut_actif.admin_order_field = 'est_actif'
+
+    # =========================
+    # ACTIONS ADMIN
+    # =========================
+
+    @admin.action(description="✅ Activer les agents sélectionnés")
+    def activer_agents(self, request, queryset):
+        for agent in queryset:
+            agent.activer()
+
+    @admin.action(description="⛔ Désactiver les agents sélectionnés")
+    def desactiver_agents(self, request, queryset):
+        for agent in queryset:
+            agent.desactiver()
+
+    # =========================
+    # STATISTIQUES
+    # =========================
 
     def statistiques_agent(self, obj):
         """
         Affiche les principales statistiques selon le type d'agent.
         """
         if obj.est_superviseur:
-            # Récupération des données détaillées
             details = obj.detail_solde_superviseur
-            solde = details['solde_vente_actuel']
-            total_recouvrements_agents = details['total_recouvrements_agents']
-            total_ventes_personnelles = details['total_ventes_personnelles']
-            total_ventes_stagiaires = details['total_ventes_stagiaires']
-            total_versements = details['total_versements_vente']
-            total_depenses = details['total_depenses_vente']
-            
 
             return (
-                f"🧾 Recouvrements: {total_recouvrements_agents:,} FCFA | "
-                f"Ventes pers.: {total_ventes_personnelles:,} FCFA | "
-                f"Ventes stagiaires: {total_ventes_stagiaires:,} FCFA | "
-                f"Versements: {total_versements:,} FCFA | "
-                f"Dépenses: {total_depenses:,} FCFA | "
-                f"💰 Solde: {solde:,} FCFA"
+                f"🧾 Recouvrements: {details['total_recouvrements_agents']:,} FCFA | "
+                f"Ventes pers.: {details['total_ventes_personnelles']:,} FCFA | "
+                f"Ventes stagiaires: {details['total_ventes_stagiaires']:,} FCFA | "
+                f"Versements: {details['total_versements_vente']:,} FCFA | "
+                f"Dépenses: {details['total_depenses_vente']:,} FCFA | "
+                f"💰 Solde: {details['solde_vente_actuel']:,} FCFA"
             )
 
         elif obj.est_agent_terrain:
@@ -154,11 +188,10 @@ class AgentAdmin(admin.ModelAdmin):
 
         elif obj.est_stagiaire:
             tuteur = "Aucun"
-            # Trouver le tuteur du stagiaire
             vente_avec_tuteur = Vente.objects.filter(stagiaire=obj).first()
             if vente_avec_tuteur and vente_avec_tuteur.agent:
                 tuteur = vente_avec_tuteur.agent.full_name
-            
+
             return (
                 f"Ventes: {obj.total_ventes:,} FCFA | "
                 f"Tuteur: {tuteur} | "
@@ -166,6 +199,7 @@ class AgentAdmin(admin.ModelAdmin):
             )
 
         return "—"
+
     statistiques_agent.short_description = "📊 Statistiques"
 
 from django.contrib import admin
@@ -276,14 +310,107 @@ class PaiementDetteAdmin(admin.ModelAdmin):
     list_filter = ('mode_paiement', 'date_paiement')
     search_fields = ('reference', 'dette__vente__client__nom')
 
-# admin.py
-from django.contrib import admin
-from django.utils.html import format_html
-from django.db.models import Sum
+@admin.register(PaiementFournisseur)
+class PaiementFournisseurAdmin(admin.ModelAdmin):
 
-from .models import PaiementFournisseur
+    list_display = (
+        'date_paiement',
+        'date_reception_lot',
+        'fournisseur',
+        'produit',
+        'lot',
+        'montant',
+        'dette_lot',
+        'total_paye_lot',
+        'reste_a_payer_lot',
+        'statut_lot',
+    )
 
+    list_filter = (
+        'fournisseur',
+        'lot__produit',
+        'date_paiement',
+    )
 
+    search_fields = (
+        'fournisseur__nom',
+        'lot__reference_lot',
+        'lot__produit__nom',
+    )
+
+    autocomplete_fields = (
+        'fournisseur',
+        'lot',
+        'superviseur',
+    )
+
+    # =========================
+    # COLONNES CALCULÉES
+    # =========================
+
+    def produit(self, obj):
+        return obj.lot.produit.nom if obj.lot else "-"
+    produit.short_description = "Produit"
+
+    def dette_lot(self, obj):
+        if not obj.lot:
+            return "-"
+        return f"{obj.lot.valeur_stock_initiale:,.0f} FCFA"
+    dette_lot.short_description = "Dette lot"
+
+    def total_paye_lot(self, obj):
+        if not obj.lot:
+            return "-"
+        total = obj.lot.total_paye_lot
+        return f"{total:,.0f} FCFA"
+    total_paye_lot.short_description = "Payé"
+
+    def reste_a_payer_lot(self, obj):
+        if not obj.lot:
+            return "-"
+        reste = obj.lot.valeur_stock_initiale - obj.lot.total_paye_lot
+        return f"{reste:,.0f} FCFA"
+    reste_a_payer_lot.short_description = "Reste"
+
+    def statut_lot(self, obj):
+        if not obj.lot:
+            return "-"
+        reste = obj.lot.valeur_stock_initiale - obj.lot.total_paye_lot
+        if reste <= 0:
+            return "Soldé"
+        return "Partiel"
+    statut_lot.short_description = "Statut"
+    
+    def date_reception_lot(self, obj):
+        if not obj.lot:
+            return "-"
+        return obj.lot.date_reception.strftime("%d/%m/%Y")
+    date_reception_lot.short_description = "Réception lot"
+    date_reception_lot.admin_order_field = "lot__date_reception"
+
+    # =========================
+    # SÉCURITÉ MÉTIER
+    # =========================
+
+    def save_model(self, request, obj, form, change):
+        if not obj.cree_par:
+            obj.cree_par = request.user
+
+        if obj.lot:
+            total_paye = (
+                PaiementFournisseur.objects
+                .filter(lot=obj.lot, est_supprime=False)
+                .exclude(pk=obj.pk)
+                .aggregate(total=Sum('montant'))['total']
+                or Decimal('0.00')
+            )
+
+            if total_paye + obj.montant > obj.lot.valeur_stock_initiale:
+                raise ValidationError(
+                    "Le montant dépasse la dette contractuelle du lot."
+                )
+
+        super().save_model(request, obj, form, change)
 
 
 # ==============================

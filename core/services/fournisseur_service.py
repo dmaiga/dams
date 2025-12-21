@@ -17,6 +17,8 @@ from core.models import (
     Perte,
     PaiementFournisseur,
 )
+from datetime import datetime, date, time
+from django.utils import timezone
 
 # Constantes
 DEC_ZERO = Decimal('0.00')
@@ -27,25 +29,43 @@ class FournisseurAnalyseService:
     Service optimisé pour l'analyse fournisseur.
     """
 
+
+
     @staticmethod
     def _normalize_period(date_debut=None, date_fin=None):
-        """Retourne des datetime aware pour la période"""
-        if date_debut and date_fin:
-            # Si déjà datetime naive strings, on suppose format 'YYYY-MM-DD' ou datetime objects
-            if isinstance(date_debut, str):
-                date_debut = datetime.strptime(date_debut, '%Y-%m-%d')
-            if isinstance(date_fin, str):
-                date_fin = datetime.strptime(date_fin, '%Y-%m-%d')
+        """
+        Retourne toujours des datetime timezone-aware
+        Accepte : None, str, date, datetime
+        """
+
         now = timezone.now()
+
+        # -------- date_debut --------
+        if isinstance(date_debut, str):
+            date_debut = datetime.strptime(date_debut, "%Y-%m-%d")
+
+        if isinstance(date_debut, date) and not isinstance(date_debut, datetime):
+            date_debut = datetime.combine(date_debut, time.min)
+
         if not date_debut:
-            # début : début de l'année en cours
             date_debut = datetime(now.year, 1, 1)
+
+        if timezone.is_naive(date_debut):
+            date_debut = timezone.make_aware(date_debut)
+
+        # -------- date_fin --------
+        if isinstance(date_fin, str):
+            date_fin = datetime.strptime(date_fin, "%Y-%m-%d")
+
+        if isinstance(date_fin, date) and not isinstance(date_fin, datetime):
+            date_fin = datetime.combine(date_fin, time.max)
+
         if not date_fin:
-            # fin : maintenant
             date_fin = now
-        # rendre aware si nécessaire
-        date_debut = timezone.make_aware(date_debut) if date_debut.tzinfo is None else date_debut
-        date_fin = timezone.make_aware(date_fin) if date_fin.tzinfo is None else date_fin
+
+        if timezone.is_naive(date_fin):
+            date_fin = timezone.make_aware(date_fin)
+
         return date_debut, date_fin
 
 

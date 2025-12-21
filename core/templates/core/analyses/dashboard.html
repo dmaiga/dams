@@ -462,7 +462,176 @@
 
     <!-- 🟣 Bloc 4 : Stock Essentiel AVEC FOURNISSEURS -->
 
-    
+    <!-- 🔵 Bloc : KPIs Fournisseurs -->
+<div class="bg-base-100 rounded-lg shadow-sm border border-base-300 p-6 mb-6">
+    <h2 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+        <i class="fas fa-truck text-primary"></i>
+        État des Fournisseurs
+        <span class="text-sm font-normal text-base-content/60">
+            ({% if periode_selectionnee == 'annee' %}Année {{ annee_selectionnee }}{% else %}
+            {% if mois_selectionne %}{{ mois_liste|get_item:mois_selectionne }} {{ annee_selectionnee }}{% else %}{{ date_debut|date:"F Y" }}{% endif %}
+            {% endif %})
+        </span>
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+        <!-- Dette contractuelle -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-file-contract text-blue-600 text-sm"></i>
+                <span class="text-xs uppercase text-blue-700 font-semibold">
+                    Dette contractuelle
+                </span>
+            </div>
+            <div class="text-2xl font-bold text-blue-900">
+                {{ kpis_fournisseurs.dette_contractuelle|fcfa }}
+            </div>
+            <div class="text-xs text-blue-700/70 mt-1">
+                Réceptions enregistrées
+            </div>
+        </div>
+
+        <!-- Dette consommée -->
+        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-chart-line text-purple-600 text-sm"></i>
+                <span class="text-xs uppercase text-purple-700 font-semibold">
+                    Dette consommée
+                </span>
+            </div>
+            <div class="text-2xl font-bold text-purple-900">
+                {{ kpis_fournisseurs.dette_consommee|fcfa }}
+            </div>
+            <div class="text-xs text-purple-700/70 mt-1">
+                Produits écoulés
+            </div>
+        </div>
+
+        <!-- Total payé -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-money-check-alt text-green-600 text-sm"></i>
+                <span class="text-xs uppercase text-green-700 font-semibold">
+                    Total payé
+                </span>
+            </div>
+            <div class="text-2xl font-bold text-green-800">
+                {{ kpis_fournisseurs.total_paye|fcfa }}
+            </div>
+        
+        </div>
+
+        <!-- Reste -->
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-exclamation-circle text-red-600 text-sm"></i>
+                <span class="text-xs uppercase text-red-700 font-semibold">
+                    Reste à payer
+                </span>
+            </div>
+            <div class="text-2xl font-bold
+                {% if kpis_fournisseurs.reste_contractuel > 0 %}
+                    text-red-800
+                {% else %}
+                    text-green-700
+                {% endif %}
+            ">
+                {{ kpis_fournisseurs.reste_contractuel|fcfa }}
+            </div>
+            <div class="text-xs text-red-700/70 mt-1">
+                Solde fournisseur
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- Tableau des fournisseurs -->
+    <div class="mt-6">
+        <h3 class="text-md font-semibold text-base-content mb-3 flex items-center gap-2">
+            <i class="fas fa-list-ul text-base-content/70"></i>
+            Détail par fournisseur
+        </h3>
+        
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                <tr class="bg-base-200 text-xs uppercase tracking-wide">
+                    <th>Fournisseur</th>
+                    <th class="text-center text-blue-700">Contractuel</th>
+                    <th class="text-center text-purple-700">Consommé</th>
+                    <th class="text-center text-green-700">Payé</th>
+                    <th class="text-center text-red-700">Reste</th>
+                   
+                    <th class="text-center">Actions</th>
+                </tr>
+                </thead>
+
+
+                <tbody>
+                {% for f in kpis_fournisseurs.fournisseurs_data %}
+                <tr class="hover:bg-base-200/50">
+                
+                    <!-- Fournisseur -->
+                    <td>
+                        <div class="font-medium">{{ f.nom }}</div>
+                        <div class="text-xs text-base-content/50">
+                            {{ f.total_lots }} lots
+                        </div>
+                    </td>
+                
+                                        <!-- Dette contractuelle -->
+                    <td class="text-center font-semibold text-blue-800">
+                        {{ f.dette_contractuelle|fcfa }}
+                    </td>
+
+                    <!-- Dette consommée -->
+                    <td class="text-center text-purple-700">
+                        {{ f.dette_consommee|fcfa }}
+                    </td>
+
+                    <!-- Payé -->
+                    <td class="text-center font-semibold text-green-700">
+                        {{ f.total_paye|fcfa }}
+                    </td>
+
+                    <!-- Reste -->
+                    <td class="text-center font-semibold">
+                        {% if f.reste_contractuel > 0 %}
+                            <span class="badge badge-error badge-outline">
+                                {{ f.reste_contractuel|fcfa }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-success badge-outline">
+                                Soldé
+                            </span>
+                        {% endif %}
+                    </td>
+                    <!-- Actions -->
+                    <td class="text-center">
+                        <a href="{% url 'detail_fournisseur_direction' f.fournisseur.id %}"
+                           class="btn btn-xs btn-outline btn-neutral">
+                            Détails
+                        </a>
+                    </td>
+                
+                </tr>
+                {% endfor %}
+                </tbody>
+
+                
+
+
+
+            </table>
+        </div>
+    </div>
+
+</div>
+
+
+
 <!-- 🟣 Bloc 4 : Stock Essentiel AVEC STATUT AMÉLIORÉ -->
 {% if stock_essentiel %}
 <div class="card bg-base-100 shadow-xl">

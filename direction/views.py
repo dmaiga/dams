@@ -56,6 +56,32 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 from core.models import LotEntrepot, VersementBancaire, Recouvrement, Agent, Facture
 from core.forms import RapportDettesForm
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.utils import timezone
+from decimal import Decimal
+from datetime import datetime
+
+from core.forms import PaiementFournisseurForm
+
+# direction/views.py
+
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, render
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.urls import reverse
+from django.db.models import Sum, Q
+from decimal import Decimal
+from datetime import datetime
+
+from core.models import Fournisseur, PaiementFournisseur, LotEntrepot, Agent
+
+from direction.services.fournisseur_service import FournisseurAnalyseService
+
 #Product
 
 class ProductListView(LoginRequiredMixin, ListView):
@@ -166,102 +192,6 @@ class ProductListPartialView(LoginRequiredMixin, ListView):
         }
 
         return context
-
-#Fournisseur
-
-
-class AnalyseFournisseursView(LoginRequiredMixin, UserPassesTestMixin, View):
-    """Vue pour l'analyse des fournisseurs"""
-    
-    def test_func(self):
-        return self.request.user.agent.est_direction 
-    
-    def get(self, request):
-        # Récupération des paramètres de filtre
-        periode_type = request.GET.get('periode', 'annee')
-        annee = request.GET.get('annee', timezone.now().year)
-        mois = request.GET.get('mois', timezone.now().month)
-        date_debut = request.GET.get('date_debut')
-        date_fin = request.GET.get('date_fin')
-        
-        # Application du filtre selon le type
-        if periode_type == 'annee':
-            analyse_data = FournisseurAnalyseService.get_analyse_annuelle(int(annee))
-            periode_label = f"Année {annee}"
-        
-        elif periode_type == 'mois':
-            analyse_data = FournisseurAnalyseService.get_analyse_mensuelle(int(mois), int(annee))
-            periode_label = f"{mois}/{annee}"
-        
-        elif periode_type == 'personnalise' and date_debut and date_fin:
-            date_debut_obj = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
-            date_fin_obj = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
-            analyse_data = FournisseurAnalyseService.get_analyse_periode(date_debut_obj, date_fin_obj)
-            periode_label = f"Du {date_debut} au {date_fin}"
-        
-        else:
-            # Par défaut: année en cours
-            analyse_data = FournisseurAnalyseService.get_analyse_annuelle()
-            periode_label = f"Année {timezone.now().year}"
-        
-        context = {
-            'analyse_data': analyse_data['analyse_data'],
-            'kpi_globaux': analyse_data['kpi_globaux'],
-            'periode_label': periode_label,
-            'periode_type': periode_type,
-            'annees': range(timezone.now().year - 5, timezone.now().year + 1),
-            'mois': [
-                (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
-                (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
-                (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre')
-            ],
-            'current_year': timezone.now().year,
-            'current_month': timezone.now().month,
-        }
-        
-        return render(
-                        request, 
-                        'direction/analyses/fournisseurs/liste.html',
-                         context
-                    )
-
-class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
-
-    """Vue détaillée d'un fournisseur"""
-    
-    def test_func(self):
-        return self.request.user.agent.est_direction 
-    
-    def get(self, request, pk):
-        # Récupération des paramètres de filtre
-        date_debut = request.GET.get('date_debut')
-        date_fin = request.GET.get('date_fin')
-        
-        # Conversion des dates si fournies
-        date_debut_obj = None
-        date_fin_obj = None
-        
-        if date_debut:
-            date_debut_obj = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
-        if date_fin:
-            date_fin_obj = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
-        
-        # Récupération des données
-        detail_data = FournisseurAnalyseService.get_detail_fournisseur(
-            pk, date_debut_obj, date_fin_obj
-        )
-        
-        context = {
-            **detail_data,
-            'date_debut': date_debut,
-            'date_fin': date_fin,
-        }
-        
-        return render(
-                        request,
-                         'direction/analyses/fournisseurs/detail.html',
-                         context
-                    )
 
 
 class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -690,303 +620,237 @@ def detail_versement_direction(request, versement_id):
     
     return render(request, 'direction/factures/detail_versement.html', context)
 
+# views.py
+
+
+
+
 @login_required
 def analyse_financiere_direction(request):
-    """Analyse financière complète : CA, versements, factures, capital"""
-    # ============ FILTRES TEMPORELLES ============
-    mois = request.GET.get('mois')
-    annee = request.GET.get('annee')
-    
-    # Valeurs par défaut : mois et année actuels
-    aujourdhui = timezone.now().date()
-    if not annee:
-        annee = aujourdhui.year
-    if not mois:
-        mois = aujourdhui.month
-    
-    annee = int(annee)
-    mois = int(mois)
-    
-    # Dates pour le filtrage
-    debut_mois = date(annee, mois, 1)
-    if mois == 12:
-        fin_mois = date(annee + 1, 1, 1) - timedelta(days=1)
+    """
+    VUE DIRECTION – ANALYSE FINANCIÈRE
+    - Filtre annuel OU mensuel
+    - KPI réels
+    - Fournisseurs visibles
+    """
+
+    today = timezone.now().date()
+
+    # =========================
+    # FILTRES
+    # =========================
+    annee = int(request.GET.get('annee', today.year))
+    mois = request.GET.get('mois')  # volontairement str ou None
+
+    if mois:
+        mois = int(mois)
+        debut_periode = date(annee, mois, 1)
+        if mois == 12:
+            fin_periode = date(annee + 1, 1, 1) - timedelta(days=1)
+        else:
+            fin_periode = date(annee, mois + 1, 1) - timedelta(days=1)
+        mode_filtre = "mensuel"
     else:
-        fin_mois = date(annee, mois + 1, 1) - timedelta(days=1)
-    
-    # ============ CALCUL DES CHIFFRES ============
-    
-    # 1. CHIFFRE D'AFFAIRES (CA) GÉNÉRÉ
-    ventes_mois = Vente.objects.filter(
-        date_vente__date__gte=debut_mois,
-        date_vente__date__lte=fin_mois,
+        debut_periode = date(annee, 1, 1)
+        fin_periode = date(annee, 12, 31)
+        mode_filtre = "annuel"
+
+    # =========================
+    # 1️⃣ CHIFFRE D’AFFAIRES
+    # =========================
+    ventes = Vente.objects.filter(
+        date_vente__date__range=(debut_periode, fin_periode),
         est_supprime=False
     )
-    
-    ca_total = ventes_mois.aggregate(
+
+    ca_total = ventes.aggregate(
         total=Sum(F('quantite') * F('prix_vente_unitaire'))
     )['total'] or Decimal('0.00')
-    
-    # CA par type de vente
-    ca_gros = ventes_mois.filter(type_vente='gros').aggregate(
+
+    ca_gros = ventes.filter(type_vente='gros').aggregate(
         total=Sum(F('quantite') * F('prix_vente_unitaire'))
     )['total'] or Decimal('0.00')
-    
-    ca_detail = ventes_mois.filter(type_vente='detail').aggregate(
+
+    ca_detail = ventes.filter(type_vente='detail').aggregate(
         total=Sum(F('quantite') * F('prix_vente_unitaire'))
     )['total'] or Decimal('0.00')
-    
-    # CA par superviseur (via les agents)
-    ca_par_superviseur = {}
-    superviseurs = Agent.objects.filter(type_agent='entrepot')
-    
-    for superviseur in superviseurs:
-        # Ventes des agents terrain sous sa supervision
-        agents_terrain = Agent.objects.filter(
-            type_agent='terrain'
-        )  # Tous les agents terrain pour l'instant
-        
-        ventes_sup = ventes_mois.filter(
-            Q(agent__in=agents_terrain) | Q(agent=superviseur)
-        )
-        
-        ca_sup = ventes_sup.aggregate(
-            total=Sum(F('quantite') * F('prix_vente_unitaire'))
-        )['total'] or Decimal('0.00')
-        
-        ca_par_superviseur[superviseur.id] = {
-            'superviseur': superviseur,
-            'ca_total': ca_sup,
-            'nombre_ventes': ventes_sup.count()
-        }
-    
-    # 2. MONTANTS VERSÉS PAR LES SUPERVISEURS - CORRIGÉ
-    versements_mois = VersementBancaire.objects.filter(
-        date_versement_reelle__date__gte=debut_mois,
-        date_versement_reelle__date__lte=fin_mois
+
+    # =========================
+    # 2️⃣ VERSEMENTS BANCAIRES
+    # =========================
+    versements = VersementBancaire.objects.filter(
+        date_versement_reelle__date__range=(debut_periode, fin_periode)
     )
-    
-    # Calcul du total versé - CORRECTION ICI
-    total_verse_decimal = Decimal('0.00')
-    for versement in versements_mois:
-        total_verse_decimal += versement.montant_total  # Utilisation de la propriété
-    
-    total_verse = total_verse_decimal
-    
-    # Versements par superviseur - CORRIGÉ
-    versements_par_superviseur = {}
-    
-    # On va calculer manuellement par superviseur
-    for superviseur in superviseurs:
-        versements_sup = versements_mois.filter(superviseur=superviseur)
-        
-        total_verse_sup = Decimal('0.00')
-        total_vente_sup = Decimal('0.00')
-        total_hors_vente_sup = Decimal('0.00')
-        
-        for versement in versements_sup:
-            total_verse_sup += versement.montant_total
-            total_vente_sup += versement.montant_vente
-            total_hors_vente_sup += versement.montant_hors_vente
-        
-        if versements_sup.exists():
-            versements_par_superviseur[superviseur.id] = {
-                'superviseur__id': superviseur.id,
-                'superviseur__full_name': superviseur.full_name,
-                'total_verse': total_verse_sup,
-                'montant_vente': total_vente_sup,
-                'montant_hors_vente': total_hors_vente_sup,
-                'nombre_versements': versements_sup.count()
-            }
-    
-    # 3. MONTANTS DES FACTURES DES LOTS (ACHATS)
-    # Les lots reçus dans le mois
-    lots_mois = LotEntrepot.objects.filter(
-        date_reception__date__gte=debut_mois,
-        date_reception__date__lte=fin_mois
-    )
-    
-    total_achats = lots_mois.aggregate(
-        total=Sum(F('quantite_initiale') * F('prix_achat_unitaire'))
-    )['total'] or Decimal('0.00')
-    
-    # Achat par fournisseur
-    achats_par_fournisseur = lots_mois.values(
-        'fournisseur__id', 'fournisseur__nom'
-    ).annotate(
-        total_achat=Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
-        nombre_lots=Count('id')
-    )
-    
-    # 4. DÉPENSES ASSOCIÉES AUX VERSEMENTS
-    depenses_mois = Depense.objects.filter(
-        versement__in=versements_mois
+
+    total_verse = sum(v.montant_total for v in versements)
+
+    # =========================
+    # 3️⃣ DÉPENSES
+    # =========================
+    total_depenses = Depense.objects.filter(
+        versement__in=versements
     ).aggregate(
         total=Sum('montant')
     )['total'] or Decimal('0.00')
-    
-    # 5. CALCUL DU CAPITAL FINANCIER
-    capital_disponible = ca_total - total_verse
-    pourcentage_verse = (total_verse / ca_total * 100) if ca_total > 0 else 0
-    
-    # Marge brute (CA - Achats)
-    marge_brute = ca_total - total_achats
-    taux_marge = (marge_brute / ca_total * 100) if ca_total > 0 else 0
-    
-    # ============ STATISTIQUES PAR SUPERVISEUR COMPLÈTES ============
-    superviseurs_complets = []
-    
-    for superviseur in superviseurs:
-        ca_data = ca_par_superviseur.get(superviseur.id, {
-            'ca_total': Decimal('0.00'),
-            'nombre_ventes': 0
+
+    # =========================
+    # 4️⃣ FOURNISSEURS (IMPORTANT)
+    # =========================
+    fournisseurs = Fournisseur.objects.all()
+
+    dette_consomme_fournisseurs = Decimal('0.00')
+    for f in fournisseurs:
+        dette_consomme_fournisseurs += f.dette_consomme
+
+    # =========================
+    # 5️⃣ ANALYSE PAR SUPERVISEUR
+    # =========================
+    analyse_superviseurs = []
+
+    superviseurs = Agent.objects.filter(type_agent='entrepot')
+    for sup in superviseurs:
+        analyse_superviseurs.append({
+            'superviseur': sup,
+            'total_verse': sup.total_versements_bancaires,
+            'total_depenses': sup.total_depenses_superviseur,
+            'solde_actuel': sup.solde_superviseur,
+            'argent_en_possession': sup.argent_en_possession,
         })
-        
-        versement_data = versements_par_superviseur.get(superviseur.id, {
-            'total_verse': Decimal('0.00'),
-            'montant_vente': Decimal('0.00'),
-            'montant_hors_vente': Decimal('0.00'),
-            'nombre_versements': 0
-        })
-        
-        # Calcul du ratio CA/Versé
-        ca_sup = ca_data['ca_total']
-        verse_sup = versement_data['total_verse']
-        
-        ratio = (verse_sup / ca_sup * 100) if ca_sup > 0 else 0
-        capital_sup = ca_sup - verse_sup
-        
-        superviseurs_complets.append({
-            'superviseur': superviseur,
-            'ca_total': ca_sup,
-            'total_verse': verse_sup,
-            'nombre_ventes': ca_data['nombre_ventes'],
-            'nombre_versements': versement_data.get('nombre_versements', 0),
-            'ratio_verse': round(ratio, 2),
-            'capital': capital_sup,
-            'montant_vente_verse': versement_data.get('montant_vente', Decimal('0.00')),
-            'montant_hors_vente_verse': versement_data.get('montant_hors_vente', Decimal('0.00')),
-        })
-    
-    # Trier par CA décroissant
-    superviseurs_complets.sort(key=lambda x: x['ca_total'], reverse=True)
-    
-    # ============ ÉVOLUTION MENSUELLE ============
-    evolution_data = []
-    for i in range(6, -1, -1):  # 6 derniers mois incluant le courant
-        mois_ref = mois - i
-        annee_ref = annee
-        
-        # Gestion du changement d'année
-        while mois_ref <= 0:
-            mois_ref += 12
-            annee_ref -= 1
-        while mois_ref > 12:
-            mois_ref -= 12
-            annee_ref += 1
-        
-        debut_mois_ref = date(annee_ref, mois_ref, 1)
-        if mois_ref == 12:
-            fin_mois_ref = date(annee_ref + 1, 1, 1) - timedelta(days=1)
-        else:
-            fin_mois_ref = date(annee_ref, mois_ref + 1, 1) - timedelta(days=1)
-        
-        # CA du mois
-        ca_mois_ref = Vente.objects.filter(
-            date_vente__date__gte=debut_mois_ref,
-            date_vente__date__lte=fin_mois_ref,
-            est_supprime=False
-        ).aggregate(
-            total=Sum(F('quantite') * F('prix_vente_unitaire'))
-        )['total'] or Decimal('0.00')
-        
-        # Versements du mois - CORRIGÉ
-        verse_mois_ref = Decimal('0.00')
-        versements_mois_ref = VersementBancaire.objects.filter(
-            date_versement_reelle__date__gte=debut_mois_ref,
-            date_versement_reelle__date__lte=fin_mois_ref
-        )
-        for versement in versements_mois_ref:
-            verse_mois_ref += versement.montant_total
-        
-        # Achats du mois
-        achat_mois_ref = LotEntrepot.objects.filter(
-            date_reception__date__gte=debut_mois_ref,
-            date_reception__date__lte=fin_mois_ref
-        ).aggregate(
-            total=Sum(F('quantite_initiale') * F('prix_achat_unitaire'))
-        )['total'] or Decimal('0.00')
-        
-        evolution_data.append({
-            'mois': debut_mois_ref.strftime('%b %Y'),
-            'ca': ca_mois_ref,
-            'verse': verse_mois_ref,
-            'achat': achat_mois_ref,
-            'capital': ca_mois_ref - verse_mois_ref,
-        })
-    
-    # ============ CONTEXT ============
+
+    # =========================
+    # CONTEXTE
+    # =========================
     context = {
-        'mois_selectionne': mois,
+        # Filtres
         'annee_selectionnee': annee,
-        'debut_mois': debut_mois,
-        'fin_mois': fin_mois,
-        
-        # Totaux
+        'mois_selectionne': mois,
+        'mode_filtre': mode_filtre,
+        'debut_periode': debut_periode,
+        'fin_periode': fin_periode,
+
+        # KPI
         'ca_total': ca_total,
         'ca_gros': ca_gros,
         'ca_detail': ca_detail,
         'total_verse': total_verse,
-        'total_achats': total_achats,
-        'total_depenses': depenses_mois or Decimal('0.00'),
-        
-        # Calculs financiers
-        'capital_disponible': capital_disponible,
-        'pourcentage_verse': round(pourcentage_verse, 2),
-        'marge_brute': marge_brute,
-        'taux_marge': round(taux_marge, 2),
-        
-        # Données détaillées
-        'superviseurs_complets': superviseurs_complets,
-        'achats_par_fournisseur': achats_par_fournisseur,
-        'evolution_data': evolution_data,
-        
-        # Pour la sélection du mois/année
+        'total_depenses': total_depenses,
+        'dette_consomme_fournisseurs': dette_consomme_fournisseurs,
+
+        # Détails
+        'analyse_superviseurs': analyse_superviseurs,
+        'fournisseurs': fournisseurs,
+
+        # UI
         'mois_choices': [
             (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
             (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
             (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre')
         ],
-        'annee_choices': range(2023, aujourdhui.year + 2),  # Depuis 2023 jusqu'à l'année prochaine
+        'annee_choices': range(2023, today.year + 2),
     }
+
+    return render(
+        request,
+        'direction/factures/analyse_financiere.html',
+        context
+    )
+
+##################
+# Fournisseur    #
+###################
+
+class AnalyseFournisseursView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Vue pour l'analyse des fournisseurs"""
     
-    return render(request, 'direction/factures/analyse_financiere.html', context)
+    def test_func(self):
+        return self.request.user.agent.est_direction 
+    
+    def get(self, request):
+        # Récupération des paramètres de filtre
+        periode_type = request.GET.get('periode', 'annee')
+        annee = request.GET.get('annee', timezone.now().year)
+        mois = request.GET.get('mois', timezone.now().month)
+        date_debut = request.GET.get('date_debut')
+        date_fin = request.GET.get('date_fin')
+        
+        # Application du filtre selon le type
+        if periode_type == 'annee':
+            analyse_data = FournisseurAnalyseService.get_analyse_annuelle(int(annee))
+            periode_label = f"Année {annee}"
+        
+        elif periode_type == 'mois':
+            analyse_data = FournisseurAnalyseService.get_analyse_mensuelle(int(mois), int(annee))
+            periode_label = f"{mois}/{annee}"
+        
+        elif periode_type == 'personnalise' and date_debut and date_fin:
+            date_debut_obj = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
+            date_fin_obj = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
+            analyse_data = FournisseurAnalyseService.get_analyse_periode(date_debut_obj, date_fin_obj)
+            periode_label = f"Du {date_debut} au {date_fin}"
+        
+        else:
+            # Par défaut: année en cours
+            analyse_data = FournisseurAnalyseService.get_analyse_annuelle()
+            periode_label = f"Année {timezone.now().year}"
+        
+        context = {
+            'analyse_data': analyse_data['analyse_data'],
+            'kpi_globaux': analyse_data['kpi_globaux'],
+            'periode_label': periode_label,
+            'periode_type': periode_type,
+            'annees': range(timezone.now().year - 5, timezone.now().year + 1),
+            'mois': [
+                (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
+                (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
+                (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre')
+            ],
+            'current_year': timezone.now().year,
+            'current_month': timezone.now().month,
+        }
+        
+        return render(
+                        request, 
+                        'direction/analyses/fournisseurs/liste.html',
+                         context
+                    )
 
+class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
 
-
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.utils import timezone
-from decimal import Decimal
-from datetime import datetime
-
-from core.forms import PaiementFournisseurForm
-
-# direction/views.py
-
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.urls import reverse
-from django.db.models import Sum, Q
-from decimal import Decimal
-from datetime import datetime
-
-from core.models import Fournisseur, PaiementFournisseur, LotEntrepot, Agent
-
-from direction.services.fournisseur_service import FournisseurAnalyseService
+    """Vue détaillée d'un fournisseur"""
+    
+    def test_func(self):
+        return self.request.user.agent.est_direction 
+    
+    def get(self, request, pk):
+        # Récupération des paramètres de filtre
+        date_debut = request.GET.get('date_debut')
+        date_fin = request.GET.get('date_fin')
+        
+        # Conversion des dates si fournies
+        date_debut_obj = None
+        date_fin_obj = None
+        
+        if date_debut:
+            date_debut_obj = timezone.make_aware(datetime.strptime(date_debut, '%Y-%m-%d'))
+        if date_fin:
+            date_fin_obj = timezone.make_aware(datetime.strptime(date_fin, '%Y-%m-%d'))
+        
+        # Récupération des données
+        detail_data = FournisseurAnalyseService.get_detail_fournisseur(
+            pk, date_debut_obj, date_fin_obj
+        )
+        
+        context = {
+            **detail_data,
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+        }
+        
+        return render(
+                        request,
+                         'direction/analyses/fournisseurs/detail.html',
+                         context
+                    )
 
 @login_required
 def liste_paiements_fournisseur(request, fournisseur_id):
@@ -1171,15 +1035,36 @@ def restaurer_paiement_fournisseur(request, paiement_id):
     
     return redirect('liste_paiements_fournisseur', fournisseur_id=fournisseur.id)
 
+
+
 @login_required
 def detail_paiement_fournisseur(request, paiement_id):
-    """
-    Détail d'un paiement
-    """
     paiement = get_object_or_404(PaiementFournisseur, id=paiement_id)
+
     fournisseur = paiement.fournisseur
-    
-    return render(request, 'direction/analyses/fournisseurs/paiements/detail_paiement.html', {
-        'paiement': paiement,
-        'fournisseur': fournisseur,
-    })
+    lot = paiement.lot
+
+    valeur_stock_initiale = Decimal('0.00')
+    reste_a_payer = None
+
+    if lot:
+        # Fallback si valeur_stock_initiale est NULL
+        valeur_stock_initiale = (
+            lot.valeur_stock_initiale
+            if lot.valeur_stock_initiale is not None
+            else lot.quantite_initiale * lot.prix_achat_unitaire
+        )
+
+        reste_a_payer = valeur_stock_initiale - lot.total_paye_lot
+
+    return render(
+        request,
+        'direction/analyses/fournisseurs/paiements/detail_paiement.html',
+        {
+            'paiement': paiement,
+            'fournisseur': fournisseur,
+            'lot': lot,
+            'valeur_stock_initiale': valeur_stock_initiale,
+            'reste_a_payer': reste_a_payer,
+        }
+    )

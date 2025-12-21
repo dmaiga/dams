@@ -142,3 +142,8 @@ def percentage(part, total):
         return 0
     except (TypeError, ZeroDivisionError):
         return 0
+    
+@register.filter
+def filter_has_dette(fournisseurs_data):
+    """Filtre les fournisseurs qui ont un reste à payer > 0"""
+    return [f for f in fournisseurs_data if f.get('reste_a_payer', 0) > 0]

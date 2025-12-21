@@ -184,26 +184,72 @@ def dashboard_agent(request):
 
 @login_required
 def liste_agents(request):
-    """Liste uniquement les agents terrain et superviseurs"""
-    agents = Agent.objects.filter(type_agent__in=['entrepot', 'terrain','stagiaire'])
-    
-    # Tri par type et statut
-    agents_superviseurs = agents.filter(type_agent='entrepot').order_by('user__first_name')
-    agents_terrain = agents.filter(type_agent='terrain').order_by('user__first_name')
+    """
+    Liste des agents (terrain, superviseurs, stagiaires)
+    avec gestion RH : actifs / inactifs / stagiaires expirés
+    """
+
+    agents = Agent.objects.filter(
+        type_agent__in=['entrepot', 'terrain', 'stagiaire']
+    ).select_related('user')
+
+    # =========================
+    # AGENTS ACTIFS / INACTIFS
+    # =========================
+    agents_actifs = agents.filter(est_actif=True)
+    agents_inactifs = agents.filter(est_actif=False)
+
+    # =========================
+    # SUPERVISEURS / TERRAIN
+    # =========================
+    agents_superviseurs = agents_actifs.filter(
+        type_agent='entrepot'
+    ).order_by('user__first_name')
+
+    agents_terrain = agents_actifs.filter(
+        type_agent='terrain'
+    ).order_by('user__first_name')
+
+    # =========================
+    # STAGIAIRES
+    # =========================
     stagiaires = agents.filter(type_agent='stagiaire')
-    stagiaires_actifs = stagiaires.filter(date_expiration__gte=timezone.now()).order_by('date_expiration')
-    stagiaires_expires = stagiaires.filter(date_expiration__lt=timezone.now()).order_by('-date_expiration')
-    
+
+    stagiaires_actifs = stagiaires.filter(
+        est_actif=True,
+        date_expiration__gte=timezone.now()
+    ).order_by('date_expiration')
+
+    stagiaires_expires = stagiaires.filter(
+        date_expiration__lt=timezone.now()
+    ).order_by('-date_expiration')
+
+    # =========================
+    # CONTEXTE
+    # =========================
     context = {
+        # Global
         'agents': agents,
+
+        # RH
+        'agents_actifs': agents_actifs,
+        'agents_inactifs': agents_inactifs,
+
+        # Opérationnel
         'agents_superviseurs': agents_superviseurs,
         'agents_terrain': agents_terrain,
+
+        # Stagiaires
         'stagiaires': stagiaires,
         'stagiaires_actifs': stagiaires_actifs,
         'stagiaires_expires': stagiaires_expires,
     }
-    
-    return render(request, 'core/agents/liste_agents.html', context)
+
+    return render(
+        request,
+        'core/agents/liste_agents.html',
+        context
+    )
 
 @login_required
 def detail_agent(request, agent_id):
@@ -331,22 +377,40 @@ from django.db.models import Sum, Count, Avg, F, Max, Min
 @login_required
 def liste_fournisseurs(request):
     fournisseurs = Fournisseur.objects.annotate(
-        # KPI financiers
-        total_achats=Sum(F('lotentrepot__quantite_initiale') * F('lotentrepot__prix_achat_unitaire')),
-        total_achats_restants=Sum(F('lotentrepot__quantite_restante') * F('lotentrepot__prix_achat_unitaire')),
-        
-        # KPI quantitatifs
-        nb_lots_total=Count('lotentrepot'),
-        nb_lots_actifs=Count('lotentrepot', filter=Q(lotentrepot__quantite_restante__gt=0)),
-        
-        # KPI temporels
-        dernier_lot=Max('lotentrepot__date_reception'),
-        premier_lot=Min('lotentrepot__date_reception'),
-    ).order_by('-total_achats')  # Tri par CA décroissant
-    
-    return render(request, 'core/fournisseur/liste_fournisseurs.html', {
-        'fournisseurs': fournisseurs
-    })
+        # =========================
+        # KPI FINANCIERS
+        # =========================
+        total_achats=Sum(
+            F('lots__quantite_initiale') * F('lots__prix_achat_unitaire')
+        ),
+        total_achats_restants=Sum(
+            F('lots__quantite_restante') * F('lots__prix_achat_unitaire')
+        ),
+
+        # =========================
+        # KPI QUANTITATIFS
+        # =========================
+        nb_lots_total=Count('lots', distinct=True),
+        nb_lots_actifs=Count(
+            'lots',
+            filter=Q(lots__quantite_restante__gt=0),
+            distinct=True
+        ),
+
+        # =========================
+        # KPI TEMPORELS
+        # =========================
+        dernier_lot=Max('lots__date_reception'),
+        premier_lot=Min('lots__date_reception'),
+    ).order_by('-total_achats')
+
+    return render(
+        request,
+        'core/fournisseur/liste_fournisseurs.html',
+        {
+            'fournisseurs': fournisseurs
+        }
+    )
 
 @login_required
 def detail_fournisseur(request, fournisseur_id):
@@ -2709,6 +2773,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if mois:
             mois = int(mois)
         
+        kpis_fournisseurs = DashboardService.get_kpis_fournisseurs(
+            periode_type=periode_type,
+            annee=annee,
+            mois=mois
+        )
+        
         # 🔵 Bloc 1 : KPIs Globaux
         kpis_globaux = DashboardService.get_kpis_globaux(periode_type, annee, mois)
         
@@ -2749,6 +2819,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             # Performances
             'performances_agents': performances_agents,
             
+            'kpis_fournisseurs': kpis_fournisseurs,
             # Ventes
             **analyses_ventes,
             
@@ -3194,7 +3265,10 @@ class AgentDashboardView(LoginRequiredMixin, TemplateView):
         
         # KPI globaux
         context['kpis'] = AgentAnalysisService.get_agent_kpis()
-        
+      
+      
+        context['agents_actifs_72h'] =AgentAnalysisService.get_agents_vendu_derniere_72h()
+        context['agents_stock'] =  AgentAnalysisService.get_agents_with_stock()
         # Top vendeurs 
         context['top_quantite'] = AgentAnalysisService.get_top_vendeurs_quantite()
         context['top_marge'] = AgentAnalysisService.get_top_vendeurs_marge()  

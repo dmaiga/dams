@@ -2,6 +2,10 @@
 from django import template
 
 register = template.Library()
+from decimal import Decimal
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)
 
 @register.filter
 def sub(value, arg):
@@ -34,3 +38,49 @@ def mul(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return 0
+    
+
+
+@register.filter
+def sum_entrees(flux_list):
+    """Somme des entrées"""
+    total = Decimal('0.00')
+    for flux in flux_list:
+        if flux.get('flux') == 'ENTRÉE':
+            try:
+                montant = Decimal(str(flux.get('montant', 0)))
+                total += montant
+            except:
+                continue
+    return total
+
+@register.filter
+def sum_sorties(flux_list):
+    """Somme des sorties"""
+    total = Decimal('0.00')
+    for flux in flux_list:
+        if flux.get('flux') == 'SORTIE':
+            try:
+                montant = Decimal(str(flux.get('montant', 0)))
+                total += montant
+            except:
+                continue
+    return total
+
+@register.filter
+def sum_balance(flux_list):
+    """Balance (entrées - sorties)"""
+    return sum_entrees(flux_list) - sum_sorties(flux_list)
+
+@register.filter
+def dictsum(queryset, field_name):
+    """Somme les valeurs d'un champ dans un queryset"""
+    total = Decimal('0.00')
+    for item in queryset:
+        value = getattr(item, field_name, None)
+        if value is not None:
+            try:
+                total += Decimal(str(value))
+            except:
+                continue
+    return total

@@ -94,8 +94,28 @@ class Fournisseur(models.Model):
     
     @property
     def dette_restante(self):
-        """Ce qu'il reste à payer"""
-        return max(self.dette_totale - self.total_paye, Decimal(0))
+        return max(
+            self.dette_consomme - self.total_paye,
+            Decimal('0.00')
+        )
+
+    @property
+    def dette_contractuelle(self):
+        return self.lots.aggregate(
+            total=Sum(F('quantite_initiale') * F('prix_achat_unitaire'))
+        )['total'] or Decimal('0.00')
+
+    @property
+    def dette_consomme(self):
+        from core.models import Vente
+        return Vente.objects.filter(
+            detail_distribution__lot__fournisseur=self
+        ).aggregate(
+            total=Sum(
+                F('quantite') *
+                F('detail_distribution__lot__prix_achat_unitaire')
+            )
+        )['total'] or Decimal('0.00')
 
 
 class LotEntrepot(models.Model):
@@ -209,9 +229,9 @@ class LotEntrepot(models.Model):
         return max(self.dette_lot - self.total_paye_lot, Decimal(0))
 
     @property
-    def dette_lot(self):
+    def chiffre_affaires_theorique_lot(self):
         """
-        Dette du lot basée sur les ventes réalisées
+        ca du lot basée sur les ventes réalisées
         """
         from django.db.models import Sum, F
         from django.db.models.functions import Coalesce
@@ -319,7 +339,10 @@ class Agent(models.Model):
         default=0,
         help_text="Ajustement manuel du solde (+/- FCFA)"
     )
-
+    est_actif = models.BooleanField(
+        default=True,
+        help_text="Agent actif sur la plateforme"
+    )
     # 🕒 champs pour la gestion automatique de l’expiration
     date_creation = models.DateTimeField(auto_now_add=True)
     date_expiration = models.DateTimeField(
@@ -389,7 +412,18 @@ class Agent(models.Model):
             'periode_jours': jours
         }
 
+    def desactiver(self):
+        self.est_actif = False
+        self.user.is_active = False
+        self.user.save(update_fields=['is_active'])
+        self.save(update_fields=['est_actif'])
 
+    def activer(self):
+        self.est_actif = True
+        self.user.is_active = True
+        self.user.save(update_fields=['is_active'])
+        self.save(update_fields=['est_actif'])
+    
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
 
@@ -402,10 +436,14 @@ class Agent(models.Model):
 
     @property
     def a_acces_plateforme(self):
-        """Renvoie True si l'agent a droit d'accéder à la plateforme"""
+        if not self.est_actif:
+            return False
+    
         if self.type_agent == 'stagiaire':
             return not self.est_expire
+    
         return True
+    
     
 
     @property
