@@ -8,7 +8,7 @@ import calendar
 
 from core.models import (
     Vente, LotEntrepot, Perte, Depense, VersementBancaire,
-    Agent, Dette, Recouvrement, PaiementDette, Facture,
+    Agent, Dette, Recouvrement, PaiementDette, 
     DetailDistribution, Client, Produit
 )
 

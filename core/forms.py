@@ -3,7 +3,7 @@ from datetime import datetime
 from django.utils import timezone
 from .models import (
     Vente, Produit, Client, LotEntrepot, Fournisseur,Dette,PaiementDette,
-    DistributionAgent, Agent, DetailDistribution, Facture,BonusAgent,
+    DistributionAgent, Agent, DetailDistribution, FactureLotEntrepot,BonusAgent,
     MouvementStock,Recouvrement,VersementBancaire,Fournisseur,
     Depense,Perte,RecuVersement,PaiementFournisseur
 )
@@ -311,19 +311,12 @@ class ReceptionLotForm(forms.ModelForm):
         label="Description"
     )
     
-    facture = forms.FileField(
-        required=False,
-        widget=forms.FileInput(attrs={
-            'class': 'form-control',
-            'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx'
-        }),
-        label="Facture (optionnel)"
-    )
+
     
     class Meta:
         model = LotEntrepot
         fields = ['produit', 'fournisseur', 'quantite_initiale',
-                  'prix_achat_unitaire', 'date_reception', 'facture']
+                  'prix_achat_unitaire', 'date_reception']
         widgets = {
             'produit': forms.Select(attrs={
                 'class': 'form-select',
@@ -364,7 +357,7 @@ class ReceptionLotForm(forms.ModelForm):
         self.fields['quantite_initiale'].required = True
         self.fields['prix_achat_unitaire'].required = True
         self.fields['date_reception'].required = True
-        self.fields['facture'].required = False
+        
         
         # Peupler les listes déroulantes avec tri alphabétique
         self.fields['produit'].queryset = Produit.objects.all().order_by('nom')
@@ -416,20 +409,6 @@ class ReceptionLotForm(forms.ModelForm):
                 self.add_error('date_reception', 'La date de réception ne peut pas être dans le futur')
         else:
             self.add_error('date_reception', 'La date de réception est requise')
-        
-        # Validation de la facture
-        facture = cleaned_data.get('facture')
-        if facture:
-            # Vérifier la taille du fichier (max 10MB)
-            if facture.size > 10 * 1024 * 1024:
-                self.add_error('facture', 'La facture ne doit pas dépasser 10MB')
-            
-            # Vérifier l'extension
-            extensions_autorisees = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
-            extension = os.path.splitext(facture.name)[1].lower()
-            if extension not in extensions_autorisees:
-                self.add_error('facture', 
-                    f'Type de fichier non autorisé. Formats acceptés: {", ".join(extensions_autorisees)}')
         
         return cleaned_data
 
@@ -486,9 +465,7 @@ class ReceptionLotForm(forms.ModelForm):
         # Initialiser la quantité restante
         instance.quantite_restante = instance.quantite_initiale
         
-        # Gérer la facture
-        if self.cleaned_data.get('facture'):
-            instance.date_upload_facture = timezone.now()
+
 
         if commit:
             instance.save()
@@ -506,6 +483,136 @@ class ReceptionLotForm(forms.ModelForm):
     
     # forms.py
 
+
+import os
+from django import forms
+from decimal import Decimal, InvalidOperation
+from django.core.exceptions import ValidationError
+
+
+class FactureLotForm(forms.Form):
+    fichiers = MultiFileField(
+        required=True,
+        widget=MultiFileInput(attrs={
+            'class': 'form-control',
+            'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+        }),
+        label="Factures",
+        help_text="Sélectionnez un ou plusieurs fichiers (maintenez Ctrl pour sélection multiple)"
+    )
+
+    montants = forms.CharField(
+        required=False,
+        label="Montants associés (FCFA)",
+        help_text="Ex: 100000,200000,150000 (un par fichier, optionnel)",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 
+            'placeholder': '100000,200000'
+        })
+    )
+
+    description_generale = forms.CharField(
+        required=False,
+        label="Description commune",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 
+            'placeholder': 'Description pour toutes les factures'
+        })
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Important: avec MultiFileField, les fichiers sont dans cleaned_data, pas dans self.files
+        fichiers = cleaned_data.get('fichiers', [])
+        montants_raw = cleaned_data.get('montants', '')
+        
+        # S'assurer que fichiers est une liste
+        if not isinstance(fichiers, list):
+            fichiers = [fichiers] if fichiers else []
+        
+        # Validation des fichiers
+        if not fichiers:
+            self.add_error('fichiers', 'Veuillez sélectionner au moins un fichier')
+        else:
+            # Vérifier chaque fichier
+            for fichier in fichiers:
+                if fichier:  # Vérifier que le fichier n'est pas None
+                    # Vérifier la taille (max 10MB)
+                    if fichier.size > 10 * 1024 * 1024:
+                        self.add_error('fichiers', 
+                            f'Le fichier "{fichier.name}" dépasse 10MB (taille: {fichier.size // (1024*1024)}MB)')
+                    
+                    # Vérifier l'extension
+                    extensions_autorisees = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
+                    extension = os.path.splitext(fichier.name)[1].lower()
+                    if extension not in extensions_autorisees:
+                        self.add_error('fichiers',
+                            f'Type de fichier non autorisé pour "{fichier.name}". Formats acceptés: {", ".join(extensions_autorisees)}')
+                else:
+                    self.add_error('fichiers', 'Un ou plusieurs fichiers sont invalides')
+        
+        # Validation des montants
+        if montants_raw:
+            montants_list = [m.strip() for m in montants_raw.split(',') if m.strip()]
+            
+            # Vérifier que chaque montant est un nombre valide
+            montants_valides = []
+            for i, montant_str in enumerate(montants_list):
+                try:
+                    montant = Decimal(montant_str)
+                    if montant <= 0:
+                        self.add_error('montants', 
+                            f'Le montant "{montant_str}" (position {i+1}) doit être positif')
+                    else:
+                        montants_valides.append(montant)
+                except (InvalidOperation, ValueError):
+                    self.add_error('montants', 
+                        f'Montant invalide à la position {i+1}: "{montant_str}"')
+            
+            # Vérifier la correspondance avec le nombre de fichiers
+            if fichiers and len(montants_valides) > len(fichiers):
+                self.add_error('montants', 
+                    f'Vous avez spécifié {len(montants_valides)} montants pour {len(fichiers)} fichier(s). '
+                    f'Supprimez {len(montants_valides) - len(fichiers)} montant(s).')
+            
+            # Stocker les montants validés
+            cleaned_data['montants_list'] = montants_valides
+        else:
+            cleaned_data['montants_list'] = []
+        
+        # Stocker le nombre de fichiers pour référence
+        cleaned_data['nombre_fichiers'] = len(fichiers)
+        
+        return cleaned_data
+
+    def save(self, lot):
+        fichiers = self.cleaned_data.get('fichiers', [])
+        description = self.cleaned_data.get('description_generale', '')
+        montants_list = self.cleaned_data.get('montants_list', [])
+        
+        # S'assurer que fichiers est une liste
+        if not isinstance(fichiers, list):
+            fichiers = [fichiers] if fichiers else []
+        
+        factures = []
+        for index, fichier in enumerate(fichiers):
+            if fichier:  # Vérifier que le fichier n'est pas None
+                # Attribuer un montant si disponible, sinon None
+                montant = None
+                if index < len(montants_list):
+                    montant = montants_list[index]
+                
+                # Créer la facture
+                facture = FactureLotEntrepot.objects.create(
+                    lot=lot,
+                    fichier=fichier,
+                    montant=montant,
+                    description=description
+                )
+                factures.append(facture)
+        
+        return factures
 # core/forms.py
 
 
@@ -518,32 +625,6 @@ class PerteForm(forms.ModelForm):
         }
 
 
-class UploadFactureForm(forms.ModelForm):
-    class Meta:
-        model = LotEntrepot
-        fields = ['facture']
-        widgets = {
-            'facture': forms.FileInput(attrs={
-                'class': 'form-control',
-                'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx'
-            })
-        }
-
-    def clean_facture(self):
-        facture = self.cleaned_data.get('facture')
-        if facture:
-            # Vérifier la taille du fichier (max 10MB)
-            if facture.size > 10 * 1024 * 1024:
-                raise forms.ValidationError('La facture ne doit pas dépasser 10MB')
-            
-            # Vérifier l'extension
-            extensions_autorisees = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
-            extension = os.path.splitext(facture.name)[1].lower()
-            if extension not in extensions_autorisees:
-                raise forms.ValidationError(
-                    f'Type de fichier non autorisé. Formats acceptés: {", ".join(extensions_autorisees)}'
-                )
-        return facture
 # forms.py
 
 class DistributionForm(forms.ModelForm):
@@ -1494,27 +1575,6 @@ class RecouvrementForm(forms.ModelForm):
     
 # forms.py
 # forms.py
-
-class FactureForm(forms.ModelForm):
-    class Meta:
-        model = Facture
-        fields = ['montant', 'fichier_facture', 'description']
-        widgets = {
-            'montant': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'step': '0.01',
-                'placeholder': 'Montant versé à la banque'
-            }),
-            'fichier_facture': forms.FileInput(attrs={
-                'class': 'form-control',
-                'accept': 'image/*,.pdf'
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'form-control', 
-                'rows': 3,
-                'placeholder': 'Description du versement'
-            }),
-        }
 
 from tinymce.widgets import TinyMCE
 from tinymce.widgets import TinyMCE

@@ -29,7 +29,7 @@ import json
 
 # Project models
 from .models import (
-    Agent, Client, Vente, Produit, Facture,
+    Agent, Client, Vente, Produit,
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
@@ -38,9 +38,9 @@ from .models import (
 
 # Project forms
 from .forms import (
-    VenteForm, DistributionForm, ReceptionLotForm, FactureForm,
+    FactureLotForm, VenteForm, DistributionForm, ReceptionLotForm, 
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
-    DistributionModificationForm,UploadFactureForm,RecouvrementForm,
+    DistributionModificationForm,RecouvrementForm,
     FournisseurForm,VersementForm,AgentCreationForm, 
     AgentModificationForm
 
@@ -503,10 +503,11 @@ def supprimer_fournisseur(request, fournisseur_id):
 #========
 
 # views.py
+# views.py
 @login_required
 def reception_lot(request):
     if request.method == 'POST':
-        form = ReceptionLotForm(request.POST, request.FILES)
+        form = ReceptionLotForm(request.POST)  
         if form.is_valid():
             try:
                 lot = form.save()
@@ -521,8 +522,8 @@ def reception_lot(request):
                 )
                 
                 messages.success(request, f"✅ Lot {lot.reference_lot} réceptionné avec succès!")
-                if lot.facture:
-                    messages.info(request, "📎 Facture uploadée avec succès")
+                
+                # REDIRECTION VERS LA PAGE D'AJOUT DE FACTURES
                 return redirect('liste_lots')
                 
             except Exception as e:
@@ -535,7 +536,6 @@ def reception_lot(request):
     return render(request, 'core/entrepot/reception_lot.html', {
         'form': form
     })
-
 
 @login_required
 def liste_lots(request):
@@ -595,7 +595,7 @@ def detail_lot(request, lot_id):
         id=lot_id
     )
 
-    facture_uploadee = False
+
 
     # --- FORMULAIRE PERTE (POST sans fichier) ---
     if request.method == 'POST' and 'quantite_perdue' in request.POST:
@@ -615,37 +615,18 @@ def detail_lot(request, lot_id):
     else:
         perte_form = PerteForm()
 
-    # --- FORMULAIRE FACTURE (POST avec fichier) ---
-    if request.method == 'POST' and 'facture' in request.FILES:
-        facture_form = UploadFactureForm(request.POST, request.FILES, instance=lot)
-        if facture_form.is_valid():
-            try:
-                lot_modifie = facture_form.save(commit=False)
-                lot_modifie.date_upload_facture = timezone.now()
-                lot_modifie.save()
-
-                messages.success(request, "📄 Facture uploadée avec succès!")
-                facture_uploadee = True
-
-                lot = LotEntrepot.objects.get(id=lot_id)
-
-            except Exception as e:
-                messages.error(request, f"❌ Erreur : {str(e)}")
-        else:
-            messages.error(request, "❌ Veuillez corriger les erreurs de la facture.")
-    else:
-        facture_form = UploadFactureForm(instance=lot)
 
     pertes = lot.pertes.all().order_by('-date_perte')
-
+    factures = lot.factures.all().order_by('-date_upload')
     return render(request, 'core/entrepot/detail_lot.html', {
         'lot': lot,
-        'form': facture_form,
+        'factures': factures,
         'perte_form': perte_form,
         'pertes': pertes,
-        'facture_uploadee': facture_uploadee,
+      
         'title': f'Lot {lot.reference_lot}'
     })
+
 
 @login_required
 def mon_stock(request):
@@ -1548,9 +1529,74 @@ def creer_dette(request):
 #FACTURE
 #=====
 
-# views.py
-# views.py
-# versement
+from decimal import Decimal
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from core.models import LotEntrepot, FactureLotEntrepot
+from core.forms import FactureLotForm
+
+@login_required
+def gestion_factures_lot(request, lot_id):
+    lot = get_object_or_404(LotEntrepot, id=lot_id)
+    factures = lot.factures.all().order_by('-date_upload')
+    
+    # Message contextuel si c'est une nouvelle création
+    is_new_lot = request.GET.get('nouveau', False)
+    if is_new_lot and not factures.exists():
+        messages.info(request, 
+            "✅ Lot créé avec succès ! Vous pouvez maintenant ajouter des factures.",
+            extra_tags='info')
+    
+    # Calcul des montants
+    montant_total_lot = lot.montant_total
+    montant_total_factures = lot.total_facture_lot
+    reste_a_payer = max(montant_total_lot - montant_total_factures, Decimal('0'))
+    
+    if request.method == 'POST':
+        form = FactureLotForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                factures_crees = form.save(lot=lot)
+                count = len(factures_crees)
+                
+                # Message de succès
+                messages.success(request, 
+                    f"✅ {count} facture(s) ajoutée(s) avec succès !",
+                    extra_tags='success')
+                
+                # Rediriger si demandé
+                if 'redirect_to_detail' in request.POST:
+                    return redirect('detail_lot', lot_id=lot.id)
+                else:
+                    # Recharger la page pour voir les nouvelles factures
+                    return redirect('gestion_factures_lot', lot_id=lot.id)
+                    
+            except Exception as e:
+                messages.error(request, 
+                    f"❌ Erreur lors de l'enregistrement des factures : {str(e)}",
+                    extra_tags='danger')
+        else:
+            # Afficher les erreurs spécifiques
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"❌ {field}: {error}", extra_tags='danger')
+    
+    else:
+        form = FactureLotForm()
+    
+    context = {
+        'lot': lot,
+        'factures': factures,
+        'form': form,
+        'montant_total_lot': montant_total_lot,
+        'montant_total_factures': montant_total_factures,
+        'reste_a_payer': reste_a_payer,
+        'est_solde': lot.est_solde,
+        'pourcentage_paye': (montant_total_factures / montant_total_lot * 100) if montant_total_lot > 0 else 0,
+    }
+    
+    return render(request, 'core/factures/gestion_factures_lot.html', context)
 
 @login_required
 def creer_versement(request):
@@ -1813,7 +1859,7 @@ def recu_create(request):
 @login_required
 def liste_factures_entrepot(request):
     """Liste des factures liées aux réceptions d'entrepôt"""
-    lots_avec_facture = LotEntrepot.objects.exclude(facture='').order_by('-date_reception')
+    lots_avec_facture = LotEntrepot.objects.all().order_by('-date_reception')
     
     context = {
         'lots_avec_facture': lots_avec_facture,
@@ -1822,47 +1868,7 @@ def liste_factures_entrepot(request):
     return render(request, 'core/factures/liste_factures_entrepot.html', context)
 # Créer une facture
 
-def creer_facture(request):
-    if request.method == 'POST':
-        form = FactureForm(request.POST, request.FILES)
-        if form.is_valid():
-            facture = form.save(commit=False)
-            try:
-                # Récupérer l'agent de l'utilisateur connecté
-                facture.agent = Agent.objects.get(user=request.user)
-            except Agent.DoesNotExist:
-                # Créer l'agent automatiquement si inexistant
-                facture.agent = Agent.objects.create(user=request.user, type_agent='entrepot')
-            
-            facture.save()
-            messages.success(request, "Facture créée avec succès.")
-            return redirect('liste_factures')
-    else:
-        form = FactureForm()
-    
-    return render(request, 'core/factures/form_facture.html', {'form': form, 'title': 'Nouvelle Facture'})
 
-# Modifier une facture
-def modifier_facture(request, facture_id):
-    facture = get_object_or_404(Facture, id=facture_id)
-    if request.method == 'POST':
-        form = FactureForm(request.POST, request.FILES, instance=facture)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Facture mise à jour.")
-            return redirect('liste_factures')
-    else:
-        form = FactureForm(instance=facture)
-    return render(request, 'core/factures/form_facture.html', {'form': form, 'title': 'Modifier Facture'})
-
-# Supprimer une facture
-def supprimer_facture(request, facture_id):
-    facture = get_object_or_404(Facture, id=facture_id)
-    if request.method == 'POST':
-        facture.delete()
-        messages.success(request, "Facture supprimée.")
-        return redirect('liste_factures')
-    return render(request, 'core/factures/confirm_versement_delete.html', {'facture': facture})
 #=========
 # #RECOUVREMENT
 #=========

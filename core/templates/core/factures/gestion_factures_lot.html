@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestion des factures - Lot {{ lot.reference_lot }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} 
+                    alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- En-tête -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1">📄 Factures du lot {{ lot.reference_lot }}</h3>
+            <p class="text-muted mb-0">{{ lot.produit.nom }} - {{ lot.fournisseur.nom|default:"Fournisseur non spécifié" }}</p>
+        </div>
+        <div>
+            <a href="{% url 'detail_lot' lot.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour au lot
+            </a>
+            <a href="{% url 'liste_lots' %}" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-list"></i> Tous les lots
+            </a>
+        </div>
+    </div>
+
+    <!-- Résumé financier amélioré -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card {% if lot.est_solde %}border-success{% else %}border-primary{% endif %}">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">Montant total du lot</h6>
+                    <h4 class="card-title text-primary">{{ montant_total_lot|floatformat:0 }} FCFA</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">Total facturé</h6>
+                    <h4 class="card-title text-success">{{ montant_total_factures|floatformat:0 }} FCFA</h4>
+                    <small class="text-muted">{{ pourcentage_paye|floatformat:1 }}% payé</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-{% if reste_a_payer > 0 %}warning{% else %}success{% endif %}">
+                <div class="card-body text-center">
+                    <h6 class="card-subtitle mb-2 text-muted">Reste à payer</h6>
+                    <h4 class="card-title {% if reste_a_payer > 0 %}text-warning{% else %}text-success{% endif %}">
+                        {{ reste_a_payer|floatformat:0 }} FCFA
+                    </h4>
+                    {% if lot.est_solde %}
+                    <span class="badge bg-success">Lot soldé ✓</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des factures -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">📋 Factures existantes ({{ factures.count }})</h6>
+            <span class="badge bg-secondary">{{ factures.count }} facture(s)</span>
+        </div>
+        <div class="card-body p-0">
+            {% if factures %}
+            <div class="list-group list-group-flush">
+                {% for facture in factures %}
+                <div class="list-group-item list-group-item-action">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file-{% if '.pdf' in facture.fichier.name %}pdf text-danger{% else %}image text-primary{% endif %} fa-2x me-3"></i>
+                            <div>
+                                <h6 class="mb-1">
+                                    <a href="{{ facture.fichier.url }}" target="_blank" class="text-decoration-none">
+                                        Facture #{{ forloop.counter }}
+                                    </a>
+                                </h6>
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    {{ facture.date_upload|date:"d/m/Y H:i" }}
+                                    {% if facture.description %}
+                                    | {{ facture.description }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            {% if facture.montant %}
+                            <span class="badge bg-success fs-6">
+                                {{ facture.montant|floatformat:0 }} FCFA
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary">Montant non précisé</span>
+                            {% endif %}
+                            <div class="mt-2">
+                                <a href="{{ facture.fichier.url }}" target="_blank" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> Voir
+                                </a>
+                                <a href="{{ facture.fichier.url }}" download 
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-download"></i> Télécharger
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-file-invoice fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">Aucune facture enregistrée</h5>
+                <p class="text-muted">Commencez par ajouter une facture ci-dessous</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Ajout de factures -->
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Ajouter des factures</h6>
+            <span class="badge bg-light text-primary">Max 10MB par fichier</span>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" id="factureForm">
+                {% csrf_token %}
+
+                <!-- Fichiers -->
+                <!-- Dans le template, section fichiers -->
+<div class="mb-4">
+    <label for="{{ form.fichiers.id_for_label }}" class="form-label fw-bold">
+        {{ form.fichiers.label }}
+    </label>
+    {{ form.fichiers }}
+    {% if form.fichiers.help_text %}
+    <div class="form-text">{{ form.fichiers.help_text }}</div>
+    {% endif %}
+    {% if form.fichiers.errors %}
+    <div class="alert alert-danger mt-2">
+        {% for error in form.fichiers.errors %}
+        <div><i class="fas fa-exclamation-triangle me-1"></i> {{ error }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <!-- Afficher les fichiers sélectionnés -->
+    <div id="selected-files" class="mt-2"></div>
+</div>
+
+                <!-- Montants -->
+                <div class="mb-4">
+                    <label for="{{ form.montants.id_for_label }}" class="form-label fw-bold">
+                        {{ form.montants.label }}
+                    </label>
+                    {{ form.montants }}
+                    {% if form.montants.help_text %}
+                    <div class="form-text">{{ form.montants.help_text }}</div>
+                    {% endif %}
+                    {% if form.montants.errors %}
+                    <div class="alert alert-danger mt-2">
+                        {% for error in form.montants.errors %}
+                        <div><i class="fas fa-exclamation-triangle me-1"></i> {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Description -->
+                <div class="mb-4">
+                    <label for="{{ form.description_generale.id_for_label }}" class="form-label fw-bold">
+                        {{ form.description_generale.label }}
+                    </label>
+                    {{ form.description_generale }}
+                    {% if form.description_generale.errors %}
+                    <div class="alert alert-danger mt-2">
+                        {% for error in form.description_generale.errors %}
+                        <div><i class="fas fa-exclamation-triangle me-1"></i> {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Boutons d'action -->
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="submit" name="stay_on_page" class="btn btn-success btn-lg">
+                        <i class="fas fa-upload me-2"></i> Ajouter les factures
+                    </button>
+                    <button type="submit" name="redirect_to_detail" class="btn btn-primary btn-lg">
+                        <i class="fas fa-check-circle me-2"></i> Valider et retourner au lot
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Information sur les formats acceptés -->
+    <div class="alert alert-light border mt-3">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle text-primary fa-lg me-3"></i>
+            <div>
+                <strong>Formats acceptés :</strong> PDF, JPG, JPEG, PNG, DOC, DOCX<br>
+                <strong>Taille maximale :</strong> 10MB par fichier<br>
+                <strong>Conseil :</strong> Vous pouvez ajouter plusieurs factures en une seule fois
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Script pour afficher les fichiers sélectionnés -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.getElementById('{{ form.fichiers.id_for_label }}');
+    const selectedFilesDiv = document.getElementById('selected-files');
+    
+    // Afficher les fichiers sélectionnés
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const files = this.files;
+            selectedFilesDiv.innerHTML = '';
+            
+            if (files.length > 0) {
+                let fileList = '<div class="alert alert-info p-2"><strong>Fichiers sélectionnés:</strong><ul class="mb-0 mt-2">';
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                    fileList += `<li>${file.name} (${sizeMB} MB)</li>`;
+                }
+                fileList += '</ul></div>';
+                selectedFilesDiv.innerHTML = fileList;
+            }
+        });
+    }
+    
+    // Validation côté client pour la taille des fichiers
+    const form = document.getElementById('factureForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            if (fileInput && fileInput.files) {
+                const files = fileInput.files;
+                const maxSize = 10 * 1024 * 1024; // 10MB
+                
+                for (let i = 0; i < files.length; i++) {
+                    if (files[i].size > maxSize) {
+                        event.preventDefault();
+                        alert(`Le fichier "${files[i].name}" dépasse 10MB. Veuillez sélectionner un fichier plus petit.`);
+                        return false;
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

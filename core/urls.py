@@ -5,7 +5,7 @@ from  .views import (
                         DashboardView,PerformanceAgentsView,
                         AnalyseClientsView,AgentDashboardView,
                         SuperviseurListView,AgentTerrainListView,
-                        AgentDetailView
+                        AgentDetailView, gestion_factures_lot
                      
                      )
 urlpatterns = [
@@ -65,7 +65,11 @@ urlpatterns = [
     # API
     path('api/info-distribution/<int:detail_id>/', views.get_info_distribution, name='get_info_distribution'),
 #factures
-
+    path(
+        'factures/entrepot/lot/<int:lot_id>/',
+        gestion_factures_lot,
+        name='gestion_factures_lot'
+    ),
     path('versement/liste/', views.liste_versement, name='liste_versement'),
     path('versements/<int:versement_id>/', views.detail_versement, name='detail_versement'),
     path('versement/<int:pk>/ajouter-recus/', views.AjouterRecusView.as_view(), name='ajouter_recus'),
@@ -74,10 +78,9 @@ urlpatterns = [
     path('versements/<int:versement_id>/supprimer/', views.supprimer_versement, name='supprimer_versement'),
     path('recus/', views.recu_liste, name='recu_liste'),
     path('recus/nouveau/', views.recu_create, name='recu_create'),
-    path('factures/creer/', views.creer_facture, name='creer_facture'),
+   
     path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
-    path('factures/<int:facture_id>/modifier/', views.modifier_facture, name='modifier_facture'),
-    path('factures/<int:facture_id>/supprimer/', views.supprimer_facture, name='supprimer_facture'),
+
 
 #Clients
     path('clients/', views.ClientListView.as_view(), name='liste_clients'),

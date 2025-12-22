@@ -1,7 +1,7 @@
 from direction.services.product_analysis_service import ProductAnalysisService
 from django.contrib.auth.decorators import login_required
 from core.models import (
-    Agent, Client, Vente, Produit, Facture,
+    Agent, Client, Vente, Produit, 
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,PaiementFournisseur,
@@ -54,7 +54,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Sum, Q
 from django.utils import timezone
-from core.models import LotEntrepot, VersementBancaire, Recouvrement, Agent, Facture
+
 from core.forms import RapportDettesForm
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required

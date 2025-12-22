@@ -3,7 +3,7 @@ from django.contrib import admin
 from .models import (
     Agent, Produit, Client, LotEntrepot, Fournisseur,
     DistributionAgent, DetailDistribution, Vente, 
-    MouvementStock, Facture,Recouvrement,VersementBancaire,PaiementFournisseur
+    MouvementStock,Recouvrement,VersementBancaire,PaiementFournisseur
 )
 from django.db.models import Sum
 from decimal import Decimal
@@ -77,10 +77,6 @@ class MouvementStockAdmin(admin.ModelAdmin):
     list_filter = ['type_mouvement', 'date_mouvement']
     search_fields = ['produit__nom']
 
-@admin.register(Facture)
-class FactureAdmin(admin.ModelAdmin):
-    list_display = ['type_facture', 'agent', 'montant', 'date_depot']
-    list_filter = ['type_facture', 'date_depot']
 
 @admin.register(Recouvrement)
 class RecouvrementAdmin(admin.ModelAdmin):

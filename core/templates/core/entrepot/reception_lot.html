@@ -22,7 +22,11 @@
                     {% endfor %}
                     {% endif %}
 
-                    <form method="post" enctype="multipart/form-data" id="reception-form">
+                    <!-- MESSAGE INFORMATIF IMPORTANT -->
+
+
+                    <!-- FORMULAIRE SANS ENCTYPE MULTIPART -->
+                    <form method="post" id="reception-form">
                         {% csrf_token %}
                         
                         <!-- Section Produit -->
@@ -147,51 +151,16 @@
                             </div>
                         </div>
 
-                        <!-- Section Facture -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-file-invoice"></i>
-                                    Facture (Optionnel)
-                                </h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-8">
-                                        <label class="form-label">Uploader la facture</label>
-                                        {{ form.facture }}
-                                        {% if form.facture.errors %}
-                                        <div class="text-danger small">{{ form.facture.errors }}</div>
-                                        {% endif %}
-                                        <div class="form-text">
-                                            Formats acceptés: PDF, JPG, JPEG, PNG, DOC, DOCX (max 10MB)
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="alert alert-info mt-4">
-                                            <small>
-                                                <i class="fas fa-info-circle"></i>
-                                                La date d'upload sera automatiquement enregistrée.
-                                            </small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Aperçu de la facture -->
-                                <div id="facture-preview" class="mt-3" style="display: none;">
-                                    <h6>Aperçu :</h6>
-                                    <div class="border rounded p-2 bg-light">
-                                        <i class="fas fa-file me-2"></i>
-                                        <span id="facture-filename"></span>
-                                        <small class="text-muted ms-2" id="facture-size"></small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- NOUVELLE SECTION : ÉTAPES SUIVANTES -->
+             
 
                         <div class="d-flex gap-2">
-                            <a href="{% url 'liste_lots' %}" class="btn btn-secondary">Annuler</a>
-                            <button type="submit" class="btn btn-primary">Enregistrer le lot</button>
+                            <a href="{% url 'liste_lots' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Annuler
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Créer le lot 
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -218,11 +187,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputNouveauFournisseur = document.getElementById('{{ form.nouveau_fournisseur_nom.id_for_label }}');
     const inputContactFournisseur = document.getElementById('{{ form.nouveau_fournisseur_contact.id_for_label }}');
 
-    // Éléments pour la facture
-    const factureInput = document.getElementById('{{ form.facture.id_for_label }}');
-    const facturePreview = document.getElementById('facture-preview');
-    const factureFilename = document.getElementById('facture-filename');
-    const factureSize = document.getElementById('facture-size');
+    // Éléments pour le calcul du montant
+    const quantiteInput = document.getElementById('{{ form.quantite_initiale.id_for_label }}');
+    const prixInput = document.getElementById('{{ form.prix_achat_unitaire.id_for_label }}');
+    const montantTotalElement = document.getElementById('montant-total-estime');
 
     // Fonction pour basculer les groupes produit
     function toggleProduitFields() {
@@ -258,49 +226,51 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Fonction pour basculer les groupes fournisseur
-   function toggleFournisseurFields() {
-    if (nouveauFournisseurCheckbox.checked) {
-        fournisseurExistantGroup.style.display = 'none';
-        nouveauFournisseurGroup.style.display = 'block';
-        if (selectFournisseur) {
-            selectFournisseur.disabled = true;
-            selectFournisseur.required = false;
-        }
-        if (inputNouveauFournisseur) {
-            inputNouveauFournisseur.disabled = false;
-            inputNouveauFournisseur.required = true;
-        }
-        if (inputContactFournisseur) {
-            inputContactFournisseur.disabled = false;
-        }
-    } else {
-        fournisseurExistantGroup.style.display = 'block';
-        nouveauFournisseurGroup.style.display = 'none';
-        if (selectFournisseur) {
-            selectFournisseur.disabled = false;
-            selectFournisseur.required = false; // ✅ désormais optionnel
-        }
-        if (inputNouveauFournisseur) {
-            inputNouveauFournisseur.disabled = true;
-            inputNouveauFournisseur.required = false;
-        }
-        if (inputContactFournisseur) {
-            inputContactFournisseur.disabled = true;
+    function toggleFournisseurFields() {
+        if (nouveauFournisseurCheckbox.checked) {
+            fournisseurExistantGroup.style.display = 'none';
+            nouveauFournisseurGroup.style.display = 'block';
+            if (selectFournisseur) {
+                selectFournisseur.disabled = true;
+                selectFournisseur.required = false;
+            }
+            if (inputNouveauFournisseur) {
+                inputNouveauFournisseur.disabled = false;
+                inputNouveauFournisseur.required = true;
+            }
+            if (inputContactFournisseur) {
+                inputContactFournisseur.disabled = false;
+            }
+        } else {
+            fournisseurExistantGroup.style.display = 'block';
+            nouveauFournisseurGroup.style.display = 'none';
+            if (selectFournisseur) {
+                selectFournisseur.disabled = false;
+                selectFournisseur.required = false; // Optionnel
+            }
+            if (inputNouveauFournisseur) {
+                inputNouveauFournisseur.disabled = true;
+                inputNouveauFournisseur.required = false;
+            }
+            if (inputContactFournisseur) {
+                inputContactFournisseur.disabled = true;
+            }
         }
     }
-}
 
-
-    // Fonction pour l'aperçu de la facture
-    function toggleFacturePreview() {
-        const file = factureInput.files[0];
-        if (file) {
-            factureFilename.textContent = file.name;
-            factureSize.textContent = `(${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-            facturePreview.style.display = 'block';
-        } else {
-            facturePreview.style.display = 'none';
-        }
+    // Fonction pour calculer le montant total estimé
+    function calculerMontantTotal() {
+        const quantite = parseFloat(quantiteInput.value) || 0;
+        const prix = parseFloat(prixInput.value) || 0;
+        const montantTotal = quantite * prix;
+        
+        // Formatage avec séparateurs de milliers
+        const formatter = new Intl.NumberFormat('fr-FR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        
+        montantTotalElement.textContent = `${formatter.format(montantTotal)} FCFA`;
     }
 
     // Événements
@@ -310,14 +280,17 @@ document.addEventListener('DOMContentLoaded', function() {
     if (nouveauFournisseurCheckbox) {
         nouveauFournisseurCheckbox.addEventListener('change', toggleFournisseurFields);
     }
-    if (factureInput) {
-        factureInput.addEventListener('change', toggleFacturePreview);
+    if (quantiteInput) {
+        quantiteInput.addEventListener('input', calculerMontantTotal);
+    }
+    if (prixInput) {
+        prixInput.addEventListener('input', calculerMontantTotal);
     }
 
     // Initialisation
     toggleProduitFields();
     toggleFournisseurFields();
-    toggleFacturePreview();
+    calculerMontantTotal(); // Calcul initial
 });
 </script>
 {% endblock %}

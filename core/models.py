@@ -134,6 +134,7 @@ class LotEntrepot(models.Model):
     quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
     quantite_restante = models.DecimalField(max_digits=10, decimal_places=2)
     prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
+    
     valeur_stock_initiale = models.DecimalField(
         max_digits=15,
         decimal_places=2,
@@ -143,17 +144,6 @@ class LotEntrepot(models.Model):
     date_reception = models.DateTimeField(default=timezone.now)
     date_enregistrement = models.DateTimeField(auto_now_add=True)
     reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
-    facture = models.FileField(
-        upload_to='factures_entrepot/%Y/%m/',
-        null=True,
-        blank=True,
-        verbose_name="Facture (optionnel)"
-    )
-    date_upload_facture = models.DateTimeField(
-        null=True, 
-        blank=True,
-        verbose_name="Date d'upload de la facture"
-    )
 
     def __str__(self):
         return f"{self.produit.nom} - {self.fournisseur} - {self.quantite_restante} restants"
@@ -248,6 +238,41 @@ class LotEntrepot(models.Model):
         )['total']
 
         return total or Decimal('0.00')
+    
+    @property
+    def montant_total(self):
+        return self.quantite_initiale * self.prix_achat_unitaire
+
+    @property
+    def total_facture_lot(self):
+        return self.factures.aggregate(
+            total=models.Sum('montant')
+        )['total'] or Decimal('0')
+
+    @property
+    def est_solde(self):
+        return self.total_facture_lot >= self.montant_total
+
+class FactureLotEntrepot(models.Model):
+    lot = models.ForeignKey(
+        LotEntrepot,
+        on_delete=models.CASCADE,
+        related_name='factures'
+    )
+
+    fichier = models.FileField(upload_to='factures_entrepot/%Y/%m/')
+    montant = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    description = models.CharField(max_length=255, blank=True)
+    date_upload = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Facture {self.id} – Lot {self.lot.reference_lot}"
+
 
 
 # core/models.py
@@ -1525,36 +1550,6 @@ class Depense(models.Model):
         verbose_name = "Dépense"
         verbose_name_plural = "Dépenses"
 
-
-class Facture(models.Model):
-
-    TYPE_FACTURE_CHOICES = [
-        ('entree', 'Facture Entrée - Fournisseur'),
-        ('depot', 'Dépôt Banque - Versement'),
-    ]
-    
-    type_facture = models.CharField(max_length=50, choices=TYPE_FACTURE_CHOICES)
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='factures_deposees')
-    versement = models.ForeignKey(
-        VersementBancaire,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='recus_bancaires'
-    )
-
-    montant = models.DecimalField(max_digits=10, decimal_places=2)
-    fichier_facture = models.FileField(upload_to='factures_depots/')
-    date_depot = models.DateTimeField(default=timezone.now)
-    description = models.TextField(blank=True)
-    
-    def __str__(self):
-        type_str = "Entrepôt" if self.type_facture == 'entree' else "Dépôt Agent"
-        return f"Facture {type_str} - {self.agent} - {self.montant} FCFA"
-    
-    class Meta:
-        verbose_name = "Facture"
-        verbose_name_plural = "Factures"
 
 class PaiementFournisseur(models.Model):
     """
