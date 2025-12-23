@@ -12,6 +12,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 
 class Client(models.Model):
@@ -355,8 +356,42 @@ class Agent(models.Model):
         ('terrain', 'Agent'),
         ('stagiaire', 'Stagiaire'), 
     )
+    TYPE_CONTRAT_CHOICES = (
+    ('prestation', 'Contrat de prestation'),
+    ('stage', 'Stage'),
+    ('cdd', 'CDD'), 
+    ('cdi', 'CDI'),
+    )
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     type_agent = models.CharField(max_length=50, choices=TYPE_AGENT_CHOICES)
+    quartier = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        verbose_name="Quartier d'affectation"
+    )
+
+    marche_affectation = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True,
+        verbose_name="Marché d'affectation"
+    )
+
+    # 📄 Contrat
+    type_contrat = models.CharField(
+        max_length=20,
+        choices=TYPE_CONTRAT_CHOICES,
+        default='prestation',
+        verbose_name="Type de contrat"
+    )
+
+    date_fin_contrat = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Date de fin de contrat"
+    )
     telephone = models.CharField(max_length=50, blank=True, null=True)
     ajustement_solde = models.DecimalField(
         max_digits=12,
@@ -381,27 +416,49 @@ class Agent(models.Model):
     )
    
     def save(self, *args, **kwargs):
-        # 🔹 Si c’est un stagiaire nouvellement créé, on fixe la date d’expiration
-       
+
+        # =========================
+        # LOGIQUE STAGIAIRE (existant)
+        # =========================
         if self.type_agent == 'stagiaire':
             if not self.date_mise_service:
                 self.date_mise_service = timezone.now()
-            
-            #  Calculer l'expiration à partir de la date de mise en service
             if not self.date_expiration:
                 self.date_expiration = self.date_mise_service + timedelta(days=14)
 
-        # 🔹 Si l’agent change de rôle (n’est plus stagiaire)
         elif self.type_agent != 'stagiaire':
-            # On réactive le compte au besoin
             if not self.user.is_active:
                 self.user.is_active = True
                 self.user.save(update_fields=['is_active'])
-            # On efface les dates spécifiques stagiaire
             self.date_expiration = None
             self.date_mise_service = None
 
+        # =========================
+        # LOGIQUE CONTRAT (NOUVEAU)
+        # =========================
+
+        # 🔹 Prestation : 1 mois par défaut
+        if self.type_contrat == 'prestation':
+            if not self.date_fin_contrat:
+                self.date_fin_contrat = (
+                    self.date_creation.date()
+                    if self.pk else timezone.now().date()
+                ) + relativedelta(months=1)
+
+        # 🔹 CDI : jamais de date de fin
+        if self.type_contrat == 'cdi':
+            self.date_fin_contrat = None
+
         super().save(*args, **kwargs)
+
+
+    def clean(self):
+        if self.type_contrat == 'cdd' and not self.date_fin_contrat:
+            raise ValidationError("Un CDD doit avoir une date de fin.")
+
+        if self.type_contrat == 'cdi' and self.date_fin_contrat:
+            raise ValidationError("Un CDI ne doit pas avoir de date de fin.")
+
 
     def get_stats_ventes_periode(self, jours=30):
         """Retourne les statistiques de vente pour une période donnée"""
@@ -451,6 +508,12 @@ class Agent(models.Model):
     
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
+
+    @property
+    def contrat_expire(self):
+        if self.date_fin_contrat:
+            return timezone.now().date() > self.date_fin_contrat
+        return False
 
     @property
     def est_expire(self):
@@ -1051,7 +1114,7 @@ class Vente(models.Model):
     max_digits=10,      
     decimal_places=2,   # Chiffres après la virgule
     default=Decimal('0.00')
-)
+    )
     type_vente = models.CharField(max_length=50, choices=TYPE_VENTE_CHOICES, default='detail')
     prix_vente_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
     mode_paiement = models.CharField(max_length=50, choices=MODE_PAIEMENT_CHOICES, default='comptant')

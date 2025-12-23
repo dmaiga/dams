@@ -4,25 +4,24 @@
 {% block content %}
 <div class="container">
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-7">
             <div class="card">
                 <div class="card-header">
                     <h4>Modifier {{ agent.full_name }}</h4>
                 </div>
                 <div class="card-body">
-                    <!-- Messages d'erreur/succès -->
+
                     {% if messages %}
-                    <div class="messages">
+                    <div class="messages mb-3">
                         {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
                             {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                         {% endfor %}
                     </div>
                     {% endif %}
 
-                    <!-- Affichage des erreurs non-field -->
                     {% if form.non_field_errors %}
                     <div class="alert alert-danger">
                         {% for error in form.non_field_errors %}
@@ -31,69 +30,50 @@
                     </div>
                     {% endif %}
 
-                    <!-- Statut actuel -->
+                    <!-- ================= STAGE INFO ================= -->
                     {% if agent.est_stagiaire %}
                     <div class="alert alert-info">
-                        <strong><i class="fas fa-user-graduate"></i> Statut Stagiaire Actuel</strong><br>
+                        <strong><i class="fas fa-user-graduate"></i> Statut stagiaire</strong><br>
                         {% if agent.est_expire %}
-                            <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> COMPTE EXPIRÉ</span><br>
-                            <small>L'agent ne peut plus se connecter</small>
+                            <span class="text-danger">
+                                <i class="fas fa-exclamation-triangle"></i> Compte expiré
+                            </span><br>
+                            <small>Accès désactivé</small>
                         {% else %}
-                            <span class="text-success"><i class="fas fa-check-circle"></i> Stage en cours</span><br>
-                            <small>Expire dans {{ agent.jours_restants }} jours (le {{ agent.date_expiration|date:"d/m/Y" }})</small>
+                            <span class="text-success">
+                                <i class="fas fa-check-circle"></i> Stage en cours
+                            </span><br>
+                            <small>
+                                Expire le {{ agent.date_expiration|date:"d/m/Y" }}
+                                ({{ agent.jours_restants }} jours restants)
+                            </small>
                         {% endif %}
                     </div>
                     {% endif %}
 
                     <form method="post">
                         {% csrf_token %}
-                        
+
+                        <!-- IDENTITÉ -->
                         <div class="mb-3">
                             <label class="form-label">Nom</label>
                             {{ form.nom }}
-                            {% if form.nom.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.nom.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="form-label">Prénom</label>
                             {{ form.prenom }}
-                            {% if form.prenom.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.prenom.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
                         </div>
-                        
+
                         <div class="mb-3">
                             <label class="form-label">Téléphone</label>
                             {{ form.telephone }}
-                            {% if form.telephone.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.telephone.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
                         </div>
-                        
+
+                        <!-- TYPE AGENT -->
                         <div class="mb-3">
-                            <label class="form-label">Type</label>
+                            <label class="form-label">Type d’agent</label>
                             {{ form.type_agent }}
-                            {% if form.type_agent.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.type_agent.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                            {% endif %}
                             {% if agent.est_stagiaire %}
                             <div class="form-text text-success">
                                 <i class="fas fa-arrow-up"></i> Promotion possible vers Agent Terrain
@@ -101,19 +81,91 @@
                             {% endif %}
                         </div>
 
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <!-- ================= AFFECTATION ================= -->
+                        <hr>
+                        <h6 class="text-muted mb-3">
+                            <i class="fas fa-map-marker-alt"></i> Affectation terrain
+                        </h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Quartier</label>
+                            {{ form.quartier }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Marché d’affectation</label>
+                            {{ form.marche_affectation }}
+                        </div>
+
+                        <!-- ================= CONTRAT ================= -->
+                        <hr>
+                        <h6 class="text-muted mb-3">
+                            <i class="fas fa-file-contract"></i> Contrat
+                        </h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Type de contrat</label>
+                            {{ form.type_contrat }}
+                        </div>
+
+                        <div class="mb-3" id="date-fin-contrat-wrapper">
+                            <label class="form-label">Date de fin de contrat</label>
+                            {{ form.date_fin_contrat }}
+                            <div class="form-text">
+                                <span id="contrat-help-text"></span>
+                            </div>
+                        </div>
+
+                        <!-- ACTIONS -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                             <button type="submit" class="btn btn-primary me-md-2">
-                                <i class="fas fa-save"></i> 
-                                {% if agent.est_stagiaire %}Promouvoir{% else %}Modifier{% endif %}
+                                <i class="fas fa-save"></i>
+                                Enregistrer
                             </button>
                             <a href="{% url 'liste_agents' %}" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Annuler
                             </a>
                         </div>
+
                     </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ================= JS CONTRAT ================= -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const typeContrat = document.getElementById('id_type_contrat');
+    const dateFinWrapper = document.getElementById('date-fin-contrat-wrapper');
+    const helpText = document.getElementById('contrat-help-text');
+
+    function toggleContratFields() {
+        if (!typeContrat) return;
+
+        if (typeContrat.value === 'cdi') {
+            dateFinWrapper.style.display = 'none';
+            helpText.textContent = 'CDI : pas de date de fin.';
+        } 
+        else if (typeContrat.value === 'prestation') {
+            dateFinWrapper.style.display = 'block';
+            helpText.textContent = 'Par défaut : 1 mois renouvelable.';
+        }
+        else if (typeContrat.value === 'cdd') {
+            dateFinWrapper.style.display = 'block';
+            helpText.textContent = 'CDD : date de fin obligatoire.';
+        }
+        else {
+            dateFinWrapper.style.display = 'none';
+            helpText.textContent = '';
+        }
+    }
+
+    toggleContratFields();
+    if (typeContrat) {
+        typeContrat.addEventListener('change', toggleContratFields);
+    }
+});
+</script>
 {% endblock %}

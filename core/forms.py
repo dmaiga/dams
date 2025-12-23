@@ -82,6 +82,22 @@ class AgentCreationForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-select'}),
         initial='stagiaire'
     )
+    type_contrat = forms.ChoiceField(
+    choices=Agent.TYPE_CONTRAT_CHOICES,
+    widget=forms.Select(attrs={'class': 'form-select'}),
+    required=False,
+    label="Type de contrat"
+    )
+
+    date_fin_contrat = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        }),
+        label="Date de fin de contrat"
+    )
+
     # Champ optionnel pour la date de mise en service
     date_mise_service = forms.DateTimeField(
         required=False,
@@ -101,7 +117,16 @@ class AgentCreationForm(forms.ModelForm):
 
     class Meta:
         model = Agent
-        fields = ['telephone', 'type_agent','date_mise_service','est_actif']
+        fields = [
+            'telephone',
+            'type_agent',
+            'type_contrat',
+            'date_fin_contrat',
+            'date_mise_service',
+            'est_actif',
+            'marche_affectation',
+            'quartier',
+        ]
 
     def clean_telephone(self):
         telephone = self.cleaned_data.get('telephone')
@@ -139,39 +164,57 @@ class AgentCreationForm(forms.ModelForm):
         prenom = self.cleaned_data['prenom']
         telephone = self.cleaned_data['telephone']
         type_agent = self.cleaned_data['type_agent']
+        type_contrat = self.cleaned_data.get('type_contrat')
+        date_fin_contrat = self.cleaned_data.get('date_fin_contrat')
         date_mise_service = self.cleaned_data.get('date_mise_service')
-        
-        # ✅ Générer un username unique
-        username = self.generate_unique_username(nom, prenom)
         est_actif = self.cleaned_data.get('est_actif', True)
-
-        # ✅ Créer l'utilisateur avec mot de passe par défaut
+    
+        username = self.generate_unique_username(nom, prenom)
+    
+        # 🔐 Création utilisateur
         user = User.objects.create_user(
-            username=username,  # ✅ prenom.nom (unique)
-            password='temp123',  # ✅ Mot de passe par défaut
-            first_name=prenom,   # ✅ CORRECTION: first_name = prénom
-            last_name=nom,       # ✅ CORRECTION: last_name = nom
-            email=f"{username}@example.com",  # Email optionnel
+            username=username,
+            password='temp123',
+            first_name=prenom,
+            last_name=nom,
+            email=f"{username}@example.com",
             is_active=est_actif
         )
-        
-        # ✅ Créer l'agent
+    
         agent = super().save(commit=False)
         agent.user = user
         agent.telephone = telephone
-
-        # ✅ Si date de mise en service fournie manuellement
-        if date_mise_service and type_agent == 'stagiaire':
-            agent.date_mise_service = date_mise_service
+    
+        # ✅ FORCER l’état actif côté Agent
+        agent.est_actif = est_actif
+    
+        # =========================
+        # CONTRAT – RÈGLES PAR DÉFAUT
+        # =========================
+        if type_agent == 'stagiaire':
+            agent.type_contrat = 'stage'
+            if date_mise_service:
+                agent.date_mise_service = date_mise_service
+        else:
+            agent.type_contrat = type_contrat or 'prestation'
+    
+            # 👉 Prestation = 1 mois par défaut
+            if agent.type_contrat == 'prestation' and not date_fin_contrat:
+                agent.date_fin_contrat = timezone.now().date() + timedelta(days=30)
+            else:
+                agent.date_fin_contrat = date_fin_contrat
+    
         if commit:
             agent.save()
-            # ✅ sécurité : forcer cohérence
+    
+            # 🔁 Synchronisation finale (sécurité)
             if est_actif:
                 agent.activer()
             else:
                 agent.desactiver()
+    
         return agent
-
+    
 
 # forms.py
 class AgentModificationForm(forms.ModelForm):
@@ -190,6 +233,20 @@ class AgentModificationForm(forms.ModelForm):
         required=True,
         widget=forms.TextInput(attrs={'class': 'form-control'})
     )
+    type_contrat = forms.ChoiceField(
+    choices=Agent.TYPE_CONTRAT_CHOICES,
+    widget=forms.Select(attrs={'class': 'form-select'}),
+    required=False
+)
+
+    date_fin_contrat = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+
     type_agent = forms.ChoiceField(
         choices=[
             ('stagiaire', 'Stagiaire'),  
@@ -205,7 +262,16 @@ class AgentModificationForm(forms.ModelForm):
 
     class Meta:
         model = Agent
-        fields = ['telephone', 'type_agent','est_actif']
+        fields = [
+            'telephone',
+            'type_agent',
+            'type_contrat',
+            'date_fin_contrat',
+            'est_actif',
+            'marche_affectation',
+            'quartier',
+        ]
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -233,24 +299,21 @@ class AgentModificationForm(forms.ModelForm):
     
     def save(self, commit=True):
         agent = super().save(commit=False)
-    
+
         if agent.user:
             agent.user.first_name = self.cleaned_data['nom']
             agent.user.last_name = self.cleaned_data['prenom']
             agent.user.save()
-    
-        est_actif = self.cleaned_data.get('est_actif', True)
-    
+
+        agent.type_contrat = self.cleaned_data.get('type_contrat')
+        agent.date_fin_contrat = self.cleaned_data.get('date_fin_contrat')
+
         if commit:
             agent.save()
-    
-            # ✅ ACTIVER / DÉSACTIVER VIA MÉTHODES
-            if est_actif:
-                agent.activer()
-            else:
-                agent.desactiver()
-    
+            agent.activer() if self.cleaned_data.get('est_actif', True) else agent.desactiver()
+
         return agent
+
     
 
 class FournisseurForm(forms.ModelForm):

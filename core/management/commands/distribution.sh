@@ -37,35 +37,41 @@ def creer_distributions_multiple():
 
            
                  {
-                    'date': '20/12/2025', 
+                    'date': '11/12/2025', 
                     'produit': 'oignon',
-                    'lot_reference': '20251222-0001',
+                    'lot_reference': '20251209-0001',
                     'specification': '',
-                    'prix_gros': 9500,
-                    'prix_detail': 13000,
+                    'prix_gros': 10500,
+                    'prix_detail': 11250,
                     
                     'distributions': [  
     
-                       (fatoumata, 20, "Fatou"),  
+                       (koniba, 1, "Fatou"),  
+                       (ramata, 1, "Fatou"),  
+                       (abdoulaye, 1, "Fatou"),  
+                       (mankoulako, 4, "Fatou"),  
+                       
                        
                        ]
                 },
                    {
-                    'date': '20/12/2025', 
+                    'date': '12/12/2025', 
                     'produit': 'oignon',
-                    'lot_reference': '20251222-0001',
+                    'lot_reference': '20251209-0001',
                     'specification': '',
-                    'prix_gros': 9500,
-                    'prix_detail': 10000,
+                    'prix_gros': 10500,
+                    'prix_detail': 11250,
                     
                     'distributions': [  
     
+                       (moussony, 3, "Fatou"),  
+                       (noumoutene, 5, "Fatou"),  
+                       (koniba, 3, "Fatou"),  
                        (ramata, 1, "Fatou"),  
-                        (koniba, 2, "Fatou"),
-                         (abdoulaye, 6, "Fatou"),  
-                          (safiatou, 1, "Fatou"), 
+                          (djenebaS, 2, "Fatou"),
+                       
                        ]
-                },
+                }
                  
            
                 

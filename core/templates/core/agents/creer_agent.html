@@ -13,6 +13,7 @@
                     </h4>
                 </div>
                 <div class="card-body">
+
                     {% if messages %}
                     <div class="mb-4">
                         {% for message in messages %}
@@ -26,7 +27,8 @@
 
                     <form method="post" id="agent-creation-form">
                         {% csrf_token %}
-                        
+
+                        <!-- NOM / PRÉNOM -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -48,6 +50,7 @@
                             </div>
                         </div>
 
+                        <!-- TÉLÉPHONE / TYPE AGENT -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
@@ -55,36 +58,58 @@
                                     {{ form.telephone }}
                                     <div class="form-text">
                                         <i class="fas fa-info-circle"></i>
-                                        Ce numéro sera utilisé pour les communications
+                                        Numéro principal de l’agent
                                     </div>
                                     {% if form.telephone.errors %}
                                     <div class="text-danger small">{{ form.telephone.errors }}</div>
                                     {% endif %}
                                 </div>
                             </div>
+
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Type d'Agent *</label>
+                                    <label class="form-label">Type d’agent *</label>
                                     {{ form.type_agent }}
                                     <div class="form-text">
-                                        <i class="fas fa-info-circle"></i>
-                                        <strong>Superviseur:</strong> Accès complet | 
-                                        <strong>Agent Terrain:</strong> Ventes uniquement | 
-                                        <strong>Stagiaire:</strong> Test 15 jours
+                                        <strong>Superviseur :</strong> gestion terrain |
+                                        <strong>Agent terrain :</strong> ventes |
+                                        <strong>Stagiaire :</strong> test 15 jours
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Champ conditionnel pour la date de mise en service -->
-                        <div id="stagiaire-fields" style="display: none;">
+                        <!-- AFFECTATION TERRAIN -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Quartier d’affectation</label>
+                                    {{ form.quartier }}
+                                    {% if form.quartier.errors %}
+                                    <div class="text-danger small">{{ form.quartier.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Marché d’affectation</label>
+                                    {{ form.marche_affectation }}
+                                    {% if form.marche_affectation.errors %}
+                                    <div class="text-danger small">{{ form.marche_affectation.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- STAGIAIRE UNIQUEMENT -->
+                        <div id="stagiaire-fields" style="display:none;">
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Date de mise en service</label>
                                         {{ form.date_mise_service }}
                                         <div class="form-text">
-                                            <i class="fas fa-info-circle"></i>
                                             Laisser vide pour utiliser la date actuelle
                                         </div>
                                         {% if form.date_mise_service.errors %}
@@ -95,27 +120,28 @@
                             </div>
                         </div>
 
-                        <!-- Informations de connexion -->
+                        <!-- INFO CONNEXION -->
                         <div class="alert alert-info">
                             <h6 class="alert-heading">
-                                <i class="fas fa-key me-2"></i>Informations de Connexion
+                                <i class="fas fa-key me-2"></i>Informations de connexion
                             </h6>
-                            <div class="mb-2">
-                                <strong>Identifiant:</strong> Généré automatiquement (prénom.nom)
-                            </div>
-                            <div class="mb-0">
-                                <strong>Mot de passe:</strong> <code>temp123</code> (à changer à la première connexion)
-                            </div>
+                            <ul class="mb-0">
+                                <li><strong>Identifiant :</strong> généré automatiquement</li>
+                                <li><strong>Mot de passe :</strong> <code>temp123</code></li>
+                                <li><strong>Contrat :</strong> prestation 1 mois (par défaut)</li>
+                            </ul>
                         </div>
 
+                        <!-- ACTIONS -->
                         <div class="d-flex gap-2">
                             <a href="{% url 'liste_agents' %}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> Annuler
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-user-plus"></i> Créer l'Agent
+                                <i class="fas fa-user-plus"></i> Créer l’agent
                             </button>
                         </div>
+
                     </form>
                 </div>
             </div>
@@ -123,43 +149,27 @@
     </div>
 </div>
 
+<!-- JS -->
 <script>
-// Afficher/masquer les champs stagiaire selon le type sélectionné
-document.addEventListener('DOMContentLoaded', function() {
-    const typeAgentSelect = document.querySelector('#id_type_agent');
-    const stagiaireFields = document.querySelector('#stagiaire-fields');
-    
+document.addEventListener('DOMContentLoaded', function () {
+    const typeAgent = document.getElementById('id_type_agent');
+    const stagiaireFields = document.getElementById('stagiaire-fields');
+
     function toggleStagiaireFields() {
-        if (typeAgentSelect.value === 'stagiaire') {
-            stagiaireFields.style.display = 'block';
-        } else {
-            stagiaireFields.style.display = 'none';
-        }
+        stagiaireFields.style.display = (typeAgent.value === 'stagiaire') ? 'block' : 'none';
     }
-    
-    // Initialiser l'état
+
     toggleStagiaireFields();
-    
-    // Écouter les changements
-    typeAgentSelect.addEventListener('change', toggleStagiaireFields);
+    typeAgent.addEventListener('change', toggleStagiaireFields);
 });
 </script>
 
 <style>
-.form-text {
-    font-size: 0.85em;
-}
-
-.alert-info {
-    background-color: #f0f9ff;
-    border-color: #b6e0fe;
-}
-
+.form-text { font-size: 0.85em; }
 code {
-    background-color: #f8f9fa;
+    background: #f8f9fa;
     padding: 2px 6px;
-    border-radius: 3px;
-    font-family: monospace;
+    border-radius: 4px;
 }
 </style>
 {% endblock %}
