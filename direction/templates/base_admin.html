@@ -82,14 +82,14 @@
                                     <span>Agents</span>
                                 </a>
                             </li>
-                            <li>
-                                <a href="{% url 'liste_fournisseurs_direction' %}" 
-                                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                                          {% if 'fournisseur' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-                                    <i class="fas fa-truck w-5"></i>
-                                    <span>Fournisseurs</span>
-                                </a>
-                            </li>
+<li>
+    <a href="{% url 'liste_fournisseurs_direction' %}" 
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+              {% if request.resolver_match.url_name == 'liste_fournisseurs_direction' %}bg-blue-50 text-primary{% endif %}">
+        <i class="fas fa-truck w-5"></i>
+        <span>Fournisseurs</span>
+    </a>
+</li>
                             <li>
                                 <a href="{% url 'product_list' %}" 
                                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
@@ -113,14 +113,14 @@
                                     <span>Ventes</span>
                                 </a>
                             </li>
-                            <li>
-                                <a href="{% url 'factures_fournisseurs_direction' %}" 
-                                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                                          {% if 'factures_fournisseurs' in request.resolver_match.url_name or 'facture_fournisseur' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-                                    <i class="fas fa-file-invoice-dollar w-5"></i>
-                                    <span>Factures Fournisseurs</span>
-                                </a>
-                            </li>
+<li>
+    <a href="{% url 'factures_fournisseurs_direction' %}" 
+       class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+              {% if request.resolver_match.url_name == 'factures_fournisseurs_direction' or request.resolver_match.url_name == 'detail_facture_fournisseur_direction' %}bg-blue-50 text-primary{% endif %}">
+        <i class="fas fa-file-invoice-dollar w-5"></i>
+        <span>Factures Fournisseurs</span>
+    </a>
+</li>
                             <li>
                                 <a href="{% url 'versements_direction' %}" 
                                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100

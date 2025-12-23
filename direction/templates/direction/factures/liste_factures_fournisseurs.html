@@ -8,112 +8,226 @@
         Factures Fournisseurs
     </h1>
     
-    <!-- Filtres -->
+    <!-- Filtres compact -->
     <div class="card bg-base-100 shadow-sm mb-6">
-        <div class="card-body">
-            <form method="get" class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <div class="md:col-span-3">
-                    <label class="label">
-                        <span class="label-text font-semibold">Fournisseur</span>
-                    </label>
-                    <select name="fournisseur" class="select select-bordered w-full">
-                        <option value="">Tous les fournisseurs</option>
-                        {% for lot in lots_avec_facture|dictsort:"fournisseur.nom" %}
-                        <option value="{{ lot.fournisseur.id }}">{{ lot.fournisseur.nom }}</option>
-                        {% endfor %}
-                    </select>
+        <div class="card-body p-4">
+            <form method="get" class="space-y-4">
+                <!-- Ligne 1 -->
+                <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="label py-1">
+                            <span class="label-text font-semibold text-sm">Fournisseur</span>
+                        </label>
+                        <select name="fournisseur" class="select select-bordered select-sm w-full">
+                            <option value="">Tous les fournisseurs</option>
+                            {% for fournisseur in fournisseurs %}
+                            <option value="{{ fournisseur.id }}" 
+                                {% if request.GET.fournisseur == fournisseur.id|stringformat:"i" %}selected{% endif %}>
+                                {{ fournisseur.nom }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="label py-1">
+                            <span class="label-text font-semibold text-sm">Date début</span>
+                        </label>
+                        <input type="date" name="date_debut" class="input input-bordered input-sm w-full"
+                               value="{{ request.GET.date_debut }}">
+                    </div>
+                    
+                    <div>
+                        <label class="label py-1">
+                            <span class="label-text font-semibold text-sm">Date fin</span>
+                        </label>
+                        <input type="date" name="date_fin" class="input input-bordered input-sm w-full"
+                               value="{{ request.GET.date_fin }}">
+                    </div>
+                    
+                    <div>
+                        <label class="label py-1">
+                            <span class="label-text font-semibold text-sm">Statut</span>
+                        </label>
+                        <select name="statut" class="select select-bordered select-sm w-full">
+                            <option value="">Tous</option>
+                            <option value="soldes" {% if request.GET.statut == 'soldes' %}selected{% endif %}>
+                                Soldés
+                            </option>
+                            <option value="non_soldes" {% if request.GET.statut == 'non_soldes' %}selected{% endif %}>
+                                Non soldés
+                            </option>
+                        </select>
+                    </div>
                 </div>
-                <div class="md:col-span-2">
-                    <label class="label">
-                        <span class="label-text font-semibold">Date début</span>
-                    </label>
-                    <input type="date" name="date_debut" class="input input-bordered w-full">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="label">
-                        <span class="label-text font-semibold">Date fin</span>
-                    </label>
-                    <input type="date" name="date_fin" class="input input-bordered w-full">
-                </div>
-                <div class="md:col-span-2 flex items-end">
-                    <button type="submit" class="btn btn-primary w-full">
-                        <i class="fas fa-filter mr-2"></i>
-                        Filtrer
-                    </button>
+                
+                <!-- Ligne 2 -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="text-xs text-gray-500">
+                        {% if request.GET %}
+                        <span class="flex items-center gap-1">
+                            <i class="fas fa-filter"></i>
+                            Filtres actifs
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="fas fa-filter mr-1"></i>
+                            Appliquer
+                        </button>
+                        <a href="{% url 'factures_fournisseurs_direction' %}" class="btn btn-outline btn-sm">
+                            <i class="fas fa-redo mr-1"></i>
+                            Réinitialiser
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
     
-    <!-- Résumé -->
-    <div class="alert alert-info mb-6">
-        <div class="flex items-center">
-            <i class="fas fa-info-circle mr-3"></i>
-            <div>
-                <strong>Total Factures : {{ total_montant|fcfa }} FCFA</strong> 
-                <span class="mx-2">•</span>
-                <span>{{ lots_avec_facture.count }} facture(s)</span>
+    <!-- Statistiques -->
+    <div class="stats shadow bg-base-100 w-full mb-6">
+        <div class="stat">
+            <div class="stat-figure text-primary">
+                <i class="fas fa-money-bill-wave text-2xl"></i>
             </div>
+            <div class="stat-title">Total facturé</div>
+            <div class="stat-value text-primary text-2xl">{{ total_montant_factures|floatformat:0 }} <span class="text-sm">FCFA</span></div>
+            <div class="stat-desc">{{ factures.count }} facture(s) - {{ stats_fournisseurs|length }} fournisseur(s)</div>
         </div>
     </div>
     
-    <!-- Liste -->
-    <div class="card bg-base-100 shadow-sm">
-        <div class="card-body">
+    <!-- Liste des factures -->
+    <div class="card bg-base-100 shadow-sm mb-6">
+        <div class="card-body p-0">
             <div class="overflow-x-auto">
                 <table class="table table-zebra">
                     <thead>
                         <tr class="bg-base-200">
-                            <th>Date</th>
-                            <th>Fournisseur</th>
-                            <th>Produit</th>
-                            <th>Quantité</th>
-                            <th>Montant</th>
-                            <th>Facture</th>
+                            <th class="whitespace-nowrap">Date réception</th>
+                            <th class="whitespace-nowrap">Fournisseur</th>
+                            <th class="whitespace-nowrap">Produit</th>
+                            <th class="whitespace-nowrap">Quantité lot</th>
+                            <th class="whitespace-nowrap">Prix unitaire</th>
+                          
+                            <th class="whitespace-nowrap text-right">Montant facture</th>
+                            <th class="whitespace-nowrap">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for lot in lots_avec_facture %}
+                        {% for facture in factures %}
                         <tr class="hover">
-                            <td>{{ lot.date_reception|date:"d/m/Y" }}</td>
-                            <td>
-                                <div class="font-semibold">{{ lot.fournisseur.nom }}</div>
+                            <td class="whitespace-nowrap">
+                                <div class="font-medium">{{ facture.lot.date_reception|date:"d/m/Y" }}</div>
                             </td>
-                            <td>{{ lot.produit.nom }}</td>
-                            <td>
-                                <span class="badge badge-outline">{{ lot.quantite_initiale }}</span>
+                            <td class="whitespace-nowrap">
+                                <div class="font-medium">{{ facture.lot.fournisseur.nom }}</div>
                             </td>
-                            <td>
-                                <span class="font-semibold text-primary">{{ lot.valeur_stock_initiale|floatformat:0 }} FCFA</span>
+                            <td class="whitespace-nowrap">
+                                <div>{{ facture.lot.produit.nom }}</div>
                             </td>
-                            <td>
-                                {% if lot.facture %}
-                                <a href="{{ lot.facture.url }}" target="_blank" class="btn btn-sm btn-outline btn-primary">
-                                    <i class="fas fa-eye mr-2"></i>
-                                    Voir
-                                </a>
+                            <td class="whitespace-nowrap">
+                                <div class="text-center">
+                                    <span class="badge badge-outline">{{ facture.lot.quantite_initiale|floatformat:"0" }}</span>
+                                </div>
+                            </td>
+                            <td class="whitespace-nowrap">
+                                <div>{{ facture.lot.prix_achat_unitaire|floatformat:"0" }} FCFA</div>
+                            </td>
+                          
+                            <td class="whitespace-nowrap text-right">
+                                {% if facture.montant %}
+                                <span class="font-bold text-success">{{ facture.montant|floatformat:0 }} FCFA</span>
                                 {% else %}
-                                <span class="badge badge-warning gap-1">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                    Non fournie
-                                </span>
+                                <span class="badge badge-warning">Non précisé</span>
                                 {% endif %}
+                            </td>
+                            <td class="whitespace-nowrap">
+                                <div class="flex gap-1">
+                                    <a href="{{ facture.fichier.url }}" target="_blank" 
+                                       class="btn btn-sm btn-outline btn-primary" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ facture.fichier.url }}" download 
+                                       class="btn btn-sm btn-outline btn-secondary" title="Télécharger">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-8">
+                            <td colspan="8" class="text-center py-8">
                                 <div class="text-gray-400">
                                     <i class="fas fa-file-invoice text-4xl mb-3"></i>
                                     <p class="text-lg">Aucune facture trouvée</p>
+                                    <p class="text-sm">Aucune facture n'a été enregistrée pour le moment.</p>
                                 </div>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
+                    {% if factures %}
+                    <tfoot>
+                        <tr class="bg-base-200 font-bold">
+                            <td colspan="6" class="text-right">Total :</td>
+                            <td class="text-right text-primary">{{ total_montant_factures|floatformat:0 }} FCFA</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
                 </table>
             </div>
         </div>
     </div>
+    
+    <!-- Top fournisseurs -->
+    {% if stats_fournisseurs %}
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                <i class="fas fa-chart-pie"></i>
+                Répartition par fournisseur
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+                {% for stat in stats_fournisseurs|slice:":6" %}
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body p-4 text-center">
+                        <div class="text-sm font-medium mb-1 truncate" title="{{ stat.lot__fournisseur__nom }}">
+                            {{ stat.lot__fournisseur__nom|truncatechars:15 }}
+                        </div>
+                        <div class="text-xl font-bold text-primary">
+                            {{ stat.total_factures|floatformat:0 }}
+                            <span class="text-xs">FCFA</span>
+                        </div>
+                        <div class="text-xs text-gray-500">{{ stat.nombre_factures }} facture(s)</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+<!-- JavaScript pour les filtres actifs -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mettre en évidence les filtres actifs
+    const params = new URLSearchParams(window.location.search);
+    const hasFilters = params.toString() !== '';
+    
+    if (hasFilters) {
+        const filterBtn = document.querySelector('button[type="submit"]');
+        if (filterBtn) {
+            filterBtn.classList.remove('btn-primary');
+            filterBtn.classList.add('btn-warning');
+            filterBtn.innerHTML = '<i class="fas fa-filter mr-2"></i>Filtres actifs';
+        }
+    }
+});
+</script>
 {% endblock %}

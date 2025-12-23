@@ -1,7 +1,7 @@
 from direction.services.product_analysis_service import ProductAnalysisService
 from django.contrib.auth.decorators import login_required
 from core.models import (
-    Agent, Client, Vente, Produit, 
+    Agent, Client, FactureLotEntrepot, Vente, Produit, 
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,PaiementFournisseur,
@@ -404,40 +404,62 @@ def dashboard_justificatif(request):
     
     return render(request, 'direction/factures/justificatif.html', context)
 
+from django.db.models import Sum, Q
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+from django.db.models import Sum, Count
+from decimal import Decimal
+
 @login_required
 def liste_factures_fournisseurs(request):
     """Liste complète des factures fournisseurs (pour direction)"""
-    # Vérifier permissions
     
-    lots_avec_facture = LotEntrepot.objects.exclude(facture='').select_related(
-        'fournisseur', 'produit'
-    ).order_by('-date_reception')
+    # Récupérer toutes les factures avec les informations du lot
+    factures = FactureLotEntrepot.objects.select_related(
+        'lot', 
+        'lot__fournisseur', 
+        'lot__produit'
+    ).order_by('-date_upload')
     
     # Filtrer par fournisseur (optionnel)
     fournisseur_id = request.GET.get('fournisseur')
     if fournisseur_id:
-        lots_avec_facture = lots_avec_facture.filter(fournisseur_id=fournisseur_id)
+        factures = factures.filter(lot__fournisseur_id=fournisseur_id)
     
     # Filtrer par date (optionnel)
     date_debut = request.GET.get('date_debut')
     date_fin = request.GET.get('date_fin')
-    if date_debut and date_fin:
-        lots_avec_facture = lots_avec_facture.filter(
-            date_reception__date__gte=date_debut,
-            date_reception__date__lte=date_fin
-        )
+    if date_debut:
+        factures = factures.filter(date_upload__date__gte=date_debut)
+    if date_fin:
+        factures = factures.filter(date_upload__date__lte=date_fin)
     
     # Calculer les totaux
-    total_montant = sum(l.valeur_stock_initiale for l in lots_avec_facture if l.valeur_stock_initiale)
+    total_montant_factures = factures.aggregate(
+        total=Sum('montant')
+    )['total'] or Decimal('0')
+    
+    # Calculer par fournisseur
+    stats_fournisseurs = FactureLotEntrepot.objects.values(
+        'lot__fournisseur__nom',
+        'lot__fournisseur_id'
+    ).annotate(
+        total_factures=Sum('montant'),
+        nombre_factures=Count('id')
+    ).order_by('-total_factures')
+    
+    # Liste des fournisseurs pour le filtre
+    fournisseurs = Fournisseur.objects.all().order_by('nom')
     
     context = {
-        'lots_avec_facture': lots_avec_facture,
-        'total_montant': total_montant,
+        'factures': factures,
+        'total_montant_factures': total_montant_factures,
+        'stats_fournisseurs': stats_fournisseurs,
+        'fournisseurs': fournisseurs,
         'title': 'Factures Fournisseurs - Direction'
     }
     return render(request, 'direction/factures/liste_factures_fournisseurs.html', context)
-
-
 
 @login_required
 def liste_versements_direction(request):
@@ -813,9 +835,7 @@ class AnalyseFournisseursView(LoginRequiredMixin, UserPassesTestMixin, View):
                         'direction/analyses/fournisseurs/liste.html',
                          context
                     )
-
 class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
-
     """Vue détaillée d'un fournisseur"""
     
     def test_func(self):
@@ -840,18 +860,38 @@ class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
             pk, date_debut_obj, date_fin_obj
         )
         
+        # Ajouter les informations sur les factures
+        fournisseur = Fournisseur.objects.get(pk=pk)
+        
+        # Nombre de factures pour ce fournisseur
+        nombre_factures = FactureLotEntrepot.objects.filter(
+            lot__fournisseur=fournisseur
+        ).count()
+        
+        # Montant total facturé
+        montant_total_factures = FactureLotEntrepot.objects.filter(
+            lot__fournisseur=fournisseur
+        ).aggregate(total=Sum('montant'))['total'] or Decimal('0')
+        
+        # Dernières factures (5 max)
+        dernieres_factures = FactureLotEntrepot.objects.filter(
+            lot__fournisseur=fournisseur
+        ).select_related('lot', 'lot__produit').order_by('-date_upload')[:5]
+        
         context = {
             **detail_data,
             'date_debut': date_debut,
             'date_fin': date_fin,
+            'nombre_factures': nombre_factures,
+            'montant_total_factures': montant_total_factures,
+            'dernieres_factures': dernieres_factures,
         }
         
         return render(
-                        request,
-                         'direction/analyses/fournisseurs/detail.html',
-                         context
-                    )
-
+            request,
+            'direction/analyses/fournisseurs/detail.html',
+            context
+        )
 @login_required
 def liste_paiements_fournisseur(request, fournisseur_id):
     """

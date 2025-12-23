@@ -6,32 +6,35 @@
 {% block content %}
 
 <div class="container mx-auto px-4 py-6">
-    <!-- Bouton retour -->
- <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-
-    <!-- Bouton retour -->
-    <a href="{% url 'liste_fournisseurs_direction' %}"
-       class="btn btn-sm btn-outline btn-neutral w-fit">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
-             viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-        </svg>
-        Retour à la liste
-    </a>
-
-    <!-- Actions -->
-    <div class="flex flex-col sm:flex-row gap-2">
-        <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}"
-           class="btn btn-primary w-full sm:w-auto">
-            Voir les paiements
+    <!-- Bouton retour et actions -->
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <!-- Bouton retour -->
+        <a href="{% url 'liste_fournisseurs_direction' %}"
+           class="btn btn-sm btn-outline btn-neutral w-fit">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Retour à la liste
         </a>
 
-       
+        <!-- Actions -->
+        <div class="flex flex-col sm:flex-row gap-2">
+            <div class="btn-group w-full sm:w-auto">
+                <a href="{% url 'factures_fournisseurs_direction' %}?fournisseur={{ fournisseur.id }}"
+                   class="btn btn-primary">
+                    <i class="fas fa-file-invoice mr-2"></i>
+                    Factures
+                </a>
+                <a href="{% url 'liste_paiements_fournisseur' fournisseur.id %}"
+                   class="btn btn-outline">
+                    <i class="fas fa-money-bill-wave mr-2"></i>
+                    Paiements
+                </a>
+            </div>
+        </div>
     </div>
-
-</div>
-
 
     <!-- En-tête -->
     <div class="mb-8">
@@ -63,7 +66,6 @@
                 </div>
             </div>
 
-            
             <!-- Filtre période -->
             <div class="bg-white p-4 rounded-lg shadow border border-gray-100">
                 <div class="flex items-center gap-2 mb-2">
@@ -92,259 +94,342 @@
                     </div>
                 </form>
             </div>
-
-        </div>
-    <!-- KPIs principaux -->
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-8">
-
-        <!-- Dette contractuelle -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border">
-            <div class="text-sm text-gray-500 font-medium mb-1">
-                Dette contractuelle
-            </div>
-            <div class="text-2xl font-bold text-gray-800">
-                {{ kpi_fournisseur.dette_contractuelle|fcfa }}
-            </div>
-            <div class="text-xs text-gray-400">
-                Basée sur les réceptions
-            </div>
         </div>
 
-        <!-- Dette consommée -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border">
-            <div class="text-sm text-gray-500 font-medium mb-1">
-                Dette consommée
+        <!-- KPIs principaux avec factures -->
+        <div class="grid grid-cols-2 lg:grid-cols-7 gap-3 mb-8">
+            <!-- Dette contractuelle -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1">
+                    Dette contractuelle
+                </div>
+                <div class="text-2xl font-bold text-gray-800">
+                    {{ kpi_fournisseur.dette_contractuelle|fcfa }}
+                </div>
+                <div class="text-xs text-gray-400">
+                    Basée sur les réceptions
+                </div>
             </div>
-            <div class="text-2xl font-bold text-blue-600">
-                {{ kpi_fournisseur.dette_consommee|fcfa }}
+
+            <!-- Dette consommée -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1">
+                    Dette consommée
+                </div>
+                <div class="text-2xl font-bold text-blue-600">
+                    {{ kpi_fournisseur.dette_consommee|fcfa }}
+                </div>
+                <div class="text-xs text-gray-400">
+                    Produits écoulés
+                </div>
             </div>
-            <div class="text-xs text-gray-400">
-                Produits écoulés
+
+            <!-- Montant payé -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1">
+                    Montant payé
+                </div>
+                <div class="text-2xl font-bold text-green-600">
+                    {{ kpi_fournisseur.total_paye|fcfa }}
+                </div>
+                <div class="text-xs text-gray-400">
+                    Paiements validés
+                </div>
+            </div>
+
+            <!-- Reste à payer -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1">
+                    Reste à payer
+                </div>
+                <div class="text-2xl font-bold 
+                    {% if kpi_fournisseur.reste_contractuel > 0 %}
+                        text-red-600
+                    {% else %}
+                        text-green-600
+                    {% endif %}">
+                    {{ kpi_fournisseur.reste_contractuel|fcfa }}
+                </div>
+                <div class="text-xs text-gray-400">
+                    Engagement fournisseur
+                </div>
+            </div>
+
+            <!-- Stock restant -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1">
+                    Stock restant
+                </div>
+                <div class="text-2xl font-bold text-gray-800">
+                    {{ kpi_fournisseur.stock_restant|floatformat:0 }}
+                </div>
+                <div class="text-xs text-gray-400">
+                    {{ kpi_fournisseur.valeur_stock_restant|fcfa }}
+                </div>
+            </div>
+
+            <!-- Écoulement -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1">
+                    Écoulement
+                </div>
+                <div class="text-2xl font-bold
+                    {% if kpi_fournisseur.taux_ecoulement_moyen >= 80 %}text-green-600
+                    {% elif kpi_fournisseur.taux_ecoulement_moyen >= 50 %}text-yellow-600
+                    {% else %}text-red-600{% endif %}">
+                    {{ kpi_fournisseur.taux_ecoulement_moyen }}%
+                </div>
+                <div class="text-xs text-gray-400">
+                    Moyenne des lots
+                </div>
+            </div>
+
+            <!-- Factures -->
+            <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 font-medium mb-1 flex items-center justify-between">
+                    <span>Factures</span>
+                    <i class="fas fa-file-invoice text-gray-400"></i>
+                </div>
+                <div class="text-2xl font-bold text-purple-600">
+                    {{ nombre_factures }}
+                </div>
+                <div class="text-xs text-gray-400">
+                    {{ montant_total_factures|floatformat:0 }} FCFA
+                </div>
+                {% if nombre_factures > 0 %}
+                <div class="mt-2">
+                    <a href="{% url 'factures_fournisseurs_direction' %}?fournisseur={{ fournisseur.id }}"
+                       class="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1">
+                        <i class="fas fa-external-link-alt"></i>
+                        Voir toutes
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
-
-        <!-- Montant payé -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border">
-            <div class="text-sm text-gray-500 font-medium mb-1">
-                Montant payé
-            </div>
-            <div class="text-2xl font-bold text-green-600">
-                {{ kpi_fournisseur.total_paye|fcfa }}
-            </div>
-            <div class="text-xs text-gray-400">
-                Paiements validés
-            </div>
-        </div>
-
-        <!-- Reste à payer -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border">
-            <div class="text-sm text-gray-500 font-medium mb-1">
-                Reste à payer
-            </div>
-            <div class="text-2xl font-bold 
-                {% if kpi_fournisseur.reste_contractuel > 0 %}
-                    text-red-600
-                {% else %}
-                    text-green-600
-                {% endif %}">
-                {{ kpi_fournisseur.reste_contractuel|fcfa }}
-            </div>
-            <div class="text-xs text-gray-400">
-                Engagement fournisseur
-            </div>
-        </div>
-
-        <!-- Stock restant -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border">
-            <div class="text-sm text-gray-500 font-medium mb-1">
-                Stock restant
-            </div>
-            <div class="text-2xl font-bold text-gray-800">
-                {{ kpi_fournisseur.stock_restant|floatformat:0 }}
-            </div>
-            <div class="text-xs text-gray-400">
-                {{ kpi_fournisseur.valeur_stock_restant|fcfa }}
-            </div>
-        </div>
-
-        <!-- Écoulement -->
-        <div class="bg-white rounded-xl p-4 shadow-sm border">
-            <div class="text-sm text-gray-500 font-medium mb-1">
-                Écoulement
-            </div>
-            <div class="text-2xl font-bold
-                {% if kpi_fournisseur.taux_ecoulement_moyen >= 80 %}text-green-600
-                {% elif kpi_fournisseur.taux_ecoulement_moyen >= 50 %}text-yellow-600
-                {% else %}text-red-600{% endif %}">
-                {{ kpi_fournisseur.taux_ecoulement_moyen }}%
-            </div>
-            <div class="text-xs text-gray-400">
-                Moyenne des lots
-            </div>
-        </div>
-
     </div>
 
-    </div>
-
-
-<!-- Tableau des lots avec actions de paiement -->
-<div class="mb-8">
-    <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <span class="p-2 rounded-lg">📦</span>
-            Détail des lots
-        </h2>
-        <div class="text-sm text-gray-500">
-            {{ analyse_lots|length }} lot{{ analyse_lots|pluralize }}
+    <!-- Dernières factures -->
+    {% if dernieres_factures %}
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <i class="fas fa-file-invoice text-purple-500"></i>
+                Factures récentes
+            </h2>
+            <a href="{% url 'factures_fournisseurs_direction' %}?fournisseur={{ fournisseur.id }}"
+               class="btn btn-xs btn-outline btn-neutral">
+                <i class="fas fa-list mr-1"></i>
+                Voir toutes ({{ nombre_factures }})
+            </a>
         </div>
-    </div>
-    
-    <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-        <div class="overflow-x-auto">
-            <table class="table">
-               <thead>
-    <!-- Ligne de regroupement -->
-    <tr class="text-xs uppercase tracking-wider text-gray-600">
-        <th colspan="2" class="bg-gray-100 text-center border-r">Lot</th>
-        <th colspan="4" class="bg-blue-50 text-center border-r">Stock / Opérations</th>
-        <th colspan="4" class="bg-yellow-50 text-center border-r">Finance fournisseur</th>
-        <th class="bg-green-50 text-center">Action</th>
-    </tr>
-
-    <!-- Ligne des colonnes -->
-    <tr class="bg-gray-50">
-        <th>Produit</th>
-        <th class="text-center">Date réception</th>
-
-        <th class="text-right">Prix unitaire</th>
-        <th class="text-right">Qté reçue</th>
-        <th class="text-right">Qté vendue</th>
-        <th class="text-right border-r">Qté restante</th>
-
-        <th class="text-right">Dette contractuelle</th>
-        <th class="text-right">Dette consommée</th>
-        <th class="text-right">Montant payé</th>
-        <th class="text-right border-r">Reste à payer</th>
-
-        <th class="text-center">Actions</th>
-    </tr>
-</thead>
-
-                <tbody>
-                    {% for lot in analyse_lots %}
-                    <tr class="hover:bg-gray-50 transition-colors duration-150">
-                        <!-- Produit avec infos détaillées -->
-                        <td>
-                            <div class="font-medium">{{ lot.lot.produit.nom }}</div>
-                            <div class="text-xs text-gray-500 mt-1">
-                  
-                            </div>
-                        </td>
-                        
-                        <!-- Date de réception -->
-                        <td class="text-center">
-                            <div class="flex flex-col items-center">
-                                <span class="font-medium">{{ lot.lot.date_reception|date:"d/m/Y" }}</span>
-                                <span class="text-xs text-gray-500">{{ lot.lot.date_reception|date:"H:i" }}</span>
-                            </div>
-                        </td>
-                        
-                        <!-- Prix unitaire d'acquisition -->
-                        <td class="text-right">
-                            <span class="font-semibold">{{ lot.lot.prix_achat_unitaire|fcfa }}</span>
-                        </td>
-                        
-                        <!-- Quantité reçue -->
-                        <td class="text-right">
-                            <span class="font-semibold">{{ lot.quantite_recue|floatformat:2 }}</span>
-                        </td>
-                        
-                        <!-- Quantité vendue -->
-                        <td class="text-right">
-                            <div class="flex flex-col items-end">
-                                <span class="font-semibold">{{ lot.quantite_vendue|floatformat:2 }}</span>
-                                <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
-                                                    {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
-                                                    {% else %}text-red-600{% endif %}">
-                                    {{ lot.ecoulement_pct }}%
-                                </span>
-                            </div>
-                        </td>
-                        
-                        <!-- Quantité restante -->
-                        <td class="text-right">
-                            <div class="flex flex-col items-end">
-                                <span class="{{ lot.quantite_classe }}">
-                                    {{ lot.quantite_restante|floatformat:2 }}
-                                </span>
-                              
-                            </div>
-                        </td>
-                        
-                        <!-- Dette réelle -->
-                        <td class="text-right font-bold bg-yellow-50">
-    {{ lot.lot.valeur_stock_initiale|fcfa }}
-</td>
-
-<td class="text-right font-bold bg-yellow-50">
-    {{ lot.dette_consommee|fcfa }}
-</td>
-
-<td class="text-right font-bold bg-green-50 text-green-700">
-    {{ lot.total_paye_lot|fcfa }}
-</td>
-
-<td class="text-right font-bold bg-red-50 text-red-700">
-    {{ lot.reste_contractuel|fcfa }}
-</td>
-
-                        
-                        <!-- Actions -->
-                       <td class="text-center">
-                            <div class="flex justify-center gap-2">
-                                {% if lot.reste_contractuel > 0 %}
-                                    <a href="{% url 'creer_paiement_fournisseur' fournisseur.id %}?lot={{ lot.lot.id }}&montant={{ lot.reste_contractuel }}"
-                                       class="btn btn-xs btn-success"
-                                       title="Payer ce lot">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
-                                             viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                                        </svg>
-                                        Payer
-                                    </a>
+        
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="table table-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="text-sm">Date</th>
+                            <th class="text-sm">Produit</th>
+                            <th class="text-sm">Lot</th>
+                            <th class="text-sm text-right">Montant</th>
+                            <th class="text-sm">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for facture in dernieres_factures %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="whitespace-nowrap">
+                                {{ facture.date_upload|date:"d/m/Y" }}
+                            </td>
+                            <td>
+                                {{ facture.lot.produit.nom|truncatechars:20 }}
+                            </td>
+                            <td>
+                               
+                                   
+                                    {{ facture.lot.reference_lot }}
+                                
+                            </td>
+                            <td class="text-right font-medium">
+                                {% if facture.montant %}
+                                {{ facture.montant|floatformat:0 }} FCFA
                                 {% else %}
-                                    <span class="text-green-600 text-sm flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
-                                             viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                  d="M5 13l4 4L19 7" />
-                                        </svg>
-                                        Payé
-                                    </span>
+                                <span class="text-gray-400 text-xs">Non précisé</span>
                                 {% endif %}
-                            </div>
-                        </td>
-
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="10" class="text-center py-8 text-gray-500">
-                            <div class="flex flex-col items-center justify-center py-8">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                </svg>
-                                <p class="text-lg font-medium">Aucun lot trouvé pour cette période</p>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                            <td>
+                                <div class="flex gap-1">
+                                    <a href="{{ facture.fichier.url }}" target="_blank"
+                                       class="btn btn-xs btn-outline btn-primary" title="Voir">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ facture.fichier.url }}" download
+                                       class="btn btn-xs btn-outline btn-secondary" title="Télécharger">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
+    {% endif %}
+
+    <!-- Tableau des lots avec actions de paiement -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <span class="p-2 rounded-lg">📦</span>
+                Détail des lots
+            </h2>
+            <div class="text-sm text-gray-500">
+                {{ analyse_lots|length }} lot{{ analyse_lots|pluralize }}
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <!-- Ligne de regroupement -->
+                        <tr class="text-xs uppercase tracking-wider text-gray-600">
+                            <th colspan="2" class="bg-gray-100 text-center border-r">Lot</th>
+                            <th colspan="4" class="bg-blue-50 text-center border-r">Stock / Opérations</th>
+                            <th colspan="4" class="bg-yellow-50 text-center border-r">Finance fournisseur</th>
+                            <th class="bg-green-50 text-center">Action</th>
+                        </tr>
+
+                        <!-- Ligne des colonnes -->
+                        <tr class="bg-gray-50">
+                            <th>Produit</th>
+                            <th class="text-center">Date réception</th>
+                            <th class="text-right">Prix unitaire</th>
+                            <th class="text-right">Qté reçue</th>
+                            <th class="text-right">Qté vendue</th>
+                            <th class="text-right border-r">Qté restante</th>
+                            <th class="text-right">Dette contractuelle</th>
+                            <th class="text-right">Dette consommée</th>
+                            <th class="text-right">Montant payé</th>
+                            <th class="text-right border-r">Reste à payer</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for lot in analyse_lots %}
+                        <tr class="hover:bg-gray-50 transition-colors duration-150">
+                            <!-- Produit avec infos détaillées -->
+                            <td>
+                                <div class="font-medium">{{ lot.lot.produit.nom }}</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                </div>
+                            </td>
+                            
+                            <!-- Date de réception -->
+                            <td class="text-center">
+                                <div class="flex flex-col items-center">
+                                    <span class="font-medium">{{ lot.lot.date_reception|date:"d/m/Y" }}</span>
+                                    <span class="text-xs text-gray-500">{{ lot.lot.date_reception|date:"H:i" }}</span>
+                                </div>
+                            </td>
+                            
+                            <!-- Prix unitaire d'acquisition -->
+                            <td class="text-right">
+                                <span class="font-semibold">{{ lot.lot.prix_achat_unitaire|fcfa }}</span>
+                            </td>
+                            
+                            <!-- Quantité reçue -->
+                            <td class="text-right">
+                                <span class="font-semibold">{{ lot.quantite_recue|floatformat:2 }}</span>
+                            </td>
+                            
+                            <!-- Quantité vendue -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="font-semibold">{{ lot.quantite_vendue|floatformat:2 }}</span>
+                                    <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
+                                                        {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
+                                                        {% else %}text-red-600{% endif %}">
+                                        {{ lot.ecoulement_pct }}%
+                                    </span>
+                                </div>
+                            </td>
+                            
+                            <!-- Quantité restante -->
+                            <td class="text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="{{ lot.quantite_classe }}">
+                                        {{ lot.quantite_restante|floatformat:2 }}
+                                    </span>
+                                </div>
+                            </td>
+                            
+                            <!-- Dette réelle -->
+                            <td class="text-right font-bold bg-yellow-50">
+                                {{ lot.lot.valeur_stock_initiale|fcfa }}
+                            </td>
+
+                            <td class="text-right font-bold bg-yellow-50">
+                                {{ lot.dette_consommee|fcfa }}
+                            </td>
+
+                            <td class="text-right font-bold bg-green-50 text-green-700">
+                                {{ lot.total_paye_lot|fcfa }}
+                            </td>
+
+                            <td class="text-right font-bold bg-red-50 text-red-700">
+                                {{ lot.reste_contractuel|fcfa }}
+                            </td>
+                            
+                            <!-- Actions -->
+                            <td class="text-center">
+                                <div class="flex justify-center gap-2">
+                                    {% if lot.reste_contractuel > 0 %}
+                                        <a href="{% url 'creer_paiement_fournisseur' fournisseur.id %}?lot={{ lot.lot.id }}&montant={{ lot.reste_contractuel }}"
+                                           class="btn btn-xs btn-success"
+                                           title="Payer ce lot">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                            </svg>
+                                            Payer
+                                        </a>
+                                    {% else %}
+                                        <span class="text-green-600 text-sm flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Payé
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="11" class="text-center py-8 text-gray-500">
+                                <div class="flex flex-col items-center justify-center py-8">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                    <p class="text-lg font-medium">Aucun lot trouvé pour cette période</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Analyse commerciale -->
     <div class="mb-8">
         <div class="flex justify-between items-center mb-4">
