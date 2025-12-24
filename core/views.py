@@ -1919,7 +1919,7 @@ def creer_recouvrement(request, agent_id):
                 
                 # Redirection appropriée
                 if agent.est_agent_terrain:
-                    return redirect('detail_agent', agent_id=agent.id)
+                    return redirect('liste_agents_recouvrement')
                 else:
                     return redirect('liste_agents_recouvrement')
                     

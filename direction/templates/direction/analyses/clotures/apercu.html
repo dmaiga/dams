@@ -1,0 +1,49 @@
+{% extends "base_admin.html" %}
+{% block content %}
+{% load format_fcfa %}
+
+<h1>Aperçu clôture – {{ cloture.superviseur.full_name }}</h1>
+
+<p>
+Période :
+<strong>{{ cloture.date_debut_periode }}</strong>
+→
+<strong>{{ cloture.date_fin_periode|default:"(en cours)" }}</strong>
+</p>
+
+<hr>
+
+<h3>Solde d’ouverture</h3>
+<p>{{ cloture.solde_ouverture|fcfa }} FCFA</p>
+
+<h3>Flux sur la période</h3>
+<ul>
+  <li>Ventes : {{ data.ventes|fcfa }} FCFA</li>
+  <li>Recouvrements : {{ data.recouvrements|fcfa }} FCFA</li>
+  <li>Dépenses : {{ data.depenses|fcfa }} FCFA</li>
+  <li>Versements bancaires : {{ data.versements|fcfa }} FCFA</li>
+</ul>
+
+<hr>
+
+<h3>Solde estimé</h3>
+<p><strong>{{ solde_estime|fcfa }} FCFA</strong></p>
+
+{% if ecart is not None %}
+  <p>⚠️ Écart : {{ ecart }} FCFA</p>
+{% endif %}
+
+
+<hr>
+
+<a href="{% url 'cloturer_periode' cloture.id %}"
+   class="btn btn-danger"
+   onclick="return confirm('Confirmer la clôture de cette période ?');">
+   Clôturer la période
+</a>
+
+<a href="{% url 'liste_clotures' %}" class="btn btn-secondary">
+   Retour
+</a>
+
+{% endblock %}

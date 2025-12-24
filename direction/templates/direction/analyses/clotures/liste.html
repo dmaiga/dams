@@ -1,0 +1,87 @@
+{% extends "base_admin.html" %}
+{% load humanize %}
+{% block content %}
+
+<div class="container mt-4">
+
+  <h1 class="mb-4">Clôtures financières</h1>
+
+  {% if clotures %}
+  <table class="table table-bordered table-striped align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Superviseur</th>
+        <th>Période réelle</th>
+        <th>Mois réf.</th>
+        <th>Solde ouverture</th>
+        <th>Solde clôture</th>
+        <th>Statut</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for cloture in clotures %}
+      <tr>
+        <td>
+          <strong>{{ cloture.superviseur.full_name }}</strong>
+        </td>
+
+        <td>
+          {{ cloture.date_debut_periode|date:"d/m/Y" }}
+          →
+          {{ cloture.date_fin_periode|date:"d/m/Y" }}
+        </td>
+
+        <td>
+          {{ cloture.mois|default:"—" }}/{{ cloture.annee }}
+        </td>
+
+        <td>
+          {{ cloture.solde_ouverture|intcomma }} FCFA
+        </td>
+
+        <td>
+          {% if cloture.est_cloture %}
+            <strong>{{ cloture.solde_cloture|intcomma }} FCFA</strong>
+          {% else %}
+            —
+          {% endif %}
+        </td>
+
+        <td>
+          {% if cloture.est_cloture %}
+            <span class="badge bg-success">Clôturée</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Ouverte</span>
+          {% endif %}
+        </td>
+
+        <td>
+          <a href="{% url 'apercu_cloture' cloture.id %}"
+             class="btn btn-sm btn-primary">
+            Aperçu
+          </a>
+
+          {% if cloture.est_cloture %}
+            <span class="text-muted ms-2">—</span>
+          {% else %}
+            <a href="{% url 'cloturer_periode' cloture.id %}"
+               class="btn btn-sm btn-danger ms-1"
+               onclick="return confirm('Clôturer cette période ?');">
+               Clôturer
+            </a>
+          {% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="text-muted">Aucune clôture enregistrée pour le moment.</p>
+  {% endif %}
+
+</div>
+
+{% endblock %}

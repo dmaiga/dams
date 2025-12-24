@@ -31,50 +31,51 @@ def creer_distributions_multiple():
             sira = Agent.objects.get(user__username='sira.sidibe')
             noumoutene =  Agent.objects.get(user__username='noumoutene.toure')
             safiatou =  Agent.objects.get(user__username='safiatou.coulibaly')
+            awa = Agent.objects.get(user__username='awa.coulibaly')
 
             # 2. CONFIGURATION DES DISTRIBUTIONS MULTIPLES AVEC SPÉCIFICATIONS
             distributions_config = [
 
            
                  {
-                    'date': '11/12/2025', 
-                    'produit': 'oignon',
-                    'lot_reference': '20251209-0001',
+                    'date': '22/12/2025', 
+                    'produit': 'ail',
+                    'lot_reference': '20251215-0001',
                     'specification': '',
-                    'prix_gros': 10500,
-                    'prix_detail': 11250,
+                    'prix_gros': 8750,
+                    'prix_detail': 10000,
                     
                     'distributions': [  
     
-                       (koniba, 1, "Fatou"),  
-                       (ramata, 1, "Fatou"),  
-                       (abdoulaye, 1, "Fatou"),  
-                       (mankoulako, 4, "Fatou"),  
+                       
+                       (mankoulako, 3, "Fatou"),
+                       
                        
                        
                        ]
                 },
-                   {
-                    'date': '12/12/2025', 
-                    'produit': 'oignon',
-                    'lot_reference': '20251209-0001',
+                 {
+                    'date': '22/12/2025', 
+                    'produit': 'ail',
+                    'lot_reference': '20251215-0001',
                     'specification': '',
-                    'prix_gros': 10500,
-                    'prix_detail': 11250,
+                    'prix_gros': 9000,
+                    'prix_detail': 10000,
                     
                     'distributions': [  
     
-                       (moussony, 3, "Fatou"),  
-                       (noumoutene, 5, "Fatou"),  
-                       (koniba, 3, "Fatou"),  
-                       (ramata, 1, "Fatou"),  
-                          (djenebaS, 2, "Fatou"),
+                       
+                       (massira, 7, "Fatou"),
+                       (abdoulaye, 3, "Fatou"),
+                       
+                       (djenebaS, 3, "Fatou"),
+                       (noumoutene, 10, "Fatou"),
+                       
+                       
+                       
                        
                        ]
-                }
-                 
-           
-                
+                },
 
                 ]
             

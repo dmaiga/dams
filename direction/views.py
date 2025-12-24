@@ -1108,3 +1108,104 @@ def detail_paiement_fournisseur(request, paiement_id):
             'reste_a_payer': reste_a_payer,
         }
     )
+
+
+###################
+# Cloture         #
+###################
+
+from datetime import timedelta
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+
+from core.models import ClotureMensuelle
+from direction.services.cloture_service import calculer_solde_periode
+
+@login_required
+def cloturer_periode(request, cloture_id):
+    cloture = get_object_or_404(ClotureMensuelle, id=cloture_id)
+
+    if cloture.est_cloture:
+        return redirect('dashboard_direction')
+
+    # La date de fin réelle = veille du jour de clic
+    cloture.date_fin_periode = timezone.now().date() - timedelta(days=1)
+
+    data = calculer_solde_periode(
+        superviseur=cloture.superviseur,
+        date_debut=cloture.date_debut_periode,
+        date_fin=cloture.date_fin_periode,
+        solde_ouverture=cloture.solde_ouverture
+    )
+
+    cloture.solde_cloture = data['solde_cloture']
+    cloture.est_cloture = True
+    cloture.date_cloture = timezone.now()
+    cloture.cloture_par = request.user
+    cloture.save()
+
+    return redirect('dashboard_direction')
+
+from core.models import ClotureMensuelle
+from decimal import Decimal
+
+def ouvrir_nouvelle_periode(superviseur, date_debut, annee, mois):
+    derniere = ClotureMensuelle.objects.filter(
+        superviseur=superviseur,
+        est_cloture=True
+    ).order_by('-date_fin_periode').first()
+
+    solde_ouverture = (
+        derniere.solde_cloture if derniere else Decimal('0.00')
+    )
+
+    return ClotureMensuelle.objects.create(
+        superviseur=superviseur,
+        annee=annee,
+        mois=mois,
+        date_debut_periode=date_debut,
+        date_fin_periode=date_debut,  # sera ajusté à la clôture
+        solde_ouverture=solde_ouverture,
+        solde_cloture=solde_ouverture
+    )
+
+@login_required
+def liste_clotures(request):
+    clotures = ClotureMensuelle.objects.select_related(
+        'superviseur'
+    ).order_by('-date_debut_periode')
+
+    return render(
+        request,
+        'direction/analyses/clotures/liste.html',
+        {'clotures': clotures}
+    )
+
+@login_required
+def apercu_cloture(request, cloture_id):
+    cloture = get_object_or_404(ClotureMensuelle, id=cloture_id)
+
+    data = calculer_solde_periode(
+        superviseur=cloture.superviseur,
+        date_debut=cloture.date_debut_periode,
+        date_fin=cloture.date_fin_periode,
+        solde_ouverture=cloture.solde_ouverture
+    )
+
+    solde_estime = data['solde_cloture']
+    if cloture.est_cloture:
+        ecart = solde_estime - cloture.solde_cloture
+    else:
+        ecart = None
+    
+    return render(
+        request,
+        'direction/analyses/clotures/apercu.html',
+        {
+            'cloture': cloture,
+            'data': data,
+            'solde_estime': solde_estime,
+            'ecart': ecart
+        }
+    )

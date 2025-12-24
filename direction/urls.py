@@ -12,7 +12,8 @@ from direction.views import (
                                 modifier_paiement_fournisseur,
                                 supprimer_paiement_fournisseur,
                                 restaurer_paiement_fournisseur,
-                                detail_paiement_fournisseur,                                                            
+                                detail_paiement_fournisseur, 
+                                 liste_clotures,apercu_cloture,cloturer_periode,                                                           
                               )
 
 
@@ -66,11 +67,35 @@ urlpatterns = [
     path('direction/versements/<int:versement_id>/', views_direction.detail_versement_direction, name='detail_versement_direction'),
     
     # Rapports
-path('analyse-financiere/', views_direction.analyse_financiere_direction, name='analyse_financiere_direction'),
+    path('analyse-financiere/', views_direction.analyse_financiere_direction, name='analyse_financiere_direction'),
     # EXPORTS
     path("direction/ventes/export/excel/", ExportVentesExcelView.as_view(), name="export_ventes_excel"),
     path("direction/ventes/export/pdf/", ExportVentesPDFView.as_view(), name="export_ventes_pdf"),
 
+          # =========================
+         # CLÔTURES MENSUELLES
+         # =========================
+
+         # Liste de toutes les clôtures (multi-superviseurs)
+         path(
+             'clotures/',
+             liste_clotures,
+             name='liste_clotures'
+         ),
+
+         # Aperçu d’une clôture avant validation
+         path(
+             'clotures/<int:cloture_id>/apercu/',
+             apercu_cloture,
+             name='apercu_cloture'
+         ),
+
+         # Validation / clôture effective
+         path(
+             'clotures/<int:cloture_id>/cloturer/',
+             cloturer_periode,
+             name='cloturer_periode'
+         ),
 
 ]
 

@@ -2,4 +2,5 @@ django-mathfilters
 django-tinymce
 openpyxl
 reportlab
- python-dateutil
+python-dateutil
+psycopg2-binary

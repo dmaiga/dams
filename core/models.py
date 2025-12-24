@@ -1712,3 +1712,99 @@ class PaiementFournisseur(models.Model):
         if self.est_supprime:
             return "supprime"
         return "actif"
+    
+
+class ClotureMensuelle(models.Model):
+    """
+    Clôture financière d'un superviseur sur une période donnée.
+    La période n'est PAS forcément calendaire.
+    """
+
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='clotures_mensuelles'
+    )
+
+    # Référence logique (pour classement / affichage)
+    annee = models.IntegerField(verbose_name="Année de référence")
+    mois = models.IntegerField(verbose_name="Mois de référence")
+
+    # 🔑 PÉRIODE RÉELLE COUVERTE (FLEXIBLE)
+    date_debut_periode = models.DateField(
+        verbose_name="Début réel de la période"
+    )
+    date_fin_periode = models.DateField(
+        verbose_name="Fin réelle de la période"
+    )
+
+    # 💰 SOLDES (CALCULÉS AUTOMATIQUEMENT)
+    solde_ouverture = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name="Solde d'ouverture"
+    )
+    solde_cloture = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        verbose_name="Solde de clôture"
+    )
+
+    # 🔒 VALIDATION HUMAINE
+    est_cloture = models.BooleanField(
+        default=False,
+        verbose_name="Clôture validée"
+    )
+    date_cloture = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Date de validation de la clôture"
+    )
+    cloture_par = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='clotures_validees',
+        verbose_name="Clôturée par"
+    )
+    ecart_post_cloture = models.DecimalField(
+    max_digits=15,
+    decimal_places=2,
+    default=0,
+    verbose_name="Écart après clôture"
+    )
+
+
+    # 🧾 MÉTADONNÉES
+    date_creation = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Date de création"
+    )
+    date_modification = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Dernière modification"
+    )
+
+    class Meta:
+        unique_together = ('superviseur', 'annee', 'mois')
+        ordering = ['-annee', '-mois']
+        verbose_name = "Clôture mensuelle"
+        verbose_name_plural = "Clôtures mensuelles"
+
+    def __str__(self):
+        return (
+            f"{self.superviseur.full_name} | "
+            f"{self.mois:02d}/{self.annee} | "
+            f"{self.date_debut_periode} → {self.date_fin_periode}"
+        )
+
+    @property
+    def est_ouverte(self):
+        return not self.est_cloture
+
+    @property
+    def duree_periode(self):
+        """Nombre de jours couverts par la clôture"""
+        return (self.date_fin_periode - self.date_debut_periode).days + 1
