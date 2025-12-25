@@ -29,7 +29,7 @@ import json
 
 # Project models
 from .models import (
-    Agent, Client, Vente, Produit,
+    Agent, Client, Vente, Produit,Depense,
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
@@ -55,6 +55,8 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from core.forms import TelephoneOrUsernameLoginForm
 from core.models import Agent
+from django.core.paginator import Paginator
+
 
 def custom_login(request):
     if request.method == "POST":
@@ -539,47 +541,59 @@ def reception_lot(request):
 
 @login_required
 def liste_lots(request):
-    """Liste tous les lots avec leurs informations"""
-    lots = LotEntrepot.objects.all().order_by('-date_reception')
-    
-    # Filtres
+    lots = (
+        LotEntrepot.objects
+        .select_related('produit', 'fournisseur')
+        .order_by('-date_reception')
+    )
+
     produit_filter = request.GET.get('produit')
     fournisseur_filter = request.GET.get('fournisseur')
     statut_filter = request.GET.get('statut')
-    
+
     if produit_filter:
         lots = lots.filter(produit__nom__icontains=produit_filter)
-    
+
     if fournisseur_filter:
         lots = lots.filter(fournisseur__nom__icontains=fournisseur_filter)
-    
-    if statut_filter:
-        if statut_filter == 'disponible':
-            lots = lots.filter(quantite_restante__gt=0)
-        elif statut_filter == 'epuise':
-            lots = lots.filter(quantite_restante=0)
-    
-    # Calcul des statistiques avec les nouvelles métriques
+
+    if statut_filter == 'disponible':
+        lots = lots.filter(quantite_restante__gt=0)
+    elif statut_filter == 'epuise':
+        lots = lots.filter(quantite_restante=0)
+
     stats = lots.aggregate(
         total_lots=models.Count('id'),
-        total_stock=models.Sum('quantite_restante'),
-        lots_epuises=models.Count('id', filter=models.Q(quantite_restante=0)),
-        total_valeur_initiale=models.Sum('valeur_stock_initiale'),
-        total_valeur_actuelle=models.Sum(
-            models.F('quantite_restante') * models.F('prix_achat_unitaire')
-        )
+        total_stock=Coalesce(
+            Sum('quantite_restante'),
+            Decimal('0.00'),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+        lots_epuises=models.Count(
+            'id',
+            filter=models.Q(quantite_restante=0)
+        ),
+        total_valeur_initiale=Coalesce(
+            Sum('valeur_stock_initiale'),
+            Decimal('0.00'),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+        total_valeur_actuelle=Coalesce(
+            Sum(
+                ExpressionWrapper(
+                    F('quantite_restante') * F('prix_achat_unitaire'),
+                    output_field=DecimalField(max_digits=14, decimal_places=2)
+                )
+            ),
+            Decimal('0.00'),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
     )
-    
-    context = {
+
+    return render(request, 'core/entrepot/liste_lots.html', {
         'lots': lots,
-        'total_lots': stats['total_lots'] or 0,
-        'total_stock': stats['total_stock'] or 0,
-        'total_valeur_initiale': stats['total_valeur_initiale'] or 0,
-        'total_valeur_actuelle': stats['total_valeur_actuelle'] or 0,
-        'lots_epuises': stats['lots_epuises'] or 0,
-    }
-    
-    return render(request, 'core/entrepot/liste_lots.html', context)
+        **stats,
+    })
 
 # core/views.py
 
@@ -920,58 +934,131 @@ def restaurer_distribution(request, distribution_id):
     
     return render(request, 'core/distribution/restaurer_distribution.html', context)
 
+
+
 @login_required
 def liste_distributions(request):
-    """Liste toutes les distributions - Vue épurée"""
-    
+    # -------------------------------
+    # Cache user + agent (ANTI N+1)
+    # -------------------------------
+    user = request.user
+    agent = getattr(user, "agent", None)
+
+    # -------------------------------
     # Filtres
+    # -------------------------------
     show_deleted = request.GET.get('show_deleted') == 'true'
     type_filter = request.GET.get('type')
     agent_filter = request.GET.get('agent')
-    lot_filter = request.GET.get('lot')  # ⬅ Nouveau filtre
+    lot_filter = request.GET.get('lot')
     date_debut = request.GET.get('date_debut')
     date_fin = request.GET.get('date_fin')
-    
-    # Base queryset
-    distributions = DistributionAgent.objects.select_related(
-        'superviseur', 'agent_terrain'
-    ).prefetch_related(
-        'detaildistribution_set__lot__produit'
-    ).order_by('-date_distribution')
-    
-    # Appliquer les filtres
+
+    # -------------------------------
+    # QUERYSET OPTIMISÉ (CORRECT)
+    # -------------------------------
+    distributions = (
+        DistributionAgent.objects
+        .select_related(
+            'superviseur__user',
+            'agent_terrain__user'
+        )
+        .prefetch_related(
+            'detaildistribution_set__lot__produit'
+        )
+        .annotate(
+            # Quantité totale distribuée
+            quantite_totale_sql=Coalesce(
+                Sum('detaildistribution__quantite'),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+
+            # Valeur totale au prix GROS
+            valeur_gros_sql=Coalesce(
+                Sum(
+                    F('detaildistribution__quantite') *
+                    F('detaildistribution__prix_gros')
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+
+            # Valeur totale au prix DÉTAIL
+            valeur_detail_sql=Coalesce(
+                Sum(
+                    F('detaildistribution__quantite') *
+                    F('detaildistribution__prix_detail')
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+
+            # Coût d’achat total
+            valeur_cout_sql=Coalesce(
+                Sum(
+                    F('detaildistribution__quantite') *
+                    F('detaildistribution__lot__prix_achat_unitaire')
+                ),
+                0,
+                output_field=DecimalField(max_digits=14, decimal_places=2)
+            ),
+        )
+        .order_by('-date_distribution')
+    )
+
+    # -------------------------------
+    # Filtres dynamiques
+    # -------------------------------
     if not show_deleted:
         distributions = distributions.filter(est_supprime=False)
+
     if type_filter:
         distributions = distributions.filter(type_distribution=type_filter)
+
     if agent_filter:
         distributions = distributions.filter(agent_terrain_id=agent_filter)
+
     if date_debut:
         distributions = distributions.filter(date_distribution__gte=date_debut)
+
     if date_fin:
         distributions = distributions.filter(date_distribution__lte=date_fin)
+
     if lot_filter:
         distributions = distributions.filter(
             detaildistribution__lot_id=lot_filter
         ).distinct()
 
+    # -------------------------------
+    # TOTAUX GLOBAUX (1 requête SQL)
+    # -------------------------------
+    totals = distributions.aggregate(
+        total_quantite=Sum('quantite_totale_sql'),
+        total_valeur_gros=Sum('valeur_gros_sql'),
+        total_valeur_detail=Sum('valeur_detail_sql'),
+        total_valeur_cout=Sum('valeur_cout_sql'),
+    )
 
-    # Calcul des totaux
-    total_distributions = distributions.count()
-    total_quantite = sum(dist.quantite_totale for dist in distributions)
-    total_valeur_gros = sum(dist.valeur_gros_totale for dist in distributions)
-    total_valeur_detail = sum(dist.valeur_detail_totale for dist in distributions)
-    
     context = {
         'distributions': distributions,
-        'total_distributions': total_distributions,
-        'total_quantite': total_quantite,
-        'total_valeur_gros': total_valeur_gros,
-        'total_valeur_detail': total_valeur_detail,
+
+        # KPI
+        'total_distributions': distributions.count(),
+        'total_quantite': totals['total_quantite'] or 0,
+        'total_valeur_gros': totals['total_valeur_gros'] or 0,
+        'total_valeur_detail': totals['total_valeur_detail'] or 0,
+        'total_valeur_cout': totals['total_valeur_cout'] or 0,
 
         # Filtres
-        'agents_terrain': Agent.objects.filter(type_agent='terrain'),
-        'lots': LotEntrepot.objects.select_related("produit", "fournisseur").all(),
+        'agents_terrain': Agent.objects.filter(
+            type_agent='terrain'
+        ).select_related("user"),
+
+        'lots': LotEntrepot.objects.select_related(
+            "produit", "fournisseur"
+        ),
+
         'filter_lot': lot_filter,
         'filter_type': type_filter,
         'filter_agent': agent_filter,
@@ -979,8 +1066,12 @@ def liste_distributions(request):
         'date_fin': date_fin,
         'show_deleted': show_deleted,
     }
-    
-    return render(request, 'core/distribution/liste_distributions.html', context)
+
+    return render(
+        request,
+        'core/distribution/liste_distributions.html',
+        context
+    )
 
 
 @login_required
@@ -1977,91 +2068,160 @@ def detail_historique(request, agent_id):
     
     return render(request, 'core/recouvrement/detail_historique.html', context)
 
+
+
 @login_required
 def liste_agents_recouvrement(request):
-    agent_connecte = request.user.agent
-    
-    # Déterminer quels agents afficher selon le type
+    # ======================================================
+    # 1️⃣ AGENT CONNECTÉ (1 requête)
+    # ======================================================
+    agent_connecte = (
+        Agent.objects
+        .select_related("user")
+        .get(user=request.user)
+    )
+
+    # ======================================================
+    # 2️⃣ QUERYSET AGENTS À AFFICHER (1 requête)
+    # ======================================================
+    agents_qs = Agent.objects.select_related("user")
+
     if agent_connecte.est_direction:
-        agents = Agent.objects.filter(type_agent__in=['terrain', 'entrepot'])
+        agents_qs = agents_qs.filter(type_agent__in=["terrain", "entrepot"])
+
     elif agent_connecte.est_superviseur:
-        agents_terrain = Agent.objects.filter(type_agent='terrain')
-        agents = list(agents_terrain) + [agent_connecte]
+        agents_qs = agents_qs.filter(
+            models.Q(type_agent="terrain") |
+            models.Q(id=agent_connecte.id)
+        )
+
     else:
-        agents = []
+        agents_qs = Agent.objects.none()
+
+    agents_ids = list(agents_qs.values_list("id", flat=True))
+
+    # ======================================================
+    # 3️⃣ AGRÉGATIONS SQL (ZÉRO N+1)
+    # ======================================================
+
+    # 🔹 VENTES PAR AGENT
+    ventes_par_agent = dict(
+        Vente.objects
+        .filter(agent_id__in=agents_ids, est_supprime=False)
+        .values("agent_id")
+        .annotate(
+            total=models.Sum(
+                models.F("quantite") * models.F("prix_vente_unitaire")
+            )
+        )
+        .values_list("agent_id", "total")
+    )
+
+    # 🔹 RECOUVREMENTS PAR AGENT
+    recouvrements_par_agent = dict(
+        Recouvrement.objects
+        .filter(agent_id__in=agents_ids)
+        .values("agent_id")
+        .annotate(total=models.Sum("montant_recouvre"))
+        .values_list("agent_id", "total")
+    )
+
+    # 🔹 DÉPENSES PAR SUPERVISEUR
+    depenses_par_superviseur = dict(
+        Depense.objects
+        .filter(versement__superviseur_id__in=agents_ids)
+        .values('versement__superviseur_id')
+        .annotate(total=models.Sum('montant'))
+        .values_list('versement__superviseur_id', 'total')
+    )
     
+
+    # ======================================================
+    # 4️⃣ ASSEMBLAGE PYTHON (AUCUNE REQUÊTE)
+    # ======================================================
     agents_data = []
-    
-    # TOTAUX SIMPLIFIÉS
-    total_ventes_tous_agents = 0
-    total_recouvre_tous_agents = 0
-    
-    for agent in agents:
+
+    total_ventes_tous_agents = Decimal("0.00")
+    total_recouvre_tous_agents = Decimal("0.00")
+
+    for agent in agents_qs:
+        total_ventes = ventes_par_agent.get(agent.id, Decimal("0.00")) or Decimal("0.00")
+        total_recouvre = recouvrements_par_agent.get(agent.id, Decimal("0.00")) or Decimal("0.00")
+        depenses = depenses_par_superviseur.get(agent.id, Decimal("0.00")) or Decimal("0.00")
+
         if agent.est_superviseur:
-            # SUPERVISEUR : ses ventes sont déjà recouvrées (auto-recouvrement)
-            total_ventes = agent.total_ventes  # Ventes directes du superviseur
-            total_recouvre = agent.total_ventes  # Auto-recouvré immédiatement
-            difference = 0  # Toujours à jour car auto-recouvré
-            depenses = agent.total_depenses_superviseur
-            
-            # Statut superviseur
-            couleur, statut = 'success', 'À jour (auto-recouvré)'
-                
+            # Auto-recouvrement
+            difference = Decimal("0.00")
+            couleur = "success"
+            statut = "À jour (auto-recouvré)"
+
         else:
-            # AGENT TERRAIN : logique normale
-            total_ventes = agent.total_ventes
-            total_recouvre = agent.total_recouvre
             difference = total_ventes - total_recouvre
-            depenses = 0
-            
-            # Statut agent terrain
             if difference == 0:
-                couleur, statut = 'success', 'Complètement recouvré'
+                couleur = "success"
+                statut = "Complètement recouvré"
             elif difference > 0:
-                couleur, statut = 'warning', f'{difference:,.0f} FCFA à recouvrir'
+                couleur = "warning"
+                statut = f"{difference:,.0f} FCFA à recouvrir"
             else:
-                couleur, statut = 'danger', 'Erreur de calcul'
-        
-        # Accumuler les totaux
+                couleur = "danger"
+                statut = "Erreur de calcul"
+
         total_ventes_tous_agents += total_ventes
         total_recouvre_tous_agents += total_recouvre
-        
+
         agents_data.append({
-            'agent': agent,
-            'total_ventes': total_ventes,
-            'total_recouvre': total_recouvre,
-            'depenses': depenses,
-            'difference': difference,
-            'couleur': couleur,
-            'statut': statut,
-            'est_auto_recouvrement': agent.id == agent_connecte.id,
-            'est_superviseur': agent.est_superviseur,
+            "agent": agent,
+            "total_ventes": total_ventes,
+            "total_recouvre": total_recouvre,
+            "depenses": depenses,
+            "difference": difference,
+            "couleur": couleur,
+            "statut": statut,
+            "est_superviseur": agent.est_superviseur,
+            "est_auto_recouvrement": agent.id == agent_connecte.id,
         })
-    
-    # TOTAUX GÉNÉRAUX CLAIRS
+
+    # ======================================================
+    # 5️⃣ TOTAUX GLOBAUX
+    # ======================================================
     reste_a_recouvrir = total_ventes_tous_agents - total_recouvre_tous_agents
-    
-    # État du superviseur connecté (si c'est un superviseur)
+
+    # ======================================================
+    # 6️⃣ ÉTAT DU SUPERVISEUR CONNECTÉ
+    # ======================================================
     etat_superviseur = None
     if agent_connecte.est_superviseur:
         etat_superviseur = {
-            'total_ventes_personnelles': agent_connecte.total_ventes,
-            'total_depenses': agent_connecte.total_depenses_superviseur,
-            'total_versements_bancaires': agent_connecte.total_versements_bancaires,
-            'solde_actuel': agent_connecte.solde_superviseur,
-            'dernier_versement': agent_connecte.dernier_versement_superviseur,
+            "total_ventes_personnelles": ventes_par_agent.get(
+                agent_connecte.id, Decimal("0.00")
+            ),
+            "total_depenses": depenses_par_superviseur.get(
+                agent_connecte.id, Decimal("0.00")
+            ),
+            "total_versements_bancaires": agent_connecte.total_versements_bancaires,
+            "solde_actuel": agent_connecte.solde_superviseur,
+            "dernier_versement": agent_connecte.dernier_versement_superviseur,
         }
-    
+
+    # ======================================================
+    # 7️⃣ CONTEXTE FINAL
+    # ======================================================
     context = {
-        'agents_data': agents_data,
-        'total_ventes_tous_agents': total_ventes_tous_agents,
-        'total_recouvre_tous_agents': total_recouvre_tous_agents,
-        'reste_a_recouvrir': reste_a_recouvrir,
-        'agent_connecte': agent_connecte,
-        'etat_superviseur': etat_superviseur,
+        "agents_data": agents_data,
+        "total_ventes_tous_agents": total_ventes_tous_agents,
+        "total_recouvre_tous_agents": total_recouvre_tous_agents,
+        "reste_a_recouvrir": reste_a_recouvrir,
+        "agent_connecte": agent_connecte,
+        "etat_superviseur": etat_superviseur,
     }
-    
-    return render(request, 'core/recouvrement/liste_agents.html', context)
+
+    return render(
+        request,
+        "core/recouvrement/liste_agents.html",
+        context
+    )
+
 
 #=====
 #CLIENT

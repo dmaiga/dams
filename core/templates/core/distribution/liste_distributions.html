@@ -217,16 +217,16 @@
                             
                             <!-- Quantité -->
                             <td class="text-center">
-                                <span class="fw-bold text-dark fs-6">{{ dist.quantite_totale|floatformat:2|intcomma  }}</span>
+                                <span class="fw-bold text-dark fs-6">{{ dist.quantite_totale_sql|floatformat:2|intcomma  }}</span>
                             </td>
                             
                             <!-- Valeurs -->
                             <td class="text-end">
-                                <span class="fw-bold ">{{ dist.valeur_gros_totale|fcfa }}</span>
+                                <span class="fw-bold ">{{ dist.valeur_gros_sql|fcfa }}</span>
                                 <div class="text-muted small">FCFA</div>
                             </td>
                             <td class="text-end">
-                                <span class="fw-bold ">{{ dist.valeur_detail_totale|fcfa }}</span>
+                                <span class="fw-bold ">{{ dist.valeur_detail_sql|fcfa }}</span>
                                 <div class="text-muted small">FCFA</div>
                             </td>
                             

@@ -254,6 +254,9 @@ class LotEntrepot(models.Model):
     def est_solde(self):
         return self.total_facture_lot >= self.montant_total
 
+
+
+
 class FactureLotEntrepot(models.Model):
     lot = models.ForeignKey(
         LotEntrepot,
@@ -610,12 +613,20 @@ class Agent(models.Model):
         """Vérifie si l'agent est un agent terrain"""
         return self.type_agent == 'terrain'
 
+
     @property
     def total_ventes(self):
-        """Total de toutes les ventes de l'agent"""
-        ventes = Vente.objects.filter(agent=self)
-        return sum(vente.total_vente for vente in ventes)
-    
+        return (
+            Vente.objects
+            .filter(agent=self)
+            .aggregate(
+                total=Coalesce(
+                    Sum(F("quantite") * F("prix_vente_unitaire")),
+                    Decimal("0.00")
+                )
+            )["total"]
+        )
+
     # Ventes réalisées par les stagiaires sous sa tutelle
     @property
     def total_ventes_stagiaires(self):
@@ -796,8 +807,6 @@ class Agent(models.Model):
             return self.bonus.get_ventes_avec_bonus().count()
         return 0
     
-
-
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent '),
@@ -1016,6 +1025,7 @@ class DetailDistribution(models.Model):
     class Meta:
         verbose_name = "Détail de distribution"
         verbose_name_plural = "Détails de distribution"
+
 
 
 class MouvementStock(models.Model):
