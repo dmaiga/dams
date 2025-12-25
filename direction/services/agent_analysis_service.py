@@ -1,8 +1,4 @@
 #/core/services/
-from django.db.models import Sum, Count, Q
-from django.utils import timezone
-from datetime import timedelta, datetime
-from decimal import Decimal
 from core.models import (Agent, Vente, Recouvrement, 
                          VersementBancaire, Depense, DetailDistribution,
                          DistributionAgent)
@@ -10,10 +6,36 @@ from core.models import (Agent, Vente, Recouvrement,
 from django.db.models import Max
 from django.utils import timezone
 from datetime import timedelta, datetime
+from django.db.models import Sum, Count, Max, F, DecimalField,Q
+from django.db.models import ExpressionWrapper, DecimalField
 
+from decimal import Decimal
+
+from core.models import Agent, Vente
+
+
+
+from django.core.cache import cache
 
 class AgentAnalysisService:
-    
+
+    @staticmethod
+    def get_agents_dashboard_snapshot():
+        cache_key = "agents_dashboard:v1"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        data = {
+            "kpis": AgentAnalysisService.get_agent_kpis(),  # counts
+            "agents_stock": AgentAnalysisService.get_agents_with_stock(),
+            "top_quantite": AgentAnalysisService.get_top_vendeurs_quantite(),
+            "top_marge": AgentAnalysisService.get_top_vendeurs_marge(),
+            "agents_actifs_72h": AgentAnalysisService.get_agents_vendu_derniere_72h(),
+        }
+
+        cache.set(cache_key, data, 60 * 10)  # 10 minutes
+        return data
 
 
     @staticmethod
@@ -199,66 +221,134 @@ class AgentAnalysisService:
         }
 
 
-
     @staticmethod
     def get_top_vendeurs_quantite(limit=5):
-        """Top vendeurs par quantité vendue (VENTES PERSONNELLES uniquement)"""
-        agents = Agent.objects.exclude(type_agent='direction')
-        
-        vendeurs_data = []
-        for agent in agents:
-            # VENTES PERSONNELLES uniquement (sans stagiaire)
-            ventes = Vente.objects.filter(agent=agent, stagiaire__isnull=True)
-            total_quantite = sum(vente.quantite for vente in ventes)
-            
-            if total_quantite > 0:
-                ventes_gros = ventes.filter(type_vente='gros')
-                ventes_detail = ventes.filter(type_vente='detail')
-                
-                quantite_gros = sum(vente.quantite for vente in ventes_gros)
-                quantite_detail = sum(vente.quantite for vente in ventes_detail)
-                pourcentage_gros = (quantite_gros / total_quantite * 100) if total_quantite > 0 else 0
-                
-                vendeurs_data.append({
-                    'agent': agent,
-                    'total_quantite': total_quantite,
-                    'quantite_gros': quantite_gros,
-                    'quantite_detail': quantite_detail,
-                    'pourcentage_gros': round(pourcentage_gros, 1)
-                })
-        
-        return sorted(vendeurs_data, key=lambda x: x['total_quantite'], reverse=True)[:limit]
-    
+        """
+        Top agents terrain par quantité vendue
+        VERSION OPTIMISÉE – 0 N+1
+        """
+
+        ventes = (
+            Vente.objects
+            .filter(
+                agent__type_agent='terrain',
+                stagiaire__isnull=True,
+                est_supprime=False
+            )
+            .values("agent_id")
+            .annotate(
+                quantite_totale=Sum("quantite"),
+
+                quantite_gros=Sum(
+                    "quantite",
+                    filter=Q(type_vente='gros')
+                ),
+
+                quantite_detail=Sum(
+                    "quantite",
+                    filter=Q(type_vente='detail')
+                ),
+            )
+            .order_by("-quantite_totale")[:limit]
+        )
+
+        agents = {
+            a.id: a
+            for a in Agent.objects.filter(
+                id__in=[v["agent_id"] for v in ventes]
+            )
+        }
+
+        result = []
+        for v in ventes:
+            agent = agents.get(v["agent_id"])
+            if not agent:
+                continue
+
+            result.append({
+                "agent": agent,
+                "quantite_totale": v["quantite_totale"] or 0,
+                "quantite_gros": v["quantite_gros"] or 0,
+                "quantite_detail": v["quantite_detail"] or 0,
+            })
+
+        return result
+
     @staticmethod
     def get_top_vendeurs_marge(limit=5):
-        """Top vendeurs par MARGE (VENTES PERSONNELLES uniquement)"""
-        agents = Agent.objects.exclude(type_agent='direction')
-        
-        vendeurs_data = []
-        for agent in agents:
-            # VENTES PERSONNELLES uniquement (sans stagiaire)
-            ventes = Vente.objects.filter(agent=agent, stagiaire__isnull=True)
-            total_ca = sum(vente.quantite * vente.prix_vente_unitaire for vente in ventes)
-            
-            if total_ca > 0:
-                # Calcul de la marge pour VENTES PERSONNELLES uniquement
-                marge_totale = Decimal('0')
-                for vente in ventes:
-                    prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
-                    marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
-                    marge_totale += marge_vente
-                
-                taux_marge = (marge_totale / total_ca * 100) if total_ca > 0 else 0
-                
-                vendeurs_data.append({
-                    'agent': agent,
-                    'total_ca': total_ca,
-                    'marge_totale': marge_totale,
-                    'taux_marge': round(taux_marge, 1)
-                })
-        
-        # Tri par MARGE (pas par CA)
-        return sorted(vendeurs_data, key=lambda x: x['marge_totale'], reverse=True)[:limit]
+        """
+        Top agents terrain par marge générée
+        VERSION OPTIMISÉE – 0 N+1
+        """
+
+        ventes = (
+            Vente.objects
+            .filter(
+                agent__type_agent='terrain',
+                stagiaire__isnull=True,
+                est_supprime=False
+            )
+            .annotate(
+                # CA ligne
+                ca_ligne=ExpressionWrapper(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+                # Marge ligne = (prix vente - prix achat) * qte
+                marge_ligne=ExpressionWrapper(
+                    (F("prix_vente_unitaire")
+                     - F("detail_distribution__lot__prix_achat_unitaire"))
+                    * F("quantite"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+            )
+            .values("agent_id")
+            .annotate(
+                ca_total=Sum("ca_ligne"),
+                marge_totale=Sum("marge_ligne"),
+                quantite_totale=Sum("quantite"),
+
+                # Optionnel : détail gros / détail
+                marge_gros=Sum(
+                    "marge_ligne",
+                    filter=Q(type_vente='gros')
+                ),
+                marge_detail=Sum(
+                    "marge_ligne",
+                    filter=Q(type_vente='detail')
+                ),
+            )
+            .order_by("-marge_totale")[:limit]
+        )
+
+        agents = {
+            a.id: a
+            for a in Agent.objects.filter(
+                id__in=[v["agent_id"] for v in ventes]
+            )
+        }
+
+        result = []
+        for v in ventes:
+            agent = agents.get(v["agent_id"])
+            if not agent:
+                continue
+
+            ca = v["ca_total"] or Decimal("0")
+            marge = v["marge_totale"] or Decimal("0")
+            taux_marge = (marge / ca * 100) if ca > 0 else 0
+
+            result.append({
+                "agent": agent,
+                "ca_total": ca,
+                "marge_totale": marge,
+                "taux_marge": float(taux_marge),
+                "quantite_totale": v["quantite_totale"] or 0,
+                "marge_gros": v["marge_gros"] or Decimal("0"),
+                "marge_detail": v["marge_detail"] or Decimal("0"),
+            })
+
+        return result
 
 
     @staticmethod
@@ -337,156 +427,234 @@ class AgentAnalysisService:
         
         # Tri par MARGE (plus pertinent que CA)
         return sorted(competition_data, key=lambda x: x['total_quantite'], reverse=True)
-    
-
-
 
     @staticmethod
-    def get_agents_terrain_performance(mois=None):
-        """Performance des agents terrain avec filtre mensuel"""
-        agents = Agent.objects.filter(type_agent='terrain')
-        
-        # Calcul de la période si filtre mensuel
-        date_debut = None
-        if mois:
-            today = timezone.now()
-            if mois == '30':
-                date_debut = today - timedelta(days=30)
-            elif mois == '60':
-                date_debut = today - timedelta(days=60)
-            elif mois == '90':
-                date_debut = today - timedelta(days=90)
-        
-        agents_data = []
-        for agent in agents:
-            # VENTES PERSONNELLES uniquement avec filtre temporel
-            ventes = Vente.objects.filter(agent=agent, stagiaire__isnull=True)
-            
-            if date_debut:
-                ventes = ventes.filter(date_vente__gte=date_debut)
-            
-            total_quantite = sum(vente.quantite for vente in ventes)
-            total_ca = sum(vente.quantite * vente.prix_vente_unitaire for vente in ventes)
-            
-            # Calcul de la MARGE
-            marge_totale = Decimal('0')
-            for vente in ventes:
-                prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
-                marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
-                marge_totale += marge_vente
-            
-            # Répartition gros/détail
-            ventes_gros = ventes.filter(type_vente='gros')
-            ventes_detail = ventes.filter(type_vente='detail')
-            
-            quantite_gros = sum(vente.quantite for vente in ventes_gros)
-            quantite_detail = sum(vente.quantite for vente in ventes_detail)
-            
-            pourcentage_gros = (quantite_gros / total_quantite * 100) if total_quantite > 0 else 0
-            pourcentage_detail = (quantite_detail / total_quantite * 100) if total_quantite > 0 else 0
-            
-            # Nombre de produits DISTINCTS vendus
-            produits_distincts = ventes.values('detail_distribution__lot__produit').distinct().count()
-            
-            # CALCUL DES PRODUITS RESTANTS
-            produits_restants_total = 0
-            distributions = DistributionAgent.objects.filter(
-                agent_terrain=agent,
-                est_supprime=False
+    def get_agents_terrain_performance(mois='all'):
+        """
+        VERSION PRO – CONTRAT STABLE POUR LE TEMPLATE
+        """
+
+        # -------------------------
+        # Filtre ventes
+        # -------------------------
+        ventes_filter = Q(
+            agent__type_agent='terrain',
+            stagiaire__isnull=True,
+            est_supprime=False
+        )
+
+        if mois != 'all':
+            try:
+                jours = int(mois)
+                ventes_filter &= Q(
+                    date_vente__gte=timezone.now() - timedelta(days=jours)
+                )
+            except ValueError:
+                pass
+
+        # -------------------------
+        # 1️⃣ AGRÉGATS SQL
+        # -------------------------
+        ventes = (
+            Vente.objects
+            .filter(ventes_filter)
+            .values("agent_id")
+            .annotate(
+                total_quantite=Sum("quantite"),
+
+                total_ca=Sum(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+
+                marge_totale=Sum(
+                    (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire"))
+                    * F("quantite"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+
+                quantite_gros=Sum(
+                    "quantite",
+                    filter=Q(type_vente='gros')
+                ),
+                quantite_detail=Sum(
+                    "quantite",
+                    filter=Q(type_vente='detail')
+                ),
+
+                derniere_vente=Max("date_vente"),
             )
-            
-            for distribution in distributions:
-                details_distribution = distribution.detaildistribution_set.filter(est_supprime=False)
-                for detail in details_distribution:
-                    quantite_vendue = Vente.objects.filter(
-                        detail_distribution=detail
-                    ).aggregate(total=Sum('quantite'))['total'] or 0
-                    
-                    quantite_restante = detail.quantite - quantite_vendue
-                    if quantite_restante > 0:
-                        produits_restants_total += 1
-            
-            # Dernière vente et jours depuis dernière vente
-            derniere_vente = ventes.aggregate(derniere_date=Max('date_vente'))['derniere_date']
-            jours_depuis_derniere_vente = "Aucune vente"
-            if derniere_vente:
-                aujourd_hui = timezone.now().date()
-                if isinstance(derniere_vente, datetime):
-                    derniere_vente = derniere_vente.date()
-                jours_depuis_derniere_vente = (aujourd_hui - derniere_vente).days
-            
-            # Statut produits à disposition
-            a_produits_disponibles = produits_restants_total > 0
-            
-            agents_data.append({
-                'agent': agent,
-                'total_ca': total_ca,
-                'marge_totale': marge_totale,
-                'total_quantite': total_quantite,
-                'repartition': f"{round(pourcentage_gros)}%/{round(pourcentage_detail)}%",
-                'produits_distincts': produits_distincts,
-                'produits_restants': produits_restants_total,
-                'a_produits_disponibles': a_produits_disponibles,
-                'argent_possession': agent.argent_en_possession,
-                'derniere_vente': derniere_vente,
-                'jours_depuis_derniere_vente': jours_depuis_derniere_vente,
+        )
+
+        ventes_map = {v["agent_id"]: v for v in ventes}
+
+        # -------------------------
+        # 2️⃣ AGENTS ORM
+        # -------------------------
+        agents = (
+            Agent.objects
+            .filter(type_agent='terrain')
+            .select_related("user")
+        )
+
+        now = timezone.now()
+        result = []
+
+        # -------------------------
+        # 3️⃣ VIEW MODEL FINAL
+        # -------------------------
+        for agent in agents:
+            stats = ventes_map.get(agent.id)
+
+            if not stats:
+                # agent sans vente
+                result.append({
+                    "agent": agent,
+                    "total_ca": Decimal("0"),
+                    "marge_totale": Decimal("0"),
+                    "total_quantite": 0,
+                    "repartition": "-",
+                    "derniere_vente": None,
+                    "jours_depuis_derniere_vente": "Aucune vente",
+                    "argent_possession": agent.argent_en_possession,
+                })
+                continue
+
+            qte_total = stats["total_quantite"] or 0
+            qte_gros = stats["quantite_gros"] or 0
+            qte_detail = stats["quantite_detail"] or 0
+
+            repartition = "-"
+            if qte_total > 0:
+                repartition = (
+                    f"{round(qte_gros / qte_total * 100)}% / "
+                    f"{round(qte_detail / qte_total * 100)}%"
+                )
+
+            derniere_vente = stats["derniere_vente"]
+            jours_inactifs = (
+                (now - derniere_vente).days
+                if derniere_vente else "Aucune vente"
+            )
+
+            result.append({
+                "agent": agent,
+                "total_ca": stats["total_ca"] or Decimal("0"),
+                "marge_totale": stats["marge_totale"] or Decimal("0"),
+                "total_quantite": qte_total,
+                "repartition": repartition,
+                "derniere_vente": derniere_vente,
+                "jours_depuis_derniere_vente": jours_inactifs,
+                "argent_possession": agent.argent_en_possession,
             })
-        
-        return sorted(agents_data, key=lambda x: x['total_ca'], reverse=True)
+
+        return result
 
     @staticmethod
     def get_agents_terrain_performance_weekly():
-        """Performance des agents terrain pour la semaine en cours"""
-        agents = Agent.objects.filter(type_agent='terrain')
-        
-        # Dates pour la semaine en cours
-        aujourd_hui = timezone.now()
-        debut_semaine = aujourd_hui - timedelta(days=aujourd_hui.weekday())
-        debut_semaine = debut_semaine.replace(hour=0, minute=0, second=0, microsecond=0)
-        fin_semaine = debut_semaine + timedelta(days=7)
-        
-        agents_data = []
-        for agent in agents:
-            # VENTES PERSONNELLES pour la semaine en cours
-            ventes_semaine = Vente.objects.filter(
-                agent=agent, 
-                stagiaire__isnull=True,
-                date_vente__gte=debut_semaine,
-                date_vente__lt=fin_semaine
+        now = timezone.now()
+        debut_semaine = now - timedelta(days=7)
+
+        # -------------------------
+        # FILTRES
+        # -------------------------
+        base_filter = Q(
+            agent__type_agent='terrain',
+            stagiaire__isnull=True,
+            est_supprime=False
+        )
+
+        semaine_filter = base_filter & Q(date_vente__gte=debut_semaine)
+
+        # -------------------------
+        # AGRÉGATS GLOBAUX
+        # -------------------------
+        global_stats = (
+            Vente.objects
+            .filter(base_filter)
+            .values("agent_id")
+            .annotate(
+                total_ca=Sum(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField()
+                ),
+                marge_totale=Sum(
+                    (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire"))
+                    * F("quantite"),
+                    output_field=DecimalField()
+                ),
+                total_quantite=Sum("quantite"),
+                derniere_vente=Max("date_vente"),
             )
-            
-            total_quantite_semaine = sum(vente.quantite for vente in ventes_semaine)
-            total_ca_semaine = sum(vente.quantite * vente.prix_vente_unitaire for vente in ventes_semaine)
-            
-            # Calcul de la MARGE pour la semaine
-            marge_semaine = Decimal('0')
-            for vente in ventes_semaine:
-                prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
-                marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
-                marge_semaine += marge_vente
-            
-            # Dernière vente (toutes périodes)
-            ventes_totales = Vente.objects.filter(agent=agent, stagiaire__isnull=True)
-            derniere_vente = ventes_totales.aggregate(derniere_date=Max('date_vente'))['derniere_date']
-            jours_depuis_derniere_vente = "Aucune vente"
-            if derniere_vente:
-                aujourd_hui_date = timezone.now().date()
-                if isinstance(derniere_vente, datetime):
-                    derniere_vente = derniere_vente.date()
-                jours_depuis_derniere_vente = (aujourd_hui_date - derniere_vente).days
-            
-            agents_data.append({
-                'agent': agent,
-                'total_ca_semaine': total_ca_semaine,
-                'marge_semaine': marge_semaine,
-                'total_quantite_semaine': total_quantite_semaine,
-                'jours_depuis_derniere_vente': jours_depuis_derniere_vente,
-                'derniere_vente': derniere_vente,
-                'nombre_ventes_semaine': ventes_semaine.count(),
+        )
+
+        global_map = {g["agent_id"]: g for g in global_stats}
+
+        # -------------------------
+        # AGRÉGATS HEBDOMADAIRES
+        # -------------------------
+        weekly_stats = (
+            Vente.objects
+            .filter(semaine_filter)
+            .values("agent_id")
+            .annotate(
+                ca_semaine=Sum(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField()
+                ),
+                marge_semaine=Sum(
+                    (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire"))
+                    * F("quantite"),
+                    output_field=DecimalField()
+                ),
+                quantite_semaine=Sum("quantite"),
+                nombre_ventes_semaine=Count("id"),
+            )
+        )
+
+        weekly_map = {w["agent_id"]: w for w in weekly_stats}
+
+        # -------------------------
+        # AGENTS
+        # -------------------------
+        agents = (
+            Agent.objects
+            .filter(type_agent='terrain')
+            .select_related("user")
+        )
+
+        result = []
+
+        for agent in agents:
+            g = global_map.get(agent.id, {})
+            w = weekly_map.get(agent.id, {})
+
+            derniere_vente = g.get("derniere_vente")
+            jours_inactifs = (
+                (now - derniere_vente).days
+                if derniere_vente else "Aucune vente"
+            )
+
+            result.append({
+                "agent": agent,
+
+                # GLOBAL
+                "total_ca": g.get("total_ca") or Decimal("0"),
+                "marge_totale": g.get("marge_totale") or Decimal("0"),
+                "total_quantite": g.get("total_quantite") or 0,
+                "derniere_vente": derniere_vente,
+                "jours_depuis_derniere_vente": jours_inactifs,
+                "argent_possession": agent.argent_en_possession,
+
+                # 🔥 HEBDO
+                "total_ca_semaine": w.get("ca_semaine") or Decimal("0"),
+                "marge_semaine": w.get("marge_semaine") or Decimal("0"),
+                "total_quantite_semaine": w.get("quantite_semaine") or 0,
+                "nombre_ventes_semaine": w.get("nombre_ventes_semaine") or 0,
             })
-        
-        return sorted(agents_data, key=lambda x: x['total_ca_semaine'], reverse=True)
-    
+
+        return result
+
     @staticmethod
     def get_custom_period_data(agent, date_debut, date_fin):
         """Retourne les données pour une période personnalisée"""
@@ -561,5 +729,101 @@ class AgentAnalysisService:
             'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
         }
 
+    @staticmethod
+    def get_agents_with_stock():
+        """
+        Stock actuel par agent terrain
+        VERSION ORM DÉFINITIVE – SANS N+1
+        """
+
+        agents = (
+            Agent.objects
+            .filter(type_agent='terrain')
+            .annotate(
+                # Quantité distribuée à l'agent
+                quantite_distribuee=Sum(
+                    "distributions_recues__detaildistribution__quantite",
+                    filter=Q(
+                        distributions_recues__est_supprime=False,
+                        distributions_recues__detaildistribution__est_supprime=False
+                    )
+                ),
+
+                # Quantité vendue par l'agent
+                quantite_vendue=Sum(
+                    "distributions_recues__detaildistribution__vente__quantite",
+                    filter=Q(
+                        distributions_recues__detaildistribution__vente__est_supprime=False
+                    )
+                ),
+            )
+        )
+
+        result = []
+        for agent in agents:
+            distrib = agent.quantite_distribuee or 0
+            vendu = agent.quantite_vendue or 0
+
+            result.append({
+                "agent": agent,
+                "quantite_distribuee": distrib,
+                "quantite_vendue": vendu,
+                "stock_actuel": distrib - vendu,
+            })
+
+        return result
 
 
+    @staticmethod
+    def get_agents_vendu_derniere_72h():
+        """
+        Agents terrain ayant vendu dans les dernières 72h
+        VERSION ORM SAFE (Django 5.x)
+        """
+
+        limite = timezone.now() - timedelta(hours=48)
+
+        ventes = (
+            Vente.objects
+            .filter(
+                agent__type_agent='terrain',
+                stagiaire__isnull=True,
+                date_vente__gte=limite
+            )
+            .annotate(
+                ca_ligne=ExpressionWrapper(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
+            )
+            .values("agent_id")
+            .annotate(
+                nombre_ventes=Count("id"),
+                quantite=Sum("quantite"),
+                ca=Sum("ca_ligne"),
+                derniere_vente=Max("date_vente"),
+            )
+        )
+
+        agents_map = {
+            a.id: a
+            for a in Agent.objects.filter(
+                id__in=[v["agent_id"] for v in ventes]
+            )
+        }
+
+        result = []
+        for v in ventes:
+            agent = agents_map.get(v["agent_id"])
+            if not agent:
+                continue
+
+            result.append({
+                "agent": agent,
+                "nombre_ventes": v["nombre_ventes"] or 0,
+                "quantite": v["quantite"] or 0,
+                "ca": v["ca"] or Decimal("0"),
+                "derniere_vente": v["derniere_vente"],
+            })
+
+        return result

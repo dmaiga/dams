@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'direction',
     'mathfilters',
     'tinymce',
+     "debug_toolbar",
 
 
 
@@ -65,6 +66,7 @@ AUTHENTICATION_BACKENDS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -118,6 +120,11 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
 
 
 
@@ -187,3 +194,7 @@ TINYMCE_SIMPLE_CONFIG = {
     'toolbar': 'undo redo | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist | link | preview',
     'statusbar': False,
 }
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+]

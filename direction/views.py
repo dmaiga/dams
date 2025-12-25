@@ -1,86 +1,240 @@
-from direction.services.product_analysis_service import ProductAnalysisService
-from django.contrib.auth.decorators import login_required
-from core.models import (
-    Agent, Client, FactureLotEntrepot, Vente, Produit, 
-    LotEntrepot, DetailDistribution, DistributionAgent,
-    Dette, PaiementDette, BonusAgent,Fournisseur,
-    JournalModificationDistribution, MouvementStock,PaiementFournisseur,
-    Recouvrement,VersementBancaire,VersementBancaire,RecuVersement
-)
-
-from django.views.generic import TemplateView, DetailView,ListView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.paginator import Paginator
-# direction/views/fournisseur_views.py
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Sum, Q, F, ExpressionWrapper, DecimalField
-from django.db.models.functions import Coalesce
-from django.utils import timezone
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 import json
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.paginator import Paginator
+from django.db.models import Sum, Count, Avg, Q, F, ExpressionWrapper, DecimalField
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse, HttpResponse
-from django.views.generic import  View,ListView, DetailView, TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-
-from direction.services.fournisseur_service import FournisseurAnalyseService
-
-from django.views.generic import ListView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-
-from direction.services.vente_analyses import VenteAnalyseService
-from core.models import Vente
-from direction.services.vente_export import VenteExportService
-from datetime import datetime
-
-from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q
-from django.utils import timezone
-from django.shortcuts import render
-from datetime import datetime, timedelta
-from decimal import Decimal
-from core.models import VersementBancaire, Agent, Depense
-from django.db.models import Sum, Count, Avg, Q, F
-
-
-# views_direction.py - Vues direction (lecture seule)
-from django.contrib import messages
-from django.shortcuts import redirect
-
-from datetime import datetime
-from decimal import Decimal
-
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
-from django.db.models import Sum, Q
-from django.utils import timezone
-
-from core.forms import RapportDettesForm
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.utils import timezone
-from decimal import Decimal
-from datetime import datetime
-
-from core.forms import PaiementFournisseurForm
-
-# direction/views.py
-
-from decimal import Decimal
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import get_object_or_404, render
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.urls import reverse
-from django.db.models import Sum, Q
-from decimal import Decimal
-from datetime import datetime
+from django.utils import timezone
+from django.views.generic import View, TemplateView, ListView, DetailView
 
-from core.models import Fournisseur, PaiementFournisseur, LotEntrepot, Agent
+from core.models import (
+    Agent, Client, Produit, Vente,
+    LotEntrepot, DetailDistribution, DistributionAgent,
+    Dette, PaiementDette, BonusAgent,
+    Fournisseur, PaiementFournisseur,
+    FactureLotEntrepot, MouvementStock,
+    JournalModificationDistribution,
+    Recouvrement, VersementBancaire, RecuVersement,
+    Depense,ClotureMensuelle
+)
 
+from core.forms import RapportDettesForm, PaiementFournisseurForm
+
+from direction.services.product_analysis_service import ProductAnalysisService
+from direction.services.agent_analysis_service import AgentAnalysisService
 from direction.services.fournisseur_service import FournisseurAnalyseService
+from direction.services.vente_analyses import VenteAnalyseService
+from direction.services.vente_export import VenteExportService
+from direction.services.dashboard_service import DashboardService
+from direction.services.cloture_service import calculer_solde_periode
+
+
+# core/views/dashboard.py
+
+class DashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'direction/analyses/dashboards/dashboard.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 🔵 Récupération des paramètres de filtre - ANNÉE par défaut
+        periode_type = self.request.GET.get('periode', 'annee')  # Changé 'mois' -> 'annee'
+        annee = self.request.GET.get('annee')
+        mois = self.request.GET.get('mois')
+        agents_inactifs = DashboardService.get_agents_inactifs(depuis_jours=3)
+
+        # Conversion des paramètres
+        if annee:
+            annee = int(annee)
+        else:
+            # Si pas d'année spécifiée, prendre l'année courante
+            annee = timezone.now().year
+        
+        if mois:
+            mois = int(mois)
+        
+        kpis_fournisseurs = DashboardService.get_kpis_fournisseurs(
+            periode_type=periode_type,
+            annee=annee,
+            mois=mois
+        )
+        
+        # 🔵 Bloc 1 : KPIs Globaux
+        kpis_globaux = DashboardService.get_kpis_globaux(periode_type, annee, mois)
+        
+        # 🟣 Bloc 2 : Stock ESSENTIEL avec fournisseurs
+        stock_essentiel = DashboardService.get_stock_essentiel_avec_fournisseurs()
+        
+        # 🟠 Bloc 3 : Performances Agents
+        performances_agents = DashboardService.get_performances_agents(periode_type, annee, mois)
+        
+        # 🔴 Bloc 4 : Analyses Ventes AVANCÉES
+        analyses_ventes = DashboardService.get_analyses_ventes_avancees(periode_type, annee, mois)
+        
+        # 🟢 Bloc 5 : Analyses Dépenses
+        analyses_depenses = DashboardService.get_analyses_depenses(periode_type, annee, mois)
+        
+        # 🟦 Bloc 6 : Portefeuilles de TOUS les superviseurs (pour la direction)
+        portefeuilles_superviseurs = []
+        user_has_agent = hasattr(self.request.user, 'agent')
+        user_is_direction = False
+        
+        if user_has_agent:
+            user_is_direction = self.request.user.agent.est_direction
+            if user_is_direction:
+                portefeuilles_superviseurs = DashboardService.get_portefeuilles_tous_superviseurs(
+                    periode_type, annee, mois
+                )
+        
+        # Années disponibles pour le filtre
+        annees_disponibles = DashboardService.get_annees_disponibles()
+        
+        context.update({
+            # KPI Globaux
+            **kpis_globaux,
+            "agents_inactifs": agents_inactifs,
+            # Stock ESSENTIEL avec fournisseurs
+            'stock_essentiel': stock_essentiel,
+            
+            # Performances
+            'performances_agents': performances_agents,
+            
+            'kpis_fournisseurs': kpis_fournisseurs,
+            # Ventes
+            **analyses_ventes,
+            
+            # Dépenses
+            **analyses_depenses,
+            
+            # Portefeuilles superviseurs (pour la direction)
+            'portefeuilles_superviseurs': portefeuilles_superviseurs,
+            'user_has_agent': user_has_agent,
+            'user_is_direction': user_is_direction,
+            
+            # Filtres
+            'annees_disponibles': annees_disponibles,
+            'periode_selectionnee': periode_type,
+            'annee_selectionnee': annee,
+            'mois_selectionne': mois,
+            'mois_liste': [
+                (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
+                (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
+                (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre')
+            ]
+        })
+        
+        return context
+
+
+#AGENT
+class AgentDashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'direction/analyses/agents/agent_dashboard.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # 🔥 Snapshot unique (cache)
+        context.update(
+            AgentAnalysisService.get_agents_dashboard_snapshot()
+        )
+
+        # Ce qui n’est PAS dans le snapshot
+        context['competition_stagiaires'] = AgentAnalysisService.get_competition_stagiaires()
+
+        return context
+
+
+class SuperviseurListView(LoginRequiredMixin, TemplateView):
+    template_name = 'direction/analyses/agents/superviseur_list.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Situation financière des superviseurs
+        context['superviseurs'] = AgentAnalysisService.get_superviseurs_finance()
+        
+        return context
+
+class AgentTerrainListView(LoginRequiredMixin, TemplateView):
+    template_name = 'direction/analyses/agents/agent_terrain_list.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Récupérer le filtre depuis les paramètres GET
+        periode = self.request.GET.get('periode', 'all')
+        vue = self.request.GET.get('vue', 'globale')  # Nouveau paramètre pour la vue
+        
+        # Performance des agents terrain avec filtre
+        if vue == 'hebdomadaire':
+            context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance_weekly()
+            context['current_vue'] = 'hebdomadaire'
+        else:
+            context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance(mois=periode)
+            context['current_vue'] = 'globale'
+        
+        context['current_periode'] = periode
+        context['periodes'] = [
+            {'value': 'all', 'label': 'Toutes périodes'},
+            {'value': '30', 'label': '30 derniers jours'},
+            {'value': '60', 'label': '60 derniers jours'},
+            {'value': '90', 'label': '90 derniers jours'},
+        ]
+        
+        return context
+    
+class AgentDetailView(LoginRequiredMixin, DetailView):
+    template_name = 'direction/analyses/agents/agent_detail.html'
+    context_object_name = 'agent'
+    model = Agent
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        agent = self.object
+        
+        # Récupérer les paramètres de filtre
+        period_filter = self.request.GET.get('period', 'yearly')  # Par défaut: yearly
+        
+        # Pour le filtre personnalisé
+        date_debut = None
+        date_fin = None
+        
+        if period_filter == 'custom':
+            # Récupérer les dates du formulaire
+            date_debut_str = self.request.GET.get('date_debut')
+            date_fin_str = self.request.GET.get('date_fin')
+            
+            if date_debut_str and date_fin_str:
+                try:
+                    date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+                    date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+                    # Ajouter un jour pour inclure la date de fin
+                    date_fin = date_fin + timezone.timedelta(days=1)
+                except ValueError:
+                    period_filter = 'yearly'  # Retour au filtre annuel si dates invalides
+        
+        # Utilisation du service pour l'analyse détaillée
+        analysis_data = AgentAnalysisService.get_agent_detailed_analysis(
+            agent, period_filter, date_debut, date_fin
+        )
+        
+        context.update(analysis_data)
+        context['period_filter'] = period_filter
+        
+        # Passer les dates pour le formulaire personnalisé
+        if period_filter == 'custom':
+            context['custom_date_debut'] = self.request.GET.get('date_debut', '')
+            context['custom_date_fin'] = self.request.GET.get('date_fin', '')
+        
+        return context
+
 
 #Product
 
@@ -90,7 +244,7 @@ class ProductListView(LoginRequiredMixin, ListView):
     Provides additional context data such as KPIs and sales statistics.
     """
 
-    template_name = 'core/analyses/produits/produit_liste.html'
+    template_name = 'direction/analyses/produits/produit_liste.html'
     context_object_name = 'products_data'
     paginate_by = 20
 
@@ -152,7 +306,7 @@ class ProductListView(LoginRequiredMixin, ListView):
         return context
     
 class ProductDetailView(LoginRequiredMixin, DetailView):
-    template_name = 'core/analyses/produits/produit_detail.html'
+    template_name = 'direction/analyses/produits/produit_detail.html'
     context_object_name = 'product_data'
     
     def get_object(self):
@@ -174,58 +328,72 @@ class ProductDetailView(LoginRequiredMixin, DetailView):
         
         return context
     
-class ProductListPartialView(LoginRequiredMixin, ListView):
-    template_name = "direction/analyses/produits/partials/produit_table.html"
-    context_object_name = "products_data"
-    paginate_by = 20
 
-    def get_queryset(self):
-        supplier_id = self.request.GET.get("fournisseur")
-        return ProductAnalysisService.get_products_by_supplier(supplier_id)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        # conserver les filtres pour la pagination
-        context["current_filters"] = {
-            "fournisseur": self.request.GET.get("fournisseur")
-        }
-
-        return context
+#ventes
 
 
 class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
     template_name = "direction/analyses/ventes/liste_ventes_admin.html"
     context_object_name = "ventes"
-  
+    paginate_by = 50
+
+    # ------------------------------------------------------------------
+    # CACHE USER + AGENT (ANTI 1000 REQUÊTES)
+    # ------------------------------------------------------------------
+    def setup(self, request, *args, **kwargs):
+        super().setup(request, *args, **kwargs)
+        self.user = request.user
+        self.agent = getattr(request.user, "agent", None)
+
     def test_func(self):
-        return (
-            self.request.user.agent.est_direction
-            or self.request.user.agent.est_superviseur
+        return self.agent and (
+            self.agent.est_direction or self.agent.est_superviseur
         )
+
+    # ------------------------------------------------------------------
+    # QUERYSET UNIQUE, OPTIMISÉ, AVEC ANNOTATIONS SQL
+    # ------------------------------------------------------------------
+    from django.db.models import F, DecimalField, ExpressionWrapper
+
 
     def get_queryset(self):
         params = self.request.GET
         periode = params.get("periode", "annee")
 
-        # 1) période
         date_debut, date_fin = VenteAnalyseService.normalize_period(periode, params)
 
-        # 2) filtres agent + type
         agent_id = params.get("agent")
         type_vente = params.get("type")
-        produit_id = params.get("produit") 
+        produit_id = params.get("produit")
 
-        # 3) appel service
+        # 🔴 ÉTAPE MANQUANTE → créer le queryset
         qs = VenteAnalyseService.filter_ventes(
             date_debut=date_debut,
             date_fin=date_fin,
             agent_id=agent_id,
             type_vente=type_vente,
-            produit_id=produit_id
+            produit_id=produit_id,
         )
 
+        # ✅ PUIS annoter
+        qs = qs.annotate(
+            total_vente_sql=ExpressionWrapper(
+                F("quantite") * F("prix_vente_unitaire"),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            cout_total=ExpressionWrapper(
+                F("quantite") * F("detail_distribution__lot__prix_achat_unitaire"),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            marge=ExpressionWrapper(
+                (F("quantite") * F("prix_vente_unitaire")) -
+                (F("quantite") * F("detail_distribution__lot__prix_achat_unitaire")),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+        )
+
+        # Cache pour réutilisation
         self.filtered_queryset = qs
         self.date_debut = date_debut
         self.date_fin = date_fin
@@ -233,47 +401,19 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
         return qs
 
+    # ------------------------------------------------------------------
+    # CONTEXTE — ZÉRO REQUÊTE EN BOUCLE
+    # ------------------------------------------------------------------
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        params = self.request.GET
-        ventes_filtrees = self.filtered_queryset
-        page_obj = context["ventes"]
+        ventes_qs = self.filtered_queryset
 
-        # --------------------------
-        # Stats globales (toutes ventes filtrées)
-        # --------------------------
-        stats = VenteAnalyseService.compute_stats(ventes_filtrees)
-        top_agents = VenteAnalyseService.compute_top_agents(ventes_filtrees)
+        stats = VenteAnalyseService.compute_stats(ventes_qs)
+        top_agents = VenteAnalyseService.compute_top_agents(ventes_qs)
         agents_list = VenteAnalyseService.get_agents_list()
 
-        # --------------------------
-        # Marge pour la page ACTIVE SEULEMENT
-        # --------------------------
-        for vente in page_obj:
-            prix_achat = getattr(
-                vente.detail_distribution.lot, 
-                'prix_achat_unitaire', 
-                Decimal('0.00')
-            )
-
-            cout_total = vente.quantite * prix_achat
-            marge = vente.total_vente - cout_total
-            taux_marge = (marge / vente.total_vente * 100) if vente.total_vente > 0 else 0
-
-            vente.marge = marge
-            vente.taux_marge = taux_marge
-            
-            # Ajouter le nom complet du stagiaire si présent
-            if vente.stagiaire:
-                vente.stagiaire_nom_complet = vente.stagiaire.full_name
-            else:
-                vente.stagiaire_nom_complet = None
-
-        # --------------------------
-        # Mise en contexte
-        # --------------------------
-        current_year = datetime.now().year
+        current_year = timezone.now().year
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),
             (5, 'Mai'), (6, 'Juin'), (7, 'Juil'), (8, 'Août'),
@@ -281,7 +421,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         ]
 
         context.update({
-            # KPI globaux
+            # KPI
             "total_ca": stats["total_ca"],
             "total_marge": stats["total_marge"],
             "taux_marge": round(stats["taux_marge"], 1),
@@ -291,21 +431,23 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "clients_count": stats["clients_count"],
             "agents_count": stats["agents_count"],
 
-
-            # Autres
+            # Listes
             "top_agents": top_agents,
             "agents_list": agents_list,
+            "produits_list": Produit.objects.only("id", "nom").order_by("nom"),
+
+            # Contexte temporel
             "years": list(range(current_year - 2, current_year + 3)),
             "months": months,
             "current_year": current_year,
-            "current_month": datetime.now().month,
+            "current_month": timezone.now().month,
             "periode": self.periode,
             "date_debut": self.date_debut,
             "date_fin": self.date_fin,
-            "produits_list": Produit.objects.all().order_by("nom"),
         })
 
         return context
+
 
 class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
@@ -378,7 +520,7 @@ class ExportVentesPDFView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
 
 
-
+#factures
 @login_required
 def dashboard_justificatif(request):
     """Tableau de bord direction - Vue d'ensemble"""
@@ -404,12 +546,6 @@ def dashboard_justificatif(request):
     
     return render(request, 'direction/factures/justificatif.html', context)
 
-from django.db.models import Sum, Q
-from datetime import datetime, timedelta
-from decimal import Decimal
-
-from django.db.models import Sum, Count
-from decimal import Decimal
 
 @login_required
 def liste_factures_fournisseurs(request):
@@ -641,11 +777,6 @@ def detail_versement_direction(request, versement_id):
     }
     
     return render(request, 'direction/factures/detail_versement.html', context)
-
-# views.py
-
-
-
 
 @login_required
 def analyse_financiere_direction(request):
@@ -892,6 +1023,7 @@ class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
             'direction/analyses/fournisseurs/detail.html',
             context
         )
+
 @login_required
 def liste_paiements_fournisseur(request, fournisseur_id):
     """
@@ -1114,13 +1246,6 @@ def detail_paiement_fournisseur(request, paiement_id):
 # Cloture         #
 ###################
 
-from datetime import timedelta
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-
-from core.models import ClotureMensuelle
-from direction.services.cloture_service import calculer_solde_periode
 
 @login_required
 def cloturer_periode(request, cloture_id):
@@ -1147,8 +1272,6 @@ def cloturer_periode(request, cloture_id):
 
     return redirect('dashboard_direction')
 
-from core.models import ClotureMensuelle
-from decimal import Decimal
 
 def ouvrir_nouvelle_periode(superviseur, date_debut, annee, mois):
     derniere = ClotureMensuelle.objects.filter(

@@ -2,10 +2,7 @@
 from django.urls import path
 from . import views
 from  .views import ( 
-                        DashboardView,PerformanceAgentsView,
-                        AnalyseClientsView,AgentDashboardView,
-                        SuperviseurListView,AgentTerrainListView,
-                        AgentDetailView, gestion_factures_lot
+                         gestion_factures_lot
                      
                      )
 urlpatterns = [
@@ -99,19 +96,9 @@ urlpatterns = [
     path('agent/<int:agent_id>/recouvrement/historique/complet/', views.detail_historique, name='detail_historique'),
 
 #ADMIN
-    path('direction/dashboard/', DashboardView.as_view(), name='dashboard'),
+
     
     path('direction/analyses/bonus', views.tous_les_bonus, name='tous_les_bonus'), 
     path('direction/analyses/dettes', views.toutes_les_dettes, name='toutes_les_dettes'),
 
-    
-    path('direction/performances/agents/', PerformanceAgentsView.as_view(), name='performance_agents'),
-    
-    path('direction/analyses/clients/', AnalyseClientsView.as_view(), name='analyse_clients'),
-    
-    path('direction/agents/', AgentDashboardView.as_view(), name='agent_dashboard'),
-    path('direction/agents/superviseurs/', SuperviseurListView.as_view(), name='superviseur_list'),
-    path('direction/agents/terrain/', AgentTerrainListView.as_view(), name='agent_terrain_list'),
-    path('direction/agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
-   
 ]

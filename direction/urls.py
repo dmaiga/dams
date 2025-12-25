@@ -4,7 +4,9 @@ from core import views
 from direction import views as views_direction
 from direction.views import ( 
                                 
-                                ProductListView, ProductDetailView,ProductListPartialView,
+                                DashboardView,AgentDetailView,SuperviseurListView,
+                                AgentDashboardView,AgentTerrainListView,
+                               ProductListView, ProductDetailView,
                                 AnalyseFournisseursView,DetailFournisseurView,ToutesLesVentesView,
                                 ExportVentesExcelView, ExportVentesPDFView,   
                                 liste_paiements_fournisseur,
@@ -18,11 +20,16 @@ from direction.views import (
 
 
 urlpatterns = [
+        path('direction/dashboard/', DashboardView.as_view(), name='dashboard'),
+       
+    path('direction/agents/', AgentDashboardView.as_view(), name='agent_dashboard'),
+    path('direction/agents/superviseurs/', SuperviseurListView.as_view(), name='superviseur_list'),
+    path('direction/agents/terrain/', AgentTerrainListView.as_view(), name='agent_terrain_list'),
+    path('direction/agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
     
     path('direction/produits/', ProductListView.as_view(), name='product_list'),
     path('direction/produits/<int:pk>/', ProductDetailView.as_view(), name='product_detail'),
-    path('direction/produits/table/', ProductListPartialView.as_view(), name='product_list_partial'),
-
+   
     
     # Liste des fournisseurs
     path('direction/fournisseurs/liste/', 
