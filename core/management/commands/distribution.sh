@@ -38,45 +38,29 @@ def creer_distributions_multiple():
 
            
                  {
-                    'date': '22/12/2025', 
+                    'date': '25/12/2025', 
                     'produit': 'ail',
-                    'lot_reference': '20251215-0001',
+                    'lot_reference': '20251222-0001',
                     'specification': '',
-                    'prix_gros': 8750,
-                    'prix_detail': 10000,
+                    'prix_gros': 9500,
+                    'prix_detail': 10500,
                     
                     'distributions': [  
     
                        
+                       (fatoumata, 3, "Fatou"),
+                       
+                       (abdoulaye, 1, "Fatou"),
+                       
+                       (massira, 2, "Fatou"),
+
                        (mankoulako, 3, "Fatou"),
                        
                        
                        
-                       ]
-                },
-                 {
-                    'date': '22/12/2025', 
-                    'produit': 'ail',
-                    'lot_reference': '20251215-0001',
-                    'specification': '',
-                    'prix_gros': 9000,
-                    'prix_detail': 10000,
-                    
-                    'distributions': [  
-    
-                       
-                       (massira, 7, "Fatou"),
-                       (abdoulaye, 3, "Fatou"),
-                       
-                       (djenebaS, 3, "Fatou"),
-                       (noumoutene, 10, "Fatou"),
-                       
-                       
-                       
                        
                        ]
                 },
-
                 ]
             
             toutes_distributions = []
