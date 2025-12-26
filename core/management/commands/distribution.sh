@@ -37,30 +37,26 @@ def creer_distributions_multiple():
             distributions_config = [
 
            
-                 {
-                    'date': '25/12/2025', 
+                 
+                {
+                    'date': '26/12/2025', 
                     'produit': 'ail',
                     'lot_reference': '20251222-0001',
                     'specification': '',
                     'prix_gros': 9500,
-                    'prix_detail': 10500,
+                    'prix_detail': 11000,
                     
                     'distributions': [  
-    
+                        
+                        (fatoumata, 3, "Fatou"),
+                           (alpha, 1, "Fatou"),
+                      (koniba, 3, "Fatou"),
+                          (moussony, 1, "Fatou"),
                        
-                       (fatoumata, 3, "Fatou"),
-                       
-                       (abdoulaye, 1, "Fatou"),
-                       
-                       (massira, 2, "Fatou"),
-
-                       (mankoulako, 3, "Fatou"),
-                       
-                       
-                       
-                       
+   
                        ]
-                },
+                }
+              
                 ]
             
             toutes_distributions = []
