@@ -1,0 +1,109 @@
+{% extends "base_admin.html" %}
+{% load custom_filters %}
+{% block title %}Créer un agent{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <!-- Titre -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-base-content">
+            ➕ Création d’un agent
+        </h1>
+        <p class="text-sm text-base-content/70">
+            Formulaire réservé à l’administration / direction
+        </p>
+    </div>
+
+    <!-- Carte -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- Nom / Prénom -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Nom</span>
+                        </label>
+                        {{ form.nom|add_class:"input input-bordered w-full" }}
+                        {% if form.nom.errors %}
+                            <p class="text-error text-sm">{{ form.nom.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Prénom</span>
+                        </label>
+                        {{ form.prenom|add_class:"input input-bordered w-full" }}
+                        {% if form.prenom.errors %}
+                            <p class="text-error text-sm">{{ form.prenom.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Téléphone -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Téléphone</span>
+                    </label>
+                    {{ form.telephone|add_class:"input input-bordered w-full" }}
+                    {% if form.telephone.errors %}
+                        <p class="text-error text-sm">{{ form.telephone.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Mot de passe -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Mot de passe initial</span>
+                    </label>
+                    {{ form.password|add_class:"input input-bordered w-full" }}
+                    <label class="label">
+                        <span class="label-text-alt text-warning">
+                            ⚠️ À communiquer à l’agent après création
+                        </span>
+                    </label>
+                    {% if form.password.errors %}
+                        <p class="text-error text-sm">{{ form.password.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Type agent -->
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Type d’agent</span>
+                    </label>
+                    {{ form.type_agent|add_class:"select select-bordered w-full" }}
+                    {% if form.type_agent.errors %}
+                        <p class="text-error text-sm">{{ form.type_agent.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Actif -->
+                <div class="form-control">
+                    <label class="cursor-pointer label justify-start gap-4">
+                        {{ form.est_actif|add_class:"checkbox checkbox-primary" }}
+                        <span class="label-text">Agent actif (accès plateforme)</span>
+                    </label>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-end gap-3 pt-4 border-t">
+                    <a href="{% url 'agent_dashboard' %}" class="btn btn-ghost">
+                        Annuler
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        Créer l’agent
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

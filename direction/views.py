@@ -25,7 +25,7 @@ from core.models import (
     Depense,ClotureMensuelle
 )
 
-from core.forms import RapportDettesForm, PaiementFournisseurForm
+from core.forms import AdminAgentCreationForm, RapportDettesForm, PaiementFournisseurForm
 
 from direction.services.product_analysis_service import ProductAnalysisService
 from direction.services.agent_analysis_service import AgentAnalysisService
@@ -146,6 +146,7 @@ class AgentDashboardView(LoginRequiredMixin, TemplateView):
         )
 
         # Ce qui n’est PAS dans le snapshot
+        context["agents_stock"] = AgentAnalysisService.get_agents_with_stock_cached()
         context['competition_stagiaires'] = AgentAnalysisService.get_competition_stagiaires()
 
         return context
@@ -1332,3 +1333,18 @@ def apercu_cloture(request, cloture_id):
             'ecart': ecart
         }
     )
+
+
+
+@login_required
+def admin_create_agent(request):
+    if request.method == 'POST':
+        form = AdminAgentCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Agent créé avec succès")
+            return redirect('agent_dashboard')
+    else:
+        form = AdminAgentCreationForm()
+
+    return render(request, 'direction/agents/agent_create.html', {'form': form})

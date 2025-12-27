@@ -72,6 +72,10 @@ def sum_balance(flux_list):
     """Balance (entrées - sorties)"""
     return sum_entrees(flux_list) - sum_sorties(flux_list)
 
+@register.filter(name='add_class')
+def add_class(field, css):
+    return field.as_widget(attrs={"class": css})
+
 @register.filter
 def dictsum(queryset, field_name):
     """Somme les valeurs d'un champ dans un queryset"""

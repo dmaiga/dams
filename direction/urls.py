@@ -9,7 +9,7 @@ from direction.views import (
                                ProductListView, ProductDetailView,
                                 AnalyseFournisseursView,DetailFournisseurView,ToutesLesVentesView,
                                 ExportVentesExcelView, ExportVentesPDFView,   
-                                liste_paiements_fournisseur,
+                                liste_paiements_fournisseur,admin_create_agent,
                                 creer_paiement_fournisseur,
                                 modifier_paiement_fournisseur,
                                 supprimer_paiement_fournisseur,
@@ -103,6 +103,8 @@ urlpatterns = [
              cloturer_periode,
              name='cloturer_periode'
          ),
+
+     path('direction/agents/creer/', admin_create_agent, name='admin_create_agent'),
 
 ]
 

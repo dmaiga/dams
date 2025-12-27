@@ -18,7 +18,11 @@
                 <i class="fas fa-user-tie"></i>
                 Agents Terrain
             </a>
-        </div>
+            <a href="{% url 'admin_create_agent' %}" class="btn btn-accent">
+                <i class="fas fa-user-plus"></i>
+                Créer un Agent
+            </a>
+            </div>
     </div>
 
     <!-- KPI Principaux -->
@@ -85,48 +89,48 @@
                 <thead>
                     <tr>
 
-<th>Date Distribution</th>
-             <th>Agent</th>
-<th>Produit</th>
-<th>Quantité Restante</th>
-<th>Lot</th>
+                        <th>Date Distribution</th>
+                                     <th>Agent</th>
+                        <th>Produit</th>
+                        <th>Quantité Restante</th>
+                        <th>Lot</th>
 
                     </tr>
                 </thead>
                 <tbody>
-{% for item in agents_stock %}
-    {% for p in item.details %}
-    <tr>
+        {% for item in agents_stock %}
+            {% for p in item.details %}
+            <tr>
+                        <td>
+                    {{ p.distribution_date|date:"d/m/Y" }}
+                </td>
+                <td class="font-semibold">
+                    {{ item.agent.full_name }}
+                </td>
+            
+                <!-- 🆕 Date de distribution -->
+            
+            
                 <td>
-            {{ p.distribution_date|date:"d/m/Y" }}
-        </td>
-        <td class="font-semibold">
-            {{ item.agent.full_name }}
-        </td>
-
-        <!-- 🆕 Date de distribution -->
-
-
-        <td>
-            {{ p.produit }}
-        </td>
-
-        <td class="font-bold text-warning">
-            {{ p.quantite_restante }}
-        </td>
-
-        <td>
-            {{ p.lot }}
-        </td>
-    </tr>
-    {% endfor %}
-{% empty %}
-<tr>
-    <td colspan="5" class="text-center text-gray-500 py-4">
-        Aucun produit en circulation
-    </td>
-</tr>
-{% endfor %}
+                    {{ p.produit }}
+                </td>
+            
+                <td class="font-bold text-warning">
+                    {{ p.quantite_restante }}
+                </td>
+            
+                <td>
+                    {{ p.lot }}
+                </td>
+            </tr>
+            {% endfor %}
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center text-gray-500 py-4">
+                Aucun produit en circulation
+            </td>
+        </tr>
+        {% endfor %}
 
                 </tbody>
             </table>

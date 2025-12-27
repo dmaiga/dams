@@ -45,5 +45,5 @@ class DashboardSnapshotService:
                 periode_type, annee, mois
             )
 
-        cache.set(cache_key, snapshot, 60 * 10)  # 10 minutes
+        cache.set(cache_key, snapshot, 60 * 5)  # 10 minutes
         return snapshot

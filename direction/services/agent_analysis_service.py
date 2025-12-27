@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from core.models import Agent, Vente
 
-
+from django.db.models.functions import Coalesce
 
 from django.core.cache import cache
 
@@ -729,50 +729,6 @@ class AgentAnalysisService:
             'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
         }
 
-    @staticmethod
-    def get_agents_with_stock():
-        """
-        Stock actuel par agent terrain
-        VERSION ORM DÉFINITIVE – SANS N+1
-        """
-
-        agents = (
-            Agent.objects
-            .filter(type_agent='terrain')
-            .annotate(
-                # Quantité distribuée à l'agent
-                quantite_distribuee=Sum(
-                    "distributions_recues__detaildistribution__quantite",
-                    filter=Q(
-                        distributions_recues__est_supprime=False,
-                        distributions_recues__detaildistribution__est_supprime=False
-                    )
-                ),
-
-                # Quantité vendue par l'agent
-                quantite_vendue=Sum(
-                    "distributions_recues__detaildistribution__vente__quantite",
-                    filter=Q(
-                        distributions_recues__detaildistribution__vente__est_supprime=False
-                    )
-                ),
-            )
-        )
-
-        result = []
-        for agent in agents:
-            distrib = agent.quantite_distribuee or 0
-            vendu = agent.quantite_vendue or 0
-
-            result.append({
-                "agent": agent,
-                "quantite_distribuee": distrib,
-                "quantite_vendue": vendu,
-                "stock_actuel": distrib - vendu,
-            })
-
-        return result
-
 
     @staticmethod
     def get_agents_vendu_derniere_72h():
@@ -827,3 +783,111 @@ class AgentAnalysisService:
             })
 
         return result
+
+    @staticmethod
+    def get_agents_with_stock():
+        """
+        Agents terrain avec stock + valeur + argent à recouvrer
+        OPTIMISÉ : 4 requêtes max
+        """
+
+        # -------------------------
+        # Agents terrain
+        # -------------------------
+        agents = (
+            Agent.objects
+            .filter(type_agent='terrain')
+            .select_related('user')
+        )
+        agent_map = {a.id: a for a in agents}
+
+        if not agent_map:
+            return []
+
+        agent_ids = list(agent_map.keys())
+
+        # -------------------------
+        # Détails de distribution (1 requête)
+        # -------------------------
+        details = (
+            DetailDistribution.objects
+            .filter(
+                distribution__agent_terrain_id__in=agent_ids,
+                est_supprime=False,
+                quantite__gt=0
+            )
+            .select_related(
+                'lot__produit',
+                'distribution'
+            )
+            .annotate(
+                quantites_vendue=Coalesce(
+                    Sum(
+                        'vente__quantite',
+                        filter=Q(vente__est_supprime=False)
+                    ),
+                    Decimal('0.00')
+                )
+            )
+        )
+
+        # -------------------------
+        # Recouvrements par agent (1 requête)
+        # -------------------------
+        recouvrements = {
+            r["agent_id"]: r["total"]
+            for r in (
+                Recouvrement.objects
+                .filter(agent_id__in=agent_ids)
+                .values("agent_id")
+                .annotate(total=Coalesce(Sum("montant_recouvre"), Decimal("0.00")))
+            )
+        }
+
+        # -------------------------
+        # Assemblage Python (ZÉRO SQL)
+        # -------------------------
+        result = {}
+        for agent in agents:
+            result[agent.id] = {
+                "agent": agent,
+                "details": [],
+                "valeur_stock": Decimal("0.00"),
+                "montant_a_recouvrer": max(
+                    agent.total_ventes - recouvrements.get(agent.id, Decimal("0.00")),
+                    Decimal("0.00")
+                ),
+            }
+
+        for d in details:
+            reste = d.quantite - d.quantites_vendue
+            if reste <= 0:
+                continue
+
+            valeur = reste * (d.prix_gros or 0)
+
+            bucket = result[d.distribution.agent_terrain_id]
+            bucket["valeur_stock"] += valeur
+
+            bucket["details"].append({
+                "distribution_date": d.distribution.date_distribution,
+                "produit": d.lot.produit.nom,
+                "quantite_restante": reste,
+                "prix_gros": d.prix_gros,
+                "valeur": valeur,
+                "lot": d.lot.reference_lot,
+            })
+
+        return [v for v in result.values() if v["details"]]
+
+    @staticmethod
+    def get_agents_with_stock_cached():
+        key = "agents_stock:v1"
+        cached = cache.get(key)
+        if cached:
+            return cached
+    
+        data = AgentAnalysisService.get_agents_with_stock()
+        cache.set(key, data, 60 * 2)
+        return data
+    

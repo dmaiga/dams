@@ -314,7 +314,64 @@ class AgentModificationForm(forms.ModelForm):
 
         return agent
 
-    
+ 
+class AdminAgentCreationForm(forms.ModelForm):
+    nom = forms.CharField(max_length=30)
+    prenom = forms.CharField(max_length=30)
+    telephone = forms.CharField(max_length=50)
+    password = forms.CharField(
+        widget=forms.PasswordInput,
+        label="Mot de passe initial"
+    )
+
+    type_agent = forms.ChoiceField(
+        choices=Agent.TYPE_AGENT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = Agent
+        fields = [
+            'telephone',
+            'type_agent',
+           
+            'est_actif',
+           
+        ]
+
+    def save(self, commit=True):
+        nom = self.cleaned_data['nom']
+        prenom = self.cleaned_data['prenom']
+        telephone = self.cleaned_data['telephone']
+        password = self.cleaned_data['password']
+        est_actif = self.cleaned_data.get('est_actif', True)
+
+        username = f"{prenom.lower()}.{nom.lower()}"
+
+        # éviter doublons
+        i = 1
+        base = username
+        while User.objects.filter(username=username).exists():
+            username = f"{base}{i}"
+            i += 1
+
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            first_name=prenom,
+            last_name=nom,
+            is_active=est_actif
+        )
+
+        agent = super().save(commit=False)
+        agent.user = user
+        agent.telephone = telephone
+        agent.est_actif = est_actif
+
+        if commit:
+            agent.save()
+
+        return agent
 
 class FournisseurForm(forms.ModelForm):
     class Meta:
