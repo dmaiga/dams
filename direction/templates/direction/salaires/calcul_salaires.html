@@ -1,0 +1,327 @@
+{% extends 'base_admin.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .salaire-card {
+        border-left: 4px solid #28a745;
+    }
+    .incentive-card {
+        border-left: 4px solid #17a2b8;
+    }
+    .total-card {
+        border-left: 4px solid #dc3545;
+        font-weight: bold;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(0,0,0,.075);
+    }
+    .badge-quantite {
+        background-color: #6c757d;
+    }
+    .badge-salaire {
+        background-color: #28a745;
+    }
+    .badge-incentive {
+        background-color: #17a2b8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0 text-gray-800">{{ page_title }}</h1>
+            <p class="text-muted">Calculez les salaires des agents selon les règles définies</p>
+        </div>
+    </div>
+
+    <!-- Formulaire de recherche -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Paramètres de calcul</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" id="salaireForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            {{ form.date_debut.label_tag }}
+                            {{ form.date_debut }}
+                            {% if form.date_debut.errors %}
+                                <div class="text-danger small">{{ form.date_debut.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            {{ form.date_fin.label_tag }}
+                            {{ form.date_fin }}
+                            {% if form.date_fin.errors %}
+                                <div class="text-danger small">{{ form.date_fin.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            {{ form.agent.label_tag }}
+                            {{ form.agent }}
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-calculator"></i> Calculer
+                        </button>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-check">
+                            {{ form.inclure_stagiaires }}
+                            <label class="form-check-label" for="{{ form.inclure_stagiaires.id_for_label }}">
+                                {{ form.inclure_stagiaires.label }}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Bouton pour mois précédent -->
+            <div class="mt-3">
+                <a href="?date_debut={{ premier_du_mois_precedent|date:'Y-m-d' }}&date_fin={{ dernier_du_mois_precedent|date:'Y-m-d' }}" 
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-calendar-alt"></i> Mois précédent
+                </a>
+                <a href="?date_debut={{ aujourdhui|date:'Y-m-01' }}&date_fin={{ aujourdhui|date:'Y-m-d' }}" 
+                   class="btn btn-outline-secondary btn-sm ml-2">
+                    <i class="fas fa-calendar"></i> Ce mois-ci
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if resultats %}
+    <!-- Résultats -->
+    <div class="row">
+        <!-- Totaux -->
+        <div class="col-xl-12 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Période : {{ resultats.periode.debut|date:"d/m/Y" }} au {{ resultats.periode.fin|date:"d/m/Y" }}
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-3">
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                        {{ resultats.totaux.nombre_agents }} agents
+                                    </div>
+                                    <div class="text-xs">Nombre d'agents</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="h5 mb-0 font-weight-bold text-success">
+                                        {{ resultats.totaux.total_salaire_base|floatformat:0 }} FCFA
+                                    </div>
+                                    <div class="text-xs">Total salaires base</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="h5 mb-0 font-weight-bold text-info">
+                                        {{ resultats.totaux.total_incentive|floatformat:0 }} FCFA
+                                    </div>
+                                    <div class="text-xs">Total incentives</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="h5 mb-0 font-weight-bold text-danger">
+                                        {{ resultats.totaux.total_general|floatformat:0 }} FCFA
+                                    </div>
+                                    <div class="text-xs">TOTAL À PAYER</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tableau des salaires -->
+        <div class="col-xl-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-primary">Détail des salaires</h6>
+                    <div>
+                        <button class="btn btn-success btn-sm" onclick="exportExcel()">
+                            <i class="fas fa-file-excel"></i> Exporter Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" id="tableSalaires" width="100%" cellspacing="0">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Type</th>
+                                    <th class="text-center">Quantité</th>
+                                    <th class="text-right">Salaire Base</th>
+                                    <th class="text-right">Incentive</th>
+                                    <th class="text-right">Total</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for resultat in resultats.resultats %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ resultat.agent.full_name }}</strong>
+                                        {% if resultat.agent.est_superviseur %}
+                                            <span class="badge badge-warning ml-1">Superviseur</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ resultat.agent.get_type_agent_display }}</td>
+                                    <td class="text-center">
+                                        <span class="badge badge-quantite">
+                                            {{ resultat.quantite_totale|floatformat:2 }}
+                                        </span>
+                                    </td>
+                                    <td class="text-right text-success">
+                                        <strong>{{ resultat.salaire_base|floatformat:0 }} FCFA</strong>
+                                    </td>
+                                    <td class="text-right text-info">
+                                        {{ resultat.incentive|floatformat:0 }} FCFA
+                                    </td>
+                                    <td class="text-right text-danger font-weight-bold">
+                                        {{ resultat.salaire_total|floatformat:0 }} FCFA
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{% url 'detail_salaire_agent' resultat.agent.id %}" 
+                                           class="btn btn-sm btn-outline-primary" 
+                                           title="Détails">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-secondary" 
+                                                onclick="calculRapide({{ resultat.agent.id }})"
+                                                title="Recalculer">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <th colspan="3" class="text-right">TOTAUX :</th>
+                                    <th class="text-right text-success">
+                                        {{ resultats.totaux.total_salaire_base|floatformat:0 }} FCFA
+                                    </th>
+                                    <th class="text-right text-info">
+                                        {{ resultats.totaux.total_incentive|floatformat:0 }} FCFA
+                                    </th>
+                                    <th class="text-right text-danger">
+                                        {{ resultats.totaux.total_general|floatformat:0 }} FCFA
+                                    </th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function exportExcel() {
+    const dateDebut = document.getElementById('id_date_debut').value;
+    const dateFin = document.getElementById('id_date_fin').value;
+    
+    fetch("{% url 'export_salaires_excel' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            date_debut: dateDebut,
+            date_fin: dateFin
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.blob();
+        }
+        throw new Error('Erreur lors de l\'export');
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `salaires_${dateDebut}_${dateFin}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+        alert('Erreur: ' + error.message);
+    });
+}
+
+function calculRapide(agentId) {
+    const dateDebut = document.getElementById('id_date_debut').value;
+    const dateFin = document.getElementById('id_date_fin').value;
+    
+    fetch("{% url 'api_calcul_salaire_rapide' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            agent_id: agentId,
+            date_debut: dateDebut,
+            date_fin: dateFin
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Salaire recalculé pour ${data.data.agent} :\n` +
+                  `Quantité: ${data.data.quantite_totale}\n` +
+                  `Salaire base: ${data.data.salaire_base} FCFA\n` +
+                  `Incentive: ${data.data.incentive} FCFA\n` +
+                  `Total: ${data.data.salaire_total} FCFA`);
+        } else {
+            alert('Erreur: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Erreur: ' + error.message);
+    });
+}
+
+// Initialiser les dates par défaut
+document.addEventListener('DOMContentLoaded', function() {
+    const aujourdhui = new Date().toISOString().split('T')[0];
+    const premierDuMois = new Date().getFullYear() + '-' + 
+                         String(new Date().getMonth() + 1).padStart(2, '0') + '-01';
+    
+    if (!document.getElementById('id_date_debut').value) {
+        document.getElementById('id_date_debut').value = premierDuMois;
+    }
+    if (!document.getElementById('id_date_fin').value) {
+        document.getElementById('id_date_fin').value = aujourdhui;
+    }
+});
+</script>
+{% endblock %}

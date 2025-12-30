@@ -13,7 +13,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import View, TemplateView, ListView, DetailView
-
+from django.db.models.functions import Concat
+from django.db.models import Value, CharField
 from core.models import (
     Agent, Client, Produit, Vente,
     LotEntrepot, DetailDistribution, DistributionAgent,
@@ -24,6 +25,7 @@ from core.models import (
     Recouvrement, VersementBancaire, RecuVersement,
     Depense,ClotureMensuelle
 )
+from django.db.models import OuterRef, Subquery, DateTimeField
 
 from core.forms import AdminAgentCreationForm, RapportDettesForm, PaiementFournisseurForm
 
@@ -337,7 +339,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
     template_name = "direction/analyses/ventes/liste_ventes_admin.html"
     context_object_name = "ventes"
-    paginate_by = 50
+    
 
     # ------------------------------------------------------------------
     # CACHE USER + AGENT (ANTI 1000 REQUÊTES)
@@ -376,6 +378,9 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             type_vente=type_vente,
             produit_id=produit_id,
         )
+        dernier_recouvrement = Recouvrement.objects.filter(
+            vente_id=OuterRef("pk")
+        ).order_by("-date_recouvrement")
 
         # ✅ PUIS annoter
         qs = qs.annotate(
@@ -392,6 +397,17 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 (F("quantite") * F("detail_distribution__lot__prix_achat_unitaire")),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
             ),
+            date_recouvrement=Subquery(
+                dernier_recouvrement.values("date_recouvrement")[:1],
+                output_field=DateTimeField()
+            ),
+            stagiaire_nom_complet=Concat(
+                F("stagiaire__user__first_name"),
+                Value(" "),
+                F("stagiaire__user__last_name"),
+                output_field=CharField()
+            )
+
         )
 
         # Cache pour réutilisation
@@ -967,6 +983,7 @@ class AnalyseFournisseursView(LoginRequiredMixin, UserPassesTestMixin, View):
                         'direction/analyses/fournisseurs/liste.html',
                          context
                     )
+
 class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Vue détaillée d'un fournisseur"""
     
@@ -1248,30 +1265,41 @@ def detail_paiement_fournisseur(request, paiement_id):
 ###################
 
 
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
+
 @login_required
 def cloturer_periode(request, cloture_id):
-    cloture = get_object_or_404(ClotureMensuelle, id=cloture_id)
+    if not request.user.agent.est_direction:
+        raise PermissionDenied
 
-    if cloture.est_cloture:
-        return redirect('dashboard_direction')
+    with transaction.atomic():
+        cloture = get_object_or_404(ClotureMensuelle, id=cloture_id)
 
-    # La date de fin réelle = veille du jour de clic
-    cloture.date_fin_periode = timezone.now().date() - timedelta(days=1)
+        if cloture.est_cloture:
+            return redirect('liste_clotures')
 
-    data = calculer_solde_periode(
-        superviseur=cloture.superviseur,
-        date_debut=cloture.date_debut_periode,
-        date_fin=cloture.date_fin_periode,
-        solde_ouverture=cloture.solde_ouverture
-    )
+        cloture.date_fin_periode = timezone.now().date() - timedelta(days=1)
+        
+        data = calculer_solde_periode(
+            superviseur=cloture.superviseur,
+            date_debut=cloture.date_debut_periode,
+            date_fin=cloture.date_fin_periode,
+            solde_ouverture=cloture.solde_ouverture
+        )
 
-    cloture.solde_cloture = data['solde_cloture']
-    cloture.est_cloture = True
-    cloture.date_cloture = timezone.now()
-    cloture.cloture_par = request.user
-    cloture.save()
+        cloture.solde_cloture = data['solde_cloture']
+        cloture.est_cloture = True
+        cloture.date_cloture = timezone.now()
+        cloture.cloture_par = request.user
+        cloture.save()
 
-    return redirect('dashboard_direction')
+        cloture.superviseur.remettre_solde_operationnel_a_zero(
+            cloture=cloture,
+            par=request.user
+        )
+
+    return redirect('liste_clotures')
 
 
 def ouvrir_nouvelle_periode(superviseur, date_debut, annee, mois):
@@ -1348,3 +1376,220 @@ def admin_create_agent(request):
         form = AdminAgentCreationForm()
 
     return render(request, 'direction/agents/agent_create.html', {'form': form})
+
+
+
+from django.contrib.auth.decorators import login_required, user_passes_test
+
+
+from direction.forms import CalculSalaireForm
+from direction.services.salaire_service import SalaireService
+
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and hasattr(u, 'agent') and u.agent.est_direction)
+def calcul_salaires(request):
+    """Vue principale pour le calcul des salaires"""
+    form = CalculSalaireForm(request.GET or None)
+    resultats = None
+    
+    # Définir les dates par défaut (mois précédent)
+    aujourdhui = timezone.now().date()
+    premier_du_mois = date(aujourdhui.year, aujourdhui.month, 1)
+    dernier_du_mois_precedent = premier_du_mois - timedelta(days=1)
+    premier_du_mois_precedent = date(
+        dernier_du_mois_precedent.year, 
+        dernier_du_mois_precedent.month, 
+        1
+    )
+    
+    if request.method == 'GET' and any(key in request.GET for key in ['date_debut', 'date_fin']):
+        if form.is_valid():
+            date_debut = form.cleaned_data['date_debut']
+            date_fin = form.cleaned_data['date_fin']
+            agent = form.cleaned_data['agent']
+            
+            if agent:
+                # Calcul pour un agent spécifique
+                resultat_agent = SalaireService.calculer_salaire_agent(
+                    agent.id, date_debut, date_fin
+                )
+                if resultat_agent:
+                    resultats = {
+                        "resultats": [resultat_agent],
+                        "totaux": {
+                            "total_salaire_base": resultat_agent["salaire_base"],
+                            "total_incentive": resultat_agent["incentive"],
+                            "total_general": resultat_agent["salaire_total"],
+                            "nombre_agents": 1
+                        },
+                        "periode": {
+                            "debut": date_debut,
+                            "fin": date_fin
+                        }
+                    }
+                    messages.success(request, f"Salaire calculé pour {agent.full_name}")
+                else:
+                    messages.error(request, "Impossible de calculer le salaire pour cet agent")
+            else:
+                # Calcul pour tous les agents
+                resultats = SalaireService.calculer_salaires_tous_agents(date_debut, date_fin)
+                messages.success(
+                    request, 
+                    f"Salaires calculés pour {resultats['totaux']['nombre_agents']} agents"
+                )
+        else:
+            messages.error(request, "Veuillez corriger les erreurs dans le formulaire")
+    
+    context = {
+        'form': form,
+        'resultats': resultats,
+        'premier_du_mois_precedent': premier_du_mois_precedent,
+        'dernier_du_mois_precedent': dernier_du_mois_precedent,
+        'page_title': 'Calcul des Salaires'
+    }
+    
+    return render(request, 'direction/salaires/calcul_salaires.html', context)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and hasattr(u, 'agent') and u.agent.est_direction)
+def detail_salaire_agent(request, agent_id):
+    """Détail du salaire d'un agent"""
+    try:
+        agent = Agent.objects.get(id=agent_id)
+    except Agent.DoesNotExist:
+        messages.error(request, "Agent non trouvé")
+        return redirect('direction:calcul_salaires')
+    
+    # Par défaut : mois précédent
+    aujourdhui = timezone.now().date()
+    premier_du_mois = date(aujourdhui.year, aujourdhui.month, 1)
+    dernier_du_mois_precedent = premier_du_mois - timedelta(days=1)
+    premier_du_mois_precedent = date(
+        dernier_du_mois_precedent.year, 
+        dernier_du_mois_precedent.month, 
+        1
+    )
+    
+    date_debut = premier_du_mois_precedent
+    date_fin = dernier_du_mois_precedent
+    
+    if request.method == 'POST':
+        date_debut = request.POST.get('date_debut', premier_du_mois_precedent)
+        date_fin = request.POST.get('date_fin', dernier_du_mois_precedent)
+        
+        if isinstance(date_debut, str):
+            date_debut = datetime.strptime(date_debut, '%Y-%m-%d').date()
+        if isinstance(date_fin, str):
+            date_fin = datetime.strptime(date_fin, '%Y-%m-%d').date()
+    
+    # Calculer le salaire
+    resultat = SalaireService.calculer_salaire_agent(agent_id, date_debut, date_fin)
+    
+    if not resultat:
+        messages.error(request, "Impossible de calculer le salaire pour cet agent")
+        return redirect('direction:calcul_salaires')
+    
+    # Récupérer les ventes détaillées pour l'incentive
+    ventes_incentive = []
+    recouvrements = Recouvrement.objects.filter(
+        agent_id=agent_id,
+        bonus_accorde=True,
+        date_recouvrement__date__gte=date_debut,
+        date_recouvrement__date__lte=date_fin,
+        vente__type_vente="detail"
+    ).select_related(
+        "vente__detail_distribution__lot__produit",
+        "vente__client"
+    )
+    
+    for r in recouvrements:
+        produit = r.vente.detail_distribution.lot.produit
+        ratio = SalaireService.CONVERSION_CARTON.get(produit.nom)
+        if ratio:
+            cartons = Decimal(r.vente.quantite) / ratio
+            incentive = cartons * Decimal("100")
+            ventes_incentive.append({
+                'date': r.date_recouvrement,
+                'produit': produit.nom,
+                'quantite': r.vente.quantite,
+                'ratio_carton': ratio,
+                'cartons': cartons,
+                'incentive': incentive,
+                'client': r.vente.client.nom if r.vente.client else "Non spécifié"
+            })
+    
+    context = {
+        'agent': agent,
+        'resultat': resultat,
+        'ventes_incentive': ventes_incentive,
+        'date_debut': date_debut,
+        'date_fin': date_fin,
+        'page_title': f'Détail Salaire - {agent.full_name}'
+    }
+    
+    return render(request, 'direction/salaires/detail_salaire.html', context)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and hasattr(u, 'agent') and u.agent.est_direction)
+def export_salaires_excel(request):
+    """Export des salaires en Excel"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        date_debut = datetime.strptime(data.get('date_debut'), '%Y-%m-%d').date()
+        date_fin = datetime.strptime(data.get('date_fin'), '%Y-%m-%d').date()
+        
+        # Générer le fichier Excel
+        excel_file = SalaireService.generer_rapport_excel(date_debut, date_fin)
+        
+        # Créer la réponse HTTP
+        response = HttpResponse(
+            excel_file.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="salaires_{date_debut}_{date_fin}.xlsx"'
+        
+        return response
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_authenticated and hasattr(u, 'agent') and u.agent.est_direction)
+def api_calcul_salaire_rapide(request):
+    """API pour calcul rapide de salaire (AJAX)"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        agent_id = data.get('agent_id')
+        date_debut = datetime.strptime(data.get('date_debut'), '%Y-%m-%d').date()
+        date_fin = datetime.strptime(data.get('date_fin'), '%Y-%m-%d').date()
+        
+        resultat = SalaireService.calculer_salaire_agent(agent_id, date_debut, date_fin)
+        
+        if resultat:
+            return JsonResponse({
+                'success': True,
+                'data': {
+                    'agent': resultat['agent'].full_name,
+                    'quantite_totale': str(resultat['quantite_totale']),
+                    'salaire_base': str(resultat['salaire_base']),
+                    'incentive': str(resultat['incentive']),
+                    'salaire_total': str(resultat['salaire_total']),
+                    'date_debut': date_debut.strftime('%d/%m/%Y'),
+                    'date_fin': date_fin.strftime('%d/%m/%Y')
+                }
+            })
+        else:
+            return JsonResponse({'success': False, 'error': 'Agent non trouvé'})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

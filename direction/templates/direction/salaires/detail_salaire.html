@@ -1,0 +1,211 @@
+{% extends 'base_admin.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">{{ page_title }}</h1>
+                    <p class="text-muted mb-0">Période : {{ date_debut|date:"d/m/Y" }} au {{ date_fin|date:"d/m/Y" }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'calcul_salaires' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Retour
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations agent -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card border-left-primary shadow h-100">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Informations Agent</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <div class="h4 font-weight-bold">{{ agent.full_name }}</div>
+                        <div class="text-muted">{{ agent.get_type_agent_display }}</div>
+                        {% if agent.marche_affectation %}
+                            <div class="mt-2">
+                                <i class="fas fa-map-marker-alt"></i> {{ agent.marche_affectation }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <hr>
+                    <div class="small">
+                        <div><strong>Contact:</strong> {{ agent.telephone|default:"Non spécifié" }}</div>
+                        <div><strong>Contrat:</strong> {{ agent.get_type_contrat_display }}</div>
+                        <div><strong>Statut:</strong> 
+                            {% if agent.est_actif %}
+                                <span class="badge badge-success">Actif</span>
+                            {% else %}
+                                <span class="badge badge-danger">Inactif</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Résumé salaire -->
+        <div class="col-md-8 mb-4">
+            <div class="card border-left-success shadow h-100">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-success">Résumé Salaire</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3 salaire-card">
+                                <div class="card-body">
+                                    <div class="text-center">
+                                        <div class="h5 text-gray-800">Salaire Base</div>
+                                        <div class="h2 font-weight-bold text-success">
+                                            {{ resultat.salaire_base|floatformat:0 }} FCFA
+                                        </div>
+                                        <div class="text-muted">
+                                            Quantité: {{ resultat.quantite_totale|floatformat:2 }}
+                                            {% if resultat.quantite_totale > 100 %}
+                                                <span class="badge badge-info ml-1">Bonus >100 unités</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3 incentive-card">
+                                <div class="card-body">
+                                    <div class="text-center">
+                                        <div class="h5 text-gray-800">Incentive</div>
+                                        <div class="h2 font-weight-bold text-info">
+                                            {{ resultat.incentive|floatformat:0 }} FCFA
+                                        </div>
+                                        <div class="text-muted">
+                                            {{ ventes_incentive|length }} ventes éligibles
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card total-card">
+                                <div class="card-body">
+                                    <div class="text-center">
+                                        <div class="h4 text-gray-800">Salaire Total</div>
+                                        <div class="h1 font-weight-bold text-danger">
+                                            {{ resultat.salaire_total|floatformat:0 }} FCFA
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Détail des incentives -->
+    {% if ventes_incentive %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-gift"></i> Détail des Incentives
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Produit</th>
+                                    <th>Client</th>
+                                    <th class="text-center">Quantité</th>
+                                    <th class="text-center">Ratio Carton</th>
+                                    <th class="text-center">Cartons</th>
+                                    <th class="text-right">Incentive</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vente in ventes_incentive %}
+                                <tr>
+                                    <td>{{ vente.date|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ vente.produit }}</td>
+                                    <td>{{ vente.client }}</td>
+                                    <td class="text-center">{{ vente.quantite|floatformat:2 }}</td>
+                                    <td class="text-center">1 carton = {{ vente.ratio_carton }} unités</td>
+                                    <td class="text-center">{{ vente.cartons|floatformat:2 }}</td>
+                                    <td class="text-right text-success font-weight-bold">
+                                        {{ vente.incentive|floatformat:0 }} FCFA
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="bg-light">
+                                <tr>
+                                    <th colspan="5"></th>
+                                    <th class="text-center">
+                                        {{ ventes_incentive|length }} ventes
+                                    </th>
+                                    <th class="text-right text-success font-weight-bold">
+                                        {{ resultat.incentive|floatformat:0 }} FCFA
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Changement de période -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Changer la période</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="row">
+                        {% csrf_token %}
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Date de début</label>
+                                <input type="date" name="date_debut" class="form-control" 
+                                       value="{{ date_debut|date:'Y-m-d' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Date de fin</label>
+                                <input type="date" name="date_fin" class="form-control" 
+                                       value="{{ date_fin|date:'Y-m-d' }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-sync-alt"></i> Recalculer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

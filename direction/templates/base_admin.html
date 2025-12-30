@@ -146,7 +146,14 @@
                                     <span>Clôtures</span>
                                 </a>
                             </li>
-                            
+                             <li>
+                                <a href="{% url 'calcul_salaires' %}" 
+                                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                                          {% if 'calcul_salaires' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
+                                    <i class="fas fa-lock w-5 text-center"></i>
+                                    <span>Salaires</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
 

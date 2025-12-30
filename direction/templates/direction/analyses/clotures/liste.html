@@ -1,5 +1,5 @@
 {% extends "base_admin.html" %}
-{% load humanize %}
+{% load humanize format_fcfa %}
 {% block content %}
 
 <div class="container mt-4">
@@ -38,12 +38,12 @@
         </td>
 
         <td>
-          {{ cloture.solde_ouverture|intcomma }} FCFA
+          {{ cloture.solde_ouverture|fcfa }} FCFA
         </td>
 
         <td>
           {% if cloture.est_cloture %}
-            <strong>{{ cloture.solde_cloture|intcomma }} FCFA</strong>
+            <strong>{{ cloture.solde_cloture|fcfa }} FCFA</strong>
           {% else %}
             —
           {% endif %}

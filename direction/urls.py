@@ -15,7 +15,9 @@ from direction.views import (
                                 supprimer_paiement_fournisseur,
                                 restaurer_paiement_fournisseur,
                                 detail_paiement_fournisseur, 
-                                 liste_clotures,apercu_cloture,cloturer_periode,                                                           
+                                 liste_clotures,apercu_cloture,cloturer_periode,  
+                                 api_calcul_salaire_rapide,export_salaires_excel,
+                                 detail_salaire_agent,calcul_salaires,                                                     
                               )
 
 
@@ -105,6 +107,12 @@ urlpatterns = [
          ),
 
      path('direction/agents/creer/', admin_create_agent, name='admin_create_agent'),
+
+   # URLs pour les salaires
+    path('salaires/', calcul_salaires, name='calcul_salaires'),
+    path('salaires/agent/<int:agent_id>/', detail_salaire_agent, name='detail_salaire_agent'),
+    path('salaires/export-excel/', export_salaires_excel, name='export_salaires_excel'),
+    path('api/salaires/calcul-rapide/', api_calcul_salaire_rapide, name='api_calcul_salaire_rapide'),
 
 ]
 

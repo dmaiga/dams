@@ -508,6 +508,26 @@ class Agent(models.Model):
         self.user.is_active = True
         self.user.save(update_fields=['is_active'])
         self.save(update_fields=['est_actif'])
+
+    def remettre_solde_operationnel_a_zero(self, cloture=None, par=None):
+        if not self.est_superviseur:
+            return
+
+        solde_actuel = self.solde_vente_superviseur
+        if solde_actuel == 0:
+            return
+
+        self.ajustement_solde -= solde_actuel
+        self.save(update_fields=['ajustement_solde'])
+
+        if cloture:
+            from core.models import AjustementSolde
+            AjustementSolde.objects.create(
+                agent=self,
+                montant=-solde_actuel,
+                motif="Remise à zéro après clôture mensuelle",
+                cloture=cloture
+            )
     
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
@@ -807,6 +827,7 @@ class Agent(models.Model):
             return self.bonus.get_ventes_avec_bonus().count()
         return 0
     
+
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent '),
@@ -1454,32 +1475,62 @@ class Recouvrement(models.Model):
     def __str__(self):
         return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
     
-    def calculer_bonus(self):
+    from decimal import Decimal
+    from math import floor
+    from datetime import timedelta
     
-        # ⚠️ Empêche l’erreur : si pk n’existe pas, on sauvegarde d’abord
+    def calculer_bonus(self):
+        # Sauvegarde initiale si nécessaire
         if not self.pk:
             super().save()
     
-        if self.vente.type_vente != "detail":
+        # 1️⃣ Seulement ventes au détail
+        if not self.vente or self.vente.type_vente != "detail":
             self.bonus_accorde = False
-            self.montant_bonus = Decimal("0.00")
+            self.montant_bonus = Decimal("0")
             self.save(update_fields=["bonus_accorde", "montant_bonus"])
             return
     
+        # 2️⃣ Vérification délai 48h
         limite_bonus = self.vente.date_vente + timedelta(hours=48)
-    
-        if self.date_recouvrement <= limite_bonus:
-            self.bonus_accorde = True
-            self.montant_bonus = self.vente.quantite * Decimal("100")
+        if self.date_recouvrement > limite_bonus:
+            self.bonus_accorde = False
+            self.montant_bonus = Decimal("0")
             self.save(update_fields=["bonus_accorde", "montant_bonus"])
+            return
     
-            bonus_agent, _ = BonusAgent.objects.get_or_create(agent=self.agent)
-            bonus_agent.ajouter_bonus(
-                montant=self.montant_bonus,
-                nb_produits=self.vente.quantite
-            )
+        # 3️⃣ Conversion produit → carton ENTIER
+        produit = self.vente.detail_distribution.lot.produit.nom
+        quantite = Decimal(self.vente.quantite)
     
-
+        CONVERSION_CARTON = {
+            "Oignons": Decimal("25"),
+            "Ail": Decimal("10"),
+            "Pomme de terre": Decimal("25"),
+            "Poivre": Decimal("1"),
+        }
+    
+        ratio = CONVERSION_CARTON.get(produit)
+        if not ratio:
+            self.bonus_accorde = False
+            self.montant_bonus = Decimal("0")
+            self.save(update_fields=["bonus_accorde", "montant_bonus"])
+            return
+    
+        cartons = quantite // ratio  # 🔥 PAS DE FRACTION
+        montant_bonus = cartons * Decimal("100")
+    
+        # 4️⃣ Application du bonus
+        if cartons > 0:
+            self.bonus_accorde = True
+            self.montant_bonus = montant_bonus
+        else:
+            self.bonus_accorde = False
+            self.montant_bonus = Decimal("0")
+    
+        self.save(update_fields=["bonus_accorde", "montant_bonus"])
+    
+    
     class Meta:
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement"
@@ -1818,3 +1869,23 @@ class ClotureMensuelle(models.Model):
     def duree_periode(self):
         """Nombre de jours couverts par la clôture"""
         return (self.date_fin_periode - self.date_debut_periode).days + 1
+
+class AjustementSolde(models.Model):
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        related_name="ajustements_solde"
+    )
+    montant = models.DecimalField(max_digits=12, decimal_places=2)
+    motif = models.CharField(max_length=255)
+    date = models.DateTimeField(auto_now_add=True)
+    cloture = models.ForeignKey(
+        ClotureMensuelle,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ajustements"
+    )
+
+    def __str__(self):
+        return f"{self.agent} | {self.montant} | {self.date:%d/%m/%Y}"
