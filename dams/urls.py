@@ -32,6 +32,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
     path('direction/', include('direction.urls')),
+    path('agents/', include('agents.urls')),
 
 
 

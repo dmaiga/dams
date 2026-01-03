@@ -86,7 +86,6 @@ urlpatterns = [
     path('clients/<int:pk>/modifier/', views.ClientUpdateView.as_view(), name='modifier_client'),
     path('clients/<int:pk>/supprimer/', views.ClientDeleteView.as_view(), name='supprimer_client'),
 #tableau_de_bord
-   path('tableau-de-bord/superviseur/', views.tableau_de_bord_superviseur, name='tableau_de_bord_superviseur'),
    path('tableau-de-bord/agent/<int:agent_id>/', views.vue_detail_agent, name='vue_detail_agent'),
    path('tableau-de-bord/stagiare/<int:stagiaire_id>/', views.detail_stagiaire, name='detail_stagiaire'),
 #RECOUVREMENT

@@ -1,175 +1,124 @@
-<!-- core/agents/creer_agent.html -->
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">
-                        <i class="fas fa-user-plus me-2"></i>Créer un Nouvel Agent
-                    </h4>
-                </div>
-                <div class="card-body">
+<style>
+/* mobile-first polish */
+.form-control,
+.form-select {
+    border-radius: 0.6rem;
+}
 
-                    {% if messages %}
-                    <div class="mb-4">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                            {{ message|safe }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                        {% endfor %}
-                    </div>
+.card {
+    border-radius: 0.75rem;
+}
+
+.btn {
+    border-radius: 0.6rem;
+}
+
+</style>
+
+<div class="container px-2 px-md-4 my-3 my-md-4">
+
+    <!-- =========================
+         HEADER MOBILE FIRST
+    ========================== -->
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body d-flex align-items-center justify-content-between py-3">
+            <div>
+                <h5 class="mb-0 fw-semibold">
+                    {% if agent %}
+                        ✏️ Modifier l’agent
+                    {% else %}
+                        ➕ Nouvel agent
                     {% endif %}
-
-                    <form method="post" id="agent-creation-form">
-                        {% csrf_token %}
-
-                        <!-- NOM / PRÉNOM -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Prénom *</label>
-                                    {{ form.prenom }}
-                                    {% if form.prenom.errors %}
-                                    <div class="text-danger small">{{ form.prenom.errors }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Nom *</label>
-                                    {{ form.nom }}
-                                    {% if form.nom.errors %}
-                                    <div class="text-danger small">{{ form.nom.errors }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- TÉLÉPHONE / TYPE AGENT -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Téléphone *</label>
-                                    {{ form.telephone }}
-                                    <div class="form-text">
-                                        <i class="fas fa-info-circle"></i>
-                                        Numéro principal de l’agent
-                                    </div>
-                                    {% if form.telephone.errors %}
-                                    <div class="text-danger small">{{ form.telephone.errors }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Type d’agent *</label>
-                                    {{ form.type_agent }}
-                                    <div class="form-text">
-                                        <strong>Superviseur :</strong> gestion terrain |
-                                        <strong>Agent terrain :</strong> ventes |
-                                        <strong>Stagiaire :</strong> test 15 jours
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- AFFECTATION TERRAIN -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Quartier d’affectation</label>
-                                    {{ form.quartier }}
-                                    {% if form.quartier.errors %}
-                                    <div class="text-danger small">{{ form.quartier.errors }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Marché d’affectation</label>
-                                    {{ form.marche_affectation }}
-                                    {% if form.marche_affectation.errors %}
-                                    <div class="text-danger small">{{ form.marche_affectation.errors }}</div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- STAGIAIRE UNIQUEMENT -->
-                        <div id="stagiaire-fields" style="display:none;">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Date de mise en service</label>
-                                        {{ form.date_mise_service }}
-                                        <div class="form-text">
-                                            Laisser vide pour utiliser la date actuelle
-                                        </div>
-                                        {% if form.date_mise_service.errors %}
-                                        <div class="text-danger small">{{ form.date_mise_service.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- INFO CONNEXION -->
-                        <div class="alert alert-info">
-                            <h6 class="alert-heading">
-                                <i class="fas fa-key me-2"></i>Informations de connexion
-                            </h6>
-                            <ul class="mb-0">
-                                <li><strong>Identifiant :</strong> généré automatiquement</li>
-                                <li><strong>Mot de passe :</strong> <code>temp123</code></li>
-                                <li><strong>Contrat :</strong> prestation 1 mois (par défaut)</li>
-                            </ul>
-                        </div>
-
-                        <!-- ACTIONS -->
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'liste_agents' %}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left"></i> Annuler
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-user-plus"></i> Créer l’agent
-                            </button>
-                        </div>
-
-                    </form>
-                </div>
+                </h5>
+                <small class="text-muted">
+                    {% if agent %}
+                        Mise à jour des informations
+                    {% else %}
+                        Création d’un nouvel utilisateur
+                    {% endif %}
+                </small>
             </div>
+
+            <a href="{% url 'liste_agents' %}"
+               class="btn btn-light btn-sm rounded-circle shadow-sm">
+                ←
+            </a>
         </div>
     </div>
+
+    <!-- =========================
+         FORMULAIRE
+    ========================== -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger small">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <div class="row g-3">
+
+                    {% for field in form %}
+                        <div class="col-12 col-md-6">
+                            <div class="form-group">
+                                <label class="form-label fw-medium mb-1">
+                                    {{ field.label }}
+                                    {% if field.field.required %}
+                                        <span class="text-danger">*</span>
+                                    {% endif %}
+                                </label>
+
+                                {{ field }}
+
+                                {% if field.help_text %}
+                                    <div class="form-text">
+                                        {{ field.help_text }}
+                                    </div>
+                                {% endif %}
+
+                                {% if field.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ field.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+
+                </div>
+
+                <!-- =========================
+                     ACTIONS (MOBILE FRIENDLY)
+                ========================== -->
+                <div class="mt-4 d-grid d-md-flex gap-2 justify-content-md-end">
+                    <a href="{% url 'liste_agents' %}"
+                       class="btn btn-outline-secondary btn-lg btn-md-sm">
+                        Annuler
+                    </a>
+
+                    <button type="submit"
+                            class="btn btn-primary btn-lg btn-md-sm">
+                        {% if agent %}
+                            Enregistrer
+                        {% else %}
+                            Créer l’agent
+                        {% endif %}
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
 </div>
-
-<!-- JS -->
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const typeAgent = document.getElementById('id_type_agent');
-    const stagiaireFields = document.getElementById('stagiaire-fields');
-
-    function toggleStagiaireFields() {
-        stagiaireFields.style.display = (typeAgent.value === 'stagiaire') ? 'block' : 'none';
-    }
-
-    toggleStagiaireFields();
-    typeAgent.addEventListener('change', toggleStagiaireFields);
-});
-</script>
-
-<style>
-.form-text { font-size: 0.85em; }
-code {
-    background: #f8f9fa;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-</style>
 {% endblock %}

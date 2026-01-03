@@ -1,4 +1,5 @@
 # Django imports
+from django.http import HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib import messages
@@ -41,10 +42,18 @@ from .forms import (
     FactureLotForm, VenteForm, DistributionForm, ReceptionLotForm, 
     DetteForm, PaiementDetteForm, DistributionSuppressionForm,
     DistributionModificationForm,RecouvrementForm,
-    FournisseurForm,VersementForm,AgentCreationForm, 
-    AgentModificationForm
+    FournisseurForm,VersementForm
 
 )
+
+from agents.forms import (
+                           
+                            SupervisorTerrainAgentCreationForm,
+                            
+                            DirectionAgentCreationForm,
+                            RotSupervisorCreationForm,
+                            
+                            )
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -87,7 +96,9 @@ def custom_login(request):
                     # Cas superviseur (entrepôt)
                     elif agent.type_agent == "entrepot":
                         return redirect("tableau_de_bord_superviseur")
-
+                    
+                    elif agent.type_agent == "rot":
+                                            return redirect("dashboard_rot")
                     # Cas terrain
                     elif agent.type_agent == "terrain":
                         return redirect("dashboard_agent")
@@ -295,67 +306,69 @@ def detail_agent(request, agent_id):
     return render(request, 'core/agents/detail_agent.html', context)
 
 
+
 @login_required
 def creer_agent(request):
-    """Uniquement pour les superviseurs - créer agent terrain, stagiaire OU superviseur"""
-    # Vérifier que c'est un superviseur
-    try:
-        superviseur = request.user.agent
-        if not superviseur.est_superviseur:
-            messages.error(request, "❌ Seuls les superviseurs peuvent créer des agents.")
-            return redirect('dashboard')
-    except:
-        messages.error(request, "❌ Accès non autorisé.")
-        return redirect('dashboard')
-    
-    if request.method == 'POST':
-        form = AgentCreationForm(request.POST)
-        if form.is_valid():
-            try:
-                agent = form.save()
-                
-                # ✅ Messages personnalisés selon le type
-                if agent.est_stagiaire:
-                    messages.success(request, f"✅ Stagiaire {agent.full_name} créé ! Test de 15 jours. ")
-                elif agent.est_superviseur:
-                    messages.success(request, f"✅ Superviseur {agent.full_name} créé ! ")
-                else:
-                    messages.success(request, f"✅ Agent terrain {agent.full_name} créé ! ")
-                
-                return redirect('liste_agents')
-                
-            except Exception as e:
-                messages.error(request, f"❌ Erreur lors de la création: {str(e)}")
+    agent_connecte = request.user.agent
+
+    # =========================
+    # CHOIX DU FORMULAIRE
+    # =========================
+
+    if agent_connecte.est_superviseur:
+        # Superviseur → Agent terrain uniquement
+        form = SupervisorTerrainAgentCreationForm(
+            request.POST or None,
+            superviseur=agent_connecte
+        )
+
+    elif agent_connecte.est_rot:
+        # ROT → Superviseur uniquement
+        form = RotSupervisorCreationForm(
+            request.POST or None
+        )
+
+
     else:
-        form = AgentCreationForm()
-    
-    return render(request, 'core/agents/creer_agent.html', {'form': form})
+        return HttpResponseForbidden("Accès non autorisé")
+
+    # =========================
+    # SOUMISSION
+    # =========================
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        return redirect('liste_agents')
+
+    return render(request, 'core/agents/creer_agent.html', {
+        'form': form
+    })
 
 @login_required
 def modifier_agent(request, agent_id):
-    """Modifier un agent - promotion simple"""
-    agent = get_object_or_404(Agent, id=agent_id)
-    
-    if request.method == 'POST':
-        form = AgentModificationForm(request.POST, instance=agent)
-        if form.is_valid():
-            ancien_type = agent.type_agent
-            agent_modifie = form.save()
-            
-            # Message simple si promotion de stagiaire
-            if ancien_type == 'stagiaire' and not agent_modifie.est_stagiaire:
-                messages.success(request, f"✅ {agent_modifie.full_name} promu {agent_modifie.get_type_agent_display()} !")
-            else:
-                messages.success(request, f"✅ Agent modifié avec succès !")
-                
-            return redirect('liste_agents')
-    else:
-        form = AgentModificationForm(instance=agent)
-    
-    return render(request, 'core/agents/modifier_agent.html', {
-        'form': form, 
-        'agent': agent
+    agent_cible = get_object_or_404(Agent, id=agent_id)
+    agent_connecte = request.user.agent
+
+    # Sécurité minimale
+    if agent_connecte.est_superviseur and agent_cible.superviseur != agent_connecte:
+        return HttpResponseForbidden()
+
+    form = SupervisorTerrainAgentCreationForm(
+        request.POST or None,
+        instance=agent_cible,
+        superviseur=agent_connecte if agent_connecte.est_superviseur else None
+    )
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, "✅ Agent modifié avec succès")
+        return redirect('liste_agents')
+
+    return render(request, 'core/agents/creer_agent.html', {
+        'form': form,
+        'agent': agent_cible
     })
+
 
 @login_required
 def supprimer_agent(request, agent_id):
@@ -933,8 +946,6 @@ def restaurer_distribution(request, distribution_id):
     }
     
     return render(request, 'core/distribution/restaurer_distribution.html', context)
-
-
 
 @login_required
 def liste_distributions(request):
@@ -2335,7 +2346,7 @@ class ClientDeleteView(LoginRequiredMixin, DeleteView):
 def tableau_de_bord_superviseur(request):
     # Vérifier que l'utilisateur est un superviseur
     try:
-        superviseur = Agent.objects.get(user=request.user, type_agent='entrepot')
+        superviseur = Agent.objects.get(user=request.user,  type_agent__in=['entrepot', 'rot'])
     except Agent.DoesNotExist:
         redirect('login')
     

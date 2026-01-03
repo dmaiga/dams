@@ -99,6 +99,7 @@ class AgentAdmin(admin.ModelAdmin):
     list_display = [
         'nom_complet',
         'type_agent',
+        'superviseur',
         'telephone',
         'statut_actif',
         'ajustement_solde',

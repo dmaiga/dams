@@ -32,12 +32,14 @@ class Client(models.Model):
     class Meta:
         ordering = ['nom'] 
 
+
 class Produit(models.Model):
     nom = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.nom
+
 
 class Fournisseur(models.Model):
     nom = models.CharField(max_length=100, unique=True)
@@ -255,8 +257,6 @@ class LotEntrepot(models.Model):
         return self.total_facture_lot >= self.montant_total
 
 
-
-
 class FactureLotEntrepot(models.Model):
     lot = models.ForeignKey(
         LotEntrepot,
@@ -276,8 +276,6 @@ class FactureLotEntrepot(models.Model):
 
     def __str__(self):
         return f"Facture {self.id} – Lot {self.lot.reference_lot}"
-
-
 
 # core/models.py
 class Perte(models.Model):
@@ -348,13 +346,13 @@ class Perte(models.Model):
             'quantite_perdue_totale': self.quantite_perdue,
             'quantite_originale': self.quantite_perdue_originale,
             'difference': self.difference_quantite
-        }
-    
+        }  
 
 
 class Agent(models.Model):
     TYPE_AGENT_CHOICES = (
         ('direction', 'Direction'),
+        ('rot', 'Responsable Opérations'),
         ('entrepot', 'Superviseur'),
         ('terrain', 'Agent'),
         ('stagiaire', 'Stagiaire'), 
@@ -368,6 +366,15 @@ class Agent(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     type_agent = models.CharField(max_length=50, choices=TYPE_AGENT_CHOICES)
+    superviseur = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='agents_geres'
+    )
+
     quartier = models.CharField(
         max_length=150,
         blank=True,
@@ -556,12 +563,6 @@ class Agent(models.Model):
         return True
     
     
-
-    @property
-    def est_stagiaire(self):
-        """Vérifie si l'agent est un stagiaire"""
-        return self.type_agent == 'stagiaire'
-
     @property
     def statut_stagiaire(self):
         """Retourne le statut du stagiaire"""
@@ -622,7 +623,11 @@ class Agent(models.Model):
     def est_direction(self):
         """Vérifie si l'agent fait partie de la direction"""
         return self.type_agent == 'direction'
-
+    
+    @property
+    def est_rot(self):
+        """Vérifie si l'agent est un rot"""
+        return self.type_agent == 'rot'
     @property
     def est_superviseur(self):
         """Vérifie si l'agent est un superviseur"""
@@ -633,6 +638,14 @@ class Agent(models.Model):
         """Vérifie si l'agent est un agent terrain"""
         return self.type_agent == 'terrain'
 
+    @property
+    def est_superviseur_ou_rot(self):
+        return self.type_agent in ['entrepot', 'rot']
+    
+    @property
+    def est_stagiaire(self):
+        """Vérifie si l'agent est un stagiaire"""
+        return self.type_agent == 'stagiaire'
 
     @property
     def total_ventes(self):
@@ -827,6 +840,41 @@ class Agent(models.Model):
             return self.bonus.get_ventes_avec_bonus().count()
         return 0
     
+class AffectationLotSuperviseur(models.Model):
+    lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='lots_affectes'
+    )
+    quantite = models.DecimalField(max_digits=10, decimal_places=2)
+
+    attribue_par = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        limit_choices_to={'type_agent': 'rot'},
+        related_name='affectations_realisees'
+    )
+
+    date_affectation = models.DateTimeField(auto_now_add=True)
+
+class AffectationLotAgent(models.Model):
+    affectation_superviseur = models.ForeignKey(
+        AffectationLotSuperviseur,
+        on_delete=models.CASCADE,
+        related_name='affectations_agents'
+    )
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'terrain'}
+    )
+    quantite = models.DecimalField(max_digits=10, decimal_places=2)
+
+    date_affectation = models.DateTimeField(auto_now_add=True)
+
 
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (

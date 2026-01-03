@@ -27,7 +27,14 @@ from core.models import (
 )
 from django.db.models import OuterRef, Subquery, DateTimeField
 
-from core.forms import AdminAgentCreationForm, RapportDettesForm, PaiementFournisseurForm
+from core.forms import RapportDettesForm, PaiementFournisseurForm
+from agents.forms import (
+                          
+                            
+                            DirectionAgentCreationForm,
+                            RotSupervisorCreationForm,
+                            SupervisorTerrainAgentCreationForm
+                            )
 
 from direction.services.product_analysis_service import ProductAnalysisService
 from direction.services.agent_analysis_service import AgentAnalysisService
@@ -1367,13 +1374,13 @@ def apercu_cloture(request, cloture_id):
 @login_required
 def admin_create_agent(request):
     if request.method == 'POST':
-        form = AdminAgentCreationForm(request.POST)
+        form = DirectionAgentCreationForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, "Agent créé avec succès")
             return redirect('agent_dashboard')
     else:
-        form = AdminAgentCreationForm()
+        form = DirectionAgentCreationForm()
 
     return render(request, 'direction/agents/agent_create.html', {'form': form})
 

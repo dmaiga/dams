@@ -400,8 +400,9 @@
                 <!-- Navigation sidebar -->
                 <div class="sidebar-nav">
                     <!-- ===== MENU AGENT TERRAIN ===== -->
-                    {% if request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}
-                    
+                    {% if request.user.is_authenticated and request.user.agent %}
+                        {# ===== MENU AGENT TERRAIN / STAGIAIRE ===== #}
+                        {% if request.user.agent.est_agent_terrain %}
                     <div class="nav flex-column">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_agent' %}active{% endif %}" 
                            href="{% url 'dashboard_agent' %}">
@@ -431,12 +432,7 @@
                             
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_dettes,detail_dette,enregistrer_paiement_dette,creer_dette' %}active{% endif %}" 
-                           href="{% url 'liste_dettes' %}">
-                            <i class="fas fa-file-invoice-dollar"></i>
-                            <span>Mes Dettes</span>
-                          
-                        </a>
+                      
 
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
                            href="{% url 'liste_clients' %}">
@@ -445,15 +441,11 @@
                             
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name == 'consulter_bonus' %}active{% endif %}" 
-                           href="{% url 'consulter_bonus' %}">
-                            <i class="fas fa-gift"></i>
-                            <span>Mes Bonus</span>
-                           
-                        </a>
+                     
                     </div>
                     
-                    {% else %}
+                    {# ===== MENU SUPERVISEUR / ROT ===== #}
+                    {% elif request.user.agent.est_superviseur %}
                     <!-- ===== MENU SUPERVISEUR/ADMIN ===== -->
                     
                     <div class="nav flex-column">
@@ -474,6 +466,45 @@
                             <i class="fas fa-hand-holding-usd"></i>
                             <span>Recouvrement Agents</span>
                         </a>
+                       
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_distributions,creer_distribution,detail_distribution' %}active{% endif %}" 
+                           href="{% url 'liste_distributions' %}">
+                            <i class="fas fa-truck-loading"></i>
+                            <span>Distributions</span>
+                        </a>
+
+                      
+                       
+
+                      
+
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
+                           href="{% url 'liste_clients' %}">
+                            <i class="fas fa-user-tie"></i>
+                            <span>Clients</span>
+                        </a>
+                    </div>
+                    {% elif request.user.agent.est_rot %}
+                    <!-- ===== MENU SUPERVISEUR/ADMIN ===== -->
+                    
+                    <div class="nav flex-column">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'tableau_de_bord_superviseur' %}active{% endif %}" 
+                           href="{% url 'tableau_de_bord_superviseur' %}">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Tableau de Bord</span>
+                        </a>
+
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_agents,ajouter_agent,modifier_agent,detail_agent' %}active{% endif %}" 
+                           href="{% url 'liste_agents' %}">
+                            <i class="fas fa-users"></i>
+                            <span>Gestion Agents</span>
+                        </a>
+                       
+                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
+                           href="{% url 'liste_agents_recouvrement' %}">
+                            <i class="fas fa-hand-holding-usd"></i>
+                            <span>Recouvrement Superviseur</span>
+                        </a>
                         
                         <a class="nav-link {% if request.resolver_match.url_name == 'liste_fournisseurs' %}active{% endif %}" 
                            href="{% url 'liste_fournisseurs' %}">
@@ -493,17 +524,7 @@
                             <span>Distributions</span>
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_ventes,detail_vente' %}active{% endif %}" 
-                           href="{% url 'liste_ventes' %}">
-                            <i class="fas fa-cash-register"></i>
-                            <span>Ventes</span>
-                        </a>
-
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_dettes,detail_dette' %}active{% endif %}" 
-                           href="{% url 'liste_dettes' %}">
-                            <i class="fas fa-file-invoice-dollar"></i>
-                            <span>Dettes</span>
-                        </a>
+                       
                           <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
                             href="{% url 'liste_versement' %}">
                              <i class="fas fa-file-invoice"></i>
@@ -512,14 +533,10 @@
 
                       
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
-                           href="{% url 'liste_clients' %}">
-                            <i class="fas fa-user-tie"></i>
-                            <span>Clients</span>
-                        </a>
                     </div>
-                    
                     {% endif %}
+                    {% endif %}
+                    
                 </div>
 
                 <!-- Footer sidebar -->
