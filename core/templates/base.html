@@ -434,12 +434,7 @@
 
                       
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
-                           href="{% url 'liste_clients' %}">
-                            <i class="fas fa-user-tie"></i>
-                            <span>Mes Clients</span>
-                            
-                        </a>
+                   
 
                      
                     </div>
@@ -456,54 +451,49 @@
                         </a>
 
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_agents,ajouter_agent,modifier_agent,detail_agent' %}active{% endif %}" 
-                           href="{% url 'liste_agents' %}">
+                           href="{% url 'liste_agents_sup' %}">
                             <i class="fas fa-users"></i>
                             <span>Gestion Agents</span>
                         </a>
-                       
+                       <a class="nav-link" href="{% url 'superviseur_lots_affectes' %}">
+                            <i class="fas fa-pallet"></i>
+                            Lots affectés
+                        </a>
+
                         <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
                            href="{% url 'liste_agents_recouvrement' %}">
                             <i class="fas fa-hand-holding-usd"></i>
                             <span>Recouvrement Agents</span>
                         </a>
                        
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_distributions,creer_distribution,detail_distribution' %}active{% endif %}" 
-                           href="{% url 'liste_distributions' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_distribution_sup' %}active{% endif %}" 
+                           href="{% url 'liste_distribution_sup' %}">
                             <i class="fas fa-truck-loading"></i>
                             <span>Distributions</span>
                         </a>
 
-                      
-                       
 
-                      
-
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_clients,ajouter_client,modifier_client,detail_client' %}active{% endif %}" 
-                           href="{% url 'liste_clients' %}">
-                            <i class="fas fa-user-tie"></i>
-                            <span>Clients</span>
-                        </a>
+               
                     </div>
                     {% elif request.user.agent.est_rot %}
                     <!-- ===== MENU SUPERVISEUR/ADMIN ===== -->
                     
                     <div class="nav flex-column">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'tableau_de_bord_superviseur' %}active{% endif %}" 
-                           href="{% url 'tableau_de_bord_superviseur' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_rot' %}active{% endif %}" 
+                           href="{% url 'dashboard_rot' %}">
                             <i class="fas fa-tachometer-alt"></i>
                             <span>Tableau de Bord</span>
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_agents,ajouter_agent,modifier_agent,detail_agent' %}active{% endif %}" 
-                           href="{% url 'liste_agents' %}">
-                            <i class="fas fa-users"></i>
-                            <span>Gestion Agents</span>
+                      <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_rot' %}active{% endif %}" 
+                           href="{% url 'liste_agents_rot' %}">
+                          <i class="fas fa-users"></i>
+                            <span>Agents</span>
                         </a>
-                       
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
-                           href="{% url 'liste_agents_recouvrement' %}">
-                            <i class="fas fa-hand-holding-usd"></i>
-                            <span>Recouvrement Superviseur</span>
+                         <a class="nav-link {% if request.resolver_match.url_name == 'recouvrer_superviseur' %}active{% endif %}" 
+                           href="{% url 'recouvrer_superviseur' %}">
+                          <i class="fas fa-users"></i>
+                            <span>Recouvrement</span>
                         </a>
                         
                         <a class="nav-link {% if request.resolver_match.url_name == 'liste_fournisseurs' %}active{% endif %}" 
@@ -518,10 +508,10 @@
                             <span>Stock Entrepôt</span>
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_distributions,creer_distribution,detail_distribution' %}active{% endif %}" 
-                           href="{% url 'liste_distributions' %}">
+                        <a class="nav-link {% if request.resolver_match.url_name in 'rot_affectations_liste' %}active{% endif %}" 
+                           href="{% url 'rot_affectations_liste' %}">
                             <i class="fas fa-truck-loading"></i>
-                            <span>Distributions</span>
+                            <span>Affecter un lot</span>
                         </a>
 
                        

@@ -12,16 +12,7 @@
                 <h1 class="h3 mb-0">
                     <i class="fas fa-users me-2"></i>Gestion du Recouvrement
                 </h1>
-                <div class="btn-group">
-                    <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left me-1"></i>Retour
-                    </a>
-                    {% if agent_connecte.est_superviseur %}
-                    <a href="{% url 'creer_versement' %}" class="btn btn-success">
-                        <i class="fas fa-money-bill-wave me-1"></i>Nouveau Versement
-                    </a>
-                    {% endif %}
-                </div>
+                
             </div>
 
 

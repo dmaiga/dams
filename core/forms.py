@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.db import models
 import os
 from django.db.models import (
-    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
+    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField,Value
 )
 
 from datetime import timedelta
@@ -682,337 +682,133 @@ class DistributionForm(forms.ModelForm):
     
         return instance
     
-class DistributionModificationForm(forms.ModelForm):
-    """Formulaire pour modifier une distribution existante"""
-    
-    raison_modification = forms.CharField(
-        required=True,
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'placeholder': 'Expliquez la raison de cette modification...',
-            'rows': 3
-        }),
-        label="Raison de la modification"
-    )
-    
+  
+# === FORMULAIRE VENTE ===
+
+class VenteForm(forms.ModelForm):
+    """
+    Vente terrain :
+    - uniquement produits distribués
+    - prix imposé par le superviseur
+    - détail + comptant uniquement
+    """
+
     class Meta:
-        model = DistributionAgent
-        fields = ['date_distribution']
+        model = Vente
+        fields = [
+            'detail_distribution',
+            'quantite',
+            'date_vente',
+        ]
         widgets = {
-            'date_distribution': forms.DateTimeInput(attrs={
-                'class': 'form-control datetimepicker',
+            'detail_distribution': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'quantite': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0.01',
+                'step': '0.01'
+            }),
+            'date_vente': forms.DateTimeInput(attrs={
+                'class': 'form-control',
                 'type': 'datetime-local'
             }),
         }
 
     def __init__(self, *args, **kwargs):
-        self.current_user = kwargs.pop('current_user', None)
+        self.agent = kwargs.pop('agent')
         super().__init__(*args, **kwargs)
-        
-        # Formater la date existante
-        if self.instance and self.instance.pk:
-            self.fields['date_distribution'].initial = self.instance.date_distribution.strftime('%Y-%m-%dT%H:%M')
 
-    def clean(self):
-        cleaned_data = super().clean()
-        
-        # Validation de la date
-        date_distribution = cleaned_data.get('date_distribution')
-        if date_distribution and date_distribution > timezone.now():
-            self.add_error('date_distribution', 'La date de distribution ne peut pas être dans le futur')
-        
-        return cleaned_data
+        # Date par défaut
+        self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        
-        if commit:
-            instance.save()
-            # La logique de mise à jour des totaux sera gérée par la vue
-        
-        return instance
-
-class DistributionSuppressionForm(forms.Form):
-    """Formulaire pour supprimer une distribution"""
-    
-    raison_suppression = forms.CharField(
-        required=True,
-        widget=forms.Textarea(attrs={
-            'class': 'form-control',
-            'placeholder': 'Expliquez la raison de cette suppression...',
-            'rows': 3
-        }),
-        label="Raison de la suppression"
-    )
-    
-    confirmer_suppression = forms.BooleanField(
-        required=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        label="Je confirme vouloir supprimer cette distribution"
-    )
-
-    def clean(self):
-        cleaned_data = super().clean()
-        confirmer_suppression = cleaned_data.get('confirmer_suppression')
-        
-        if not confirmer_suppression:
-            self.add_error('confirmer_suppression', 'Vous devez confirmer la suppression')
-        
-        return cleaned_data
-
-# === FORMULAIRE VENTE ===
-# === FORMULAIRE VENTE ===
-class VenteForm(forms.ModelForm):
-    # Nouveau client (optionnel)
-    nouveau_client = forms.BooleanField(
-        required=False, 
-        initial=False, 
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
-    )
-    client_nom = forms.CharField(
-        max_length=100, 
-        required=False, 
-        widget=forms.TextInput(attrs={
-            'class': 'form-control', 
-            'placeholder': 'Nom du client (optionnel)'
-        })
-    )
-    client_contact = forms.CharField(
-        max_length=100, 
-        required=False, 
-        widget=forms.TextInput(attrs={
-            'class': 'form-control', 
-            'placeholder': 'Contact (téléphone, optionnel)'
-        })
-    )
-    client_type = forms.ChoiceField(
-        choices=Client.TYPE_CLIENT_CHOICES,
-        required=False,
-        initial='detail',
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-    
-    # Type de vente
-    type_vente = forms.ChoiceField(
-        choices=Vente.TYPE_VENTE_CHOICES,
-        initial='detail',
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-            'id': 'type-vente'
-        }),
-        help_text="Choisissez le type de vente (gros ou détail)"
-    )
-    
-    # Mode de paiement
-    mode_paiement = forms.ChoiceField(
-        choices=Vente.MODE_PAIEMENT_CHOICES,
-        initial='comptant',
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-            'id': 'mode-paiement'
-        }),
-        help_text="Choisissez le mode de paiement"
-    )
-
-    # Date de vente rétroactive
-    date_vente = forms.DateTimeField(
-        widget=forms.DateTimeInput(attrs={
-            'class': 'form-control',
-            'type': 'datetime-local',
-            'id': 'date-vente'
-        }),
-        initial=timezone.now,
-        label="Date de la vente",
-        help_text="Date à laquelle la vente a été effectuée"
-    )
-
-    # ✅ MODIFIÉ : Champ stagiaire optionnel - TOUS les stagiaires
-    stagiaire = forms.ModelChoiceField(
-        queryset=Agent.objects.none(),  # Sera rempli dans __init__
-        required=False,
-        widget=forms.Select(attrs={
-            'class': 'form-select',
-            'id': 'stagiaire-select'
-        }),
-        label="Stagiaire (optionnel)",
-        help_text="Si cette vente a été réalisée par un stagiaire"
-    )
-
-    class Meta:
-        model = Vente
-        fields = ['detail_distribution', 'quantite', 'type_vente', 'mode_paiement', 'prix_vente_unitaire', 'date_vente', 'stagiaire']
-        widgets = {
-            'client': forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
-            'detail_distribution': forms.Select(attrs={'class': 'form-select', 'id': 'detail-distribution'}),
-            'quantite': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'id': 'quantite-vente'}),
-            'prix_vente_unitaire': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'step': '0.01', 
-                'id': 'prix-vente',
-                'readonly': 'readonly',
-                'placeholder': 'Le prix sera déterminé automatiquement'
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        self.agent = kwargs.pop('agent', None)
-        super().__init__(*args, **kwargs)
-        
-        # Rendre tous les champs non obligatoires sauf ceux nécessaires
-        self.fields['detail_distribution'].required = False
-        self.fields['quantite'].required = False
-        self.fields['type_vente'].required = True
-        self.fields['mode_paiement'].required = True
-        self.fields['prix_vente_unitaire'].required = False
-        self.fields['date_vente'].required = True
-        self.fields['stagiaire'].required = False
-        
-        # Formater la date initiale pour le champ datetime-local
-        if self.instance and self.instance.pk:
-            self.fields['date_vente'].initial = self.instance.date_vente.strftime('%Y-%m-%dT%H:%M')
-        else:
-            self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
-        
-        # ✅ Tous les stagiaires, même expirés
-        if self.agent:
-            tous_les_stagiaires = Agent.objects.filter(type_agent='stagiaire').select_related('user')
-            self.fields['stagiaire'].queryset = tous_les_stagiaires
-            self.fields['stagiaire'].label_from_instance = lambda obj: (
-                f"{obj.full_name} (Expire le {obj.date_expiration.strftime('%d/%m/%Y')})"
-                if obj.date_expiration else f"{obj.full_name} (Pas de date d'expiration)"
-            )
-        
-        # Filtrer les clients existants
-        self.fields['client'] = forms.ModelChoiceField(
-            queryset=Client.objects.all(),
-            required=False,
-            widget=forms.Select(attrs={'class': 'form-select', 'id': 'client-existant'}),
-            empty_label="Sélectionner un client existant (optionnel)..."
-        )        
-        # ✅ APPROCHE CALCUL DYNAMIQUE
-        from django.db.models import DecimalField, Sum, F, Value, ExpressionWrapper
-        from django.db.models.functions import Coalesce
-
-        if self.agent:
-            detail_qs = DetailDistribution.objects.filter(
-                distribution__agent_terrain=self.agent,
-                distribution__est_supprime=False,
-                est_supprime=False
-            ).annotate(
+        # 🔒 PRODUITS DISPONIBLES UNIQUEMENT
+        detail_qs = (
+            DetailDistribution.objects
+            .filter(distribution__agent_terrain=self.agent)
+            .annotate(
                 quantite_vendue_calculee=Coalesce(
-                    Sum('vente__quantite'), 
+                    Sum('vente__quantite'),
                     Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
-                )
-            ).annotate(
+                ),
                 quantite_restante=ExpressionWrapper(
-                    F('quantite') - F('quantite_vendue_calculee'),
+                    F('quantite') - Coalesce(Sum('vente__quantite'), Value(0)),
                     output_field=DecimalField(max_digits=10, decimal_places=2)
                 )
-            ).filter(
-                quantite_restante__gt=0
-            ).select_related('lot__produit', 'lot')
+            )
+            .filter(quantite_restante__gt=0)
+            .select_related('lot__produit', 'distribution')
+        )
 
-            self.fields['detail_distribution'].queryset = detail_qs
+        self.fields['detail_distribution'].queryset = detail_qs
+        self.fields['detail_distribution'].label_from_instance = self.label_distribution
 
-    def label_from_distribution(self, obj):
-        """Format correct pour l'affichage des options"""
-        produit = obj.lot.produit.nom
-        lot_ref = obj.lot.reference_lot or f"Lot#{obj.lot.id}"
-        
-        # ✅ FORCER le calcul de la quantité restante
-        if hasattr(obj, 'quantite_restante'):
-           quantite_dispo = getattr(obj, 'quantite_restante', None)
+    # ============================
+    # AFFICHAGE
+    # ============================
 
-        else:
-            # Calcul manuel si l'annotation n'est pas disponible
-            from django.db.models import Sum
-            quantite_vendue = obj.vente_set.aggregate(
-                total=Sum('quantite')
-            )['total'] or 0
-            quantite_dispo = obj.quantite - quantite_vendue
-        
-        specification = f" - {obj.specification}" if obj.specification else ""
-        
-        return f"{produit}{specification} - {lot_ref} (Stock dispo: {quantite_dispo})"
+    def label_distribution(self, obj):
+        return (
+            f"{obj.lot.produit.nom} "
+            f"(Stock: {obj.quantite_restante}) "
+            f"- Prix: {obj.prix_detail} FCFA"
+        )
+
+    # ============================
+    # VALIDATION
+    # ============================
+
     def clean(self):
         cleaned_data = super().clean()
-        
-        # Validation client - TOUT EST OPTIONNEL
-        if cleaned_data.get('nouveau_client') and cleaned_data.get('client_nom'):
-            if not cleaned_data.get('client_nom'):
-                self.add_error('client_nom', 'Nom requis si vous créez un nouveau client')
-        
-        # Validation de base (produit et quantité)
-        if not cleaned_data.get('detail_distribution'):
-            self.add_error('detail_distribution', 'Produit à vendre requis')
-        
-        if not cleaned_data.get('quantite') or cleaned_data.get('quantite', 0) <= 0:
-            self.add_error('quantite', 'Quantité valide requise')
-        
-        # ✅ Vérifier la quantité disponible AVEC LE CALCUL DYNAMIQUE
-        if cleaned_data.get('detail_distribution') and cleaned_data.get('quantite'):
-            detail = cleaned_data['detail_distribution']
-            
-            # Calculer la quantité déjà vendue
-            from django.db.models import Sum
+        detail = cleaned_data.get('detail_distribution')
+        quantite = cleaned_data.get('quantite')
+
+        if not detail:
+            self.add_error('detail_distribution', "Produit requis")
+
+        if not quantite or quantite <= 0:
+            self.add_error('quantite', "Quantité invalide")
+
+        if detail and quantite:
+            # recalcul sécurité
             quantite_vendue = detail.vente_set.aggregate(
                 total=Sum('quantite')
             )['total'] or 0
-            
+
             quantite_disponible = detail.quantite - quantite_vendue
-            
-            if cleaned_data['quantite'] > quantite_disponible:
-                self.add_error('quantite', f'Quantité insuffisante. Disponible: {quantite_disponible}')
-        
-        # Validation de la date de vente
+
+            if quantite > quantite_disponible:
+                self.add_error(
+                    'quantite',
+                    f"Stock insuffisant. Disponible : {quantite_disponible}"
+                )
+
         date_vente = cleaned_data.get('date_vente')
         if date_vente and date_vente > timezone.now():
-            self.add_error('date_vente', 'La date de vente ne peut pas être dans le futur')
-        
-        # Validation stagiaire
-        stagiaire = cleaned_data.get('stagiaire')
-        if stagiaire:
-            if stagiaire.type_agent != 'stagiaire':
-                self.add_error('stagiaire', "L'agent sélectionné doit être un stagiaire")
-        
+            self.add_error('date_vente', "Date future interdite")
+
         return cleaned_data
 
+    # ============================
+    # SAUVEGARDE
+    # ============================
+
     def save(self, commit=True):
-        instance = super().save(commit=False)
+        vente = super().save(commit=False)
 
-        # Associer l'agent
-        instance.agent = self.agent
+        # 🔒 FORÇAGE MÉTIER
+        vente.agent = self.agent
+        vente.type_vente = 'detail'
+        vente.mode_paiement = 'comptant'
+        vente.stagiaire = None
 
-        # Associer le stagiaire si sélectionné
-        stagiaire = self.cleaned_data.get('stagiaire')
-        if stagiaire:
-            instance.stagiaire = stagiaire
-
-        # Gérer le client
-        if self.cleaned_data.get('nouveau_client') and self.cleaned_data.get('client_nom'):
-            client = Client.objects.create(
-                nom=self.cleaned_data['client_nom'],
-                contact=self.cleaned_data.get('client_contact', ''),
-                type_client=self.cleaned_data.get('client_type', 'detail')
-            )
-            instance.client = client
-        elif self.cleaned_data.get('client'):
-            instance.client = self.cleaned_data.get('client')
-        else:
-            instance.client = None
-
-        # Déterminer automatiquement le prix
-        if not instance.prix_vente_unitaire and instance.detail_distribution:
-            if instance.type_vente == 'gros':
-                instance.prix_vente_unitaire = instance.detail_distribution.prix_gros
-            else:
-                instance.prix_vente_unitaire = instance.detail_distribution.prix_detail
+        # 🔒 PRIX IMPOSÉ
+        vente.prix_vente_unitaire = vente.detail_distribution.prix_detail
 
         if commit:
-            instance.save()
-            # ✅ NE RIEN FAIRE - la quantité disponible est calculée dynamiquement
-            
-        return instance
+            vente.save()
+
+        return vente
 
 # === FORMULAIRE DETTE (pour vente à crédit) ===
 class DetteForm(forms.ModelForm):

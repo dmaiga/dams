@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load format_fcfa %}
+
+{% block title %}Affectations ROT{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">
+            <i class="fas fa-clipboard-list"></i>
+            Mes affectations
+        </h5>
+        <a href="{% url 'affecter_lot_superviseur' %}" class="btn btn-primary btn-sm">
+            + Nouvelle affectation
+        </a>
+    </div>
+
+    <div class="list-group">
+        {% for a in affectations %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between">
+                    <strong>{{ a.lot.produit.nom }}</strong>
+                    <span class="badge bg-primary">{{ a.quantite }}</span>
+                </div>
+                <small class="text-muted">
+                    Superviseur : {{ a.superviseur.full_name }} <br>
+                    Lot : {{ a.lot.reference_lot }} <br>
+                    Date : {{ a.date_affectation|date:"d/m/Y H:i" }}
+                </small>
+            </div>
+        {% empty %}
+            <div class="text-muted text-center py-4">
+                Aucune affectation enregistrée
+            </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

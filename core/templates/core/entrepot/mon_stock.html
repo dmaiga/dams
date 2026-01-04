@@ -86,7 +86,7 @@
                                 {% for produit in stock_agent %}
                                 <tr class="{% if produit.quantite_restante <= 5 %}table-warning{% endif %}">
                                     <td>
-                                        <strong>{{ produit.nom_produit }}</strong>
+                                        <strong>{{ produit.produit }}</strong>
                                         {% if produit.specification %}
                                         <br><small class="text-muted">{{ produit.specification }}</small>
                                         {% endif %}

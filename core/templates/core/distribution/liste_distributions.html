@@ -14,7 +14,7 @@
             <p class="text-muted mb-0">Historique des distributions superviseur → agents</p>
         </div>
         <div>
-            <a href="{% url 'distribuer_produits' %}" class="btn btn-primary btn-sm">
+            <a href="{% url 'distribuer_lot_agent' %}" class="btn btn-primary btn-sm">
                 <i class="fas fa-plus me-1"></i> Nouvelle Distribution
             </a>
         </div>
@@ -62,13 +62,7 @@
                     <input type="date" name="date_fin" class="form-control form-control-sm" 
                            value="{{ date_fin }}" placeholder="Fin" style="width: 140px;">
                 </div>
-                <div class="col-auto">
-                    <div class="form-check form-check-inline">
-                        <input type="checkbox" name="show_deleted" value="true" class="form-check-input" 
-                               id="show_deleted" {% if show_deleted %}checked{% endif %}>
-                        <label class="form-check-label small" for="show_deleted">Supprimés</label>
-                    </div>
-                </div>
+                
                 <div class="col-auto">
                     <button type="submit" class="btn btn-primary btn-sm">
                         <i class="fas fa-filter me-1"></i> Filtrer
@@ -120,23 +114,6 @@
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1">
-                            <h6 class="card-title text-muted mb-1">Valeur Gros</h6>
-                            <h4 class="mb-0 ">{{ total_valeur_gros|fcfa }} <small class="fs-6">FCFA</small></h4>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <div class="avatar-sm rounded-circle bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center">
-                                <i class="fas fa-money-bill-wave fa-lg"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-3 col-md-6">
-            <div class="card card-stat border-0 shadow-sm">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
                             <h6 class="card-title text-muted mb-1">Valeur Détail</h6>
                             <h4 class="mb-0 ">{{ total_valeur_detail|fcfa }} <small class="fs-6">FCFA</small></h4>
                         </div>
@@ -164,7 +141,7 @@
                             <th>Destinataire</th>
 
                             <th class="text-center">Quantité</th>
-                            <th class="text-end" >Valeur Gros</th>
+                            
                             <th class="text-end" >Valeur Détail</th>
                             <th class="text-center">Actions</th>
                         </tr>
@@ -220,11 +197,6 @@
                                 <span class="fw-bold text-dark fs-6">{{ dist.quantite_totale_sql|floatformat:2|intcomma  }}</span>
                             </td>
                             
-                            <!-- Valeurs -->
-                            <td class="text-end">
-                                <span class="fw-bold ">{{ dist.valeur_gros_sql|fcfa }}</span>
-                                <div class="text-muted small">FCFA</div>
-                            </td>
                             <td class="text-end">
                                 <span class="fw-bold ">{{ dist.valeur_detail_sql|fcfa }}</span>
                                 <div class="text-muted small">FCFA</div>
@@ -240,27 +212,7 @@
                                         <i class="fas fa-eye"></i>
                                     </a>
                                     
-                                    {% if not dist.est_supprime %}
-                                    <a href="{% url 'modifier_distribution' dist.id %}" 
-                                       class="btn btn-outline-warning btn-sm" 
-                                       title="Modifier"
-                                       data-bs-toggle="tooltip">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="{% url 'supprimer_distribution' dist.id %}" 
-                                       class="btn btn-outline-danger btn-sm rounded-end" 
-                                       title="Supprimer"
-                                       data-bs-toggle="tooltip">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                    {% else %}
-                                    <a href="{% url 'restaurer_distribution' dist.id %}" 
-                                       class="btn btn-outline-success btn-sm rounded-end" 
-                                       title="Restaurer"
-                                       data-bs-toggle="tooltip">
-                                        <i class="fas fa-undo"></i>
-                                    </a>
-                                    {% endif %}
+                                    
                                 </div>
                             </td>
                         </tr>

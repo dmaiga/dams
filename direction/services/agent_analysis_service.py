@@ -92,15 +92,15 @@ class AgentAnalysisService:
     def get_agent_current_stock(agent):
         """Récupère les produits actuellement à disposition de l'agent"""
         distributions_actives = DistributionAgent.objects.filter(
-            agent_terrain=agent,
-            est_supprime=False
+            agent_terrain=agent
+            
         )
         
         stock_data = []
         total_produits = 0
         
         for distribution in distributions_actives:
-            details = distribution.detaildistribution_set.filter(est_supprime=False)
+            details = distribution.detaildistribution_set.all()
             
             for detail in details:
                 quantite_restante = detail.quantite_restante_calculee
@@ -375,7 +375,7 @@ class AgentAnalysisService:
             total_versements = sum(vers.montant_vente for vers in versements)
             
             # Solde
-            solde = superviseur.solde_superviseur
+            solde = superviseur.solde_reel_superviseur
             
             superviseurs_data.append({
                 'superviseur': superviseur,
@@ -813,7 +813,7 @@ class AgentAnalysisService:
             DetailDistribution.objects
             .filter(
                 distribution__agent_terrain_id__in=agent_ids,
-                est_supprime=False,
+              
                 quantite__gt=0
             )
             .select_related(

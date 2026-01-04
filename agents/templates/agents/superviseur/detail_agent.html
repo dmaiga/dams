@@ -12,14 +12,14 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
-                    <a href="{% url 'liste_agents' %}" class="btn btn-secondary me-3">
+                    <a href="{% url 'liste_agents_sup' %}" class="btn btn-secondary me-3">
                         <i class="fas fa-arrow-left"></i>
                     </a>
                     <div>
                         <h1 class="h3 mb-1">{{ agent.full_name }}</h1>
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb mb-0">
-                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents_sup' %}">Agents</a></li>
                                 <li class="breadcrumb-item active">{{ agent.full_name }}</li>
                             </ol>
                         </nav>

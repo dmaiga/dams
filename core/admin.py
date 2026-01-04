@@ -94,6 +94,7 @@ class RecouvrementAdmin(admin.ModelAdmin):
 
 
 
+
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
     list_display = [
@@ -142,13 +143,11 @@ class AgentAdmin(admin.ModelAdmin):
 
     @admin.action(description="✅ Activer les agents sélectionnés")
     def activer_agents(self, request, queryset):
-        for agent in queryset:
-            agent.activer()
+        queryset.update(est_actif=True)
 
     @admin.action(description="⛔ Désactiver les agents sélectionnés")
     def desactiver_agents(self, request, queryset):
-        for agent in queryset:
-            agent.desactiver()
+        queryset.update(est_actif=False)
 
     # =========================
     # STATISTIQUES
@@ -156,44 +155,52 @@ class AgentAdmin(admin.ModelAdmin):
 
     def statistiques_agent(self, obj):
         """
-        Affiche les principales statistiques selon le type d'agent.
+        Statistiques FINANCIÈRES & MÉTIER
+        Basées UNIQUEMENT sur les nouvelles propriétés valides
         """
+
+        if obj.est_agent_terrain:
+            return (
+                f"💼 Ventes: {obj.total_ventes:,.0f} FCFA | "
+                f"💵 Recouvré: {obj.total_recouvre:,.0f} FCFA | "
+                f"📥 En possession: {obj.argent_en_possession:,.0f} FCFA"
+            )
+
         if obj.est_superviseur:
-            details = obj.detail_solde_superviseur
+            solde = obj.solde_reel_superviseur
+
+            couleur = "green" if solde <= 0 else "red"
+
+            return format_html(
+                "📦 Recouvré agents: <b>{}</b> FCFA | "
+                "💸 Dépenses: <b>{}</b> FCFA | "
+                "🏦 Versé: <b>{}</b> FCFA | "
+                "💰 Solde: <b style='color:{}'>{}</b> FCFA",
+                f"{obj.total_recouvre_agents:,.0f}",
+                f"{obj.total_depenses_superviseur:,.0f}",
+                f"{obj.total_versements_superviseur:,.0f}",
+                couleur,
+                f"{solde:,.0f}"
+            )
+        
+        if obj.est_rot:
+            return "🧠 Responsable Opérations & Trésorerie"
+
+
+        if obj.est_direction:
+            return "👔 Direction"
+
+
+        if obj.est_stagiaire:
+            vente = Vente.objects.filter(stagiaire=obj).first()
+            tuteur = vente.agent.full_name if vente and vente.agent else "—"
 
             return (
-                f"🧾 Recouvrements: {details['total_recouvrements_agents']:,} FCFA | "
-                f"Ventes pers.: {details['total_ventes_personnelles']:,} FCFA | "
-                f"Ventes stagiaires: {details['total_ventes_stagiaires']:,} FCFA | "
-                f"Versements: {details['total_versements_vente']:,} FCFA | "
-                f"Dépenses: {details['total_depenses_vente']:,} FCFA | "
-                f"💰 Solde: {details['solde_vente_actuel']:,} FCFA"
+                f"🧪 Stagiaire | "
+                f"Ventes: {obj.total_ventes:,.0f} FCFA | "
+                f"Tuteur: {tuteur}"
             )
 
-        elif obj.est_agent_terrain:
-            return (
-                f"Ventes pers.: {obj.total_ventes_personnelles:,} FCFA | "
-                f"Ventes stagiaires: {obj.total_ventes_stagiaires:,} FCFA | "
-                f"Total: {obj.total_ventes:,} FCFA | "
-                f"Recouvré: {obj.total_recouvre:,} FCFA | "
-                f"À recouvrir: {obj.argent_en_possession:,} FCFA | "
-                f"Stagiaires: {obj.nombre_stagiaires_supervises}"
-            )
-
-        elif obj.est_direction:
-            return "👔 Membre de la direction"
-
-        elif obj.est_stagiaire:
-            tuteur = "Aucun"
-            vente_avec_tuteur = Vente.objects.filter(stagiaire=obj).first()
-            if vente_avec_tuteur and vente_avec_tuteur.agent:
-                tuteur = vente_avec_tuteur.agent.full_name
-
-            return (
-                f"Ventes: {obj.total_ventes:,} FCFA | "
-                f"Tuteur: {tuteur} | "
-                f"Statut: {obj.statut_stagiaire}"
-            )
 
         return "—"
 

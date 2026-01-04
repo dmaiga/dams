@@ -121,234 +121,6 @@ class Fournisseur(models.Model):
         )['total'] or Decimal('0.00')
 
 
-class LotEntrepot(models.Model):
-    produit = models.ForeignKey(Produit,
-                                 on_delete=models.CASCADE,
-                                 related_name="lots")
-    fournisseur = models.ForeignKey(
-        Fournisseur,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        default=None,
-        related_name="lots",
-        verbose_name="Fournisseur (optionnel)"
-    )
-    quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
-    quantite_restante = models.DecimalField(max_digits=10, decimal_places=2)
-    prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    valeur_stock_initiale = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        null=True,
-        blank=True
-    )
-    date_reception = models.DateTimeField(default=timezone.now)
-    date_enregistrement = models.DateTimeField(auto_now_add=True)
-    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
-
-    def __str__(self):
-        return f"{self.produit.nom} - {self.fournisseur} - {self.quantite_restante} restants"
-    
-    def save(self, *args, **kwargs):
-        # Si la valeur initiale n'est pas encore enregistrée, on la calcule UNE SEULE FOIS
-        if self.valeur_stock_initiale is None:
-            self.valeur_stock_initiale = self.quantite_initiale * (self.prix_achat_unitaire or 0)
-        
-        # Validation de cohérence des quantités
-        if self.quantite_restante > self.quantite_initiale:
-            raise ValueError("La quantité restante ne peut pas être supérieure à la quantité initiale")
-        
-        if self.quantite_restante < 0:
-            raise ValueError("La quantité restante ne peut pas être négative")
-
-        super().save(*args, **kwargs)
-    
-    @property
-    def montant_total(self):
-        """Calcule le montant total du lot"""
-        return self.quantite_initiale * (self.prix_achat_unitaire or 0)
-    
-    @property
-    def valeur_actuelle_stock(self):
-        """Calcule la valeur actuelle du stock basée sur la quantité restante"""
-        return self.quantite_restante * (self.prix_achat_unitaire or 0)
-    
-    @property
-    def quantite_perdue_totale(self):
-        """Calcule la quantité totale perdue pour ce lot"""
-        return sum(perte.quantite_perdue for perte in self.pertes.all())
-    
-    @property
-    def quantite_theorique_restante(self):
-        """Quantité théorique restante (initiale - pertes)"""
-        return self.quantite_initiale - self.quantite_perdue_totale
-    
-    @property
-    def coherence_quantites(self):
-        """Vérifie la cohérence entre quantité restante et pertes"""
-        return self.quantite_restante == self.quantite_theorique_restante
-    
-    @property
-    def ecart_quantite(self):
-        """Retourne l'écart entre quantité réelle et théorique"""
-        return self.quantite_restante - self.quantite_theorique_restante
-    
-    def recalculer_quantite_restante(self):
-        """Recalcule la quantité restante basée sur les pertes"""
-        self.quantite_restante = self.quantite_theorique_restante
-        self.save()
-    
-    @staticmethod
-    def get_lots_disponibles(produit_nom):
-        return LotEntrepot.objects.filter(
-            produit__nom=produit_nom,
-            quantite_restante__gt=0
-        ).order_by("date_reception")
-   
-    
-    @property
-    def total_paye_lot(self):
-        """Somme des paiements pour ce lot"""
-        total = self.paiements.aggregate(
-            total=models.Sum('montant')
-        )['total'] or 0
-        return Decimal(total)
-    
-    @property
-    def reste_a_payer_lot(self):
-        """Ce qu'il reste à payer pour ce lot"""
-        return max(self.dette_lot - self.total_paye_lot, Decimal(0))
-
-    @property
-    def chiffre_affaires_theorique_lot(self):
-        """
-        ca du lot basée sur les ventes réalisées
-        """
-        from django.db.models import Sum, F
-        from django.db.models.functions import Coalesce
-        from decimal import Decimal
-        from core.models import Vente
-
-        total = Vente.objects.filter(
-            detail_distribution__lot=self
-        ).aggregate(
-            total=Coalesce(
-                Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
-                Decimal('0.00')
-            )
-        )['total']
-
-        return total or Decimal('0.00')
-    
-    @property
-    def montant_total(self):
-        return self.quantite_initiale * self.prix_achat_unitaire
-
-    @property
-    def total_facture_lot(self):
-        return self.factures.aggregate(
-            total=models.Sum('montant')
-        )['total'] or Decimal('0')
-
-    @property
-    def est_solde(self):
-        return self.total_facture_lot >= self.montant_total
-
-
-class FactureLotEntrepot(models.Model):
-    lot = models.ForeignKey(
-        LotEntrepot,
-        on_delete=models.CASCADE,
-        related_name='factures'
-    )
-
-    fichier = models.FileField(upload_to='factures_entrepot/%Y/%m/')
-    montant = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True
-    )
-    description = models.CharField(max_length=255, blank=True)
-    date_upload = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Facture {self.id} – Lot {self.lot.reference_lot}"
-
-# core/models.py
-class Perte(models.Model):
-    lot = models.ForeignKey(
-        LotEntrepot,
-        on_delete=models.CASCADE,
-        related_name="pertes"
-    )
-    quantite_perdue = models.DecimalField(max_digits=10, decimal_places=2)
-    quantite_perdue_originale = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=0,
-        verbose_name="Quantité perdue initiale"
-    )
-    description = models.TextField()
-    date_perte = models.DateTimeField(default=timezone.now)
-    date_modification = models.DateTimeField(auto_now=True)
-    est_modifiee = models.BooleanField(default=False)
-    
-    def __str__(self):
-        statut = " (modifiée)" if self.est_modifiee else ""
-        return f"Perte de {self.quantite_perdue} sur {self.lot}{statut}"
-    
-    def save(self, *args, **kwargs):
-        from django.db import transaction
-        
-        with transaction.atomic():
-            if not self.pk:  # Création
-                # Sauvegarder la quantité originale
-                self.quantite_perdue_originale = self.quantite_perdue
-                # Déduire la quantité du lot
-                self.lot.quantite_restante -= self.quantite_perdue
-                self.lot.save()
-            else:  # Modification
-                ancienne_perte = Perte.objects.get(pk=self.pk)
-                difference = self.quantite_perdue - ancienne_perte.quantite_perdue
-                
-                if difference != 0:
-                    # Ajuster la quantité du lot
-                    self.lot.quantite_restante -= difference
-                    self.lot.save()
-                    self.est_modifiee = True
-            
-            super().save(*args, **kwargs)
-    
-    def delete(self, using=None, keep_parents=False):
-        """Restituer la quantité au lot lors de la suppression"""
-        from django.db import transaction
-        
-        with transaction.atomic():
-            # Restituer la quantité perdue au lot
-            self.lot.quantite_restante += self.quantite_perdue
-            self.lot.save()
-            super().delete(using=using, keep_parents=keep_parents)
-    
-    @property
-    def difference_quantite(self):
-        """Retourne la différence entre la quantité actuelle et originale"""
-        return self.quantite_perdue - self.quantite_perdue_originale
-    
-    @property
-    def impact_quantite(self):
-        """Retourne l'impact sur la quantité du lot"""
-        return {
-            'quantite_avant_perte': self.lot.quantite_initiale,
-            'quantite_actuelle': self.lot.quantite_restante,
-            'quantite_perdue_totale': self.quantite_perdue,
-            'quantite_originale': self.quantite_perdue_originale,
-            'difference': self.difference_quantite
-        }  
-
-
 class Agent(models.Model):
     TYPE_AGENT_CHOICES = (
         ('direction', 'Direction'),
@@ -515,27 +287,35 @@ class Agent(models.Model):
         self.user.is_active = True
         self.user.save(update_fields=['is_active'])
         self.save(update_fields=['est_actif'])
-
+    
     def remettre_solde_operationnel_a_zero(self, cloture=None, par=None):
+        """
+        Remet à zéro le solde OPÉRATIONNEL du superviseur
+        après une clôture mensuelle ou de transition.
+        """
+    
         if not self.est_superviseur:
             return
-
-        solde_actuel = self.solde_vente_superviseur
+    
+        solde_actuel = self.solde_reel_superviseur  # ✅ BON SOLDE
+    
         if solde_actuel == 0:
             return
-
+    
+        # Neutralisation comptable via ajustement
         self.ajustement_solde -= solde_actuel
         self.save(update_fields=['ajustement_solde'])
-
+    
+        # Traçabilité
         if cloture:
-            from core.models import AjustementSolde
             AjustementSolde.objects.create(
                 agent=self,
                 montant=-solde_actuel,
-                motif="Remise à zéro après clôture mensuelle",
+                motif="Remise à zéro du solde opérationnel après clôture",
                 cloture=cloture
             )
     
+
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
 
@@ -614,6 +394,12 @@ class Agent(models.Model):
         
         return (f"En cours ({self.jours_restants}j restants, "
                 f"débuté le {self.date_mise_service.strftime('%d/%m/%Y')})")
+   
+    @property
+    def peut_acceder_admin(self):
+        """Vérifie si l'agent peut accéder à l'administration"""
+        return self.est_direction or self.est_superviseur
+
     @property
     def full_name(self):
         """Retourne le nom complet de l'agent"""
@@ -647,208 +433,432 @@ class Agent(models.Model):
         """Vérifie si l'agent est un stagiaire"""
         return self.type_agent == 'stagiaire'
 
-    @property
-    def total_ventes(self):
-        return (
-            Vente.objects
-            .filter(agent=self)
-            .aggregate(
-                total=Coalesce(
-                    Sum(F("quantite") * F("prix_vente_unitaire")),
-                    Decimal("0.00")
-                )
-            )["total"]
-        )
-
-    # Ventes réalisées par les stagiaires sous sa tutelle
-    @property
-    def total_ventes_stagiaires(self):
-        """Total des ventes réalisées par les stagiaires sous sa tutelle"""
-        if self.est_agent_terrain or self.est_superviseur:
-            ventes_stagiaires = Vente.objects.filter(stagiaire__isnull=False, agent=self)
-            return sum(vente.total_vente for vente in ventes_stagiaires)
-        return 0
-    
-    #  Ventes personnelles (hors stagiaires)
-    @property
-    def total_ventes_personnelles(self):
-        """Total des ventes réalisées personnellement (sans stagiaire)"""
-        ventes_personnelles = Vente.objects.filter(agent=self, stagiaire__isnull=True)
-        return sum(vente.total_vente for vente in ventes_personnelles)
-    
-    # Nombre de stagiaires supervisés
+ # Nombre de stagiaires supervisés
     @property
     def nombre_stagiaires_supervises(self):
         """Nombre de stagiaires distincts supervisés"""
         if self.est_agent_terrain or self.est_superviseur:
             return Vente.objects.filter(agent=self, stagiaire__isnull=False).values('stagiaire').distinct().count()
         return 0
+    
+    @property
+    def total_ventes(self):
+        """
+        Total des ventes réalisées par l’agent terrain
+        """
+        if not self.est_agent_terrain:
+            return Decimal("0.00")
+
+        return (
+            Vente.objects
+            .filter(agent=self)
+            .aggregate(
+                total=Coalesce(
+                    Sum(
+                        F("quantite") * F("prix_vente_unitaire"),
+                        output_field=DecimalField(max_digits=15, decimal_places=2)
+                    ),
+                    Decimal("0.00")
+                )
+            )["total"]
+        )
+
+
     @property
     def total_recouvre(self):
-        """Total déjà recouvré auprès de l'agent"""
-        recouvrements = Recouvrement.objects.filter(agent=self)
-        return sum(recouvrement.montant_recouvre for recouvrement in recouvrements)
-    
+        """
+        Total déjà remis par l’agent terrain à son superviseur
+        """
+        if not self.est_agent_terrain:
+            return Decimal("0.00")
+
+        return (
+            Recouvrement.objects
+            .filter(agent=self)
+            .aggregate(
+                total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
+            )["total"]
+        )
+
+
     @property
     def argent_en_possession(self):
-        """Argent que l'agent a encore en sa possession"""
+        """
+        Argent physiquement détenu par l’agent terrain
+        """
+        if not self.est_agent_terrain:
+            return Decimal("0.00")
+
         return self.total_ventes - self.total_recouvre
-    
+
+
     @property
     def peut_etre_recouvre(self):
-        """Vérifie s'il reste de l'argent à recouvrir"""
-        return self.argent_en_possession > 0
-    
-    @property
-    def peut_acceder_admin(self):
-        """Vérifie si l'agent peut accéder à l'administration"""
-        return self.est_direction or self.est_superviseur
+        """
+        Indique si l’agent terrain a encore de l’argent à remettre
+        """
+        return self.est_agent_terrain and self.argent_en_possession > 0
 
-
-    # PROPRIÉTÉS FINANCIÈRES POUR SUPERVISEUR - CORRIGÉES
+    #superviseur
     @property
-    def total_argent_recouvre_et_ventes(self):
-        """Total des entrées (recouvrements + ventes personnelles)"""
-        if self.est_superviseur:
-            recouvrements_agents = Recouvrement.objects.filter(superviseur=self)
-            total_recouvrements = sum(r.montant_recouvre for r in recouvrements_agents)
-            return total_recouvrements + self.total_ventes
-        return 0
-
-    @property
-    def total_depenses_vente(self):
-        """Total des dépenses impactant le solde vente"""
-        if self.est_superviseur:
-            # Toutes les dépenses impactent le solde vente
-            return Depense.objects.filter(
-                versement__superviseur=self
-            ).aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
-        return 0
-
-    @property
-    def total_versements_vente(self):
-        """Total des versements impactant le solde vente"""
-        if self.est_superviseur:
-            return self.versements_bancaires.aggregate(
-                total=Sum('montant_vente')
-            )['total'] or Decimal('0.00')
-        return 0
-
-    @property
-    def solde_vente_superviseur(self):
-        """Solde actuel pour les ventes"""
+    def total_recouvre_agents(self):
+        """
+        Argent récupéré par le superviseur auprès de ses agents terrain
+        """
         if not self.est_superviseur:
-            return 0
-        
-        entrees = self.total_argent_recouvre_et_ventes
-        versements = self.total_versements_vente
-        depenses = self.total_depenses_vente
-        
-        return entrees - versements - depenses + self.ajustement_solde
+            return Decimal("0.00")
 
-    # PROPRIÉTÉS DE COMPATIBILITÉ (pour la vue existante)
+        return (
+            Recouvrement.objects
+            .filter(superviseur=self)
+            .aggregate(
+                total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
+            )["total"]
+        )
+
     @property
     def total_depenses_superviseur(self):
-        """Alias pour total_depenses_vente"""
-        return self.total_depenses_vente
+        """
+        Dépenses engagées par le superviseur (transport, logistique, terrain…)
+        """
+        if not self.est_superviseur:
+            return Decimal("0.00")
+
+        return (
+            Depense.objects
+            .filter(versement__superviseur=self)
+            .aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0.00"))
+            )["total"]
+        )
 
     @property
-    def total_versements_bancaires(self):
-        """Alias pour total_versements_vente"""
-        return self.total_versements_vente
+    def total_versements_superviseur(self):
+        """
+        Argent déjà versé par le superviseur (banque ou ROT)
+        """
+        if not self.est_superviseur:
+            return Decimal("0.00")
+
+        versements = VersementBancaire.objects.filter(superviseur=self).aggregate(
+            vente=Coalesce(Sum("montant_vente"), Decimal("0.00")),
+            hors_vente=Coalesce(Sum("montant_hors_vente"), Decimal("0.00")),
+        )
+
+        return versements["vente"] + versements["hors_vente"]
 
     @property
-    def solde_superviseur(self):
-        """Alias pour solde_vente_superviseur"""
-        return self.solde_vente_superviseur
+    def anciennes_ventes_personnelles(self):
+        """
+        ⚠️ TRANSITOIRE
+        Ventes réalisées AVANT le changement de rôle
+        À supprimer après clôture définitive
+        """
+        if not self.est_superviseur:
+            return Decimal("0.00")
 
-    # Autres propriétés existantes...
-    @property
-    def total_depenses_hors_vente(self):
-        """Total des dépenses hors vente"""
-        if self.est_superviseur:
-            return Decimal('0.00')  # Simplifié pour l'instant
-        return 0
+        return (
+            Vente.objects
+            .filter(agent=self)
+            .aggregate(
+                total=Coalesce(
+                    Sum(
+                        F("quantite") * F("prix_vente_unitaire"),
+                        output_field=DecimalField(max_digits=15, decimal_places=2)
+                    ),
+                    Decimal("0.00")
+                )
+            )["total"]
+        )
 
     @property
-    def total_versements_hors_vente(self):
-        """Total des versements hors vente"""
-        if self.est_superviseur:
+    def solde_reel_superviseur(self):
+        """
+        SOLDE RÉEL DU SUPERVISEUR (FORMULE OFFICIELLE)
+
+        argent agents
+        + anciennes ventes personnelles
+        - dépenses
+        - versements
+        ± ajustement manuel
+        """
+        if not self.est_superviseur:
+            return Decimal("0.00")
+
+        return (
+            self.total_recouvre_agents
+            + self.anciennes_ventes_personnelles
+            - self.total_depenses_superviseur
+            - self.total_versements_superviseur
+            + (self.ajustement_solde or Decimal("0.00"))
+        )
+
+    @property
+    def total_versements_vente(self): 
+        """Total des versements impactant le solde vente""" 
+        if self.est_superviseur: 
             return self.versements_bancaires.aggregate(
-                total=Sum('montant_hors_vente')
-            )['total'] or Decimal('0.00')
-        return 0
-
-    @property
-    def detail_solde_superviseur(self):
-        """Détail complet du solde du superviseur"""
-        if not self.est_superviseur:
-            return {}
-        
-        return {
-            'total_ventes_personnelles': self.total_ventes,
-            'total_ventes_stagiaires': self.total_ventes_stagiaires,
-            'total_recouvrements_agents': self.total_argent_recouvre_et_ventes - self.total_ventes,
-            'total_entrees_vente': self.total_argent_recouvre_et_ventes,
-            'total_depenses_vente': self.total_depenses_vente,
-            'total_versements_vente': self.total_versements_vente,
-            'solde_vente_actuel': self.solde_vente_superviseur,
-            'total_depenses_hors_vente': self.total_depenses_hors_vente,
-            'total_versements_hors_vente': self.total_versements_hors_vente,
-        }
-    
-    @property
-    def argent_disponible_pour_versement_vente(self):
-        """Argent réellement disponible pour un nouveau versement lié aux ventes"""
-        if not self.est_superviseur:
+                 total=Sum('montant_vente') 
+                 )['total'] or Decimal('0.00')
             return 0
-        return max(self.solde_vente_superviseur, 0)
+
+class LotEntrepot(models.Model):
+    produit = models.ForeignKey(Produit,
+                                 on_delete=models.CASCADE,
+                                 related_name="lots")
+    fournisseur = models.ForeignKey(
+        Fournisseur,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        default=None,
+        related_name="lots",
+        verbose_name="Fournisseur (optionnel)"
+    )
+    quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite_restante = models.DecimalField(max_digits=10, decimal_places=2)
+    prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    valeur_stock_initiale = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    receptionne_par = models.ForeignKey(
+        Agent,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="lots_receptionnes"
+    )
+
+    date_reception = models.DateTimeField(default=timezone.now)
+    date_enregistrement = models.DateTimeField(auto_now_add=True)
+    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
+
+    def __str__(self):
+        return f"{self.produit.nom} - {self.fournisseur} - {self.quantite_restante} restants"
+    
+    def save(self, *args, **kwargs):
+        # Si la valeur initiale n'est pas encore enregistrée, on la calcule UNE SEULE FOIS
+        if self.valeur_stock_initiale is None:
+            self.valeur_stock_initiale = self.quantite_initiale * (self.prix_achat_unitaire or 0)
+        
+        # Validation de cohérence des quantités
+        if self.quantite_restante > self.quantite_initiale:
+            raise ValueError("La quantité restante ne peut pas être supérieure à la quantité initiale")
+        
+        if self.quantite_restante < 0:
+            raise ValueError("La quantité restante ne peut pas être négative")
+
+        super().save(*args, **kwargs)
     
     @property
-    def dernier_versement_superviseur(self):
-        """Dernier versement effectué par le superviseur (compatibilité)"""
-        if self.est_superviseur:
-            dernier = VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle').first()
-            if dernier:
-                return {
-                    'versement': dernier,
-                    'type': dernier.type_versement,  # ✅ Propriété calculée
-                    'montant_verse': dernier.montant_total,  # ✅ Alias pour compatibilité
-                    'depenses_associees': dernier.total_depenses_associees,
-                    'date': dernier.date_versement_reelle
-                }
-        return None
+    def montant_total(self):
+        """Calcule le montant total du lot"""
+        return self.quantite_initiale * (self.prix_achat_unitaire or 0)
+    
+    @property
+    def valeur_actuelle_stock(self):
+        """Calcule la valeur actuelle du stock basée sur la quantité restante"""
+        return self.quantite_restante * (self.prix_achat_unitaire or 0)
+    
+    @property
+    def quantite_perdue_totale(self):
+        """Calcule la quantité totale perdue pour ce lot"""
+        return sum(perte.quantite_perdue for perte in self.pertes.all())
+    
+    @property
+    def quantite_theorique_restante(self):
+        """Quantité théorique restante (initiale - pertes)"""
+        return self.quantite_initiale - self.quantite_perdue_totale
+    
+    @property
+    def coherence_quantites(self):
+        """Vérifie la cohérence entre quantité restante et pertes"""
+        return self.quantite_restante == self.quantite_theorique_restante
+    
+    @property
+    def ecart_quantite(self):
+        """Retourne l'écart entre quantité réelle et théorique"""
+        return self.quantite_restante - self.quantite_theorique_restante
+    
+    def recalculer_quantite_restante(self):
+        """Recalcule la quantité restante basée sur les pertes"""
+        self.quantite_restante = self.quantite_theorique_restante
+        self.save()
+    
+    @staticmethod
+    def get_lots_disponibles(produit_nom):
+        return LotEntrepot.objects.filter(
+            produit__nom=produit_nom,
+            quantite_restante__gt=0
+        ).order_by("date_reception")
+   
+    
+    @property
+    def total_paye_lot(self):
+        """Somme des paiements pour ce lot"""
+        total = self.paiements.aggregate(
+            total=models.Sum('montant')
+        )['total'] or 0
+        return Decimal(total)
+    
+    @property
+    def reste_a_payer_lot(self):
+        """Ce qu'il reste à payer pour ce lot"""
+        return max(self.dette_lot - self.total_paye_lot, Decimal(0))
 
     @property
-    def versements_recents_superviseur(self):
-        """Versements récents du superviseur (5 derniers)"""
-        if self.est_superviseur:
-            return VersementBancaire.objects.filter(superviseur=self).order_by('-date_versement_reelle')[:5]
-        return VersementBancaire.objects.none()
+    def chiffre_affaires_theorique_lot(self):
+        """
+        ca du lot basée sur les ventes réalisées
+        """
+        from django.db.models import Sum, F
+        from django.db.models.functions import Coalesce
+        from decimal import Decimal
+        from core.models import Vente
+
+        total = Vente.objects.filter(
+            detail_distribution__lot=self
+        ).aggregate(
+            total=Coalesce(
+                Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
+                Decimal('0.00')
+            )
+        )['total']
+
+        return total or Decimal('0.00')
     
     @property
-    def bonus_total(self):
-        """Retourne le bonus total de l'agent"""
-        if hasattr(self, 'bonus'):
-            return self.bonus.total_bonus
-        return 0
+    def montant_total(self):
+        return self.quantite_initiale * self.prix_achat_unitaire
+
+    @property
+    def total_facture_lot(self):
+        return self.factures.aggregate(
+            total=models.Sum('montant')
+        )['total'] or Decimal('0')
+
+    @property
+    def est_solde(self):
+        return self.total_facture_lot >= self.montant_total
+
+
+class FactureLotEntrepot(models.Model):
+    lot = models.ForeignKey(
+        LotEntrepot,
+        on_delete=models.CASCADE,
+        related_name='factures'
+    )
+
+    fichier = models.FileField(upload_to='factures_entrepot/%Y/%m/')
+    montant = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    description = models.CharField(max_length=255, blank=True)
+    date_upload = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Facture {self.id} – Lot {self.lot.reference_lot}"
+
+
+class Perte(models.Model):
+    lot = models.ForeignKey(
+        LotEntrepot,
+        on_delete=models.CASCADE,
+        related_name="pertes"
+    )
+    quantite_perdue = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite_perdue_originale = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Quantité perdue initiale"
+    )
+    description = models.TextField()
+    date_perte = models.DateTimeField(default=timezone.now)
+    date_modification = models.DateTimeField(auto_now=True)
+    est_modifiee = models.BooleanField(default=False)
+    
+    def __str__(self):
+        statut = " (modifiée)" if self.est_modifiee else ""
+        return f"Perte de {self.quantite_perdue} sur {self.lot}{statut}"
+    
+    def save(self, *args, **kwargs):
+        from django.db import transaction
+        
+        with transaction.atomic():
+            if not self.pk:  # Création
+                # Sauvegarder la quantité originale
+                self.quantite_perdue_originale = self.quantite_perdue
+                # Déduire la quantité du lot
+                self.lot.quantite_restante -= self.quantite_perdue
+                self.lot.save()
+            else:  # Modification
+                ancienne_perte = Perte.objects.get(pk=self.pk)
+                difference = self.quantite_perdue - ancienne_perte.quantite_perdue
+                
+                if difference != 0:
+                    # Ajuster la quantité du lot
+                    self.lot.quantite_restante -= difference
+                    self.lot.save()
+                    self.est_modifiee = True
+            
+            super().save(*args, **kwargs)
+    
+    def delete(self, using=None, keep_parents=False):
+        """Restituer la quantité au lot lors de la suppression"""
+        from django.db import transaction
+        
+        with transaction.atomic():
+            # Restituer la quantité perdue au lot
+            self.lot.quantite_restante += self.quantite_perdue
+            self.lot.save()
+            super().delete(using=using, keep_parents=keep_parents)
     
     @property
-    def nombre_ventes_avec_bonus(self):
-        """Retourne le nombre de ventes éligibles au bonus"""
-        if hasattr(self, 'bonus'):
-            return self.bonus.get_ventes_avec_bonus().count()
-        return 0
+    def difference_quantite(self):
+        """Retourne la différence entre la quantité actuelle et originale"""
+        return self.quantite_perdue - self.quantite_perdue_originale
     
+    @property
+    def impact_quantite(self):
+        """Retourne l'impact sur la quantité du lot"""
+        return {
+            'quantite_avant_perte': self.lot.quantite_initiale,
+            'quantite_actuelle': self.lot.quantite_restante,
+            'quantite_perdue_totale': self.quantite_perdue,
+            'quantite_originale': self.quantite_perdue_originale,
+            'difference': self.difference_quantite
+        }  
+
 class AffectationLotSuperviseur(models.Model):
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
+
     superviseur = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
         limit_choices_to={'type_agent': 'entrepot'},
         related_name='lots_affectes'
     )
-    quantite = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # 🔒 IMMUTABLE : quantité affectée au départ
+    quantite_initiale = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    # 🔁 MUTABLE : quantité restante chez le superviseur
+    quantite_restante = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
 
     attribue_par = models.ForeignKey(
         Agent,
@@ -860,20 +870,9 @@ class AffectationLotSuperviseur(models.Model):
 
     date_affectation = models.DateTimeField(auto_now_add=True)
 
-class AffectationLotAgent(models.Model):
-    affectation_superviseur = models.ForeignKey(
-        AffectationLotSuperviseur,
-        on_delete=models.CASCADE,
-        related_name='affectations_agents'
-    )
-    agent = models.ForeignKey(
-        Agent,
-        on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'terrain'}
-    )
-    quantite = models.DecimalField(max_digits=10, decimal_places=2)
+    def __str__(self):
+        return f"{self.lot.produit.nom} – {self.quantite_restante}"
 
-    date_affectation = models.DateTimeField(auto_now_add=True)
 
 
 class DistributionAgent(models.Model):
@@ -929,26 +928,10 @@ class DistributionAgent(models.Model):
     date_modification = models.DateTimeField(auto_now=True, verbose_name="Dernière modification")
     est_retroactive = models.BooleanField(default=False)
     
-    # Soft delete
-    est_supprime = models.BooleanField(default=False, verbose_name="Supprimé")
-    date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
-    raison_suppression = models.TextField(blank=True, verbose_name="Raison de la suppression")
     
-    # Audit des modifications
-    nombre_modifications = models.PositiveIntegerField(default=0, verbose_name="Nombre de modifications")
-    derniere_modification_par = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='distributions_modifiees',
-        verbose_name="Dernière modification par"
-    )
-
     def __str__(self):
-        if self.est_supprime:
-            return f"[SUPPRIMÉ] Distribution {self.id} de {self.superviseur}"
-        elif self.type_distribution == 'AUTO':
+       
+        if self.type_distribution == 'AUTO':
             return f"Auto-distribution {self.id} de {self.superviseur}"
         else:
             return f"Distribution {self.id} de {self.superviseur} → {self.agent_terrain}"
@@ -966,78 +949,8 @@ class DistributionAgent(models.Model):
             if self.type_distribution == 'AUTO':
                 self.agent_terrain = self.superviseur
 
-        # Compte les modifications
-        if self.pk:
-            self.nombre_modifications += 1
-
         super().save(*args, **kwargs)
 
-    def soft_delete(self, user=None, raison=""):
-        """Soft delete de la distribution"""
-        self.est_supprime = True
-        self.date_suppression = timezone.now()
-        self.raison_suppression = raison
-        if user:
-            self.derniere_modification_par = user
-        self.save()
-        
-        # Soft delete des détails associés
-        self.detaildistribution_set.update(est_supprime=True)
-
-    def restaurer(self, user=None):
-        """Restaurer une distribution supprimée"""
-        self.est_supprime = False
-        self.date_suppression = None
-        self.raison_suppression = ""
-        if user:
-            self.derniere_modification_par = user
-        self.save()
-        
-        # Restaurer les détails associés
-        self.detaildistribution_set.update(est_supprime=False)
-
-    def _mettre_a_jour_totaux(self, user=None):
-        """Met à jour les totaux immuables de la distribution"""
-        from django.db import transaction
-        
-        with transaction.atomic():
-            # Recharger l'objet pour éviter les problèmes de concurrence
-            distribution = DistributionAgent.objects.select_for_update().get(pk=self.pk)
-            details = distribution.detaildistribution_set.filter(est_supprime=False)
-            
-            # Calculer les nouveaux totaux
-            quantite_totale = sum(detail.quantite for detail in details)
-            valeur_gros_totale = sum((detail.prix_gros or 0) * detail.quantite for detail in details)
-            valeur_detail_totale = sum((detail.prix_detail or 0) * detail.quantite for detail in details)
-            nombre_produits_differents = details.values('lot__produit').distinct().count()
-            
-            # Mettre à jour les champs immuables
-            DistributionAgent.objects.filter(pk=self.pk).update(
-                quantite_totale=quantite_totale,
-                valeur_gros_totale=valeur_gros_totale,
-                valeur_detail_totale=valeur_detail_totale,
-                nombre_produits_differents=nombre_produits_differents,
-                date_modification=timezone.now(),
-                derniere_modification_par=user
-            )
-            
-            # Recharger l'instance
-            self.refresh_from_db()
-
-    @property
-    def est_modifie(self):
-        """Vérifie si la distribution a été modifiée"""
-        return self.nombre_modifications > 0
-
-    @property
-    def statut(self):
-        """Retourne le statut de la distribution"""
-        if self.est_supprime:
-            return "supprime"
-        elif self.est_modifie:
-            return "modifie"
-        else:
-            return "actif"
 
     class Meta:
         ordering = ['-date_distribution']
@@ -1069,10 +982,7 @@ class DetailDistribution(models.Model):
         blank=True,
         verbose_name="Spécification (forme, présentation, etc.)"
     )
-    # Soft delete
-    est_supprime = models.BooleanField(default=False)
-    date_suppression = models.DateTimeField(null=True, blank=True)
-
+    
     def __str__(self):
         spec_info = f" - {self.specification}" if self.specification else ""
         return f"{self.lot.produit.nom} : Qt - {self.quantite} {spec_info}"
@@ -1584,6 +1494,46 @@ class Recouvrement(models.Model):
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
           
+
+class RecouvrementSuperviseur(models.Model):
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='recouvrements_rot'
+    )
+
+    rot = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'rot'},
+        related_name='recouvrements_superviseurs'
+    )
+
+    montant = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        verbose_name="Montant remis au ROT"
+    )
+
+  
+
+    commentaire = models.TextField(blank=True)
+
+    date_recouvrement = models.DateTimeField(default=timezone.now)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return (
+            f"Recouvrement {self.montant} FCFA | "
+            f"{self.superviseur.full_name} → {self.rot.full_name}"
+        )
+
+    class Meta:
+        ordering = ['-date_recouvrement']
+        verbose_name = "Recouvrement superviseur"
+        verbose_name_plural = "Recouvrements superviseurs"
+
 
 class VersementBancaire(models.Model):
     superviseur = models.ForeignKey(

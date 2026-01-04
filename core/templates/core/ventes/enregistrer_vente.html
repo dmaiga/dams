@@ -1,473 +1,90 @@
-<!-- core/ventes/enregistrer_vente.html -->
-{% extends 'base.html' %}
-{% load static %}
+{% extends "base.html" %}
+{% load humanize %}
 
-{% block title %}Enregistrer une Vente{% endblock %}
+{% block title %}Enregistrer une vente{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-2">
-    <!-- En-tête simplifié -->
+<div class="container-fluid py-3">
+
+    <!-- ===== HEADER ===== -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h4 class="mb-0">
-                <i class="fas fa-cash-register me-2 text-primary"></i>Nouvelle Vente
-            </h4>
-            <small class="text-muted">Agent: {{ agent.user.get_full_name|default:agent.user.username }}</small>
-        </div>
+        <h5 class="mb-0">
+            🧾 Nouvelle vente
+        </h5>
         <a href="{% url 'liste_ventes' %}" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-arrow-left me-1"></i>Retour
+            ← Retour
         </a>
     </div>
 
-    <form method="post" id="vente-form">
-        {% csrf_token %}
-        
-        <!-- Section Stagiaire - Optionnel -->
-        <div class="card mb-3">
-            <div class="card-header bg-light py-2">
-                <h6 class="mb-0">
-                    <i class="fas fa-user-graduate me-1 text-warning"></i>
-                    Attribution Stagiaire (Optionnel)
-                </h6>
-            </div>
-            <div class="card-body py-2">
-                <div class="row g-2 align-items-center">
-                    <div class="col-12 col-md-8">
-                        <label class="form-label small fw-bold mb-1">Stagiaire concerné</label>
-                        {{ form.stagiaire }}
-                    </div>
-                    <div class="col-12 col-md-4">
-                        <div class="alert alert-info py-1 px-2 mb-0 small">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Optionnel - Vente par stagiaire
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- ===== CARD FORM ===== -->
+    <div class="card shadow-sm">
+        <div class="card-body">
 
-        <!-- Section Client - Optionnel -->
-        <div class="card mb-3">
-            <div class="card-header bg-light py-2">
-                <h6 class="mb-0">
-                    <i class="fas fa-users me-1 text-info"></i>
-                    Client (Optionnel)
-                </h6>
-            </div>
-            <div class="card-body py-2">
-                <!-- Toggle Nouveau Client -->
-                <div class="row mb-2">
-                    <div class="col-12">
-                        <div class="form-check form-switch">
-                            {{ form.nouveau_client }}
-                            <label class="form-check-label small" for="{{ form.nouveau_client.id_for_label }}">
-                                Créer un nouveau client
-                            </label>
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger small">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- ===== PRODUIT / LOT ===== -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Produit à vendre <span class="text-danger">*</span>
+                    </label>
+                    {{ form.detail_distribution }}
+                    {% if form.detail_distribution.errors %}
+                        <div class="text-danger small">
+                            {{ form.detail_distribution.errors|striptags }}
                         </div>
+                    {% endif %}
+                    <div class="form-text">
+                        Stock issu des distributions reçues
                     </div>
                 </div>
 
-                <!-- Client existant -->
-                <div id="client-existant-group" class="row g-2">
-                    <div class="col-12">
-                        <label class="form-label small fw-bold mb-1">Client existant</label>
-                        {{ form.client }}
-                    </div>
+                <!-- ===== QUANTITÉ ===== -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Quantité <span class="text-danger">*</span>
+                    </label>
+                    {{ form.quantite }}
+                    {% if form.quantite.errors %}
+                        <div class="text-danger small">
+                            {{ form.quantite.errors|striptags }}
+                        </div>
+                    {% endif %}
                 </div>
 
-                <!-- Nouveau client -->
-                <div id="nouveau-client-group" class="row g-2" style="display: none;">
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label small fw-bold mb-1">Nom du client</label>
-                        {{ form.client_nom }}
-                    </div>
-                    <div class="col-12 col-sm-6">
-                        <label class="form-label small fw-bold mb-1">Contact</label>
-                        {{ form.client_contact }}
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label small fw-bold mb-1">Type de client</label>
-                        {{ form.client_type }}
-                    </div>
+                <!-- ===== DATE ===== -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Date de la vente
+                    </label>
+                    {{ form.date_vente }}
+                    {% if form.date_vente.errors %}
+                        <div class="text-danger small">
+                            {{ form.date_vente.errors|striptags }}
+                        </div>
+                    {% endif %}
                 </div>
-            </div>
-        </div>
 
-        <!-- Section Produit - Obligatoire -->
-        <div class="card mb-3">
-            <div class="card-header bg-light py-2">
-                <h6 class="mb-0">
-                    <i class="fas fa-box me-1 text-success"></i>
-                    Produit à Vendre *
-                </h6>
-            </div>
-            <div class="card-body py-2">
-                <div class="row g-2">
-                    <!-- Produit disponible -->
-                    <div class="col-12">
-                        <label class="form-label small fw-bold mb-1">Produit disponible *</label>
-                        {{ form.detail_distribution }}
-                        <div class="form-text small">
-                            <i class="fas fa-cubes me-1"></i>
-                            Stock: <span id="quantite-disponible" class="fw-bold">-</span> unités
-                        </div>
-                    </div>
-                    
-                    <!-- Type de vente et Mode paiement -->
-                    <div class="col-6">
-                        <label class="form-label small fw-bold mb-1">Type de vente *</label>
-                        {{ form.type_vente }}
-                    </div>
-                    
-                    <div class="col-6">
-                        <label class="form-label small fw-bold mb-1">Mode paiement *</label>
-                        {{ form.mode_paiement }}
-                    </div>
-                    
-                    <!-- Quantité et Prix -->
-                    <div class="col-6">
-                        <label class="form-label small fw-bold mb-1">Quantité *</label>
-                        {{ form.quantite }}
-                    </div>
-                    
-                    <div class="col-6">
-                        <label class="form-label small fw-bold mb-1">Prix unitaire *</label>
-                        {{ form.prix_vente_unitaire }}
-                        <div class="form-text small">
-                            <span id="info-prix-applique">Prix automatique</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Informations produit -->
-                <div id="produit-info" class="mt-2 p-2 bg-light rounded small" style="display: none;">
-                    <div class="row g-1">
-                        <div class="col-6">
-                            <strong>Produit:</strong> <span id="info-produit" class="text-primary">-</span>
-                        </div>
-                        <div class="col-6">
-                            <strong>Lot:</strong> <span id="info-lot" class="text-secondary">-</span>
-                        </div>
-                        <div class="col-6">
-                            <strong>Prix gros:</strong> <span id="info-prix-gros" class="text-success">-</span>
-                        </div>
-                        <div class="col-6">
-                            <strong>Prix détail:</strong> <span id="info-prix-detail" class="text-info">-</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                <!-- ===== CLIENT OPTIONNEL ===== -->
+              
 
-        <!-- Section Date -->
-        <div class="card mb-3">
-            <div class="card-header bg-light py-2">
-                <h6 class="mb-0">
-                    <i class="fas fa-calendar me-1 text-primary"></i>
-                    Date de la Vente *
-                </h6>
-            </div>
-            <div class="card-body py-2">
-                <div class="row g-2">
-                    <div class="col-12">
-                        <label class="form-label small fw-bold mb-1">Date et heure *</label>
-                        {{ form.date_vente }}
-                        <div class="form-text small">
-                            <i class="fas fa-clock me-1"></i>
-                            Date réelle de la vente chez le client
-                        </div>
-                    </div>
+                <!-- ===== ACTIONS ===== -->
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        💾 Enregistrer la vente
+                    </button>
                 </div>
-            </div>
-        </div>
 
-        <!-- Résumé de la vente -->
-        <div class="card bg-primary text-white mb-3">
-            <div class="card-body py-2">
-                <h6 class="mb-2">
-                    <i class="fas fa-receipt me-1"></i>Résumé
-                </h6>
-                <div class="row g-2 text-center">
-                    <div class="col-4">
-                        <div class="h6 mb-0" id="resume-produit">-</div>
-                        <small class="opacity-75">Produit</small>
-                    </div>
-                    <div class="col-4">
-                        <div class="h6 mb-0" id="resume-quantite">0</div>
-                        <small class="opacity-75">Unités</small>
-                    </div>
-                    <div class="col-4">
-                        <div class="h6 mb-0" id="resume-total">0</div>
-                        <small class="opacity-75">FCFA</small>
-                    </div>
-                </div>
-                <div class="row mt-1">
-                    <div class="col-6">
-                        <small class="opacity-75">
-                            <i class="fas fa-user me-1"></i>
-                            Client: <span id="resume-client" class="fw-bold">Inconnu</span>
-                        </small>
-                    </div>
-                    <div class="col-6 text-end">
-                        <small class="opacity-75">
-                            <i class="fas fa-user-graduate me-1"></i>
-                            Stag: <span id="resume-stagiaire" class="fw-bold">Aucun</span>
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
+            </form>
 
-        <!-- Boutons d'action -->
-        <div class="d-grid gap-2">
-            <button type="submit" class="btn btn-success btn-lg">
-                <i class="fas fa-check me-2"></i> Enregistrer la Vente
-            </button>
-            <a href="{% url 'liste_ventes' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-times me-2"></i> Annuler
-            </a>
-        </div>
-    </form>
-</div>
-
-<!-- Messages d'alerte -->
-{% if messages %}
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-    {% for message in messages %}
-    <div class="toast show" role="alert">
-        <div class="toast-header">
-            <i class="fas 
-                {% if message.tags == 'success' %}fa-check-circle text-success
-                {% elif message.tags == 'error' %}fa-exclamation-circle text-danger
-                {% else %}fa-info-circle text-info{% endif %} 
-                me-2"></i>
-            <strong class="me-auto">Notification</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-        </div>
-        <div class="toast-body">
-            {{ message }}
         </div>
     </div>
-    {% endfor %}
+
 </div>
-{% endif %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Éléments du formulaire
-    const selectStagiaire = document.getElementById('{{ form.stagiaire.id_for_label }}');
-    const nouveauClientCheckbox = document.getElementById('{{ form.nouveau_client.id_for_label }}');
-    const clientExistantGroup = document.getElementById('client-existant-group');
-    const nouveauClientGroup = document.getElementById('nouveau-client-group');
-    const selectClient = document.getElementById('{{ form.client.id_for_label }}');
-    const inputClientNom = document.getElementById('{{ form.client_nom.id_for_label }}');
-    const selectDistribution = document.getElementById('{{ form.detail_distribution.id_for_label }}');
-    const selectTypeVente = document.getElementById('{{ form.type_vente.id_for_label }}');
-    const quantiteInput = document.getElementById('{{ form.quantite.id_for_label }}');
-    const prixInput = document.getElementById('{{ form.prix_vente_unitaire.id_for_label }}');
-    const quantiteDisponibleSpan = document.getElementById('quantite-disponible');
-
-    // Éléments du résumé
-    const resumeClient = document.getElementById('resume-client');
-    const resumeProduit = document.getElementById('resume-produit');
-    const resumeQuantite = document.getElementById('resume-quantite');
-    const resumeTotal = document.getElementById('resume-total');
-    const resumeStagiaire = document.getElementById('resume-stagiaire');
-
-    // Fonction pour basculer les clients
-    function toggleClientFields() {
-        if (nouveauClientCheckbox.checked) {
-            clientExistantGroup.style.display = 'none';
-            nouveauClientGroup.style.display = 'block';
-            if (selectClient) selectClient.disabled = true;
-            if (inputClientNom) inputClientNom.disabled = false;
-        } else {
-            clientExistantGroup.style.display = 'block';
-            nouveauClientGroup.style.display = 'none';
-            if (selectClient) selectClient.disabled = false;
-            if (inputClientNom) inputClientNom.disabled = true;
-        }
-        updateResume();
-    }
-
-    // Fonction pour mettre à jour les infos produit
-    async function updateProduitInfo() {
-        const distributionId = selectDistribution.value;
-        
-        if (distributionId) {
-            try {
-                const response = await fetch(`/api/info-distribution/${distributionId}/`);
-                const data = await response.json();
-                
-                quantiteDisponibleSpan.textContent = data.quantite_disponible;
-                quantiteDisponibleSpan.className = data.quantite_disponible > 0 ? 'text-success' : 'text-danger';
-                
-                if (quantiteInput) {
-                    quantiteInput.max = data.quantite_disponible;
-                }
-                
-                // Mettre à jour le prix automatiquement
-                const typeVente = selectTypeVente ? selectTypeVente.value : 'detail';
-                const prix = typeVente === 'gros' ? data.prix_gros : data.prix_detail;
-                if (prix > 0) {
-                    prixInput.value = prix;
-                }
-                
-            } catch (error) {
-                quantiteDisponibleSpan.textContent = 'Erreur';
-                quantiteDisponibleSpan.className = 'text-danger';
-            }
-        } else {
-            quantiteDisponibleSpan.textContent = '-';
-        }
-        updateResume();
-    }
-
-    // Fonction pour mettre à jour le résumé
-    function updateResume() {
-        // Client
-        let clientName = 'Inconnu';
-        if (nouveauClientCheckbox.checked && inputClientNom && inputClientNom.value) {
-            clientName = inputClientNom.value;
-        } else if (!nouveauClientCheckbox.checked && selectClient && selectClient.value) {
-            const option = selectClient.options[selectClient.selectedIndex];
-            clientName = option.text.includes('Sélectionner') ? 'Inconnu' : option.text.split(' - ')[0];
-        }
-        resumeClient.textContent = clientName;
-
-        // Produit
-        if (selectDistribution && selectDistribution.value) {
-            const option = selectDistribution.options[selectDistribution.selectedIndex];
-            resumeProduit.textContent = option.text.split(' - ')[0] || '-';
-        } else {
-            resumeProduit.textContent = '-';
-        }
-
-        // Quantité et Total
-        const quantite = parseInt(quantiteInput.value) || 0;
-        const prix = parseFloat(prixInput.value) || 0;
-        const total = quantite * prix;
-        
-        resumeQuantite.textContent = quantite;
-        resumeTotal.textContent = total.toLocaleString();
-
-        // Stagiaire
-        if (selectStagiaire && selectStagiaire.value) {
-            const option = selectStagiaire.options[selectStagiaire.selectedIndex];
-            resumeStagiaire.textContent = option.text.split(' (Expire le')[0];
-            resumeStagiaire.className = 'fw-bold text-warning';
-        } else {
-            resumeStagiaire.textContent = 'Aucun';
-            resumeStagiaire.className = 'fw-bold opacity-75';
-        }
-    }
-
-    // Événements
-    if (nouveauClientCheckbox) {
-        nouveauClientCheckbox.addEventListener('change', toggleClientFields);
-    }
-    if (selectClient) {
-        selectClient.addEventListener('change', updateResume);
-    }
-    if (inputClientNom) {
-        inputClientNom.addEventListener('input', updateResume);
-    }
-    if (selectDistribution) {
-        selectDistribution.addEventListener('change', updateProduitInfo);
-    }
-    if (selectTypeVente) {
-        selectTypeVente.addEventListener('change', updateProduitInfo);
-    }
-    if (quantiteInput) {
-        quantiteInput.addEventListener('input', updateResume);
-    }
-    if (prixInput) {
-        prixInput.addEventListener('input', updateResume);
-    }
-    if (selectStagiaire) {
-        selectStagiaire.addEventListener('change', updateResume);
-    }
-
-    // Initialisation
-    toggleClientFields();
-    updateResume();
-});
-</script>
-
-<style>
-/* Améliorations mobile-first */
-.form-label {
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.form-control, .form-select {
-    font-size: 0.9rem;
-    padding: 0.5rem 0.75rem;
-}
-
-.card {
-    border: 1px solid #e0e0e0;
-    border-radius: 0.5rem;
-}
-
-.card-header {
-    padding: 0.75rem 1rem;
-    background-color: #f8f9fa;
-}
-
-.card-body {
-    padding: 1rem;
-}
-
-.btn {
-    font-size: 0.9rem;
-    padding: 0.75rem 1rem;
-}
-
-/* Amélioration de l'apparence des selects */
-.form-select {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.5rem center;
-    background-size: 1.5em 1.5em;
-}
-
-/* Focus states */
-.form-control:focus, .form-select:focus {
-    border-color: #4e73df;
-    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.15);
-}
-
-/* Responsive adjustments */
-@media (max-width: 576px) {
-    .container-fluid {
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
-    }
-    
-    .card-body {
-        padding: 0.75rem;
-    }
-    
-    .btn {
-        padding: 0.875rem 1rem;
-    }
-}
-
-/* Animation pour les changements */
-#resume-total, #resume-quantite {
-    transition: all 0.2s ease;
-}
-
-/* Style pour les petits écrans */
-@media (max-width: 360px) {
-    .h6 {
-        font-size: 0.9rem;
-    }
-    
-    small {
-        font-size: 0.75rem;
-    }
-}
-</style>
 {% endblock %}

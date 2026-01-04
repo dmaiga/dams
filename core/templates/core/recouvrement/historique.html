@@ -10,15 +10,15 @@
             <!-- En-tête avec navigation -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
-                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-secondary me-3">
+                    <a href="{% url 'detail_agent_sup' agent.id %}" class="btn btn-secondary me-3">
                         <i class="fas fa-arrow-left"></i>
                     </a>
                     <div>
                         <h1 class="h3 mb-1">Historique des Recouvrements</h1>
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb mb-0">
-                                <li class="breadcrumb-item"><a href="{% url 'liste_agents' %}">Agents</a></li>
-                                <li class="breadcrumb-item"><a href="{% url 'detail_agent' agent.id %}">{{ agent.full_name }}</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'liste_agents_sup' %}">Agents</a></li>
+                                <li class="breadcrumb-item"><a href="{% url 'detail_agent_sup' agent.id %}">{{ agent.full_name }}</a></li>
                                 <li class="breadcrumb-item active">Historique Recouvrement</li>
                             </ol>
                         </nav>
@@ -30,7 +30,7 @@
                         <i class="fas fa-hand-holding-usd me-1"></i>Nouveau Recouvrement
                     </a>
                     {% endif %}
-                    <a href="{% url 'detail_agent' agent.id %}" class="btn btn-outline-primary">
+                    <a href="{% url 'detail_agent_sup' agent.id %}" class="btn btn-outline-primary">
                         <i class="fas fa-user me-1"></i>Retour au Profil
                     </a>
                 </div>
@@ -240,7 +240,7 @@
                                     Nouveau Recouvrement
                                 </a>
                                 {% endif %}
-                                <a href="{% url 'detail_agent' agent.id %}" class="btn btn-outline-primary">
+                                <a href="{% url 'detail_agent_sup' agent.id %}" class="btn btn-outline-primary">
                                     <i class="fas fa-user me-1"></i>
                                     Retour au Profil
                                 </a>

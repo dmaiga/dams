@@ -7,14 +7,10 @@ from  .views import (
                      )
 urlpatterns = [
     # Dashboard
-  
-    path('agent/dashboard/', views.dashboard_agent, name='dashboard_agent'),
+    path("acces-refuse/", views.access_denied, name="access_denied"),
     # Agents
-    path('agents/', views.liste_agents, name='liste_agents'),
-    path('agents/<int:agent_id>/', views.detail_agent, name='detail_agent'),
-    path('agents/creer/', views.creer_agent, name='creer_agent'),
-    path('agents/modifier/<int:agent_id>/', views.modifier_agent, name='modifier_agent'),
-    path('agents/supprimer/<int:agent_id>/', views.supprimer_agent, name='supprimer_agent'),    
+
+  
 # FOURNISSEUR
     path('fournisseurs/', views.liste_fournisseurs, name='liste_fournisseurs'),
     path('fournisseur/<int:fournisseur_id>/', views.detail_fournisseur, name='detail_fournisseur'),

@@ -15,7 +15,7 @@ from django.contrib.auth.models import User
 # DB / ORM
 from django.db import models, transaction
 from django.db.models import (
-    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
+    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField,Value
 )
 from django.db.models.functions import Coalesce
 
@@ -40,8 +40,7 @@ from .models import (
 # Project forms
 from .forms import (
     FactureLotForm, VenteForm, DistributionForm, ReceptionLotForm, 
-    DetteForm, PaiementDetteForm, DistributionSuppressionForm,
-    DistributionModificationForm,RecouvrementForm,
+    DetteForm, PaiementDetteForm,RecouvrementForm,
     FournisseurForm,VersementForm
 
 )
@@ -123,251 +122,49 @@ def logout_user(request):
     logout(request)  
     return redirect('login') 
 
-def custom_403(request, exception=None):
-    return render(request, 'core/errors/403.html', status=403)
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def access_denied(request, reason=None):
+    agent = getattr(request.user, "agent", None)
+
+    context = {
+        "agent": agent,
+        "reason": reason,
+        "redirect_url": None,
+        "redirect_label": "Retour",
+        "message": "Vous n’avez pas l’autorisation d’accéder à cette page.",
+    }
+
+    if agent:
+        if agent.est_rot:
+            context.update({
+                "message": "Cette fonctionnalité est réservée à un autre niveau d’autorisation.",
+                "redirect_url": "dashboard_rot",
+                "redirect_label": "Aller au tableau de bord ROT",
+            })
+        elif agent.est_superviseur:
+            context.update({
+                "message": "Cette action est réservée au Responsable des Opérations (ROT).",
+                "redirect_url": "tableau_de_bord_superviseur",
+                "redirect_label": "Retour à mon tableau de bord",
+            })
+        else:
+            context.update({
+                "redirect_url": "dashboard_agent",
+                "redirect_label": "Retour à mon espace",
+            })
+
+    return render(request, "core/errors/403.html", context, status=403)
+
 #=========
 #AGENT
 #========
 # views.py
-@login_required
-def dashboard_agent(request):
-    """Tableau de bord simplifié pour les agents terrain"""
-    try:
-        agent = Agent.objects.get(user=request.user)
-    except Agent.DoesNotExist:
-        messages.error(request, "Aucun agent trouvé.")
-        return redirect('dashboard')
-    
-    # Récupérer le bonus agent
-    bonus_agent, created = BonusAgent.objects.get_or_create(agent=agent)
-    
-    # Données essentielles uniquement
-    ventes_mois = Vente.objects.filter(
-        agent=agent, 
-        date_vente__month=timezone.now().month
-    )
-    
-    # Stock disponible simplifié
-    produits_disponibles = (
-        DetailDistribution.objects
-        .filter(
-            distribution__agent_terrain=agent,
-            est_supprime=False,
-            distribution__est_supprime=False,
-        )
-        .annotate(
-            quantite_restante=F('quantite') - F('quantite_vendue')
-        )
-        .filter(quantite_restante__gt=0)
-        .select_related('lot__produit')
-        .order_by('lot__produit__nom')[:10]  # Limiter à 10 produits
-    )
-
-    total_stock_disponible = sum(d.quantite_restante for d in produits_disponibles)
-
-    # Dettes à recouvrer
-    dettes_prioritaires = Dette.objects.filter(
-        vente__agent=agent,
-        statut__in=['en_cours', 'partiellement_paye', 'en_retard']
-    ).order_by('date_echeance')[:3]  # Seulement 3 dettes prioritaires
-
-    total_a_recouvrer = sum(dette.montant_restant for dette in dettes_prioritaires)
-
-    # Activité récente (5 dernières ventes)
-    ventes_recentes = ventes_mois.select_related(
-        'client', 'detail_distribution__lot__produit'
-    ).order_by('-date_vente')[:5]
-
-    # Statistiques simples
-    nombre_ventes_mois = ventes_mois.count()
-    clients_servis_mois = ventes_mois.values('client').distinct().count()
-
-    context = {
-        'agent': agent,
-        'nombre_ventes_mois': nombre_ventes_mois,
-        'clients_servis_mois': clients_servis_mois,
-        'total_a_recouvrer': total_a_recouvrer,
-        'dettes_prioritaires': dettes_prioritaires,
-        'produits_disponibles': produits_disponibles,
-        'total_stock_disponible': total_stock_disponible,
-        'ventes_recentes': ventes_recentes,
-    }
-    
-    return render(request, 'core/dashboard/dashboard_agent.html', context)
-
-@login_required
-def liste_agents(request):
-    """
-    Liste des agents (terrain, superviseurs, stagiaires)
-    avec gestion RH : actifs / inactifs / stagiaires expirés
-    """
-
-    agents = Agent.objects.filter(
-        type_agent__in=['entrepot', 'terrain', 'stagiaire']
-    ).select_related('user')
-
-    # =========================
-    # AGENTS ACTIFS / INACTIFS
-    # =========================
-    agents_actifs = agents.filter(est_actif=True)
-    agents_inactifs = agents.filter(est_actif=False)
-
-    # =========================
-    # SUPERVISEURS / TERRAIN
-    # =========================
-    agents_superviseurs = agents_actifs.filter(
-        type_agent='entrepot'
-    ).order_by('user__first_name')
-
-    agents_terrain = agents_actifs.filter(
-        type_agent='terrain'
-    ).order_by('user__first_name')
-
-    # =========================
-    # STAGIAIRES
-    # =========================
-    stagiaires = agents.filter(type_agent='stagiaire')
-
-    stagiaires_actifs = stagiaires.filter(
-        est_actif=True,
-        date_expiration__gte=timezone.now()
-    ).order_by('date_expiration')
-
-    stagiaires_expires = stagiaires.filter(
-        date_expiration__lt=timezone.now()
-    ).order_by('-date_expiration')
-
-    # =========================
-    # CONTEXTE
-    # =========================
-    context = {
-        # Global
-        'agents': agents,
-
-        # RH
-        'agents_actifs': agents_actifs,
-        'agents_inactifs': agents_inactifs,
-
-        # Opérationnel
-        'agents_superviseurs': agents_superviseurs,
-        'agents_terrain': agents_terrain,
-
-        # Stagiaires
-        'stagiaires': stagiaires,
-        'stagiaires_actifs': stagiaires_actifs,
-        'stagiaires_expires': stagiaires_expires,
-    }
-
-    return render(
-        request,
-        'core/agents/liste_agents.html',
-        context
-    )
-
-@login_required
-def detail_agent(request, agent_id):
-    agent = get_object_or_404(Agent, id=agent_id)
-    
-    # Récupérer les statistiques des ventes
-    ventes = Vente.objects.filter(agent=agent).order_by('-date_vente')
-    total_ventes = agent.total_ventes
-    total_recouvre = agent.total_recouvre
-    argent_en_possession = agent.argent_en_possession
-    
-    # Statistiques par type de vente
-    ventes_gros = ventes.filter(type_vente='gros')
-    ventes_detail = ventes.filter(type_vente='detail')
-    
-    total_ventes_gros = sum(vente.total_vente for vente in ventes_gros)
-    total_ventes_detail = sum(vente.total_vente for vente in ventes_detail)
-    
-    # Derniers recouvrements
-    recouvrements = Recouvrement.objects.filter(agent=agent).order_by('-date_recouvrement')[:5]
-    
-    # Ventes récentes (30 derniers jours)
-    date_limite = timezone.now() - timedelta(days=30)
-    ventes_recentes = ventes.filter(date_vente__gte=date_limite)
-    
-    context = {
-        'agent': agent,
-        'ventes': ventes[:10],  # 10 dernières ventes
-        'ventes_total_count': ventes.count(),
-        'ventes_gros': ventes_gros,
-        'ventes_detail': ventes_detail,
-        'total_ventes_gros': total_ventes_gros,
-        'total_ventes_detail': total_ventes_detail,
-        'total_ventes': total_ventes,
-        'total_recouvre': total_recouvre,
-        'argent_en_possession': argent_en_possession,
-        'recouvrements': recouvrements,
-        'ventes_recentes_count': ventes_recentes.count(),
-    }
-    
-    return render(request, 'core/agents/detail_agent.html', context)
 
 
 
-@login_required
-def creer_agent(request):
-    agent_connecte = request.user.agent
-
-    # =========================
-    # CHOIX DU FORMULAIRE
-    # =========================
-
-    if agent_connecte.est_superviseur:
-        # Superviseur → Agent terrain uniquement
-        form = SupervisorTerrainAgentCreationForm(
-            request.POST or None,
-            superviseur=agent_connecte
-        )
-
-    elif agent_connecte.est_rot:
-        # ROT → Superviseur uniquement
-        form = RotSupervisorCreationForm(
-            request.POST or None
-        )
-
-
-    else:
-        return HttpResponseForbidden("Accès non autorisé")
-
-    # =========================
-    # SOUMISSION
-    # =========================
-
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        return redirect('liste_agents')
-
-    return render(request, 'core/agents/creer_agent.html', {
-        'form': form
-    })
-
-@login_required
-def modifier_agent(request, agent_id):
-    agent_cible = get_object_or_404(Agent, id=agent_id)
-    agent_connecte = request.user.agent
-
-    # Sécurité minimale
-    if agent_connecte.est_superviseur and agent_cible.superviseur != agent_connecte:
-        return HttpResponseForbidden()
-
-    form = SupervisorTerrainAgentCreationForm(
-        request.POST or None,
-        instance=agent_cible,
-        superviseur=agent_connecte if agent_connecte.est_superviseur else None
-    )
-
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, "✅ Agent modifié avec succès")
-        return redirect('liste_agents')
-
-    return render(request, 'core/agents/creer_agent.html', {
-        'form': form,
-        'agent': agent_cible
-    })
 
 
 @login_required
@@ -389,96 +186,151 @@ def supprimer_agent(request, agent_id):
 from django.db.models import Sum, Count, Avg, F, Max, Min
 
 
+
 @login_required
 def liste_fournisseurs(request):
-    fournisseurs = Fournisseur.objects.annotate(
+    data = []
+
+    fournisseurs = Fournisseur.objects.all()
+
+    for f in fournisseurs:
         # =========================
-        # KPI FINANCIERS
+        # LOTS FOURNISSEUR
         # =========================
-        total_achats=Sum(
-            F('lots__quantite_initiale') * F('lots__prix_achat_unitaire')
-        ),
-        total_achats_restants=Sum(
-            F('lots__quantite_restante') * F('lots__prix_achat_unitaire')
-        ),
+        lots = LotEntrepot.objects.filter(fournisseur=f)
+
+        # -------------------------
+        # Produits livrés (liste)
+        # -------------------------
+        produits = (
+            lots
+            .values('produit__nom')
+            .annotate(
+                qte_livree=Coalesce(Sum('quantite_initiale'), Decimal('0'))
+            )
+            .order_by('produit__nom')
+        )
+
+        produits_liste = [
+            f"{p['produit__nom']} – {p['qte_livree']}"
+            for p in produits
+        ]
+
+        # -------------------------
+        # Dette contractuelle
+        # -------------------------
+        dette_contractuelle = lots.aggregate(
+            total=Coalesce(
+                Sum(
+                    F('quantite_initiale') * F('prix_achat_unitaire'),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+                Decimal('0')
+            )
+        )['total']
 
         # =========================
-        # KPI QUANTITATIFS
+        # DETTE CONSOMMÉE
         # =========================
-        nb_lots_total=Count('lots', distinct=True),
-        nb_lots_actifs=Count(
-            'lots',
-            filter=Q(lots__quantite_restante__gt=0),
-            distinct=True
-        ),
+        ventes = Vente.objects.filter(
+            detail_distribution__lot__fournisseur=f
+        )
 
-        # =========================
-        # KPI TEMPORELS
-        # =========================
-        dernier_lot=Max('lots__date_reception'),
-        premier_lot=Min('lots__date_reception'),
-    ).order_by('-total_achats')
+        dette_consommee = ventes.aggregate(
+            total=Coalesce(
+                Sum(
+                    F('quantite') *
+                    (F('prix_vente_unitaire') - F('detail_distribution__lot__prix_achat_unitaire')),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+                Decimal('0')
+            )
+        )['total']
+
+
+        data.append({
+            'fournisseur': f,
+            'contact': f.contact if hasattr(f, 'contact') else "",
+            'produits': produits_liste,
+            'dette_contractuelle': dette_contractuelle,
+            'dette_consommee': dette_consommee,
+        })
+        total_contractuelle = sum(item['dette_contractuelle'] for item in data)
+        total_consommee = sum(item['dette_consommee'] for item in data)
 
     return render(
         request,
         'core/fournisseur/liste_fournisseurs.html',
         {
-            'fournisseurs': fournisseurs
+            'fournisseurs': data,
+            'total_contractuelle': total_contractuelle,
+            'total_consommee': total_consommee,
         }
     )
 
 @login_required
 def detail_fournisseur(request, fournisseur_id):
     fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
-    
-    # Lots du fournisseur
-    lots = LotEntrepot.objects.filter(fournisseur=fournisseur).select_related('produit').order_by('-date_reception')
-    
-    # KPI détaillés
+
+    lots_qs = (
+        LotEntrepot.objects
+        .filter(fournisseur=fournisseur)
+        .select_related('produit')
+        .order_by('-date_reception')
+    )
+
+    lots = []
+    dette_contractuelle = Decimal('0')
+    dette_consomme = Decimal('0')
+
+    for lot in lots_qs:
+        valeur_livree = lot.quantite_initiale * lot.prix_achat_unitaire
+        valeur_consomme = (
+            (lot.quantite_initiale - lot.quantite_restante)
+            * lot.prix_achat_unitaire
+        )
+
+        dette_contractuelle += valeur_livree
+        dette_consomme += valeur_consomme
+
+        lots.append({
+            'lot': lot,
+            'date_reception': lot.date_reception,
+            'produit': lot.produit.nom,
+            'quantite_initiale': lot.quantite_initiale,
+            'quantite_restante': lot.quantite_restante,
+            'prix_achat': lot.prix_achat_unitaire,
+            'valeur_consomme': valeur_consomme,
+            'valeur_livree': valeur_livree,
+        })
+
+    paiements = fournisseur.paiements.filter(
+        est_supprime=False
+    ).aggregate(
+        total=Coalesce(Sum('montant'), Decimal('0'))
+    )['total']
+
     kpi = {
-        'total_achats': lots.aggregate(
-            total=Sum(F('quantite_initiale') * F('prix_achat_unitaire'))
-        )['total'] or 0,
-        
-        'stock_actuel_valeur': lots.filter(quantite_restante__gt=0).aggregate(
-            total=Sum(F('quantite_restante') * F('prix_achat_unitaire'))
-        )['total'] or 0,
-        
-        'nb_lots_total': lots.count(),
-        'nb_lots_actifs': lots.filter(quantite_restante__gt=0).count(),
-        'nb_produits_différents': lots.values('produit').distinct().count(),
-        
-        'moyenne_commande': lots.aggregate(
-            moyenne=Avg(F('quantite_initiale') * F('prix_achat_unitaire'))
-        )['moyenne'] or 0,
-        
-        'derniere_activite': lots.aggregate(
-            dernier=Max('date_reception')
-        )['dernier'],
-        
-        'jours_sans_activite': (timezone.now() - lots.aggregate(
-            dernier=Max('date_reception')
-        )['dernier']).days if lots.exists() else None,
+        'dette_contractuelle': dette_contractuelle,
+        'dette_consomme': dette_consomme,
+        'paiements': paiements,
+        'reste_a_payer': dette_contractuelle - paiements,
+        'nb_lots': lots_qs.count(),
+        'nb_produits': lots_qs.values('produit').distinct().count(),
     }
-    
-    # Produits les plus achetés
-    produits_populaires = lots.values('produit__nom').annotate(
-        total_achete=Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
-        nb_lots=Count('id')
-    ).order_by('-total_achete')
-    
-    # Évolution des achats (3 derniers mois)
-    date_limite = timezone.now() - timedelta(days=90)
-    recent_lots = lots.filter(date_reception__gte=date_limite)
-    
+
     context = {
         'fournisseur': fournisseur,
         'lots': lots,
         'kpi': kpi,
-        'produits_populaires': produits_populaires,
-        'recent_lots': recent_lots,
     }
-    return render(request, 'core/fournisseur/detail_fournisseur.html', context)
+
+    return render(
+        request,
+        'core/fournisseur/detail_fournisseur.html',
+        context
+    )
+
 
 @login_required
 def creer_fournisseur(request):
@@ -521,11 +373,18 @@ def supprimer_fournisseur(request, fournisseur_id):
 # views.py
 @login_required
 def reception_lot(request):
+    agent = request.user.agent
+    if not agent.est_rot:
+        return redirect('access_denied')
+    
     if request.method == 'POST':
         form = ReceptionLotForm(request.POST)  
         if form.is_valid():
             try:
-                lot = form.save()
+                lot = form.save(commit=False)
+                lot.receptionne_par = request.user.agent
+                lot.save()
+
                 
                 # Créer un mouvement de stock
                 MouvementStock.objects.create(
@@ -538,7 +397,7 @@ def reception_lot(request):
                 
                 messages.success(request, f"✅ Lot {lot.reference_lot} réceptionné avec succès!")
                 
-                # REDIRECTION VERS LA PAGE D'AJOUT DE FACTURES
+                
                 return redirect('liste_lots')
                 
             except Exception as e:
@@ -654,127 +513,53 @@ def detail_lot(request, lot_id):
         'title': f'Lot {lot.reference_lot}'
     })
 
+from agents.services.agent_stock_service import AgentStockService
+from django.utils import timezone
+from datetime import timedelta
+
 
 @login_required
 def mon_stock(request):
-    """Vue simplifiée pour consulter le stock personnel de l'agent"""
-    try:
-        agent = request.user.agent
-    except Agent.DoesNotExist:
-        return redirect('login')
-    
-    # Vérifier que l'utilisateur est un agent terrain
-    if agent.type_agent not in ['terrain', 'entrepot', 'stagiaire']:
-        return redirect('login')
-    
-    # Calcul du stock actuel de l'agent (version simplifiée)
-    stock_agent = calculer_stock_agent(agent)
-    
-    # Filtrer uniquement les produits avec stock positif
+    agent = request.user.agent
+
+    if not agent.est_agent_terrain:
+        return redirect('access_denied')
+
+    service = AgentStockService(agent)
+    stock_agent = service.get_stock()
+
     stock_positif = [p for p in stock_agent if p['quantite_restante'] > 0]
     stock_negatif = [p for p in stock_agent if p['quantite_restante'] < 0]
-    
-    # Distributions récentes (simplifié - 15 derniers jours)
+
     distributions_recentes = DistributionAgent.objects.filter(
         agent_terrain=agent,
-        est_supprime=False,
         date_distribution__gte=timezone.now() - timedelta(days=15)
-    ).select_related('superviseur')[:5]  # Limiter à 5 distributions
-    
-    # Ventes récentes (simplifié - 5 derniers jours)
+    ).select_related('superviseur')[:5]
+
     ventes_recentes = Vente.objects.filter(
         agent=agent,
         date_vente__gte=timezone.now() - timedelta(days=5)
-    ).select_related('client', 'detail_distribution__lot__produit')[:5]  # Limiter à 5 ventes
-    
-    # Alertes stock faible (seulement pour stock positif)
-    alertes_stock_faible = [p for p in stock_positif if p['quantite_restante'] <= 5]
-    
-    # Calcul des totaux CORRIGÉS
-    total_quantite = sum(p['quantite_restante'] for p in stock_positif)
-    total_valeur_stock = sum(p['valeur_totale'] for p in stock_positif)
-    total_produits = len(stock_positif)
-    
+    ).select_related('client', 'detail_distribution__lot__produit')[:5]
+
+    alertes_stock_faible = [
+        p for p in stock_positif if p['quantite_restante'] <= 5
+    ]
+
     context = {
         'agent': agent,
-        'stock_agent': stock_positif,  # Uniquement le stock positif
-        'stock_negatif': stock_negatif,  # Stock négatif séparé
+        'stock_agent': stock_positif,
+        'stock_negatif': stock_negatif,
         'distributions_recentes': distributions_recentes,
         'ventes_recentes': ventes_recentes,
         'alertes_stock_faible': alertes_stock_faible,
-        'total_valeur_stock': total_valeur_stock,
-        'total_quantite': total_quantite,
-        'total_produits': total_produits,
+        'total_valeur_stock': sum(p['valeur_totale'] for p in stock_positif),
+        'total_quantite': sum(p['quantite_restante'] for p in stock_positif),
+        'total_produits': len(stock_positif),
         'total_alertes': len(alertes_stock_faible),
     }
-    
+
     return render(request, 'core/entrepot/mon_stock.html', context)
 
-
-def calculer_stock_agent(agent):
-    """
-    Calcule le stock actuel d'un agent en fonction des distributions et ventes
-    """
-    # Récupérer toutes les distributions non supprimées pour cet agent
-    distributions = DistributionAgent.objects.filter(
-        agent_terrain=agent,
-        est_supprime=False
-    ).prefetch_related('detaildistribution_set__lot__produit')
-    
-    # Récupérer toutes les ventes de cet agent
-    ventes = Vente.objects.filter(agent=agent).select_related('detail_distribution__lot__produit')
-    
-    # Calculer le stock par produit
-    stock_par_produit = {}
-    
-    # Ajouter les quantités distribuées
-    for distribution in distributions:
-        for detail in distribution.detaildistribution_set.filter(est_supprime=False):
-            produit = detail.lot.produit
-            produit_id = produit.id
-            
-            if produit_id not in stock_par_produit:
-                stock_par_produit[produit_id] = {
-                    'produit': produit,
-                    'quantite_distribuee': 0,
-                    'quantite_vendue': 0,
-                    'quantite_restante': 0,
-                    'prix_gros': detail.prix_gros,
-                    'prix_detail': detail.prix_detail,
-                    'valeur_totale': 0,
-                    'seuil_alerte': 5  # Seuil par défaut
-                }
-            
-            stock_par_produit[produit_id]['quantite_distribuee'] += detail.quantite
-    
-    # Soustraire les quantités vendues
-    for vente in ventes:
-        produit = vente.detail_distribution.lot.produit
-        produit_id = produit.id
-        
-        if produit_id in stock_par_produit:
-            stock_par_produit[produit_id]['quantite_vendue'] += vente.quantite
-    
-    # Calculer les quantités restantes et valeurs CORRIGÉ
-    for produit_id, data in stock_par_produit.items():
-        data['quantite_restante'] = data['quantite_distribuee'] - data['quantite_vendue']
-        
-        # CORRECTION : Calculer la valeur du stock SEULEMENT si le stock est positif
-        if data['quantite_restante'] > 0 and data['prix_detail']:
-            data['valeur_totale'] = data['quantite_restante'] * data['prix_detail']
-        else:
-            data['valeur_totale'] = 0
-        
-        # CORRECTION : Ajuster l'affichage pour les stocks négatifs
-        if data['quantite_restante'] < 0:
-            # Pour l'affichage, on peut garder la valeur négative mais la valeur monétaire doit être 0
-            data['valeur_totale'] = 0
-    
-    # Convertir en liste et trier par quantité restante (décroissant)
-    stock_list = list(stock_par_produit.values())
-    stock_list.sort(key=lambda x: x['quantite_restante'], reverse=True)
-    
-    return stock_list
 #============
 #DISTRIBUTION
 #============
@@ -958,7 +743,7 @@ def liste_distributions(request):
     # -------------------------------
     # Filtres
     # -------------------------------
-    show_deleted = request.GET.get('show_deleted') == 'true'
+
     type_filter = request.GET.get('type')
     agent_filter = request.GET.get('agent')
     lot_filter = request.GET.get('lot')
@@ -1021,8 +806,6 @@ def liste_distributions(request):
     # -------------------------------
     # Filtres dynamiques
     # -------------------------------
-    if not show_deleted:
-        distributions = distributions.filter(est_supprime=False)
 
     if type_filter:
         distributions = distributions.filter(type_distribution=type_filter)
@@ -1075,7 +858,7 @@ def liste_distributions(request):
         'filter_agent': agent_filter,
         'date_debut': date_debut,
         'date_fin': date_fin,
-        'show_deleted': show_deleted,
+
     }
 
     return render(
@@ -1189,7 +972,7 @@ def mes_distributions(request):
     # Requête optimisée
     distributions = DistributionAgent.objects.filter(
         agent_terrain=agent,
-        est_supprime=False,
+        
         date_distribution__range=[date_debut, date_fin]
     ).select_related('superviseur').prefetch_related(
         'detaildistribution_set__lot__produit'
@@ -1228,65 +1011,60 @@ def mes_distributions(request):
     }
     
     return render(request, 'core/distribution/mes_distributions.html', context)
+
 #=====
 #VENTE
 #=====
 @login_required
 def enregistrer_vente(request):
-    """Enregistrer une vente avec gestion des dettes et stagiaires"""
-    # Récupérer l'agent connecté (sans restriction de type)
+    """
+    Vente terrain uniquement :
+    - détail
+    - comptant
+    - prix imposé
+    """
+
     try:
-        agent = Agent.objects.get(user=request.user)
+        agent = request.user.agent
     except Agent.DoesNotExist:
-        messages.error(request, "Aucun agent trouvé pour cet utilisateur.")
+        messages.error(request, "Profil agent introuvable.")
         return redirect('dashboard')
-    
+
+    # 🔒 Sécurité : seuls les agents terrain vendent
+    if not agent.est_agent_terrain:
+        return redirect('access_denied')
+
     if request.method == 'POST':
         form = VenteForm(request.POST, agent=agent)
-        
+
         if form.is_valid():
             try:
-                with transaction.atomic():  # Transaction pour garantir l'intégrité
+                with transaction.atomic():
                     vente = form.save()
-                    
-                    # Récupérer le nom du client en utilisant la propriété nom_client
-                    nom_client_affichage = vente.nom_client
-                    
-                    # ✅ NOUVEAU : Message personnalisé selon le type de vente
-                    if vente.stagiaire:
-                        message_success = (
-                            f"✅ Vente stagiaire enregistrée ! {vente.quantite} {vente.produit_nom} "
-                            f"vendu par {vente.stagiaire.full_name} à {nom_client_affichage} "
-                            f"pour {vente.total_vente} FCFA"
-                        )
-                    else:
-                        message_success = (
-                            f"✅ Vente enregistrée ! {vente.quantite} {vente.produit_nom} "
-                            f"vendu à {nom_client_affichage} pour {vente.total_vente} FCFA"
-                        )
-                    
-                    # Si c'est une vente à crédit, créer la dette
-                    if vente.mode_paiement == 'credit':
-                        # Rediriger vers le formulaire de création de dette
-                        request.session['vente_pending_dette'] = vente.id
-                        messages.success(request, f"{message_success} - Veuillez compléter les informations de la dette.")
-                        return redirect('creer_dette')
-                    
-                    else:  # Vente comptant
-                        messages.success(request, message_success)
-                        return redirect('liste_ventes')
-                        
+
+                    messages.success(
+                        request,
+                        f"✅ Vente enregistrée : "
+                        f"{vente.quantite} {vente.detail_distribution.lot.produit.nom} "
+                        f"pour {vente.total_vente} FCFA"
+                    )
+
+                    return redirect('liste_ventes')
+
             except Exception as e:
-                messages.error(request, f"❌ Erreur lors de l'enregistrement: {str(e)}")
+                messages.error(request, f"❌ Erreur lors de l’enregistrement : {str(e)}")
+
         else:
-            messages.error(request, "❌ Veuillez corriger les erreurs ci-dessous.")
+            messages.error(request, "❌ Veuillez corriger les erreurs du formulaire.")
+
     else:
         form = VenteForm(agent=agent)
-    
+
     return render(request, 'core/ventes/enregistrer_vente.html', {
         'form': form,
         'agent': agent
     })
+
 
 @login_required
 def liste_ventes(request):
@@ -1744,11 +1522,11 @@ def modifier_versement(request, versement_id):
     # La direction peut modifier tous les versements
     if user_agent.est_superviseur and versement.superviseur != user_agent:
         messages.error(request, "Vous ne pouvez modifier que vos propres versements.")
-        return redirect('liste_versements')
+        return redirect('liste_versement')
     
     if not (user_agent.est_superviseur or user_agent.est_direction):
         messages.error(request, "Accès non autorisé.")
-        return redirect('liste_versements')
+        return redirect('liste_versement')
     
     # Récupérer la dépense existante s'il y en a une
     depense_existante = versement.depenses.first()
@@ -1814,12 +1592,6 @@ def detail_versement(request, versement_id):
     # Récupérer le versement
     versement = get_object_or_404(VersementBancaire, id=versement_id)
     
-    # Vérifier les permissions
-    if hasattr(request.user, 'agent'):
-        user_agent = request.user.agent
-        if not (user_agent.est_direction or user_agent.est_superviseur and versement.superviseur == user_agent):
-            messages.error(request, "Vous n'avez pas accès à ce versement.")
-            return redirect('liste_versements')
     
     # Récupérer les dépenses associées
     depenses = versement.depenses.all()
@@ -1974,72 +1746,88 @@ def liste_factures_entrepot(request):
 #=========
 # #RECOUVREMENT
 #=========
+
 @login_required
 def creer_recouvrement(request, agent_id):
-    # Récupérer l'agent cible (peut être terrain OU superviseur)
-    agent = get_object_or_404(Agent, id=agent_id)
     agent_connecte = request.user.agent
-    
-    # Vérifications de sécurité
+    agent_cible = get_object_or_404(Agent, id=agent_id)
+
+    # =========================
+    # SÉCURITÉ – RÔLES
+    # =========================
+
+    # ❌ Agent terrain : interdit
     if agent_connecte.est_agent_terrain:
-        messages.error(request, "Les agents terrain ne peuvent pas effectuer de recouvrements.")
-        return redirect('dashboard_agent')
-    
-    # Un superviseur peut recouvrir ses propres ventes OU celles des agents terrain
-    if agent_connecte.est_superviseur:
-        if not (agent.est_agent_terrain or agent.id == agent_connecte.id):
-            messages.error(request, "Vous ne pouvez recouvrir que vos propres ventes ou celles de vos agents terrain.")
-            return redirect('tableau_de_bord_superviseur')
-    
-    # Un directeur peut recouvrir tout le monde
-    if agent_connecte.est_direction:
-        if not (agent.est_agent_terrain or agent.est_superviseur):
-            messages.error(request, "Vous ne pouvez recouvrir que les agents terrain et superviseurs.")
-            return redirect('tableau_de_bord')  # Correction du typo ici
-    
-    if request.method == 'POST':
-        form = RecouvrementForm(request.POST, agent=agent)
-        if form.is_valid():
-            try:
-                # Créer le recouvrement avec les données supplémentaires
-                recouvrement = form.save(commit=False)
-                recouvrement.agent = agent
-                recouvrement.superviseur = agent_connecte  # ← CORRECTION ICI
-                
-                # IMPORTANT: Ne pas réassigner vente ici car déjà fait dans form.save()
-                # recouvrement.vente = form.cleaned_data['vente']  # ← SUPPRIMER CETTE LIGNE
-                
-                recouvrement.save()
-                
-                # Message personnalisé selon le type d'agent
-                if agent.est_agent_terrain:
-                    message = f"Recouvrement de {recouvrement.montant_recouvre} FCFA effectué auprès de {agent.full_name} avec succès!"
-                else:  # Auto-recouvrement
-                    message = f"Auto-recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès!"
-                
-                messages.success(request, message)
-                
-                # Redirection appropriée
-                if agent.est_agent_terrain:
-                    return redirect('liste_agents_recouvrement')
-                else:
-                    return redirect('liste_agents_recouvrement')
-                    
-            except Exception as e:
-                messages.error(request, f"Erreur lors du recouvrement: {str(e)}")
+        return redirect('access_denied')
+
+    # ❌ Seuls les superviseurs sont autorisés ici
+    if not agent_connecte.est_superviseur:
+        return redirect('access_denied')
+
+    # =========================
+    # SÉCURITÉ – PÉRIMÈTRE
+    # =========================
+
+    # Auto-recouvrement autorisé
+    if agent_cible.id == agent_connecte.id:
+        pass
+
+    # Recouvrement d’un agent terrain SOUS CE SUPERVISEUR
+    elif agent_cible.est_agent_terrain:
+        if agent_cible.superviseur_id != agent_connecte.id:
+            return redirect('access_denied')
+
+    # ❌ Tout le reste interdit (autre superviseur, stagiaire, etc.)
     else:
-        form = RecouvrementForm(agent=agent)
-    
+        return redirect('access_denied')
+
+    # =========================
+    # FORMULAIRE
+    # =========================
+
+    if request.method == 'POST':
+        form = RecouvrementForm(request.POST, agent=agent_cible)
+        if form.is_valid():
+            recouvrement = form.save(commit=False)
+            recouvrement.agent = agent_cible
+            recouvrement.superviseur = agent_connecte
+            recouvrement.save()
+
+            # Message clair
+            if agent_cible.id == agent_connecte.id:
+                messages.success(
+                    request,
+                    f"✅ Auto-recouvrement de {recouvrement.montant_recouvre} FCFA effectué avec succès."
+                )
+            else:
+                messages.success(
+                    request,
+                    f"✅ Recouvrement de {recouvrement.montant_recouvre} FCFA effectué auprès de {agent_cible.full_name}."
+                )
+
+            return redirect('liste_agents_recouvrement')
+    else:
+        form = RecouvrementForm(agent=agent_cible)
+
+    # =========================
+    # CONTEXTE
+    # =========================
+
     context = {
-        'agent': agent,
+        'agent': agent_cible,
         'form': form,
-        'argent_en_possession': agent.argent_en_possession,
-        'total_ventes': agent.total_ventes,
-        'total_recouvre': agent.total_recouvre,
-        'est_auto_recouvrement': agent.id == agent_connecte.id,
+        'argent_en_possession': agent_cible.argent_en_possession,
+        'total_ventes': agent_cible.total_ventes,
+        'total_recouvre': agent_cible.total_recouvre,
+        'est_auto_recouvrement': agent_cible.id == agent_connecte.id,
     }
-    
-    return render(request, 'core/recouvrement/creer_recouvrement.html', context)
+
+    return render(
+        request,
+        'core/recouvrement/creer_recouvrement.html',
+        context
+    )
+
 
 @login_required
 def historique_recouvrement(request, agent_id):
@@ -2080,45 +1868,38 @@ def detail_historique(request, agent_id):
     return render(request, 'core/recouvrement/detail_historique.html', context)
 
 
-
 @login_required
 def liste_agents_recouvrement(request):
-    # ======================================================
-    # 1️⃣ AGENT CONNECTÉ (1 requête)
-    # ======================================================
     agent_connecte = (
         Agent.objects
         .select_related("user")
         .get(user=request.user)
     )
 
-    # ======================================================
-    # 2️⃣ QUERYSET AGENTS À AFFICHER (1 requête)
-    # ======================================================
-    agents_qs = Agent.objects.select_related("user")
+    # =========================
+    # SÉCURITÉ : QUI VOIT QUOI
+    # =========================
 
-    if agent_connecte.est_direction:
-        agents_qs = agents_qs.filter(type_agent__in=["terrain", "entrepot"])
+    if agent_connecte.est_superviseur:
+        agents_qs = Agent.objects.filter(
+            type_agent="terrain",
+            superviseur=agent_connecte
+        ).select_related("user")
 
-    elif agent_connecte.est_superviseur:
-        agents_qs = agents_qs.filter(
-            models.Q(type_agent="terrain") |
-            models.Q(id=agent_connecte.id)
-        )
 
     else:
-        agents_qs = Agent.objects.none()
+        # Terrain / autre → interdit
+        return redirect("access_denied")
 
     agents_ids = list(agents_qs.values_list("id", flat=True))
 
-    # ======================================================
-    # 3️⃣ AGRÉGATIONS SQL (ZÉRO N+1)
-    # ======================================================
+    # =========================
+    # AGRÉGATIONS SQL
+    # =========================
 
-    # 🔹 VENTES PAR AGENT
     ventes_par_agent = dict(
         Vente.objects
-        .filter(agent_id__in=agents_ids, est_supprime=False)
+        .filter(agent_id__in=agents_ids)
         .values("agent_id")
         .annotate(
             total=models.Sum(
@@ -2128,7 +1909,6 @@ def liste_agents_recouvrement(request):
         .values_list("agent_id", "total")
     )
 
-    # 🔹 RECOUVREMENTS PAR AGENT
     recouvrements_par_agent = dict(
         Recouvrement.objects
         .filter(agent_id__in=agents_ids)
@@ -2137,46 +1917,28 @@ def liste_agents_recouvrement(request):
         .values_list("agent_id", "total")
     )
 
-    # 🔹 DÉPENSES PAR SUPERVISEUR
-    depenses_par_superviseur = dict(
-        Depense.objects
-        .filter(versement__superviseur_id__in=agents_ids)
-        .values('versement__superviseur_id')
-        .annotate(total=models.Sum('montant'))
-        .values_list('versement__superviseur_id', 'total')
-    )
-    
 
-    # ======================================================
-    # 4️⃣ ASSEMBLAGE PYTHON (AUCUNE REQUÊTE)
-    # ======================================================
+    # =========================
+    # ASSEMBLAGE
+    # =========================
+
     agents_data = []
-
     total_ventes_tous_agents = Decimal("0.00")
     total_recouvre_tous_agents = Decimal("0.00")
 
     for agent in agents_qs:
         total_ventes = ventes_par_agent.get(agent.id, Decimal("0.00")) or Decimal("0.00")
         total_recouvre = recouvrements_par_agent.get(agent.id, Decimal("0.00")) or Decimal("0.00")
-        depenses = depenses_par_superviseur.get(agent.id, Decimal("0.00")) or Decimal("0.00")
+       
+        difference = total_ventes - total_recouvre
 
-        if agent.est_superviseur:
-            # Auto-recouvrement
-            difference = Decimal("0.00")
+        if difference == 0:
+            statut = "Complètement recouvré"
             couleur = "success"
-            statut = "À jour (auto-recouvré)"
-
         else:
-            difference = total_ventes - total_recouvre
-            if difference == 0:
-                couleur = "success"
-                statut = "Complètement recouvré"
-            elif difference > 0:
-                couleur = "warning"
-                statut = f"{difference:,.0f} FCFA à recouvrir"
-            else:
-                couleur = "danger"
-                statut = "Erreur de calcul"
+            statut = f"{difference:,.0f} FCFA à recouvrer"
+            couleur = "warning"
+
 
         total_ventes_tous_agents += total_ventes
         total_recouvre_tous_agents += total_recouvre
@@ -2185,46 +1947,19 @@ def liste_agents_recouvrement(request):
             "agent": agent,
             "total_ventes": total_ventes,
             "total_recouvre": total_recouvre,
-            "depenses": depenses,
+           
             "difference": difference,
-            "couleur": couleur,
             "statut": statut,
-            "est_superviseur": agent.est_superviseur,
-            "est_auto_recouvrement": agent.id == agent_connecte.id,
+            "couleur": couleur,
+         
         })
 
-    # ======================================================
-    # 5️⃣ TOTAUX GLOBAUX
-    # ======================================================
-    reste_a_recouvrir = total_ventes_tous_agents - total_recouvre_tous_agents
-
-    # ======================================================
-    # 6️⃣ ÉTAT DU SUPERVISEUR CONNECTÉ
-    # ======================================================
-    etat_superviseur = None
-    if agent_connecte.est_superviseur:
-        etat_superviseur = {
-            "total_ventes_personnelles": ventes_par_agent.get(
-                agent_connecte.id, Decimal("0.00")
-            ),
-            "total_depenses": depenses_par_superviseur.get(
-                agent_connecte.id, Decimal("0.00")
-            ),
-            "total_versements_bancaires": agent_connecte.total_versements_bancaires,
-            "solde_actuel": agent_connecte.solde_superviseur,
-            "dernier_versement": agent_connecte.dernier_versement_superviseur,
-        }
-
-    # ======================================================
-    # 7️⃣ CONTEXTE FINAL
-    # ======================================================
     context = {
         "agents_data": agents_data,
         "total_ventes_tous_agents": total_ventes_tous_agents,
         "total_recouvre_tous_agents": total_recouvre_tous_agents,
-        "reste_a_recouvrir": reste_a_recouvrir,
+        "reste_a_recouvrir": total_ventes_tous_agents - total_recouvre_tous_agents,
         "agent_connecte": agent_connecte,
-        "etat_superviseur": etat_superviseur,
     }
 
     return render(

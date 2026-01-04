@@ -1,484 +1,162 @@
-<!-- templates/agents/dashboards/rot.html -->
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load humanize %}
 {% load format_fcfa %}
-{% load static %}
-
-{% block title %}Tableau de Bord ROT - Trésorerie et Opérations{% endblock %}
-
-{% block extra_css %}
-<style>
-    .card-rot {
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
-    }
-    .card-rot:hover {
-        transform: translateY(-2px);
-    }
-    .badge-alerte {
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        font-size: 0.7rem;
-    }
-    .flux-entree {
-        border-left: 4px solid #28a745;
-    }
-    .flux-sortie {
-        border-left: 4px solid #dc3545;
-    }
-    .stat-card {
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-    .fournisseur-card {
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-    .fournisseur-card:hover {
-        background-color: #f8f9fa;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    .superviseur-en-regle {
-        border-left: 4px solid #28a745;
-    }
-    .superviseur-defaut {
-        border-left: 4px solid #dc3545;
-    }
-</style>
-{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- En-tête -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="mb-1">
-                <i class="fas fa-university text-primary"></i>
-                Tableau de Bord ROT
-            </h1>
-            <p class="text-muted mb-0">
-                Responsable Opérations et Trésorerie - {{ rot.full_name }}
-            </p>
-        </div>
-        <div class="btn-group">
-            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalFlux">
-                <i class="fas fa-chart-line"></i> Flux Trésorerie
-            </button>
-            <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#modalVersement">
-                <i class="fas fa-money-bill-wave"></i> Nouveau Versement
-            </button>
-            <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modalPaiementFournisseur">
-                <i class="fas fa-truck"></i> Payer Fournisseur
-            </button>
-        </div>
-    </div>
+<div class="container-fluid py-3">
 
-    <!-- Alertes critiques -->
-    {% if alertes %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        Alertes Requérant Action
-                    </h5>
-                    <span class="badge bg-light text-danger">{{ alertes|length }}</span>
-                </div>
+    <!-- ================= KPIs ================= -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-start border-success border-4 shadow-sm">
                 <div class="card-body">
-                    <div class="row">
-                        {% for alerte in alertes %}
-                        <div class="col-md-4 mb-3">
-                            <div class="alert alert-{{ alerte.niveau }} d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ alerte.titre }}</strong>
-                                    <p class="mb-0 small">{{ alerte.description }}</p>
-                                </div>
-                                <a href="{{ alerte.lien }}" class="btn btn-sm btn-outline-{{ alerte.niveau }}">
-                                    <i class="fas fa-arrow-right"></i>
-                                </a>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <div class="text-muted small">Argent récupéré</div>
+                    <h5>{{ kpis.total_recupere_rot|fcfa }}</h5>
                 </div>
             </div>
         </div>
-    </div>
-    {% endif %}
 
-    <!-- Vue financière globale -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card card-rot">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-pie"></i>
-                        Vue Financière Globale
-                    </h5>
-                </div>
+        <div class="col-md-3">
+            <div class="card border-start border-primary border-4 shadow-sm">
                 <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="stat-card bg-light">
-                                <h6 class="text-muted">Ventes Total</h6>
-                                <h3 class="text-primary">{{ vue_financiere.ventes_total|fcfa }}</h3>
-                                <small class="text-muted">Cumul historique</small>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="stat-card bg-light">
-                                <h6 class="text-muted">Stock Actuel</h6>
-                                <h3 class="text-info">{{ vue_financiere.stock_total_valeur|fcfa }}</h3>
-                                <small class="text-muted">Valeur d'achat</small>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="stat-card bg-light">
-                                <h6 class="text-muted">À Recouvrer</h6>
-                                <h3 class="text-warning">{{ vue_financiere.argent_a_recouvrer_total|fcfa }}</h3>
-                                <small class="text-muted">Agents + Superviseurs</small>
-                            </div>
-                        </div>
-                        <div class="col-lg-3 col-md-6 mb-3">
-                            <div class="stat-card bg-light">
-                                <h6 class="text-muted">Flux Net</h6>
-                                <h3 class="{% if vue_financiere.flux_net > 0 %}text-success{% else %}text-danger{% endif %}">
-                                    {{ vue_financiere.flux_net|fcfa }}
-                                </h3>
-                                <small class="text-muted">Entrées - Sorties</small>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="text-muted small">Versé banque</div>
+                    <h5>{{ kpis.total_verse_banque|fcfa }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-start border-warning border-4 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Dépenses fournisseurs</div>
+                    <h5>{{ kpis.total_depenses|fcfa }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-start border-danger border-4 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Solde ROT</div>
+                    <h5 class="fw-bold">{{ kpis.solde_rot|fcfa }}</h5>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- Colonne gauche: Fournisseurs -->
-        <div class="col-lg-6">
-            <!-- Situation Fournisseurs -->
-            <div class="card card-rot mb-4">
-                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-truck-loading"></i>
-                        Situation Fournisseurs
-                    </h5>
-                    <span class="badge bg-light text-dark">
-                        {{ situation_fournisseurs.totaux.nombre_fournisseurs }} fournisseurs
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Fournisseur</th>
-                                    <th>Dette Consommée</th>
-                                    <th>Payé</th>
-                                    <th>Reste</th>
-                                    <th>Statut</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for f in situation_fournisseurs.fournisseurs %}
-                                <tr class="fournisseur-card" 
-                                    onclick="window.location.href='#'">
-                                    <td>
-                                        <strong>{{ f.fournisseur.nom }}</strong>
-                                        {% if f.alerte_dette or f.alerte_paiement %}
-                                        <i class="fas fa-exclamation-triangle text-warning ms-1"></i>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ f.dette_consommee|fcfa }}</td>
-                                    <td class="text-success">{{ f.paiements_effectues|fcfa }}</td>
-                                    <td class="{% if f.dette_restante > 0 %}text-danger{% else %}text-success{% endif %}">
-                                        {{ f.dette_restante|fcfa }}
-                                    </td>
-                                    <td>
-                                        {% if f.dette_restante > 0 %}
-                                            <span class="badge bg-warning">{{ f.taux_paiement|floatformat:0 }}% payé</span>
-                                        {% else %}
-                                            <span class="badge bg-success">Soldé</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">Aucun fournisseur</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot class="table-light">
-                                <tr>
-                                    <th>TOTAUX</th>
-                                    <th>{{ situation_fournisseurs.totaux.dette_restante_total|fcfa }}</th>
-                                    <th class="text-success">{{ situation_fournisseurs.totaux.paiements_total|fcfa }}</th>
-                                    <th class="text-danger">{{ situation_fournisseurs.totaux.dette_restante_total|fcfa }}</th>
-                                    <th>
-                                        <span class="badge bg-danger">
-                                            {{ situation_fournisseurs.totaux.fournisseurs_alertes }} alertes
-                                        </span>
-                                    </th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold">
+        🏭 Fournisseurs – Stock & Dettes
+    </div>
 
-            <!-- Flux Trésorerie Récent -->
-            <div class="card card-rot">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-exchange-alt"></i>
-                        Flux Trésorerie (30 jours)
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <!-- Résumé -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <div class="p-3 bg-light rounded flux-entree">
-                                <h6 class="text-muted">Entrées</h6>
-                                <h4 class="text-success">{{ flux_tresorerie.entrees.total|fcfa }}</h4>
-                                <small class="text-muted">
-                                    Recouvrements: {{ flux_tresorerie.entrees.recouvrements|fcfa }}<br>
-                                    Ventes comptant: {{ flux_tresorerie.entrees.ventes_comptant|fcfa }}
-                                </small>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 bg-light rounded flux-sortie">
-                                <h6 class="text-muted">Sorties</h6>
-                                <h4 class="text-danger">{{ flux_tresorerie.sorties.total|fcfa }}</h4>
-                                <small class="text-muted">
-                                    Versements: {{ flux_tresorerie.sorties.versements|fcfa }}<br>
-                                    Dépenses: {{ flux_tresorerie.sorties.depenses|fcfa }}<br>
-                                    Fournisseurs: {{ flux_tresorerie.sorties.paiements_fournisseurs|fcfa }}
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Flux net -->
-                    <div class="text-center p-3 mb-3 {% if flux_tresorerie.flux_net > 0 %}bg-success-light{% else %}bg-danger-light{% endif %} rounded">
-                        <h5 class="mb-0">
-                            Flux Net: 
-                            <span class="{% if flux_tresorerie.flux_net > 0 %}text-success{% else %}text-danger{% endif %}">
-                                {{ flux_tresorerie.flux_net|fcfa }}
-                            </span>
-                        </h5>
-                        <small class="text-muted">
-                            Taux entrées/sorties: {{ flux_tresorerie.taux_entrees_sorties|floatformat:1 }}%
-                        </small>
-                    </div>
-                    
-                    <!-- Derniers flux journaliers -->
-                    <h6 class="mt-4 mb-2">Derniers flux journaliers</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th class="text-success">Entrées</th>
-                                    <th class="text-danger">Sorties</th>
-                                    <th>Net</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for flux in flux_tresorerie.flux_journalier %}
-                                <tr>
-                                    <td>{{ flux.date|date:"d/m" }}</td>
-                                    <td class="text-success">{{ flux.entrees|fcfa }}</td>
-                                    <td class="text-danger">{{ flux.sorties|fcfa }}</td>
-                                    <td class="{% if flux.flux_net > 0 %}text-success{% else %}text-danger{% endif %}">
-                                        {{ flux.flux_net|fcfa }}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Colonne droite: Superviseurs -->
-        <div class="col-lg-6">
-            <!-- Situation Superviseurs -->
-            <div class="card card-rot mb-4">
-                <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-user-shield"></i>
-                        Situation Superviseurs
-                    </h5>
-                    <span class="badge bg-light text-dark">
-                        {{ situation_superviseurs.totaux.nombre_superviseurs }} superviseurs
-                    </span>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Superviseur</th>
-                                    <th>Recouvré</th>
-                                    <th>Versé</th>
-                                    <th>Solde</th>
-                                    <th>À Recouvrer</th>
-                                    <th>Statut</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for s in situation_superviseurs.superviseurs %}
-                                <tr class="{% if s.statut == 'en_regle' %}superviseur-en-regle{% else %}superviseur-defaut{% endif %} 
-                                          superviseur-card"
-                                    onclick="window.location.href='#'">
-                                    <td>
-                                        <strong>{{ s.superviseur.full_name }}</strong>
-                                        {% if s.alerte %}
-                                        <i class="fas fa-exclamation-circle text-danger ms-1"></i>
-                                        {% endif %}
-                                        <br>
-                                        <small class="text-muted">{{ s.nombre_agents }} agents</small>
-                                    </td>
-                                    <td class="text-success">{{ s.recouvrements|fcfa }}</td>
-                                    <td class="text-info">{{ s.versements|fcfa }}</td>
-                                    <td class="{% if s.solde_actuel > 0 %}text-success{% else %}text-danger fw-bold{% endif %}">
-                                        {{ s.solde_actuel|fcfa }}
-                                    </td>
-                                    <td class="text-warning">{{ s.argent_a_recouvrer|fcfa }}</td>
-                                    <td>
-                                        {% if s.statut == 'en_regle' %}
-                                            <span class="badge bg-success">En règle</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">Défaut</span>
-                                        {% endif %}
-                                        {% if s.dernier_versement %}
-                                        <br>
-                                        <small class="text-muted">Dernier: {{ s.dernier_versement.date_versement_reelle|date:"d/m" }}</small>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted">Aucun superviseur</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot class="table-light">
-                                <tr>
-                                    <th>TOTAUX</th>
-                                    <th class="text-success">{{ situation_superviseurs.totaux.versements_total|fcfa }}</th>
-                                    <th class="text-info">{{ situation_superviseurs.totaux.versements_total|fcfa }}</th>
-                                    <th class="{% if situation_superviseurs.totaux.solde_total > 0 %}text-success{% else %}text-danger{% endif %}">
-                                        {{ situation_superviseurs.totaux.solde_total|fcfa }}
-                                    </th>
-                                    <th class="text-warning">{{ situation_superviseurs.totaux.argent_a_recouvrer_total|fcfa }}</th>
-                                    <th>
-                                        <span class="badge bg-success me-1">
-                                            {{ situation_superviseurs.totaux.superviseurs_en_regle }} OK
-                                        </span>
-                                        <span class="badge bg-danger">
-                                            {{ situation_superviseurs.totaux.superviseurs_alertes }} alertes
-                                        </span>
-                                    </th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Statistiques Rapides -->
-            <div class="card card-rot">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-tachometer-alt"></i>
-                        Statistiques Rapides
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-md-3 col-6 mb-3">
-                            <div class="p-3 border rounded">
-                                <h6 class="text-muted">Lots Actifs</h6>
-                                <h3 class="text-primary">{{ stats_rapides.nombre_lots_actifs }}</h3>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6 mb-3">
-                            <div class="p-3 border rounded">
-                                <h6 class="text-muted">Agents Actifs</h6>
-                                <h3 class="text-info">{{ stats_rapides.nombre_agents_actifs }}</h3>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6 mb-3">
-                            <div class="p-3 border rounded">
-                                <h6 class="text-muted">Ventes (30j)</h6>
-                                <h3 class="text-success">{{ stats_rapides.nombre_ventes_mois|intcomma }}</h3>
-                            </div>
-                        </div>
-                        <div class="col-md-3 col-6 mb-3">
-                            <div class="p-3 border rounded">
-                                <h6 class="text-muted">Valeur Stock</h6>
-                                <h3 class="text-warning">{{ stats_rapides.valeur_stock_total|fcfa }}</h3>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Actions rapides -->
-                    <div class="mt-4">
-                        <h6 class="mb-3">Actions Rapides</h6>
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                            <a href="#" class="btn btn-outline-warning">
-                                <i class="fas fa-truck"></i> Payer Fournisseur
-                            </a>
-                            <a href="#" class="btn btn-outline-success">
-                                <i class="fas fa-university"></i> Nouveau Versement
-                            </a>
-                            <a href="#" class="btn btn-outline-info">
-                                <i class="fas fa-list"></i> Voir Fournisseurs
-                            </a>
-                            <a href="#" class="btn btn-outline-primary">
-                                <i class="fas fa-chart-line"></i> Flux Détail
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Fournisseur</th>
+                    <th class="text-end">Qté livrée</th>
+                    <th class="text-end">Qté vendue</th>
+                    <th class="text-end">Dette contractuelle</th>
+                    <th class="text-end">Dette consommée</th>
+                    <th class="text-end">Payé</th>
+                    <th class="text-end">Reste</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in fournisseurs %}
+                <tr>
+                    <td>{{ f.fournisseur.nom }}</td>
+                    <td class="text-end">{{ f.qte_livree }}</td>
+                    <td class="text-end">{{ f.qte_vendue }}</td>
+                    <td class="text-end">{{ f.dette_contractuelle|fcfa }}</td>
+                    <td class="text-end">{{ f.dette_consommee|fcfa }}</td>
+                    <td class="text-end text-success">{{ f.paye|fcfa }}</td>
+                    <td class="text-end fw-bold {% if f.reste > 0 %}text-danger{% endif %}">
+                        {{ f.reste|fcfa }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">
+                        Aucun fournisseur
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 
-<!-- Modals -->
-<div class="modal fade" id="modalFlux" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Analyse Flux de Trésorerie</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <!-- Contenu du modal -->
-                <p>Analyse détaillée des flux...</p>
-            </div>
+    <!-- ================= STOCK ENTREPÔT ================= -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">
+            📦 Stock Entrepôt
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produit</th>
+                        <th class="text-end">Qté restante</th>
+                        <th class="text-end">Valeur</th>
+                        <th class="text-center">Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in stock_entrepot.produits %}
+                    <tr>
+                        <td>{{ p.produit__nom }}</td>
+                        <td class="text-end">{{ p.quantite_restante }}</td>
+                        <td class="text-end">{{ p.valeur_stock|fcfa }}</td>
+                        <td class="text-center">
+                            {% if p.quantite_restante <= stock_entrepot.seuil_faible %}
+                                <span class="badge bg-danger">Faible</span>
+                            {% else %}
+                                <span class="badge bg-success">OK</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted">Aucun stock</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-</div>
 
-<!-- Scripts -->
-<script>
-    // Initialisation des tooltips
-    document.addEventListener('DOMContentLoaded', function() {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
-        });
-    });
-</script>
+    <!-- ================= SUPERVISEURS ================= -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold">
+            👥 Superviseurs – Stock & Argent
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Superviseur</th>
+                        <th class="text-end">Stock restant</th>
+                        <th class="text-end">Argent collecté</th>
+                        <th class="text-end">Remis ROT</th>
+                        <th class="text-end">À remettre</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in suivi_superviseurs %}
+                    <tr>
+                        <td>{{ s.superviseur.full_name }}</td>
+                        <td class="text-end">{{ s.quantite_restante }}</td>
+                        <td class="text-end">{{ s.total_ventes_agents|fcfa }}</td>
+                        <td class="text-end">{{ s.total_remis_rot|fcfa }}</td>
+                        <td class="text-end fw-semibold {% if s.reste_a_remettre > 0 %}text-danger{% endif %}">
+                            {{ s.reste_a_remettre|fcfa }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
 {% endblock %}
+                                                                                          

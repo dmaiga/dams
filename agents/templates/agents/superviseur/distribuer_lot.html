@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load format_fcfa %}
+
+{% block title %}Distribuer un lot{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+    <!-- ===== Header ===== -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">
+            <i class="fas fa-truck-loading me-2"></i>
+            Distribution de lot
+        </h5>
+        <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-sm btn-outline-secondary">
+            ← Tableau de bord
+        </a>
+    </div>
+
+    <!-- ===== Card ===== -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <!-- ===== Agent terrain ===== -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Agent terrain
+                    </label>
+                    {{ form.agent_terrain }}
+                    {% if form.agent_terrain.errors %}
+                        <div class="text-danger small">
+                            {{ form.agent_terrain.errors|striptags }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- ===== Lot affecté ===== -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Lot affecté
+                    </label>
+                    {{ form.lot }}
+                    
+                    <div class="form-text">
+                        Seuls les lots qui vous sont affectés sont visibles.
+                    </div>
+                    {% if form.lot.errors %}
+                        <div class="text-danger small">
+                            {{ form.lot.errors|striptags }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- ===== Quantité ===== -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Quantité à distribuer
+                    </label>
+                    {{ form.quantite }}
+                    {% if form.quantite.errors %}
+                        <div class="text-danger small">
+                            {{ form.quantite.errors|striptags }}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- ===== Prix ===== -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small text-muted">
+                            Prix gros (optionnel)
+                        </label>
+                        {{ form.prix_gros }}
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">
+                            Prix détail 
+                        </label>
+                        {{ form.prix_detail }}
+                    </div>
+                </div>
+
+                <!-- ===== Actions ===== -->
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-outline-secondary">
+                        Annuler
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check me-1"></i>
+                        Distribuer
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -76,6 +76,13 @@ def sum_balance(flux_list):
 def add_class(field, css):
     return field.as_widget(attrs={"class": css})
 
+register = template.Library()
+
+@register.filter
+def sum_attribute(queryset, attribute):
+    """Somme d'un attribut sur un queryset/liste"""
+    return sum(getattr(item, attribute, 0) for item in queryset)
+
 @register.filter
 def dictsum(queryset, field_name):
     """Somme les valeurs d'un champ dans un queryset"""

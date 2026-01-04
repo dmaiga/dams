@@ -247,7 +247,7 @@ class DashboardService:
         
         # Solde des superviseurs - TOUJOURS calculé sur l'état actuel
         superviseurs = Agent.objects.filter(type_agent='entrepot')
-        solde_superviseurs = sum(float(superviseur.solde_vente_superviseur) for superviseur in superviseurs)
+        solde_superviseurs = sum(float(superviseur.solde_reel_superviseur) for superviseur in superviseurs)
         
         # Dépenses totales (période)
         depenses_periode = Depense.objects.filter(filtre_depenses)
@@ -349,9 +349,9 @@ class DashboardService:
                 'superviseur': superviseur.full_name,
                 'total_ventes': total_ventes_periode,
                 'total_recouvre': total_recouvre_periode,
-                'solde_actuel': float(superviseur.solde_vente_superviseur),  # Toujours actuel
+                'solde_actuel': float(superviseur.solde_reel_superviseur),  # Toujours actuel
                 'moyenne_vente': total_ventes_periode / max(ventes_periode.count(), 1),
-                'bonus': float(superviseur.bonus_total),  # Toujours actuel
+                
             })
         
         # Trier par CA décroissant
@@ -598,7 +598,7 @@ class DashboardService:
             )['total'] or Decimal('0.00')
 
             # Solde actuel (propriété calculée sur l'état actuel de l'agent)
-            solde_actuel = float(superviseur.solde_vente_superviseur)
+            solde_actuel = float(superviseur.solde_reel_superviseur)
 
             return {
                 'superviseur': superviseur.full_name,

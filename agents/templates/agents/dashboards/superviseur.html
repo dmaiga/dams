@@ -1,353 +1,174 @@
-
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load humanize %}
-{% load custom_filters %}
 {% load format_fcfa %}
-{% block title %}Tableau de Bord Superviseur{% endblock %}
+
+{% block title %}Tableau de bord Superviseur{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <!-- En-tête -->
+<div class="container-fluid py-3">
+
+    <!-- ================= HEADER ================= -->
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Tableau de Bord Superviseur</h1>
-        <div class="btn-group">
-            <a href="{% url 'liste_lots' %}" class="btn btn-outline-primary">
-                <i class="fas fa-boxes"></i> Stock 
-            </a>
-            <a href="{% url 'distribuer_produits' %}" class="btn btn-outline-success">
-                <i class="fas fa-truck-loading"></i> Distributions
-            </a>
-            <a href="{% url 'liste_agents_recouvrement' %}" class="btn btn-outline-info">
-                <i class="fas fa-money-bill-wave"></i> Recouvrements
-            </a>
-        </div>
+        <h4 class="mb-0">
+            <i class="fas fa-user-shield me-2"></i>
+            Tableau de bord Superviseur
+        </h4>
+        <span class="badge bg-secondary">
+            {{ superviseur.full_name }}
+        </span>
     </div>
 
-    <!-- Alertes -->
-    {% if stocks_faibles %}
-    <div class="alert alert-warning">
-        <i class="fas fa-exclamation-triangle"></i>
-        <strong>Alertes Stock:</strong> {{ stocks_faibles|length }} produit(s) avec stock faible
-    </div>
-    {% endif %}
+    <!-- ================= KPIs FINANCIERS ================= -->
+    <div class="row g-3 mb-4">
 
-    <!-- Cartes de résumé PRINCIPALES -->
-    <div class="row mb-4">
-        <!-- Carte Stock -->
-        <div class="col-xl-3 col-md-3">
-            <div class="card text-white bg-primary">
+        <div class="col-md-3">
+            <div class="card border-start border-primary border-4 shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title">Stock Total</h5>
-                    <h2>{{ stock_total.total_quantite|floatformat:0 }}</h2>
-                    <p class="card-text">{{ stock_total.total_valeur|default:0|fcfa}} FCFA</p>
-                </div>
-            </div>
-        </div>
-
-
-
-        <!-- Carte Ventes -->
-        <div class="col-xl-3 col-md-3">
-            <div class="card text-white bg-info">
-                <div class="card-body">
-                    <h5 class="card-title">Ventes Total</h5>
-                    <h2>{{ ventes_global.total_ventes|fcfa }} FCFA</h2>
-                    <p class="card-text">{{ ventes_global.nombre_ventes|default:0 }} transactions</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Carte Recouvrement -->
-        <div class="col-xl-3 col-md-3">
-            <div class="card text-white bg-secondary">
-                <div class="card-body">
-                    <h5 class="card-title">À Recouvrer</h5>
-                    <h2>{{ recapitulatif_financier.total_a_recouvrer|fcfa }} FCFA</h2>
-                    <p class="card-text">Total agents</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Carte Finances Superviseur -->
-        <div class="col-xl-3 col-md-3">
-            <div class="card text-white bg-warning">
-                <div class="card-body">
-                    <h5 class="card-title">Mon Solde</h5>
-                    <h2>{{ stats_superviseur.solde_actuel|fcfa }} FCFA</h2>
-                    <p class="card-text">
-                        {% if stats_superviseur.solde_actuel > 0 %}
-                        <span class="badge bg-success">Excédent</span>
-                        {% else %}
-                        <span class="badge bg-danger">Déficit</span>
-                        {% endif %}
-                    </p>
-                </div>
-            </div>
-        </div>
-
-
-    </div>
-
-
-    <div class="row">
-        <!-- Colonne de gauche: Stock et Performances Agents -->
-        <div class="col-lg-8">
-            <!-- Stock par produit -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-boxes"></i> Stock par Produit
-                    </h5>
-                    <span class="badge bg-primary">{{ produits_stock|length }} produits</span>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Produit</th>
-                                    <th>Quantité</th>
-                                    <th>Valeur Stock</th>
-                                    <th>Prix Moyen</th>
-                                    <th>Statut</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for produit in produits_stock %}
-                                <tr>
-                                    <td>{{ produit.produit__nom }}</td>
-                                    <td>{{ produit.quantite_totale|intcomma }}</td>
-                                    <td>{{ produit.valeur_totale|fcfa}} FCFA</td>
-                                    <td>
-                                        {% if produit.quantite_totale > 0 %}
-                                            {{ produit.valeur_totale|div:produit.quantite_totale|floatformat:0 }} FCFA
-                                        {% else %}
-                                            0 FCFA
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if produit.quantite_totale <= seuil_stock_faible %}
-                                        <span class="badge bg-warning">Faible</span>
-                                        {% else %}
-                                        <span class="badge bg-success">Normal</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">Aucun produit en stock</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Performances des Agents -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-chart-line"></i> Performances des Agents
-                    </h5>
-                    <small class="text-muted">Toutes périodes</small>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-striped">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Agent</th>
-                                    
-                                    <th>Ventes Total</th>
-                                    <th>Déjà Recouvré</th>
-                                    <th>En Possession</th>
-                                    <th>Nb Ventes</th>
-                                    
-                                 
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for perf in performances_agents %}
-                                <tr>
-                                    <td>
-                                        <strong>{{ perf.agent.full_name }}</strong>
-                                        <br>
-                                        <small class="text-muted">
-                                            Gros: {{ perf.ventes_gros|fcfa}} <br>
-                                            Détail: {{ perf.ventes_detail|fcfa}}
-                                        </small>
-                                    </td>
-
-<td>
-    <strong>{{ perf.total_ventes|fcfa}} FCFA</strong>
-    <br>
-    <small class="text-muted">
-        Pers: {{ perf.total_ventes_personnelles|fcfa}} <br>
-        Stag: {{ perf.total_ventes_stagiaires|fcfa}}
-    </small>
-</td>
-                                    <td>
-                                        <span class="text-success">{{ perf.total_recouvre|fcfa}} FCFA</span>
-                                    </td>
-                                    <td>
-                                        <span class="{% if perf.argent_en_possession > 0 %}text-warning fw-bold{% else %}text-muted{% endif %}">
-                                            {{ perf.argent_en_possession|fcfa}} FCFA
-                                        </span>
-                                    </td>
-                                    <td>{{ perf.nombre_ventes }}</td>
-
-                                 
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'vue_detail_agent' perf.agent.id %}" 
-                                               class="btn btn-outline-primary" title="Détails">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            {% if perf.peut_etre_recouvre %}
-                                            <a href="{% url 'liste_agents_recouvrement' %}?agent={{ perf.agent.id }}" 
-                                               class="btn btn-outline-success" title="Recouvrer">
-                                                <i class="fas fa-money-bill-wave"></i>
-                                            </a>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="8" class="text-center text-muted">Aucun agent terrain</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Colonne de droite: Vue personnelle et statistiques -->
-        <div class="col-lg-4">
-            <!-- Vue personnelle du superviseur -->
-            <div class="card mb-4">
-                <div class="card-header bg-warning text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-user-shield"></i> Mon Activité de Superviseur
+                    <div class="text-muted small">Total ventes agents</div>
+                    <h5 class="fw-bold">
+                        {{ finances_superviseur.total_ventes_agents|fcfa }}
                     </h5>
                 </div>
-                <div class="card-body">
-                    <!-- Mes ventes -->
-
-<div class="mb-3 p-2 border-bottom">
-    <h6>Ventes Personnelles</h6>
-    <div class="d-flex justify-content-between">
-        <span>Chiffre d'affaires:</span>
-        <strong>{{ ventes_superviseur.total_ventes|default:0|fcfa}} FCFA</strong>
-    </div>
-    <div class="d-flex justify-content-between text-success small">
-        <span>→ Ventes personnelles:</span>
-        <span>{{ ventes_superviseur.total_ventes_personnelles|default:0|fcfa}} FCFA</span>
-    </div>
-    <div class="d-flex justify-content-between text-info small">
-        <span>→ Ventes stagiaires:</span>
-        <span>{{ ventes_superviseur.total_ventes_stagiaires|default:0|fcfa}} FCFA</span>
-    </div>
-   
-    <div class="d-flex justify-content-between">
-        <span>Quantité vendue:</span>
-        <strong>{{ ventes_superviseur.quantite_vendue|default:0 }} unités</strong>
-    </div>
-    <div class="d-flex justify-content-between text-muted small">
-        <span>Gros:</span>
-        <span>{{ ventes_superviseur.ventes_gros|default:0|fcfa}} FCFA</span>
-    </div>
-    <div class="d-flex justify-content-between text-muted small">
-        <span>Détail:</span>
-        <span>{{ ventes_superviseur.ventes_detail|default:0|fcfa}} FCFA</span>
-    </div>
-</div>
-
-                    <!-- Mes distributions -->
-                    <div class="mb-3 p-2 border-bottom">
-                        <h6>Distributions Récentes</h6>
-                        <div class="d-flex justify-content-between">
-                            <span>30 derniers jours:</span>
-                            <strong>{{ distributions_superviseur }}</strong>
-                        </div>
-                    </div>
-
-                    <!-- Mes finances -->
-                    <div class="p-2">
-                        <h6>Mes Finances</h6>
-                        <div class="d-flex justify-content-between">
-                            <span>Recouvrements effectués:</span>
-                            <strong class="text-success">{{ stats_superviseur.total_recouvrements|fcfa}} FCFA</strong>
-                        </div>
-                       
-                        <div class="d-flex justify-content-between mt-1 pt-1 border-top">
-                            <span><strong>Solde actuel:</strong></span>
-                            <strong class="{% if stats_superviseur.solde_actuel > 0 %}text-success{% else %}text-danger{% endif %}">
-                                {{ stats_superviseur.solde_actuel|fcfa}} FCFA
-                            </strong>
-                        </div>
-                    </div>
-                </div>
             </div>
+        </div>
 
-           
-
-            <!-- Statistiques ventes détaillées -->
-
- 
-            <!-- Alertes rapides -->
-            <div class="card">
-                <div class="card-header bg-danger text-white">
-                    <h6 class="card-title mb-0">
-                        <i class="fas fa-bell"></i> Alertes & Actions
-                    </h6>
-                </div>
+        <div class="col-md-3">
+            <div class="card border-start border-success border-4 shadow-sm">
                 <div class="card-body">
-                    {% if stocks_faibles %}
-                    <div class="alert alert-sm alert-warning mb-2">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Stock faible:</strong> {{ stocks_faibles|length }} produit(s)
-                        <a href="{% url 'liste_lots' %}" class="float-end">
-                            <i class="fas fa-arrow-right"></i>
-                        </a>
-                    </div>
-                    {% endif %}
-                    
-                    {% if recapitulatif_financier.total_a_recouvrer > 0 %}
-                    <div class="alert alert-sm alert-info mb-2">
-                        <i class="fas fa-money-bill-wave"></i>
-                        <strong>À recouvrer:</strong> {{ recapitulatif_financier.total_a_recouvrer|fcfa}} FCFA
-                        <a href="{% url 'liste_agents_recouvrement' %}" class="float-end">
-                            <i class="fas fa-arrow-right"></i>
-                        </a>
-                    </div>
-                    {% endif %}
-                    
-                    {% if dettes_en_cours %}
-                    <div class="alert alert-sm alert-secondary mb-2">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <strong>Dettes en cours:</strong> {{ dettes_en_cours }}
-                    </div>
-                    {% endif %}
-
-                    {% if stats_superviseur.solde_actuel > 0 %}
-                    <div class="alert alert-sm alert-success">
-                        <i class="fas fa-piggy-bank"></i>
-                        <strong>Solde positif:</strong> {{ stats_superviseur.solde_actuel|fcfa}} FCFA
-                    </div>
-                    {% elif stats_superviseur.solde_actuel < 0 %}
-                    <div class="alert alert-sm alert-danger">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <strong>Solde négatif:</strong> {{ stats_superviseur.solde_actuel|fcfa}} FCFA
-                    </div>
-                    {% endif %}
+                    <div class="text-muted small">Recouvré auprès des agents</div>
+                    <h5 class="fw-bold text-success">
+                        {{ finances_superviseur.total_recouvre|fcfa }}
+                    </h5>
                 </div>
             </div>
         </div>
+
+        <div class="col-md-3">
+            <div class="card border-start border-danger border-4 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Encore chez les agents</div>
+                    <h5 class="fw-bold text-danger">
+                        {{ finances_superviseur.reste_a_recouvrer|fcfa }}
+                    </h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-start border-warning border-4 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">À remettre au ROT</div>
+                    <h5 class="fw-bold text-warning">
+                        {{ finances_superviseur.argent_chez_superviseur|fcfa }}
+                    </h5>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <!-- ================= STOCK SUPERVISEUR ================= -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold">
+            <i class="fas fa-boxes me-2"></i>
+            Stock actuellement sous votre responsabilité
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Produit</th>
+                        <th class="text-end">Qté initiale</th>
+                        <th class="text-end">Qté restante</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stock_superviseur %}
+                        <tr>
+                            <td>{{ item.produit.nom }}</td>
+                            <td class="text-end">
+                                {{ item.quantite_initiale|floatformat:0 }}
+                            </td>
+                            <td class="text-end fw-semibold
+                                {% if item.quantite_restante <= 5 %}
+                                    text-danger
+                                {% endif %}
+                            ">
+                                {{ item.quantite_restante|floatformat:0 }}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted">
+                                Aucun stock affecté
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= AGENTS SOUS TUTELLE ================= -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold">
+            <i class="fas fa-users me-2"></i>
+            Situation financière des agents terrain
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Agent</th>
+                        <th class="text-end">Total ventes</th>
+                        <th class="text-end">Déjà recouvré</th>
+                        <th class="text-end">Reste à rendre</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in agents_financiers %}
+                        <tr>
+                            <td>{{ row.agent.full_name }}</td>
+                            <td class="text-end">
+                                {{ row.total_ventes|fcfa }}
+                            </td>
+                            <td class="text-end text-success">
+                                {{ row.total_recouvre|fcfa }}
+                            </td>
+                            <td class="text-end fw-bold
+                                {% if row.reste_a_rendre > 0 %}
+                                    text-danger
+                                {% endif %}
+                            ">
+                                {{ row.reste_a_rendre|fcfa }}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">
+                                Aucun agent terrain actif
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ================= ACTIVITÉ RÉCENTE ================= -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold">
+            <i class="fas fa-truck-loading me-2"></i>
+            Activité récente
+        </div>
+
+        <div class="card-body text-muted">
+            Distributions réalisées sur les 7 derniers jours :
+            <strong>{{ distributions_recentes }}</strong>
+        </div>
+    </div>
+
 </div>
 {% endblock %}

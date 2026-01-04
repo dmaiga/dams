@@ -34,9 +34,9 @@ class PilotageGlobalService:
             data.append({
                 "superviseur": sup,
                 # ⬇️ ON UTILISE TES PROPRIÉTÉS (SOURCE DE VÉRITÉ)
-                "solde": sup.solde_superviseur,
+                "solde": sup.solde_reel_superviseur,
                 "depenses": sup.total_depenses_superviseur,
-                "versements": sup.total_versements_bancaires,
+                "versements": sup.total_versements_vente,
             })
 
         return data

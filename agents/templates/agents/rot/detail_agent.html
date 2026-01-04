@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Détail agent{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+    <a href="{% url 'liste_agents_rot' %}" class="btn btn-sm btn-outline-secondary mb-3">
+        ← Retour
+    </a>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <strong>{{ agent.full_name }}</strong>
+            <span class="badge bg-secondary ms-2">
+                {{ agent.get_type_agent_display }}
+            </span>
+        </div>
+
+        <div class="card-body">
+            <div class="row mb-2">
+                <div class="col-md-4 text-muted">Téléphone</div>
+                <div class="col-md-8">{{ agent.telephone|default:"—" }}</div>
+            </div>
+
+            <div class="row mb-2">
+                <div class="col-md-4 text-muted">Quartier</div>
+                <div class="col-md-8">{{ agent.quartier|default:"—" }}</div>
+            </div>
+
+            <div class="row mb-2">
+                <div class="col-md-4 text-muted">Marché</div>
+                <div class="col-md-8">{{ agent.marche_affectation|default:"—" }}</div>
+            </div>
+
+            {% if agent.superviseur %}
+                <div class="row mb-2">
+                    <div class="col-md-4 text-muted">Superviseur</div>
+                    <div class="col-md-8">
+                        {{ agent.superviseur.full_name }}
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="row mb-2">
+                <div class="col-md-4 text-muted">Statut</div>
+                <div class="col-md-8">
+                    {% if agent.est_actif %}
+                        <span class="badge bg-success">Actif</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactif</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

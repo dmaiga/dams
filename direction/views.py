@@ -888,9 +888,9 @@ def analyse_financiere_direction(request):
     for sup in superviseurs:
         analyse_superviseurs.append({
             'superviseur': sup,
-            'total_verse': sup.total_versements_bancaires,
+            'total_verse': sup.total_versements_vente,
             'total_depenses': sup.total_depenses_superviseur,
-            'solde_actuel': sup.solde_superviseur,
+            'solde_actuel': sup.solde_reel_superviseur,
             'argent_en_possession': sup.argent_en_possession,
         })
 

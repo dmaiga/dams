@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Recouvrement superviseur{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+    <h4 class="mb-4">
+        <i class="fas fa-hand-holding-usd me-2"></i>
+        Recouvrement auprès d’un superviseur
+    </h4>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                {{ form.non_field_errors }}
+
+                <div class="mb-3">
+                    {{ form.superviseur.label_tag }}
+                    {{ form.superviseur }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.montant.label_tag }}
+                    {{ form.montant }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.mode_remise.label_tag }}
+                    {{ form.mode_remise }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.commentaire.label_tag }}
+                    {{ form.commentaire }}
+                </div>
+
+                <div class="text-end">
+                    <button class="btn btn-primary">
+                        <i class="fas fa-check me-1"></i>
+                        Valider le recouvrement
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
