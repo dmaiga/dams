@@ -152,117 +152,137 @@
 
 
                 <!-- Tableau des lots amélioré -->
-                <div class="table-responsive">
-                    <table class="table table-hover table-flush" id="lots-table">
-                        <thead class="thead-light">
-                            <tr>
-                                <th>Référence</th>
-                                <th>Produit</th>
-                                <th>Fournisseur</th>
-                                <th>Stock</th>
-                                <th>Prix d'achat</th>
-                                <th>Valeur Initiale</th>
-                                <th>Valeur Actuelle</th>
-                                <th>Date réception</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for lot in lots %}
-                            <tr class="{% if lot.quantite_restante == 0 %}table-secondary{% endif %}">
-                                <td class="font-weight-bold">
-                                    {% if lot.reference_lot %}
-                                        <span class="badge bg-primary">{{ lot.reference_lot }}</span>
-                                    {% else %}
-                                        <span class="text-muted">Lot #{{ lot.id }}</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <strong>{{ lot.produit.nom }}</strong>
-                                </td>
-                                <td>
-                                    {% if lot.fournisseur %}
-                                        <span class="badge bg-light text-dark">{{ lot.fournisseur.nom }}</span>
-                                    {% else %}
-                                        <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="me-3 text-center">
-                                            <small class="text-muted d-block">Restant</small>
-                                            <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
-                                                {{ lot.quantite_restante|floatformat:2 }}
-                                            </strong>
-                                        </div>
-                                        <div class="flex-grow-1">
-                                            <div class="progress" style="height: 6px;">
-                                                {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress_percent %}
-                                                <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-gradient-success{% else %}bg-gradient-danger{% endif %}" 
-                                                     role="progressbar" 
-                                                     style="width: {{ progress_percent }}%" 
-                                                     aria-valuenow="{{ lot.quantite_restante }}" 
-                                                     aria-valuemin="0" 
-                                                     aria-valuemax="{{ lot.quantite_initiale }}">
-                                                </div>
-                                            </div>
-                                            <small class="text-muted d-block text-center">
-                                                Initial: {{ lot.quantite_initiale|floatformat:2 }}
-                                            </small>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>
-                                    <strong class="text-primary">{{ lot.prix_achat_unitaire|fcfa }}</strong>
-                                    <small class="d-block text-muted">FCFA/unité</small>
-                                </td>
-                                <td>
-                                    <strong class="text-success">{{ lot.valeur_stock_initiale|fcfa }}</strong>
-                                    <small class="d-block text-muted">FCFA</small>
-                                </td>
-                                <td>
-                                    <strong class="text-info">{{ lot.valeur_actuelle_stock|fcfa }}</strong>
-                                    <small class="d-block text-muted">FCFA</small>
-                                </td>
-                                <td>
-                                    <small class="text-muted d-block">{{ lot.date_reception|date:"d/m/Y" }}</small>
-                                    <small class="text-muted">{{ lot.date_reception|date:"H:i" }}</small>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <!-- Voir détail du lot -->
-                                        <a href="{% url 'detail_lot' lot.id %}" 
-                                           class="btn btn-outline-info" 
-                                           data-bs-toggle="tooltip" 
-                                           title="Voir détails">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        {% if lot.quantite_restante > 0 %}
-                                        <!-- Distribuer -->
-                                        <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}" 
-                                           class="btn btn-outline-primary" 
-                                           data-bs-toggle="tooltip" 
-                                           title="Distribuer">
-                                            <i class="fas fa-share"></i>
-                                        </a>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="9" class="text-center py-4">
-                                    <i class="fas fa-box-open fa-3x mb-3 text-muted"></i>
-                                    <p class="text-muted">Aucun lot enregistré</p>
-                                    <a href="{% url 'reception_lot' %}" class="btn btn-primary">
-                                        <i class="fas fa-plus me-2"></i>Ajouter le premier lot
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+<div class="table-responsive">
+  <table class="table table-hover align-middle" id="lots-table">
+    <thead class="table-light">
+      <tr>
+        <th>Lot</th>
+        <th>Produit</th>
+        <th>Fournisseur</th>
+        <th>Stock</th>
+        <th>Prix (FCFA/kg)</th>
+        <th>Valeur initiale</th>
+        <th>Valeur actuelle</th>
+        <th>Réception</th>
+        <th class="text-end">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for lot in lots %}
+      <tr class="{% if lot.quantite_restante == 0 %}table-secondary{% endif %}">
+
+        <!-- LOT -->
+        <td>
+          {% if lot.reference_lot %}
+            <span class="badge bg-primary">{{ lot.reference_lot }}</span>
+          {% else %}
+            <span class="text-muted">Lot #{{ lot.id }}</span>
+          {% endif %}
+        </td>
+
+        <!-- PRODUIT -->
+        <td>
+          <strong>{{ lot.produit.nom }}</strong>
+      
+        </td>
+
+        <!-- FOURNISSEUR -->
+        <td>
+          {% if lot.fournisseur %}
+            {{ lot.fournisseur.nom }}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+
+        <!-- STOCK -->
+        <td style="min-width: 180px;">
+          {% if lot.est_conditionne %}
+            <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+              {{ lot.quantite_restante_unites }} unités
+            </strong>
+            <div class="small text-muted">
+              {{ lot.quantite_restante|floatformat:0 }} kg
+            </div>
+          {% else %}
+            <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+              {{ lot.quantite_restante|floatformat:2 }} kg
+            </strong>
+          {% endif %}
+
+          <div class="progress mt-1" style="height: 5px;">
+            {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress %}
+            <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}"
+                 style="width: {{ progress }}%">
+            </div>
+          </div>
+
+          <div class="small text-muted text-center">
+            {% if lot.est_conditionne %}
+              Initial : {{ lot.quantite_initiale_unites }} unités
+            {% else %}
+              Initial : {{ lot.quantite_initiale|floatformat:2 }} kg
+            {% endif %}
+          </div>
+        </td>
+
+        <!-- PRIX -->
+        <td>
+          <strong>{{ lot.prix_achat_unitaire|fcfa }}</strong>
+        </td>
+
+        <!-- VALEUR INITIALE -->
+        <td>
+          <strong class="text-success">{{ lot.valeur_stock_initiale|fcfa }}</strong>
+        </td>
+
+        <!-- VALEUR ACTUELLE -->
+        <td>
+          <strong class="text-info">{{ lot.valeur_actuelle_stock|fcfa }}</strong>
+        </td>
+
+        <!-- DATE -->
+        <td>
+          <div class="small">{{ lot.date_reception|date:"d/m/Y" }}</div>
+          <div class="small text-muted">{{ lot.date_reception|date:"H:i" }}</div>
+        </td>
+
+        <!-- ACTIONS -->
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <a href="{% url 'detail_lot' lot.id %}"
+               class="btn btn-outline-info"
+               title="Voir le lot">
+              <i class="fas fa-eye"></i>
+            </a>
+
+            {% if lot.quantite_restante > 0 %}
+            <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}"
+               class="btn btn-outline-primary"
+               title="Distribuer">
+              <i class="fas fa-share"></i>
+            </a>
+            {% endif %}
+          </div>
+        </td>
+
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" class="text-center py-5">
+          <i class="fas fa-box-open fa-2x text-muted mb-2"></i>
+          <p class="text-muted mb-3">Aucun lot enregistré</p>
+          <a href="{% url 'reception_lot' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Ajouter un lot
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
                
             </div>
         </div>

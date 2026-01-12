@@ -1031,8 +1031,8 @@ def enregistrer_vente(request):
         return redirect('dashboard')
 
     # 🔒 Sécurité : seuls les agents terrain vendent
-    if not agent.est_agent_terrain:
-        return redirect('access_denied')
+    #if not agent.est_agent_terrain:
+    #    return redirect('access_denied')
 
     if request.method == 'POST':
         form = VenteForm(request.POST, agent=agent)

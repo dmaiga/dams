@@ -11,7 +11,8 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from django.core.validators import MinValueValidator
-from decimal import Decimal
+from decimal import Decimal, ROUND_FLOOR
+
 from dateutil.relativedelta import relativedelta
 
 
@@ -37,9 +38,18 @@ class Produit(models.Model):
     nom = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
 
-    def __str__(self):
-        return self.nom
+    poids_unitaire_kg = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Poids standard d’une unité (carton/sac). Laisser vide si produit non conditionné."
+    )
 
+    def __str__(self):
+        if self.poids_unitaire_kg:
+            return f"{self.nom} ({self.poids_unitaire_kg} kg / unité)"
+        return f"{self.nom}"
 
 class Fournisseur(models.Model):
     nom = models.CharField(max_length=100, unique=True)
@@ -617,8 +627,12 @@ class LotEntrepot(models.Model):
     )
     quantite_initiale = models.DecimalField(max_digits=10, decimal_places=2)
     quantite_restante = models.DecimalField(max_digits=10, decimal_places=2)
-    prix_achat_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
-    
+    prix_achat_unitaire = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Prix par unité fournisseur (carton / sac OU kg si non conditionné)"
+    )
+
     valeur_stock_initiale = models.DecimalField(
         max_digits=15,
         decimal_places=2,
@@ -638,33 +652,68 @@ class LotEntrepot(models.Model):
     date_enregistrement = models.DateTimeField(auto_now_add=True)
     reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
 
+
+
     def __str__(self):
-        return f"{self.produit.nom} - {self.fournisseur} - {self.quantite_restante} restants"
-    
+        produit = self.produit
+        fournisseur = self.fournisseur.nom if self.fournisseur else "—"
+
+        # Produit conditionné
+        if produit.poids_unitaire_kg:
+            unites = (
+                self.quantite_restante / produit.poids_unitaire_kg
+            ).quantize(Decimal("1"), rounding=ROUND_FLOOR)
+
+            return (
+                f"{produit.nom} - {fournisseur} - "
+                f"{unites} unité(s) / {self.quantite_restante} kg restant"
+            )
+
+        # Produit non conditionné (vrac)
+        return (
+            f"{produit.nom} - {fournisseur} - "
+            f"{self.quantite_restante} kg restant"
+        )
+
+    from decimal import Decimal
+    from django.core.exceptions import ValidationError
+
     def save(self, *args, **kwargs):
-        # Si la valeur initiale n'est pas encore enregistrée, on la calcule UNE SEULE FOIS
+
+        # --- Calcul valeur initiale UNE SEULE FOIS ---
         if self.valeur_stock_initiale is None:
-            self.valeur_stock_initiale = self.quantite_initiale * (self.prix_achat_unitaire or 0)
-        
-        # Validation de cohérence des quantités
+
+            if self.est_conditionne:
+                # prix par unité × nombre d’unités
+                nb_unites = self.quantite_initiale / self.produit.poids_unitaire_kg
+                self.valeur_stock_initiale = nb_unites * self.prix_achat_unitaire
+            else:
+                # produit vrac → prix au kg
+                self.valeur_stock_initiale = self.quantite_initiale * self.prix_achat_unitaire
+
+        # --- Garde-fous ---
         if self.quantite_restante > self.quantite_initiale:
-            raise ValueError("La quantité restante ne peut pas être supérieure à la quantité initiale")
-        
+            raise ValidationError("Quantité restante > quantité initiale")
+
         if self.quantite_restante < 0:
-            raise ValueError("La quantité restante ne peut pas être négative")
+            raise ValidationError("Quantité restante négative")
 
         super().save(*args, **kwargs)
-    
+
     @property
     def montant_total(self):
-        """Calcule le montant total du lot"""
-        return self.quantite_initiale * (self.prix_achat_unitaire or 0)
-    
+        if self.est_conditionne:
+            nb_unites = self.quantite_initiale / self.produit.poids_unitaire_kg
+            return nb_unites * self.prix_achat_unitaire
+        return self.quantite_initiale * self.prix_achat_unitaire
+
     @property
     def valeur_actuelle_stock(self):
-        """Calcule la valeur actuelle du stock basée sur la quantité restante"""
-        return self.quantite_restante * (self.prix_achat_unitaire or 0)
-    
+        if self.est_conditionne:
+            nb_unites = self.quantite_restante / self.produit.poids_unitaire_kg
+            return nb_unites * self.prix_achat_unitaire
+        return self.quantite_restante * self.prix_achat_unitaire
+
     @property
     def quantite_perdue_totale(self):
         """Calcule la quantité totale perdue pour ce lot"""
@@ -745,6 +794,37 @@ class LotEntrepot(models.Model):
     @property
     def est_solde(self):
         return self.total_facture_lot >= self.montant_total
+
+    @property
+    def est_conditionne(self):
+        """
+        Un lot est conditionné si le produit a un poids unitaire défini
+        """
+        return bool(self.produit and self.produit.poids_unitaire_kg)
+
+    @property
+    def quantite_restante_unites(self):
+        """
+        Nombre d’unités restantes (cartons / sacs)
+        """
+        if not self.est_conditionne:
+            return None
+
+        return (self.quantite_restante / self.produit.poids_unitaire_kg).quantize(
+            Decimal("1"), rounding=ROUND_FLOOR
+        )
+
+    @property
+    def quantite_initiale_unites(self):
+        """
+        Nombre d’unités initiales
+        """
+        if not self.est_conditionne:
+            return None
+
+        return (self.quantite_initiale / self.produit.poids_unitaire_kg).quantize(
+            Decimal("1"), rounding=ROUND_FLOOR
+        )
 
 
 class FactureLotEntrepot(models.Model):
@@ -838,6 +918,7 @@ class Perte(models.Model):
             'difference': self.difference_quantite
         }  
 
+
 class AffectationLotSuperviseur(models.Model):
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
 
@@ -871,7 +952,18 @@ class AffectationLotSuperviseur(models.Model):
     date_affectation = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.lot.produit.nom} – {self.quantite_restante}"
+        produit = self.lot.produit
+
+        if produit.poids_unitaire_kg:
+            unites = self.quantite_restante / produit.poids_unitaire_kg
+            return (
+                f"{produit.nom} – "
+                f"{unites:.0f} unités "
+                f"({self.quantite_restante} kg)"
+            )
+
+        return f"{produit.nom} – {self.quantite_restante} kg"
+
 
 
 

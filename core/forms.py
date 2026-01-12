@@ -64,229 +64,236 @@ class FournisseurForm(forms.ModelForm):
         fields = ['nom', 'contact', 'email', 'adresse']
 
 class ReceptionLotForm(forms.ModelForm):
-    # Champs pour nouveau fournisseur
-    nouveau_fournisseur = forms.BooleanField(
-        required=False, 
-        initial=False, 
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        label="Créer un nouveau fournisseur"
+    """
+    Formulaire de réception de lot
+    - Le stock est TOUJOURS enregistré en kilogrammes
+    - Le poids de référence est porté par le PRODUIT
+    """
+
+    # =============================
+    # CHAMP UX UNIQUE
+    # =============================
+    quantite_saisie = forms.DecimalField(
+        required=True,
+        min_value=0.01,
+        decimal_places=2,
+        max_digits=10,
+        label="Quantité reçue",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex : 20 (cartons) ou 50 (kg)'
+        })
     )
-    nouveau_fournisseur_nom = forms.CharField(
-        max_length=100, 
-        required=False, 
-        widget=forms.TextInput(attrs={
-            'class': 'form-control', 
-            'placeholder': 'Nom du fournisseur'
-        }),
-        label="Nom du fournisseur"
-    )
-    nouveau_fournisseur_contact = forms.CharField(
-        max_length=100, 
-        required=False, 
-        widget=forms.TextInput(attrs={
-            'class': 'form-control', 
-            'placeholder': 'Contact (téléphone, email...)'
-        }),
-        label="Contact"
-    )
-    
-    # Champs pour nouveau produit
+
+    # =============================
+    # PRODUIT (création)
+    # =============================
     nouveau_produit = forms.BooleanField(
-        required=False, 
-        initial=False, 
+        required=False,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         label="Créer un nouveau produit"
     )
+
     nouveau_produit_nom = forms.CharField(
-        max_length=100, 
-        required=False, 
-        widget=forms.TextInput(attrs={
-            'class': 'form-control', 
-            'placeholder': 'Nom du produit'
-        }),
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
         label="Nom du produit"
     )
+
     nouveau_produit_description = forms.CharField(
         required=False,
-        widget=forms.Textarea(attrs={
-            'class': 'form-control', 
-            'placeholder': 'Description (optionnel)',
-            'rows': 2
-        }),
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         label="Description"
     )
-    
 
-    
+    nouveau_produit_poids = forms.DecimalField(
+        required=False,
+        min_value=0.01,
+        decimal_places=2,
+        max_digits=10,
+        label="Poids unitaire (kg)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex : 10 (laisser vide si non conditionné)'
+        })
+    )
+
+    # =============================
+    # FOURNISSEUR
+    # =============================
+    nouveau_fournisseur = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label="Créer un nouveau fournisseur"
+    )
+
+    nouveau_fournisseur_nom = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label="Nom du fournisseur"
+    )
+
+    nouveau_fournisseur_contact = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label="Contact"
+    )
+
+    # =============================
+    # META
+    # =============================
     class Meta:
         model = LotEntrepot
-        fields = ['produit', 'fournisseur', 'quantite_initiale',
-                  'prix_achat_unitaire', 'date_reception']
+        fields = [
+            'produit',
+            'fournisseur',
+            'quantite_initiale',  # champ technique
+            'prix_achat_unitaire',
+            'date_reception'
+        ]
         widgets = {
-            'produit': forms.Select(attrs={
-                'class': 'form-select',
-                'data-placeholder': 'Sélectionner un produit...'
-            }),
-            'fournisseur': forms.Select(attrs={
-                'class': 'form-select',
-                'data-placeholder': 'Sélectionner un fournisseur...'
-            }),
-            'quantite_initiale': forms.NumberInput(attrs={
-            'class': 'form-control',
-            'step': '0.5',   
-            'min': '0.5',
-            'placeholder': 'Quantité'
-             }),
-            'prix_achat_unitaire': forms.NumberInput(attrs={
-                'class': 'form-control', 
-                'step': '1',
-                'placeholder': '0.00'
-            }),
+            'produit': forms.Select(attrs={'class': 'form-select'}),
+            'fournisseur': forms.Select(attrs={'class': 'form-select'}),
+            'quantite_initiale': forms.HiddenInput(),
+            'prix_achat_unitaire': forms.NumberInput(attrs={'class': 'form-control'}),
             'date_reception': forms.DateTimeInput(attrs={
                 'class': 'form-control',
                 'type': 'datetime-local'
             }),
         }
-        labels = {
-            'quantite_initiale': 'Quantité initiale',
-            'prix_achat_unitaire': 'Prix d\'achat unitaire (FCFA)',
-            'date_reception': 'Date et heure de réception'
-        }
 
+    # =============================
+    # INIT
+    # =============================
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # Configuration des champs requis
+
+        self.fields['produit'].queryset = Produit.objects.order_by('nom')
+        self.fields['fournisseur'].queryset = Fournisseur.objects.order_by('nom')
+        self.fields['quantite_initiale'].required = False
         self.fields['produit'].required = False
-        self.fields['fournisseur'].required = False
-        self.fields['quantite_initiale'].required = True
-        self.fields['prix_achat_unitaire'].required = True
-        self.fields['date_reception'].required = True
-        
-        
-        # Peupler les listes déroulantes avec tri alphabétique
-        self.fields['produit'].queryset = Produit.objects.all().order_by('nom')
-        self.fields['produit'].empty_label = "Sélectionner un produit..."
-        self.fields['fournisseur'].queryset = Fournisseur.objects.all().order_by('nom')
-        self.fields['fournisseur'].empty_label = "Sélectionner un fournisseur..."
-        
-        # Définir la date actuelle comme valeur par défaut
         self.fields['date_reception'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
+    # =============================
+    # CLEAN — LOGIQUE MÉTIER UNIQUE
+    # =============================
     def clean(self):
         cleaned_data = super().clean()
-        nouveau_fournisseur = cleaned_data.get('nouveau_fournisseur')
-        nouveau_produit = cleaned_data.get('nouveau_produit')
-        
-        # Validation fournisseur
-        if nouveau_fournisseur:
-            nom_fournisseur = cleaned_data.get('nouveau_fournisseur_nom')
-            if not nom_fournisseur or not nom_fournisseur.strip():
-                self.add_error('nouveau_fournisseur_nom', 'Le nom du fournisseur est requis')
-            elif Fournisseur.objects.filter(nom__iexact=nom_fournisseur.strip()).exists():
-                self.add_error('nouveau_fournisseur_nom', 'Ce fournisseur existe déjà')
-        else:
-            # Si aucun fournisseur sélectionné, on laisse vide (sera remplacé par défaut plus tard)
-            if not cleaned_data.get('fournisseur'):
-                cleaned_data['fournisseur'] = None
 
-        # Validation produit
+        quantite_saisie = cleaned_data.get("quantite_saisie")
+        nouveau_produit = cleaned_data.get("nouveau_produit")
+
+        if not quantite_saisie or quantite_saisie <= 0:
+            self.add_error("quantite_saisie", "La quantité doit être supérieure à 0")
+            return cleaned_data
+
+        # ---- CAS NOUVEAU PRODUIT ----
         if nouveau_produit:
-            nom_produit = cleaned_data.get('nouveau_produit_nom')
-            if not nom_produit or not nom_produit.strip():
-                self.add_error('nouveau_produit_nom', 'Le nom du produit est requis')
-            elif Produit.objects.filter(nom__iexact=nom_produit.strip()).exists():
-                self.add_error('nouveau_produit_nom', 'Ce produit existe déjà')
-        else:
-            if not cleaned_data.get('produit'):
-                self.add_error('produit', 'Veuillez sélectionner un produit existant')
+            cleaned_data["produit"] = None
         
-        # Validation des champs obligatoires
-        quantite = cleaned_data.get('quantite_initiale')
-        if not quantite or quantite <= 0:
-            self.add_error('quantite_initiale', 'La quantité doit être supérieure à 0')
+            nom = cleaned_data.get("nouveau_produit_nom")
+            poids = cleaned_data.get("nouveau_produit_poids")
+        
+            if not nom:
+                self.add_error("nouveau_produit_nom", "Nom du produit requis")
+                return cleaned_data
+        
+            if quantite_saisie > 1 and not poids:
+                self.add_error(
+                    "nouveau_produit_poids",
+                    "Le poids unitaire est requis pour un produit conditionné"
+                )
+                return cleaned_data
+        
+            if poids:
+                cleaned_data["quantite_initiale"] = quantite_saisie * poids
+            else:
+                cleaned_data["quantite_initiale"] = quantite_saisie
+        
+            return cleaned_data
         
 
-        # Validation de la date de réception
-        date_reception = cleaned_data.get('date_reception')
-        if date_reception:
-            if date_reception > timezone.now():
-                self.add_error('date_reception', 'La date de réception ne peut pas être dans le futur')
+        # ---- PRODUIT EXISTANT ----
+        produit = cleaned_data.get("produit")
+        if not produit:
+            self.add_error("produit", "Veuillez sélectionner un produit")
+            return cleaned_data
+
+        if produit.poids_unitaire_kg:
+            cleaned_data["quantite_initiale"] = (
+                quantite_saisie * produit.poids_unitaire_kg
+            )
         else:
-            self.add_error('date_reception', 'La date de réception est requise')
-        
+            cleaned_data["quantite_initiale"] = quantite_saisie
+
         return cleaned_data
 
+    # =============================
+    # SAVE
+    # =============================
     def save(self, commit=True):
         instance = super().save(commit=False)
-    
-        # Gérer le fournisseur
+
+        # ----- Fournisseur -----
         if self.cleaned_data.get('nouveau_fournisseur'):
-            fournisseur_nom = self.cleaned_data['nouveau_fournisseur_nom'].strip()
-            fournisseur_contact = self.cleaned_data.get('nouveau_fournisseur_contact', '').strip()
-            
-            fournisseur, created = Fournisseur.objects.get_or_create(
-                nom=fournisseur_nom,
-                defaults={'contact': fournisseur_contact}
+            fournisseur, _ = Fournisseur.objects.get_or_create(
+                nom=self.cleaned_data['nouveau_fournisseur_nom'].strip(),
+                defaults={'contact': self.cleaned_data.get('nouveau_fournisseur_contact', '')}
             )
             instance.fournisseur = fournisseur
         elif not self.cleaned_data.get('fournisseur'):
-            # Fournisseur par défaut si rien n’est renseigné
-            fournisseur_defaut, _ = Fournisseur.objects.get_or_create(
+            instance.fournisseur, _ = Fournisseur.objects.get_or_create(
                 nom="Fournisseur Inconnu",
-                defaults={'contact': 'N/A', 'adresse': 'Non renseignée'}
+                defaults={'contact': 'N/A'}
             )
-            instance.fournisseur = fournisseur_defaut
-    
-        # Gérer le produit
+
+        # ----- Produit -----
         if self.cleaned_data.get('nouveau_produit'):
-            produit_nom = self.cleaned_data['nouveau_produit_nom'].strip()
-            produit_description = self.cleaned_data.get('nouveau_produit_description', '').strip()
-            
             produit, created = Produit.objects.get_or_create(
-                nom=produit_nom,
-                defaults={'description': produit_description}
+                nom=self.cleaned_data['nouveau_produit_nom'].strip(),
+                defaults={
+                    'description': self.cleaned_data.get('nouveau_produit_description', ''),
+                    'poids_unitaire_kg': self.cleaned_data.get('nouveau_produit_poids')
+                }
             )
+
+            if not created and self.cleaned_data.get('nouveau_produit_poids'):
+                produit.poids_unitaire_kg = self.cleaned_data['nouveau_produit_poids']
+                produit.save(update_fields=["poids_unitaire_kg"])
+
             instance.produit = produit
 
-        # Générer une référence de lot
-        if not instance.reference_lot:
-            prefix = timezone.now().strftime("%Y%m%d")
-            dernier_lot = LotEntrepot.objects.filter(
-                reference_lot__startswith=prefix
-            ).order_by('-reference_lot').first()
-            
-            if dernier_lot:
-                try:
-                    dernier_num = int(dernier_lot.reference_lot[-4:])
-                    nouveau_num = dernier_num + 1
-                except (ValueError, IndexError):
+            if not instance.reference_lot:
+                prefix = timezone.now().strftime("%Y%m%d")
+                dernier_lot = LotEntrepot.objects.filter(
+                    reference_lot__startswith=prefix
+                ).order_by('-reference_lot').first()
+
+                if dernier_lot:
+                    try:
+                        dernier_num = int(dernier_lot.reference_lot[-4:])
+                        nouveau_num = dernier_num + 1
+                    except (ValueError, IndexError):
+                        nouveau_num = 1
+                else:
                     nouveau_num = 1
-            else:
-                nouveau_num = 1
-                
-            instance.reference_lot = f"{prefix}-{nouveau_num:04d}"
 
-        # Initialiser la quantité restante
+                instance.reference_lot = f"{prefix}-{nouveau_num:04d}"
+
+        # ----- Invariant métier -----
         instance.quantite_restante = instance.quantite_initiale
-        
-
 
         if commit:
             instance.save()
-            # Créer le mouvement de stock après sauvegarde
             MouvementStock.objects.create(
                 produit=instance.produit,
                 lot=instance,
                 type_mouvement='RECEPTION',
                 quantite=instance.quantite_initiale,
-                date_mouvement=instance.date_reception,
-
+                date_mouvement=instance.date_reception
             )
-            
-        return instance 
-    
-    # forms.py
+
+        return instance
 
 
 import os

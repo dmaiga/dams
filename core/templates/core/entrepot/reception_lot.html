@@ -1,296 +1,220 @@
-<!-- core/entrepot/reception_lot.html -->
 {% extends 'base.html' %}
 {% load static %}
 
 {% block title %}Réception de Lot{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0">Réception d'un Nouveau Lot</h4>
-                </div>
-                <div class="card-body">
-                    {% if messages %}
-                    {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
+<div class="container-fluid py-3">
 
-                    <!-- MESSAGE INFORMATIF IMPORTANT -->
+  <!-- TITRE -->
+  <div class="mb-3">
+    <h4 class="fw-bold mb-0">Réception d’un nouveau lot</h4>
+    <small class="text-muted">
+      La quantité est automatiquement convertie en kilogrammes selon le produit
+    </small>
+  </div>
 
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
 
-                    <!-- FORMULAIRE SANS ENCTYPE MULTIPART -->
-                    <form method="post" id="reception-form">
-                        {% csrf_token %}
-                        
-                        <!-- Section Produit -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">Produit</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-12">
-                                        <div class="form-check form-switch">
-                                            {{ form.nouveau_produit }}
-                                            <label class="form-check-label" for="{{ form.nouveau_produit.id_for_label }}">
-                                                Nouveau produit
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
+  <form method="post" id="reception-form">
+    {% csrf_token %}
 
-                                <!-- Produit existant -->
-                                <div id="produit-existant-group" class="row">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Produit existant</label>
-                                        {{ form.produit }}
-                                        {% if form.produit.errors %}
-                                        <div class="text-danger small">{{ form.produit.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
+    <!-- ================= PRODUIT ================= -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <strong>Produit</strong>
+      </div>
+      <div class="card-body">
 
-                                <!-- Nouveau produit -->
-                                <div id="nouveau-produit-group" class="row" style="display: none;">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Nom du nouveau produit</label>
-                                        {{ form.nouveau_produit_nom }}
-                                        {% if form.nouveau_produit_nom.errors %}
-                                        <div class="text-danger small">{{ form.nouveau_produit_nom.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Description</label>
-                                        {{ form.nouveau_produit_description }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Section Fournisseur -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">Fournisseur</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-12">
-                                        <div class="form-check form-switch">
-                                            {{ form.nouveau_fournisseur }}
-                                            <label class="form-check-label" for="{{ form.nouveau_fournisseur.id_for_label }}">
-                                                Nouveau fournisseur
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Fournisseur existant -->
-                                <div id="fournisseur-existant-group" class="row">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Fournisseur existant</label>
-                                        {{ form.fournisseur }}
-                                        {% if form.fournisseur.errors %}
-                                        <div class="text-danger small">{{ form.fournisseur.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <!-- Nouveau fournisseur -->
-                                <div id="nouveau-fournisseur-group" class="row" style="display: none;">
-                                    <div class="col-md-6">
-                                        <label class="form-label">Nom du fournisseur</label>
-                                        {{ form.nouveau_fournisseur_nom }}
-                                        {% if form.nouveau_fournisseur_nom.errors %}
-                                        <div class="text-danger small">{{ form.nouveau_fournisseur_nom.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">Contact</label>
-                                        {{ form.nouveau_fournisseur_contact }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Informations du lot -->
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5 class="mb-0">Informations du Lot</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">Quantité</label>
-                                        {{ form.quantite_initiale }}
-                                        {% if form.quantite_initiale.errors %}
-                                        <div class="text-danger small">{{ form.quantite_initiale.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Prix d'achat unitaire (FCFA)</label>
-                                        {{ form.prix_achat_unitaire }}
-                                        {% if form.prix_achat_unitaire.errors %}
-                                        <div class="text-danger small">{{ form.prix_achat_unitaire.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">Date de réception</label>
-                                        {{ form.date_reception }}
-                                        {% if form.date_reception.errors %}
-                                        <div class="text-danger small">{{ form.date_reception.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- NOUVELLE SECTION : ÉTAPES SUIVANTES -->
-             
-
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'liste_lots' %}" class="btn btn-secondary">
-                                <i class="fas fa-times"></i> Annuler
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Créer le lot 
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+        <div class="form-check form-switch mb-3">
+          {{ form.nouveau_produit }}
+          <label class="form-check-label" for="{{ form.nouveau_produit.id_for_label }}">
+            Nouveau produit
+          </label>
         </div>
+
+        <!-- Produit existant -->
+        <div id="produit-existant-group" class="mb-3">
+          <label class="form-label">Produit existant</label>
+          {{ form.produit }}
+          {% if form.produit.errors %}
+            <div class="text-danger small">{{ form.produit.errors }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Nouveau produit -->
+        <div id="nouveau-produit-group" class="mb-3" style="display:none;">
+          <label class="form-label">Nom du produit</label>
+          {{ form.nouveau_produit_nom }}
+          {% if form.nouveau_produit_nom.errors %}
+            <div class="text-danger small">{{ form.nouveau_produit_nom.errors }}</div>
+          {% endif %}
+
+          <div class="mt-2">
+            <label class="form-label">Description</label>
+            {{ form.nouveau_produit_description }}
+          </div>
+          <div class="mt-2">
+            <label class="form-label">Poids</label>
+            {{ form.nouveau_produit_poids }}
+          </div>
+        </div>
+
+      </div>
     </div>
+
+    <!-- ================= FOURNISSEUR ================= -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <strong>Fournisseur</strong>
+      </div>
+      <div class="card-body">
+
+        <div class="form-check form-switch mb-3">
+          {{ form.nouveau_fournisseur }}
+          <label class="form-check-label" for="{{ form.nouveau_fournisseur.id_for_label }}">
+            Nouveau fournisseur
+          </label>
+        </div>
+
+        <!-- Fournisseur existant -->
+        <div id="fournisseur-existant-group" class="mb-3">
+          <label class="form-label">Fournisseur existant</label>
+          {{ form.fournisseur }}
+          {% if form.fournisseur.errors %}
+            <div class="text-danger small">{{ form.fournisseur.errors }}</div>
+          {% endif %}
+        </div>
+
+        <!-- Nouveau fournisseur -->
+        <div id="nouveau-fournisseur-group" class="mb-3" style="display:none;">
+          <label class="form-label">Nom du fournisseur</label>
+          {{ form.nouveau_fournisseur_nom }}
+          {% if form.nouveau_fournisseur_nom.errors %}
+            <div class="text-danger small">{{ form.nouveau_fournisseur_nom.errors }}</div>
+          {% endif %}
+
+          <div class="mt-2">
+            <label class="form-label">Contact</label>
+            {{ form.nouveau_fournisseur_contact }}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= RÉCEPTION DU LOT ================= -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <strong>Réception du lot</strong>
+      </div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label">
+            Quantité reçue
+            <span class="text-muted small">
+              (cartons / sacs / kg selon le produit)
+            </span>
+          </label>
+          {{ form.quantite_saisie }}
+          {% if form.quantite_saisie.errors %}
+            <div class="text-danger small">{{ form.quantite_saisie.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="alert alert-info">
+          💡 <strong>Information :</strong>
+          <br>
+          Si le produit est conditionné (carton / sac), la conversion en kg est automatique.
+          <br>
+          Sinon, la quantité est considérée directement en kilogrammes.
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= PRIX & DATE ================= -->
+    <div class="card mb-3">
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label">Prix d’achat unitaire (FCFA / kg)</label>
+          {{ form.prix_achat_unitaire }}
+          {% if form.prix_achat_unitaire.errors %}
+            <div class="text-danger small">{{ form.prix_achat_unitaire.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Date de réception</label>
+          {{ form.date_reception }}
+          {% if form.date_reception.errors %}
+            <div class="text-danger small">{{ form.date_reception.errors }}</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ================= ACTIONS ================= -->
+    <div class="d-grid gap-2">
+      <a href="{% url 'liste_lots' %}" class="btn btn-outline-secondary btn-lg">
+        Annuler
+      </a>
+      <button type="submit" class="btn btn-primary btn-lg">
+        Créer le lot
+      </button>
+    </div>
+
+  </form>
 </div>
 
+<!-- ================= JS SIMPLE ================= -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Éléments pour les produits
-    const nouveauProduitCheckbox = document.getElementById('{{ form.nouveau_produit.id_for_label }}');
-    const produitExistantGroup = document.getElementById('produit-existant-group');
-    const nouveauProduitGroup = document.getElementById('nouveau-produit-group');
-    const selectProduit = document.getElementById('{{ form.produit.id_for_label }}');
-    const inputNouveauProduit = document.getElementById('{{ form.nouveau_produit_nom.id_for_label }}');
-    const inputDescriptionProduit = document.getElementById('{{ form.nouveau_produit_description.id_for_label }}');
+document.addEventListener("DOMContentLoaded", function () {
 
-    // Éléments pour les fournisseurs
-    const nouveauFournisseurCheckbox = document.getElementById('{{ form.nouveau_fournisseur.id_for_label }}');
-    const fournisseurExistantGroup = document.getElementById('fournisseur-existant-group');
-    const nouveauFournisseurGroup = document.getElementById('nouveau-fournisseur-group');
-    const selectFournisseur = document.getElementById('{{ form.fournisseur.id_for_label }}');
-    const inputNouveauFournisseur = document.getElementById('{{ form.nouveau_fournisseur_nom.id_for_label }}');
-    const inputContactFournisseur = document.getElementById('{{ form.nouveau_fournisseur_contact.id_for_label }}');
+  const nouveauProduit = document.getElementById("{{ form.nouveau_produit.id_for_label }}");
+  const produitExistant = document.getElementById("produit-existant-group");
+  const nouveauProduitGroup = document.getElementById("nouveau-produit-group");
 
-    // Éléments pour le calcul du montant
-    const quantiteInput = document.getElementById('{{ form.quantite_initiale.id_for_label }}');
-    const prixInput = document.getElementById('{{ form.prix_achat_unitaire.id_for_label }}');
-    const montantTotalElement = document.getElementById('montant-total-estime');
+  const nouveauFournisseur = document.getElementById("{{ form.nouveau_fournisseur.id_for_label }}");
+  const fournisseurExistant = document.getElementById("fournisseur-existant-group");
+  const nouveauFournisseurGroup = document.getElementById("nouveau-fournisseur-group");
 
-    // Fonction pour basculer les groupes produit
-    function toggleProduitFields() {
-        if (nouveauProduitCheckbox.checked) {
-            produitExistantGroup.style.display = 'none';
-            nouveauProduitGroup.style.display = 'block';
-            if (selectProduit) {
-                selectProduit.disabled = true;
-                selectProduit.required = false;
-            }
-            if (inputNouveauProduit) {
-                inputNouveauProduit.disabled = false;
-                inputNouveauProduit.required = true;
-            }
-            if (inputDescriptionProduit) {
-                inputDescriptionProduit.disabled = false;
-            }
-        } else {
-            produitExistantGroup.style.display = 'block';
-            nouveauProduitGroup.style.display = 'none';
-            if (selectProduit) {
-                selectProduit.disabled = false;
-                selectProduit.required = true;
-            }
-            if (inputNouveauProduit) {
-                inputNouveauProduit.disabled = true;
-                inputNouveauProduit.required = false;
-            }
-            if (inputDescriptionProduit) {
-                inputDescriptionProduit.disabled = true;
-            }
-        }
+  function toggleProduit() {
+    if (nouveauProduit.checked) {
+      produitExistant.style.display = "none";
+      nouveauProduitGroup.style.display = "block";
+    } else {
+      produitExistant.style.display = "block";
+      nouveauProduitGroup.style.display = "none";
     }
+  }
 
-    // Fonction pour basculer les groupes fournisseur
-    function toggleFournisseurFields() {
-        if (nouveauFournisseurCheckbox.checked) {
-            fournisseurExistantGroup.style.display = 'none';
-            nouveauFournisseurGroup.style.display = 'block';
-            if (selectFournisseur) {
-                selectFournisseur.disabled = true;
-                selectFournisseur.required = false;
-            }
-            if (inputNouveauFournisseur) {
-                inputNouveauFournisseur.disabled = false;
-                inputNouveauFournisseur.required = true;
-            }
-            if (inputContactFournisseur) {
-                inputContactFournisseur.disabled = false;
-            }
-        } else {
-            fournisseurExistantGroup.style.display = 'block';
-            nouveauFournisseurGroup.style.display = 'none';
-            if (selectFournisseur) {
-                selectFournisseur.disabled = false;
-                selectFournisseur.required = false; // Optionnel
-            }
-            if (inputNouveauFournisseur) {
-                inputNouveauFournisseur.disabled = true;
-                inputNouveauFournisseur.required = false;
-            }
-            if (inputContactFournisseur) {
-                inputContactFournisseur.disabled = true;
-            }
-        }
+  function toggleFournisseur() {
+    if (nouveauFournisseur.checked) {
+      fournisseurExistant.style.display = "none";
+      nouveauFournisseurGroup.style.display = "block";
+    } else {
+      fournisseurExistant.style.display = "block";
+      nouveauFournisseurGroup.style.display = "none";
     }
+  }
 
-    // Fonction pour calculer le montant total estimé
-    function calculerMontantTotal() {
-        const quantite = parseFloat(quantiteInput.value) || 0;
-        const prix = parseFloat(prixInput.value) || 0;
-        const montantTotal = quantite * prix;
-        
-        // Formatage avec séparateurs de milliers
-        const formatter = new Intl.NumberFormat('fr-FR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-        
-        montantTotalElement.textContent = `${formatter.format(montantTotal)} FCFA`;
-    }
+  nouveauProduit?.addEventListener("change", toggleProduit);
+  nouveauFournisseur?.addEventListener("change", toggleFournisseur);
 
-    // Événements
-    if (nouveauProduitCheckbox) {
-        nouveauProduitCheckbox.addEventListener('change', toggleProduitFields);
-    }
-    if (nouveauFournisseurCheckbox) {
-        nouveauFournisseurCheckbox.addEventListener('change', toggleFournisseurFields);
-    }
-    if (quantiteInput) {
-        quantiteInput.addEventListener('input', calculerMontantTotal);
-    }
-    if (prixInput) {
-        prixInput.addEventListener('input', calculerMontantTotal);
-    }
-
-    // Initialisation
-    toggleProduitFields();
-    toggleFournisseurFields();
-    calculerMontantTotal(); // Calcul initial
+  toggleProduit();
+  toggleFournisseur();
 });
 </script>
+
 {% endblock %}
