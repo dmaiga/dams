@@ -1,41 +1,311 @@
 {% extends "base.html" %}
 {% load format_fcfa %}
+{% load humanize %}
 
 {% block title %}Affectations ROT{% endblock %}
 
 {% block content %}
 <div class="container mt-3">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">
-            <i class="fas fa-clipboard-list"></i>
-            Mes affectations
-        </h5>
-        <a href="{% url 'affecter_lot_superviseur' %}" class="btn btn-primary btn-sm">
-            + Nouvelle affectation
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h5 class="mb-0">
+                <i class="fas fa-clipboard-list me-2"></i>
+                Mes affectations
+            </h5>
+            <small class="text-muted">Historique des lots affectés aux superviseurs</small>
+        </div>
+        <a href="{% url 'affecter_lot_superviseur' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Nouvelle affectation
         </a>
     </div>
 
-    <div class="list-group">
-        {% for a in affectations %}
-            <div class="list-group-item">
-                <div class="d-flex justify-content-between">
-                    <strong>{{ a.lot.produit.nom }}</strong>
-                  
+    <!-- Statistiques rapides -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded me-3">
+                            <i class="fas fa-boxes text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Total affectations</div>
+                            <div class="h5 mb-0">{{ affectations.count }}</div>
+                        </div>
+                    </div>
                 </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-info bg-opacity-10 p-2 rounded me-3">
+                            <i class="fas fa-balance-scale text-info"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Total quantité</div>
+                            <div class="h5 mb-0">
+                                {% with total_qte=affectations_total.kg|floatformat:0 %}
+                                    {{ total_qte|intcomma }} kg
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-success bg-opacity-10 p-2 rounded me-3">
+                            <i class="fas fa-users text-success"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Superviseurs</div>
+                            <div class="h5 mb-0">{{ superviseurs_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-warning bg-opacity-10 p-2 rounded me-3">
+                            <i class="fas fa-archive text-warning"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Produits différents</div>
+                            <div class="h5 mb-0">{{ produits_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des affectations -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-list me-2"></i>
+                    Détail des affectations
+                </h6>
+                <span class="badge bg-secondary">{{ affectations.count }} affectation{{ affectations.count|pluralize }}</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if affectations %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                   <thead class="table-light">
+<tr>
+    <th>Date</th>
+    <th>Produit</th>
+    <th class="text-end">Quantité affectée</th>
+    <th class="text-end">Quantité restante</th>
+    <th>Superviseur</th>
+    <th>Fournisseur</th>
+    <th class="text-end">Prix d’achat</th>
+</tr>
+</thead>
+
+                    <tbody>
+                        {% for a in affectations %}
+                        <tr>
+                            <!-- Date -->
+                            <td>
+                                <div>{{ a.date_affectation|date:"d/m/Y" }}</div>
+                                <small class="text-muted">{{ a.date_affectation|date:"H:i" }}</small>
+                            </td>
+                            
+                            <!-- Produit -->
+                            <td>
+                                <strong>{{ a.lot.produit.nom }}</strong>
+                              
+                            </td>
+                            
+                            <!-- Type -->
+                            
+                            
+                            <!-- Quantité -->
+                            <td class="text-end">
+    <div class="fw-bold">
+        {{ a.quantite_initiale|floatformat:2 }}
+    </div>
+</td>
+
+                            
+                            <!-- Stock restant -->
+                           <td class="text-end">
+    <div class="fw-bold">
+        {{ a.quantite_restante|floatformat:2 }}
+    </div>
+
+  {% if a.quantite_initiale > 0 %}
+{% widthratio a.quantite_restante a.quantite_initiale 100 as percent %}
+<div class="progress mt-1" style="height: 4px;">
+    <div class="progress-bar
+        {% if percent > 50 %}bg-success
+        {% elif percent > 20 %}bg-warning
+        {% else %}bg-danger
+        {% endif %}"
+        role="progressbar"
+        style="width: {{ percent }}%">
+    </div>
+</div>
+{% endif %}
+
+</td>
+
+                            
+                            <!-- Superviseur -->
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-light rounded-circle p-2 me-2">
+                                        <i class="fas fa-user-tie text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <div>{{ a.superviseur.full_name }}</div>
+                                        <small class="text-muted">
+                                            {% if a.superviseur.telephone %}
+                                            <i class="fas fa-phone me-1"></i>{{ a.superviseur.telephone }}
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- Fournisseur -->
+                            <td>
+                                {% if a.lot.fournisseur %}
+                                <div>{{ a.lot.fournisseur.nom }}</div>
+                                <small class="text-muted">
+                                    {% if a.lot.fournisseur.contact %}
+                                    {{ a.lot.fournisseur.contact|truncatechars:15 }}
+                                    {% endif %}
+                                </small>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Prix achat -->
+                           <td class="text-end">
+    <strong>{{ a.lot.prix_achat_unitaire|floatformat:0 }} F</strong>
+</td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                <h6 class="text-muted">Aucune affectation enregistrée</h6>
+                <p class="text-muted small mb-4">Commencez par affecter un lot à un superviseur</p>
+                <a href="{% url 'affecter_lot_superviseur' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Créer une affectation
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% if affectations %}
+        <div class="card-footer bg-white">
+            <div class="d-flex justify-content-between align-items-center">
                 <small class="text-muted">
-                    Superviseur : {{ a.superviseur.full_name }} <br>
-                    Qte envoyées:  {{ a.quantite_initiale }} <br>
-                  
-                    Date : {{ a.date_affectation|date:"d/m/Y H:i" }}
+                    <i class="fas fa-info-circle me-1"></i>
+                    Affichage des {{ affectations.count }} dernières affectations
                 </small>
+                <div>
+                    {% if affectations.has_other_pages %}
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            {% if affectations.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ affectations.previous_page_number }}">Précédent</a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for i in affectations.paginator.page_range %}
+                            <li class="page-item {% if affectations.number == i %}active{% endif %}">
+                                <a class="page-link" href="?page={{ i }}">{{ i }}</a>
+                            </li>
+                            {% endfor %}
+                            
+                            {% if affectations.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ affectations.next_page_number }}">Suivant</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                </div>
             </div>
-        {% empty %}
-            <div class="text-muted text-center py-4">
-                Aucune affectation enregistrée
-            </div>
-        {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
 </div>
+
+<style>
+.card {
+    border-radius: 12px;
+    border: 1px solid #e3e6f0;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.progress {
+    border-radius: 2px;
+    background-color: #f8f9fa;
+}
+
+.bg-opacity-10 {
+    opacity: 0.1;
+}
+
+.text-success {
+    color: #198754 !important;
+}
+
+.text-info {
+    color: #0dcaf0 !important;
+}
+
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .h5 {
+        font-size: 1.1rem;
+    }
+    
+    .card-body {
+        padding: 0.75rem;
+    }
+}
+</style>
 {% endblock %}

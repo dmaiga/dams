@@ -160,7 +160,7 @@
         <th>Produit</th>
         <th>Fournisseur</th>
         <th>Stock</th>
-        <th>Prix (FCFA/kg)</th>
+        <th>Prix </th>
         <th>Valeur initiale</th>
         <th>Valeur actuelle</th>
         <th>Réception</th>
@@ -197,35 +197,23 @@
         </td>
 
         <!-- STOCK -->
-        <td style="min-width: 180px;">
-          {% if lot.est_conditionne %}
-            <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
-              {{ lot.quantite_restante_unites }} unités
-            </strong>
-            <div class="small text-muted">
-              {{ lot.quantite_restante|floatformat:0 }} kg
-            </div>
-          {% else %}
-            <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
-              {{ lot.quantite_restante|floatformat:2 }} kg
-            </strong>
-          {% endif %}
+<!-- STOCK -->
+<td style="min-width: 180px;">
+  <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+    {{ lot.quantite_restante|floatformat:2 }}
+  </strong>
 
-          <div class="progress mt-1" style="height: 5px;">
-            {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress %}
-            <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}"
-                 style="width: {{ progress }}%">
-            </div>
-          </div>
+  <div class="progress mt-1" style="height: 5px;">
+    {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress %}
+    <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}"
+         style="width: {{ progress }}%">
+    </div>
+  </div>
 
-          <div class="small text-muted text-center">
-            {% if lot.est_conditionne %}
-              Initial : {{ lot.quantite_initiale_unites }} unités
-            {% else %}
-              Initial : {{ lot.quantite_initiale|floatformat:2 }} kg
-            {% endif %}
-          </div>
-        </td>
+  <div class="small text-muted text-center">
+    Initial : {{ lot.quantite_initiale|floatformat:2 }}
+  </div>
+</td>
 
         <!-- PRIX -->
         <td>
@@ -258,7 +246,7 @@
             </a>
 
             {% if lot.quantite_restante > 0 %}
-            <a href="{% url 'distribuer_produits' %}?lot={{ lot.id }}"
+            <a href="{% url 'affecter_lot_superviseur' %}"
                class="btn btn-outline-primary"
                title="Distribuer">
               <i class="fas fa-share"></i>

@@ -46,29 +46,44 @@ class DetailDistributionAdmin(admin.ModelAdmin):
     list_display = ['distribution', 'lot', 'quantite', 'prix_gros', 'prix_detail']
     list_filter = ['distribution__date_distribution']
 
+
+
+
 @admin.register(Vente)
 class VenteAdmin(admin.ModelAdmin):
     list_display = [
         'agent',
         'client',
-        'get_produit',  # ← Nouveau champ calculé
+        'get_produit',
         'detail_distribution',
-        'quantite',
+        'quantite_affichee',   # ✅ AU LIEU DE quantite
         'prix_vente_unitaire',
         'date_vente',
-        'date_creation'
+        'date_creation',
     ]
-    list_filter = ['date_vente', 'agent', 'client','date_creation']
+
+    list_filter = ['date_vente', 'agent', 'client', 'date_creation']
+
     search_fields = [
-        'agent__user__username', 
-        'agent__user__first_name', 
+        'agent__user__username',
+        'agent__user__first_name',
         'agent__user__last_name',
-        'detail_distribution__lot__produit__nom'  # Permet rechercher par produit
+        'detail_distribution__lot__produit__nom',
     ]
 
     def get_produit(self, obj):
         return obj.detail_distribution.lot.produit.nom if obj.detail_distribution else "-"
     get_produit.short_description = 'Produit'
+
+    def quantite_affichee(self, obj):
+        """
+        Affiche la quantité avec la vraie unité métier
+        """
+        if obj.type_vente == 'gros':
+            poids = obj.detail_distribution.lot.produit.poids_unitaire_kg or 1
+            quantite_kg = obj.quantite * poids
+            return f"{obj.quantite} unité(s) ({quantite_kg} kg)"
+        return f"{obj.quantite} kg"
 
 
 @admin.register(MouvementStock)

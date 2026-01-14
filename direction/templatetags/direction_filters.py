@@ -44,6 +44,12 @@ def format_currency(value, currency="FCFA"):
     except (ValueError, TypeError):
         return f"0 {currency}"
 
+@register.filter(name='add_class')
+def add_class(field, css):
+    return field.as_widget(attrs={"class": css})
+
+
+
 @register.filter
 def percentage(value, decimals=2):
     """

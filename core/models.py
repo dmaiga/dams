@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from environs import ValidationError
 from tinymce.models import HTMLField
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.db.models import (
     Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField
@@ -47,8 +47,6 @@ class Produit(models.Model):
     )
 
     def __str__(self):
-        if self.poids_unitaire_kg:
-            return f"{self.nom} ({self.poids_unitaire_kg} kg / unité)"
         return f"{self.nom}"
 
 class Fournisseur(models.Model):
@@ -137,6 +135,7 @@ class Agent(models.Model):
         ('rot', 'Responsable Opérations'),
         ('entrepot', 'Superviseur'),
         ('terrain', 'Agent'),
+        ('agent_gros', 'Agent (Vente en Gros)'), 
         ('stagiaire', 'Stagiaire'), 
     )
     TYPE_CONTRAT_CHOICES = (
@@ -361,6 +360,18 @@ class Agent(models.Model):
         if self.est_expire:
             return "Expiré"
         return f"Valide ({self.jours_restants} jours restants)"
+    
+    @property
+    def est_stagiaire(self):
+        """Vérifie si l'agent est un stagiaire"""
+        return self.type_agent == 'stagiaire'
+
+    @property
+    def nombre_stagiaires_supervises(self):
+        """Nombre de stagiaires distincts supervisés"""
+        if self.est_agent_terrain or self.est_superviseur:
+            return Vente.objects.filter(agent=self, stagiaire__isnull=False).values('stagiaire').distinct().count()
+        return 0
 
     @property
     def jours_restants(self):
@@ -424,6 +435,7 @@ class Agent(models.Model):
     def est_rot(self):
         """Vérifie si l'agent est un rot"""
         return self.type_agent == 'rot'
+    
     @property
     def est_superviseur(self):
         """Vérifie si l'agent est un superviseur"""
@@ -438,25 +450,22 @@ class Agent(models.Model):
     def est_superviseur_ou_rot(self):
         return self.type_agent in ['entrepot', 'rot']
     
+  
     @property
-    def est_stagiaire(self):
-        """Vérifie si l'agent est un stagiaire"""
-        return self.type_agent == 'stagiaire'
+    def est_agent_gros(self):
+        return self.type_agent == 'agent_gros'
 
- # Nombre de stagiaires supervisés
     @property
-    def nombre_stagiaires_supervises(self):
-        """Nombre de stagiaires distincts supervisés"""
-        if self.est_agent_terrain or self.est_superviseur:
-            return Vente.objects.filter(agent=self, stagiaire__isnull=False).values('stagiaire').distinct().count()
-        return 0
-    
+    def est_agent_vente(self):
+        return self.type_agent in ['terrain', 'agent_gros']
+
+   
     @property
     def total_ventes(self):
         """
         Total des ventes réalisées par l’agent terrain
         """
-        if not self.est_agent_terrain:
+        if not self.est_agent_vente:
             return Decimal("0.00")
 
         return (
@@ -496,7 +505,7 @@ class Agent(models.Model):
         """
         Argent physiquement détenu par l’agent terrain
         """
-        if not self.est_agent_terrain:
+        if not self.est_agent_vente:
             return Decimal("0.00")
 
         return self.total_ventes - self.total_recouvre
@@ -507,7 +516,7 @@ class Agent(models.Model):
         """
         Indique si l’agent terrain a encore de l’argent à remettre
         """
-        return self.est_agent_terrain and self.argent_en_possession > 0
+        return self.est_agent_vente and self.argent_en_possession > 0
 
     #superviseur
     @property
@@ -530,6 +539,9 @@ class Agent(models.Model):
     def total_depenses_superviseur(self):
         """
         Dépenses engagées par le superviseur (transport, logistique, terrain…)
+        """
+        """
+        ⚠️ OBSOLÈTE – dépenses interdites après transition
         """
         if not self.est_superviseur:
             return Decimal("0.00")
@@ -566,7 +578,8 @@ class Agent(models.Model):
         """
         if not self.est_superviseur:
             return Decimal("0.00")
-
+        if self.date_derniere_cloture:
+            return Decimal("0.00")  # 🔒 bloqué après transition
         return (
             Vente.objects
             .filter(agent=self)
@@ -595,6 +608,9 @@ class Agent(models.Model):
         if not self.est_superviseur:
             return Decimal("0.00")
 
+        if self.date_derniere_cloture:
+            return Decimal("0.00")  # 🔒 ancien monde fermé
+
         return (
             self.total_recouvre_agents
             + self.anciennes_ventes_personnelles
@@ -612,6 +628,93 @@ class Agent(models.Model):
                  )['total'] or Decimal('0.00')
             return 0
 
+    @property
+    def date_derniere_cloture(self):
+        derniere = (
+            ClotureMensuelle.objects
+            .filter(superviseur=self, est_cloture=True)
+            .order_by('-date_fin_periode')
+            .first()
+        )
+        return (
+            derniere.date_fin_periode
+            if derniere
+            else date.min
+        )
+    
+    
+    @property
+    def total_ventes_autorisees_superviseur(self):
+        if not self.est_superviseur:
+            return Decimal("0.00")
+
+        return Vente.objects.filter(
+            agent=self,
+            date_vente__gte=self.date_derniere_cloture
+        ).aggregate(
+            total=Coalesce(
+                Sum(F("quantite") * F("prix_vente_unitaire")),
+                Decimal("0.00")
+            )
+        )["total"]
+
+    @property
+    def solde_transitoire_superviseur(self):
+        """
+        Solde de transit (cash temporairement détenu)
+        """
+        if not self.est_superviseur:
+            return Decimal("0.00")
+
+        return (
+            self.total_recouvre_agents
+            + self.total_ventes_autorisees_superviseur
+            - self.total_versements_vente
+        )
+
+    @property
+    def solde_operationnel_superviseur(self):
+        """
+        SOLDE OPÉRATIONNEL ACTUEL DU SUPERVISEUR (POST-CLÔTURE)
+    
+        = cash réellement détenu aujourd’hui
+        """
+    
+        if not self.est_superviseur:
+            return Decimal("0.00")
+    
+        date_ref = self.date_derniere_cloture
+    
+        # 💰 Argent recouvré auprès des agents
+        recouvre_agents = Recouvrement.objects.filter(
+            superviseur=self,
+            date_recouvrement__gt=date_ref
+        ).aggregate(
+            total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
+        )["total"]
+    
+        # 🧾 Ventes personnelles AUTORISÉES (exception terrain)
+        ventes_perso = Vente.objects.filter(
+            agent=self,
+            date_vente__gt=date_ref
+        ).aggregate(
+            total=Coalesce(
+                Sum(F("quantite") * F("prix_vente_unitaire")),
+                Decimal("0.00")
+            )
+        )["total"]
+    
+        # 🏦 Argent déjà remis au ROT (VENTE SEULEMENT)
+        versements_vente = VersementBancaire.objects.filter(
+            superviseur=self,
+            date_versement__gt=date_ref
+        ).aggregate(
+            total=Coalesce(Sum("montant_vente"), Decimal("0.00"))
+        )["total"]
+    
+        return recouvre_agents + ventes_perso - versements_vente
+    
+    
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit,
                                  on_delete=models.CASCADE,
@@ -655,25 +758,15 @@ class LotEntrepot(models.Model):
 
 
     def __str__(self):
-        produit = self.produit
+        produit = self.produit.nom if self.produit else "Produit inconnu"
         fournisseur = self.fournisseur.nom if self.fournisseur else "—"
-
-        # Produit conditionné
-        if produit.poids_unitaire_kg:
-            unites = (
-                self.quantite_restante / produit.poids_unitaire_kg
-            ).quantize(Decimal("1"), rounding=ROUND_FLOOR)
-
-            return (
-                f"{produit.nom} - {fournisseur} - "
-                f"{unites} unité(s) / {self.quantite_restante} kg restant"
-            )
-
-        # Produit non conditionné (vrac)
+       
         return (
-            f"{produit.nom} - {fournisseur} - "
-            f"{self.quantite_restante} kg restant"
+            f"{produit} | {fournisseur} | "
+            f"reste {self.quantite_restante:.2f} "
+            f"(init. {self.quantite_initiale:.2f})"
         )
+
 
     from decimal import Decimal
     from django.core.exceptions import ValidationError
@@ -952,18 +1045,21 @@ class AffectationLotSuperviseur(models.Model):
     date_affectation = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        produit = self.lot.produit
+        if not self.lot or not self.lot.produit:
+            return f"Affectation #{self.id}"
 
-        if produit.poids_unitaire_kg:
-            unites = self.quantite_restante / produit.poids_unitaire_kg
-            return (
-                f"{produit.nom} – "
-                f"{unites:.0f} unités "
-                f"({self.quantite_restante} kg)"
-            )
+        return (
+            f"{self.lot.produit.nom} — "
+            f"reste {self.quantite_restante:.2f} "
+            f"(init. {self.quantite_initiale:.2f})"
+        )
 
-        return f"{produit.nom} – {self.quantite_restante} kg"
 
+    def quantite_resume(self):
+        """
+        Résumé simple et uniforme de la quantité
+        """
+        return f"{self.quantite_restante:.2f} / {self.quantite_initiale:.2f}"
 
 
 
@@ -1093,6 +1189,8 @@ class DetailDistribution(models.Model):
         ).aggregate(total=Sum('quantite'))['total'] or 0
         
         return self.quantite - quantite_vendue
+
+
     class Meta:
         verbose_name = "Détail de distribution"
         verbose_name_plural = "Détails de distribution"
@@ -1258,6 +1356,7 @@ class Vente(models.Model):
                 date_echeance=self.date_vente.date() + timedelta(days=30)
             )
 
+   
 
     @property
     def total_vente(self):

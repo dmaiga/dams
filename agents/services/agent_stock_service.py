@@ -31,6 +31,7 @@ class AgentStockService:
         )
 
         # 1️⃣ Quantités distribuées
+
         for distribution in distributions:
             for detail in distribution.detaildistribution_set.all():
                 produit = detail.lot.produit
@@ -40,6 +41,10 @@ class AgentStockService:
                     stock_par_produit[pid] = self._init_produit(produit, detail)
 
                 stock_par_produit[pid]['quantite_distribuee'] += detail.quantite
+
+                # ✅ VALEUR FIXÉE PAR LE SUPERVISEUR
+                prix_reference = detail.prix_gros or 0
+                stock_par_produit[pid]['valeur_distribuee'] += detail.quantite * prix_reference
 
         # 2️⃣ Quantités vendues
         for vente in ventes:
@@ -54,22 +59,23 @@ class AgentStockService:
             data['quantite_restante'] = (
                 data['quantite_distribuee'] - data['quantite_vendue']
             )
-        
+
             if data['quantite_restante'] < 0:
                 data['alerte'] = True
                 data['quantite_restante'] = 0
             else:
                 data['alerte'] = False
-        
+
             if data['quantite_distribuee'] > 0:
-                prix_moyen = data['valeur_distribuee'] / data['quantite_distribuee']
+                data['prix_moyen'] = data['valeur_distribuee'] / data['quantite_distribuee']
             else:
-                prix_moyen = 0
-        
-            data['prix_moyen'] = prix_moyen
-            data['valeur_totale'] = data['quantite_restante'] * prix_moyen
-        
-        return stock_list
+                data['prix_moyen'] = 0
+
+            # ✅ valeur réelle du stock restant
+            data['valeur_totale'] = data['quantite_restante'] * data['prix_moyen']
+
+        return list(stock_par_produit.values())
+
 
     # =========================
     # Helpers
@@ -82,6 +88,7 @@ class AgentStockService:
             'quantite_restante': 0,
             'prix_gros': detail.prix_gros,
             'prix_detail': detail.prix_detail,
+            'valeur_distribuee': 0,   
             'valeur_totale': 0,
-            'seuil_alerte': 5,
+            'seuil_alerte': 1,
         }

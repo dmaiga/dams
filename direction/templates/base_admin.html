@@ -22,6 +22,26 @@
         <!-- CONTENU PRINCIPAL -->
         <div class="drawer-content flex flex-col min-h-screen">
            
+            <!-- HEADER MOBILE -->
+            <header class="lg:hidden bg-white border-b shadow-sm sticky top-0 z-10">
+                <div class="flex items-center justify-between p-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <i class="fas fa-warehouse text-white text-sm"></i>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-gray-800">DAM'S</h1>
+                            <p class="text-xs text-gray-500">Backoffice</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Bouton hamburger pour mobile -->
+                    <label for="drawer-toggle" class="drawer-button btn btn-ghost btn-circle">
+                        <i class="fas fa-bars text-lg"></i>
+                    </label>
+                </div>
+            </header>
+
             <!-- CONTENU PAGE -->
             <main class="flex-1 p-4 lg:p-6">
                 {% block content %}
@@ -35,11 +55,11 @@
         </div>
 
         <!-- SIDEBAR -->
-        <div class="drawer-side">
+        <div class="drawer-side z-20">
             <label for="drawer-toggle" class="drawer-overlay"></label>
             <aside class="bg-white min-h-full w-72 border-r shadow-sm">
-                <!-- Logo -->
-                <div class="p-5 border-b">
+                <!-- Logo desktop (masqué sur mobile) -->
+                <div class="p-5 border-b hidden lg:block">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                             <i class="fas fa-warehouse text-white text-lg"></i>
@@ -49,6 +69,13 @@
                             <p class="text-xs text-gray-500">Backoffice</p>
                         </div>
                     </div>
+                </div>
+
+                <!-- Bouton fermer pour mobile -->
+                <div class="lg:hidden flex justify-end p-4 border-b">
+                    <label for="drawer-toggle" class="btn btn-ghost btn-sm btn-circle">
+                        <i class="fas fa-times"></i>
+                    </label>
                 </div>
 
                 <!-- Navigation -->
@@ -161,8 +188,6 @@
                             </li>
                         </ul>
                     </div>
-
-                    
                 </nav>
             </aside>
         </div>

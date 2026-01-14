@@ -39,7 +39,8 @@ from .models import (
 
 # Project forms
 from .forms import (
-    FactureLotForm, VenteForm, DistributionForm, ReceptionLotForm, 
+    FactureLotForm, VenteDetailAgentForm,VenteGrosAgentForm,
+    VenteSuperviseurForm,DistributionForm, ReceptionLotForm, 
     DetteForm, PaiementDetteForm,RecouvrementForm,
     FournisseurForm,VersementForm
 
@@ -522,7 +523,7 @@ from datetime import timedelta
 def mon_stock(request):
     agent = request.user.agent
 
-    if not agent.est_agent_terrain:
+    if not agent.est_agent_vente:
         return redirect('access_denied')
 
     service = AgentStockService(agent)
@@ -542,7 +543,7 @@ def mon_stock(request):
     ).select_related('client', 'detail_distribution__lot__produit')[:5]
 
     alertes_stock_faible = [
-        p for p in stock_positif if p['quantite_restante'] <= 5
+        p for p in stock_positif if p['quantite_restante'] <= 1
     ]
 
     context = {
@@ -846,7 +847,7 @@ def liste_distributions(request):
 
         # Filtres
         'agents_terrain': Agent.objects.filter(
-            type_agent='terrain'
+            type_agent__in=['terrain', 'agent_gros']
         ).select_related("user"),
 
         'lots': LotEntrepot.objects.select_related(
@@ -1028,38 +1029,27 @@ def enregistrer_vente(request):
         agent = request.user.agent
     except Agent.DoesNotExist:
         messages.error(request, "Profil agent introuvable.")
-        return redirect('dashboard')
+        return redirect('login')
+    
+    if agent.est_agent_terrain:
+        FormClass = VenteDetailAgentForm
 
-    # 🔒 Sécurité : seuls les agents terrain vendent
-    #if not agent.est_agent_terrain:
-    #    return redirect('access_denied')
+    elif agent.est_agent_gros:
+        FormClass = VenteGrosAgentForm
 
-    if request.method == 'POST':
-        form = VenteForm(request.POST, agent=agent)
-
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    vente = form.save()
-
-                    messages.success(
-                        request,
-                        f"✅ Vente enregistrée : "
-                        f"{vente.quantite} {vente.detail_distribution.lot.produit.nom} "
-                        f"pour {vente.total_vente} FCFA"
-                    )
-
-                    return redirect('liste_ventes')
-
-            except Exception as e:
-                messages.error(request, f"❌ Erreur lors de l’enregistrement : {str(e)}")
-
-        else:
-            messages.error(request, "❌ Veuillez corriger les erreurs du formulaire.")
-
+    elif agent.est_superviseur:
+        FormClass = VenteSuperviseurForm
+        
     else:
-        form = VenteForm(agent=agent)
+        return redirect('access_denied')
 
+    form = FormClass(request.POST or None, agent=agent)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, "✅ Vente enregistrée avec succès")
+        return redirect('liste_ventes')
+    
     return render(request, 'core/ventes/enregistrer_vente.html', {
         'form': form,
         'agent': agent
@@ -1749,18 +1739,27 @@ def liste_factures_entrepot(request):
 
 @login_required
 def creer_recouvrement(request, agent_id):
-    agent_connecte = request.user.agent
-    agent_cible = get_object_or_404(Agent, id=agent_id)
+
+    agent_connecte = (
+        Agent.objects
+        .select_related('user')
+        .get(user=request.user)
+    )
+
+    agent_cible = get_object_or_404(
+        Agent.objects.select_related('user'),
+        id=agent_id
+    )
 
     # =========================
     # SÉCURITÉ – RÔLES
     # =========================
 
-    # ❌ Agent terrain : interdit
+    # ❌ Un agent terrain ne peut jamais recouvrer
     if agent_connecte.est_agent_terrain:
         return redirect('access_denied')
 
-    # ❌ Seuls les superviseurs sont autorisés ici
+    # ❌ Seul un superviseur peut accéder
     if not agent_connecte.est_superviseur:
         return redirect('access_denied')
 
@@ -1768,17 +1767,19 @@ def creer_recouvrement(request, agent_id):
     # SÉCURITÉ – PÉRIMÈTRE
     # =========================
 
-    # Auto-recouvrement autorisé
+    # ✅ Auto-recouvrement
     if agent_cible.id == agent_connecte.id:
-        pass
+        autorise = True
 
-    # Recouvrement d’un agent terrain SOUS CE SUPERVISEUR
-    elif agent_cible.est_agent_terrain:
-        if agent_cible.superviseur_id != agent_connecte.id:
-            return redirect('access_denied')
+    # ✅ Recouvrement d’un agent sous ce superviseur (terrain OU gros)
+    elif agent_cible.superviseur_id == agent_connecte.id:
+        autorise = True
 
-    # ❌ Tout le reste interdit (autre superviseur, stagiaire, etc.)
+    # ❌ Tout le reste
     else:
+        autorise = False
+
+    if not autorise:
         return redirect('access_denied')
 
     # =========================
@@ -1793,7 +1794,6 @@ def creer_recouvrement(request, agent_id):
             recouvrement.superviseur = agent_connecte
             recouvrement.save()
 
-            # Message clair
             if agent_cible.id == agent_connecte.id:
                 messages.success(
                     request,
@@ -1827,7 +1827,6 @@ def creer_recouvrement(request, agent_id):
         'core/recouvrement/creer_recouvrement.html',
         context
     )
-
 
 @login_required
 def historique_recouvrement(request, agent_id):
@@ -1882,7 +1881,8 @@ def liste_agents_recouvrement(request):
 
     if agent_connecte.est_superviseur:
         agents_qs = Agent.objects.filter(
-            type_agent="terrain",
+            type_agent__in=["terrain", "agent_gros"],
+            est_actif=True,
             superviseur=agent_connecte
         ).select_related("user")
 
@@ -2104,7 +2104,7 @@ def tableau_de_bord_superviseur(request):
     ).order_by('-quantite_totale')
     
     # Vue Agents - TOUTES LES PÉRIODES
-    agents_terrain = Agent.objects.filter(type_agent='terrain').select_related('user')
+    agents_terrain = Agent.objects.filter(type_agent__in=['terrain', 'agent_gros']).select_related('user')
     
     performances_agents = []
     for agent in agents_terrain:
@@ -2337,7 +2337,7 @@ def tableau_de_bord_superviseur(request):
 @login_required
 def vue_detail_agent(request, agent_id):
     superviseur = get_object_or_404(Agent, user=request.user, type_agent='entrepot')
-    agent = get_object_or_404(Agent, id=agent_id, type_agent='terrain')
+    agent = get_object_or_404(Agent, id=agent_id, type_agent__in=['terrain', 'agent_gros'])
     
     # Période pour les statistiques
     date_debut = timezone.now() - timedelta(days=30)
@@ -2614,7 +2614,7 @@ def toutes_les_dettes(request):
     top_dettes = dettes.filter(statut__in=['en_cours', 'partiellement_paye', 'en_retard']).order_by('-montant_restant')[:5]
     
     # Liste des agents pour le filtre
-    agents_list = Agent.objects.filter(type_agent='terrain')
+    agents_list = Agent.objects.filter(type_agent__in=['terrain', 'agent_gros'])
     
     context = {
         'dettes': dettes,

@@ -179,55 +179,30 @@ class ReceptionLotForm(forms.ModelForm):
     # =============================
     def clean(self):
         cleaned_data = super().clean()
-
+    
         quantite_saisie = cleaned_data.get("quantite_saisie")
-        nouveau_produit = cleaned_data.get("nouveau_produit")
-
+    
         if not quantite_saisie or quantite_saisie <= 0:
             self.add_error("quantite_saisie", "La quantité doit être supérieure à 0")
             return cleaned_data
-
-        # ---- CAS NOUVEAU PRODUIT ----
-        if nouveau_produit:
-            cleaned_data["produit"] = None
-        
+    
+        # ---- PRODUIT ----
+        if cleaned_data.get("nouveau_produit"):
             nom = cleaned_data.get("nouveau_produit_nom")
-            poids = cleaned_data.get("nouveau_produit_poids")
-        
             if not nom:
                 self.add_error("nouveau_produit_nom", "Nom du produit requis")
                 return cleaned_data
-        
-            if quantite_saisie > 1 and not poids:
-                self.add_error(
-                    "nouveau_produit_poids",
-                    "Le poids unitaire est requis pour un produit conditionné"
-                )
-                return cleaned_data
-        
-            if poids:
-                cleaned_data["quantite_initiale"] = quantite_saisie * poids
-            else:
-                cleaned_data["quantite_initiale"] = quantite_saisie
-        
-            return cleaned_data
-        
-
-        # ---- PRODUIT EXISTANT ----
-        produit = cleaned_data.get("produit")
-        if not produit:
+            cleaned_data["produit"] = None
+    
+        elif not cleaned_data.get("produit"):
             self.add_error("produit", "Veuillez sélectionner un produit")
             return cleaned_data
-
-        if produit.poids_unitaire_kg:
-            cleaned_data["quantite_initiale"] = (
-                quantite_saisie * produit.poids_unitaire_kg
-            )
-        else:
-            cleaned_data["quantite_initiale"] = quantite_saisie
-
+    
+        # ✅ RÈGLE UNIQUE
+        cleaned_data["quantite_initiale"] = quantite_saisie
+    
         return cleaned_data
-
+    
     # =============================
     # SAVE
     # =============================
@@ -263,22 +238,20 @@ class ReceptionLotForm(forms.ModelForm):
 
             instance.produit = produit
 
-            if not instance.reference_lot:
-                prefix = timezone.now().strftime("%Y%m%d")
-                dernier_lot = LotEntrepot.objects.filter(
-                    reference_lot__startswith=prefix
-                ).order_by('-reference_lot').first()
-
-                if dernier_lot:
-                    try:
-                        dernier_num = int(dernier_lot.reference_lot[-4:])
-                        nouveau_num = dernier_num + 1
-                    except (ValueError, IndexError):
-                        nouveau_num = 1
-                else:
+        if not instance.reference_lot:
+            prefix = timezone.now().strftime("%Y%m%d")
+            dernier_lot = LotEntrepot.objects.filter(
+                reference_lot__startswith=prefix
+            ).order_by('-reference_lot').first()
+            if dernier_lot:
+                try:
+                    dernier_num = int(dernier_lot.reference_lot[-4:])
+                    nouveau_num = dernier_num + 1
+                except (ValueError, IndexError):
                     nouveau_num = 1
-
-                instance.reference_lot = f"{prefix}-{nouveau_num:04d}"
+            else:
+                nouveau_num = 1
+            instance.reference_lot = f"{prefix}-{nouveau_num:04d}"
 
         # ----- Invariant métier -----
         instance.quantite_restante = instance.quantite_initiale
@@ -691,13 +664,10 @@ class DistributionForm(forms.ModelForm):
     
   
 # === FORMULAIRE VENTE ===
-
-class VenteForm(forms.ModelForm):
+class BaseVenteForm(forms.ModelForm):
     """
-    Vente terrain :
-    - uniquement produits distribués
-    - prix imposé par le superviseur
-    - détail + comptant uniquement
+    Formulaire de base pour toute vente
+    Source de vérité : DetailDistribution.quantite
     """
 
     class Meta:
@@ -708,9 +678,7 @@ class VenteForm(forms.ModelForm):
             'date_vente',
         ]
         widgets = {
-            'detail_distribution': forms.Select(attrs={
-                'class': 'form-select'
-            }),
+            'detail_distribution': forms.Select(attrs={'class': 'form-select'}),
             'quantite': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': '0.01',
@@ -725,18 +693,85 @@ class VenteForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.agent = kwargs.pop('agent')
         super().__init__(*args, **kwargs)
-
-        # Date par défaut
         self.fields['date_vente'].initial = timezone.now().strftime('%Y-%m-%dT%H:%M')
+        self._init_queryset()
 
-        # 🔒 PRODUITS DISPONIBLES UNIQUEMENT
-        detail_qs = (
+    # -----------------------------
+    # À implémenter par les enfants
+    # -----------------------------
+    def _init_queryset(self):
+        raise NotImplementedError
+
+    def get_prix_unitaire(self, detail):
+        raise NotImplementedError
+
+    def get_type_vente(self):
+        raise NotImplementedError
+
+    def get_mode_paiement(self):
+        return 'comptant'
+
+    # -----------------------------
+    # VALIDATION STOCK (UNIQUE)
+    # -----------------------------
+    def clean(self):
+        cleaned_data = super().clean()
+        detail = cleaned_data.get('detail_distribution')
+        quantite = cleaned_data.get('quantite')
+
+        if not detail or not quantite:
+            return cleaned_data
+
+        quantites_vendue = detail.vente_set.aggregate(
+            total=Coalesce(Sum('quantite'), Decimal('0'))
+        )['total']
+
+        stock_disponible = detail.quantite - quantites_vendue
+
+        if quantite > stock_disponible:
+            self.add_error(
+                'quantite',
+                f"Stock insuffisant. Disponible : {stock_disponible}"
+            )
+
+        date_vente = cleaned_data.get('date_vente')
+        if date_vente and date_vente > timezone.now():
+            self.add_error('date_vente', "La date de vente ne peut pas être future")
+
+        return cleaned_data
+
+    # -----------------------------
+    # SAUVEGARDE
+    # -----------------------------
+    def save(self, commit=True):
+        vente = super().save(commit=False)
+        vente.agent = self.agent
+        vente.type_vente = self.get_type_vente()
+        vente.mode_paiement = self.get_mode_paiement()
+        vente.prix_vente_unitaire = self.get_prix_unitaire(
+            vente.detail_distribution
+        )
+
+        if commit:
+            vente.save()
+
+        return vente
+
+
+class VenteGrosAgentForm(BaseVenteForm):
+    """
+    Vente en gros par agent gros
+    """
+
+    def _init_queryset(self):
+        qs = (
             DetailDistribution.objects
             .filter(distribution__agent_terrain=self.agent)
             .annotate(
-                quantite_vendue_calculee=Coalesce(
+                quantites_vendue=Coalesce(
                     Sum('vente__quantite'),
-                    Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+                    Value(0),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
                 ),
                 quantite_restante=ExpressionWrapper(
                     F('quantite') - Coalesce(Sum('vente__quantite'), Value(0)),
@@ -747,75 +782,107 @@ class VenteForm(forms.ModelForm):
             .select_related('lot__produit', 'distribution')
         )
 
-        self.fields['detail_distribution'].queryset = detail_qs
-        self.fields['detail_distribution'].label_from_instance = self.label_distribution
-
-    # ============================
-    # AFFICHAGE
-    # ============================
-
-    def label_distribution(self, obj):
-        return (
-            f"{obj.lot.produit.nom} "
-            f"(Stock: {obj.quantite_restante}) "
-            f"- Prix: {obj.prix_detail} FCFA"
+        self.fields['detail_distribution'].queryset = qs
+        self.fields['detail_distribution'].label_from_instance = (
+            lambda obj: (
+                f"{obj.lot.produit.nom} | "
+                f"Restant : {obj.quantite_restante} | "
+                f"Prix gros : {obj.prix_gros} FCFA"
+            )
         )
 
-    # ============================
-    # VALIDATION
-    # ============================
+    def get_prix_unitaire(self, detail):
+        return detail.prix_gros
 
-    def clean(self):
-        cleaned_data = super().clean()
-        detail = cleaned_data.get('detail_distribution')
-        quantite = cleaned_data.get('quantite')
+    def get_type_vente(self):
+        return 'gros'
 
-        if not detail:
-            self.add_error('detail_distribution', "Produit requis")
+class VenteDetailAgentForm(BaseVenteForm):
+    """
+    Vente au détail par agent terrain
+    """
 
-        if not quantite or quantite <= 0:
-            self.add_error('quantite', "Quantité invalide")
-
-        if detail and quantite:
-            # recalcul sécurité
-            quantite_vendue = detail.vente_set.aggregate(
-                total=Sum('quantite')
-            )['total'] or 0
-
-            quantite_disponible = detail.quantite - quantite_vendue
-
-            if quantite > quantite_disponible:
-                self.add_error(
-                    'quantite',
-                    f"Stock insuffisant. Disponible : {quantite_disponible}"
+    def _init_queryset(self):
+        qs = (
+            DetailDistribution.objects
+            .filter(distribution__agent_terrain=self.agent)
+            .annotate(
+                quantites_vendue=Coalesce(
+                    Sum('vente__quantite'),
+                    Value(0),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                ),
+                quantite_restante=ExpressionWrapper(
+                    F('quantite') - Coalesce(Sum('vente__quantite'), Value(0)),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
                 )
+            )
+            .filter(quantite_restante__gt=0)
+            .select_related('lot__produit', 'distribution')
+        )
 
-        date_vente = cleaned_data.get('date_vente')
-        if date_vente and date_vente > timezone.now():
-            self.add_error('date_vente', "Date future interdite")
+        self.fields['detail_distribution'].queryset = qs
+        self.fields['detail_distribution'].label_from_instance = (
+            lambda obj: (
+                f"{obj.lot.produit.nom} | "
+                f"Restant : {obj.quantite_restante} | "
+                f"Prix détail : {obj.prix_detail} FCFA"
+            )
+        )
 
-        return cleaned_data
+    def get_prix_unitaire(self, detail):
+        return detail.prix_detail
 
-    # ============================
-    # SAUVEGARDE
-    # ============================
+    def get_type_vente(self):
+        return 'detail'
 
-    def save(self, commit=True):
-        vente = super().save(commit=False)
+class VenteSuperviseurForm(BaseVenteForm):
+    TYPE_VENTE_CHOICES = (
+        ('detail', 'Vente au détail'),
+        ('gros', 'Vente en gros'),
+    )
 
-        # 🔒 FORÇAGE MÉTIER
-        vente.agent = self.agent
-        vente.type_vente = 'detail'
-        vente.mode_paiement = 'comptant'
-        vente.stagiaire = None
+    type_vente_choisie = forms.ChoiceField(
+        choices=TYPE_VENTE_CHOICES,
+        widget=forms.RadioSelect
+    )
 
-        # 🔒 PRIX IMPOSÉ
-        vente.prix_vente_unitaire = vente.detail_distribution.prix_detail
+    def _init_queryset(self):
+        qs = (
+            DetailDistribution.objects
+            .filter(distribution__agent_terrain=self.agent)
+            .annotate(
+                quantites_vendue=Coalesce(
+                    Sum('vente__quantite'),
+                    Value(0),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                ),
+                quantite_restante=ExpressionWrapper(
+                    F('quantite') - Coalesce(Sum('vente__quantite'), Value(0)),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                )
+            )
+            .filter(quantite_restante__gt=0)
+            .select_related('lot__produit', 'distribution')
+        )
 
-        if commit:
-            vente.save()
+        self.fields['detail_distribution'].queryset = qs
+        self.fields['detail_distribution'].label_from_instance = (
+            lambda obj: (
+                f"{obj.lot.produit.nom} | "
+                f"Restant : {obj.quantite_restante}"
+            )
+        )
 
-        return vente
+    def get_prix_unitaire(self, detail):
+        return (
+            detail.prix_gros
+            if self.cleaned_data['type_vente_choisie'] == 'gros'
+            else detail.prix_detail
+        )
+
+    def get_type_vente(self):
+        return self.cleaned_data['type_vente_choisie']
 
 # === FORMULAIRE DETTE (pour vente à crédit) ===
 class DetteForm(forms.ModelForm):
@@ -994,7 +1061,7 @@ class RapportDettesForm(forms.Form):
     )
     
     agent = forms.ModelChoiceField(
-        queryset=Agent.objects.filter(type_agent='terrain'),
+        queryset=Agent.objects.filter(type_agent__in=['terrain', 'agent_gros']),
         required=False,
         empty_label="Tous les agents",
         widget=forms.Select(attrs={'class': 'form-select'}),

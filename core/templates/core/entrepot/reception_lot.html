@@ -130,15 +130,7 @@
           {% endif %}
         </div>
 
-        <div class="alert alert-info">
-          💡 <strong>Information :</strong>
-          <br>
-          Si le produit est conditionné (carton / sac), la conversion en kg est automatique.
-          <br>
-          Sinon, la quantité est considérée directement en kilogrammes.
-        </div>
-
-      </div>
+       
     </div>
 
     <!-- ================= PRIX & DATE ================= -->
@@ -146,7 +138,7 @@
       <div class="card-body">
 
         <div class="mb-3">
-          <label class="form-label">Prix d’achat unitaire (FCFA / kg)</label>
+          <label class="form-label">Prix d’achat unitaire </label>
           {{ form.prix_achat_unitaire }}
           {% if form.prix_achat_unitaire.errors %}
             <div class="text-danger small">{{ form.prix_achat_unitaire.errors }}</div>

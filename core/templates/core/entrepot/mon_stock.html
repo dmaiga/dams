@@ -84,7 +84,7 @@
                             </thead>
                             <tbody>
                                 {% for produit in stock_agent %}
-                                <tr class="{% if produit.quantite_restante <= 5 %}table-warning{% endif %}">
+                                <tr class="{% if produit.quantite_restante <= 1 %}table-warning{% endif %}">
                                     <td>
                                         <strong>{{ produit.produit }}</strong>
                                         {% if produit.specification %}
@@ -92,7 +92,7 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-center">
-                                        <span class="badge {% if produit.quantite_restante <= 5 %}bg-warning{% else %}bg-success{% endif %}">
+                                        <span class="badge {% if produit.quantite_restante <= 1 %}bg-warning{% else %}bg-success{% endif %}">
                                             {{ produit.quantite_restante }}
                                         </span>
                                     </td>

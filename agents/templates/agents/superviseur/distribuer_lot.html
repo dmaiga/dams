@@ -7,23 +7,25 @@
 {% block content %}
 <div class="container py-3">
 
-    <!-- ===== Header ===== -->
+    <!-- HEADER -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">
             <i class="fas fa-truck-loading me-2"></i>
-            Distribution de lot
+            Distribution de produit
         </h5>
-        <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-sm btn-outline-secondary">
+        <a href="{% url 'tableau_de_bord_superviseur' %}"
+           class="btn btn-sm btn-outline-secondary">
             ← Tableau de bord
         </a>
     </div>
 
-    <!-- ===== Card ===== -->
     <div class="card shadow-sm">
         <div class="card-body">
 
             <form method="post" novalidate>
                 {% csrf_token %}
+
+             
 
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger">
@@ -31,9 +33,26 @@
                     </div>
                 {% endif %}
 
-                <!-- ===== Agent terrain ===== -->
-                <div class="mb-3">
+                <!-- AUTO DISTRIBUTION -->
+                <div class="card border-primary mb-4">
+                    <div class="card-body">
+                        <div class="form-check form-switch">
+                            {{ form.auto_distribution }}
+                            <label class="form-check-label fw-bold text-primary">
+                                <i class="fas fa-user-check me-1"></i>
+                                Vente directe par le superviseur
+                            </label>
+                        </div>
+                        <div class="form-text mt-2">
+                            Le produit sera affecté directement à votre compte.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AGENT TERRAIN -->
+                <div class="mb-4" id="agent-field-container">
                     <label class="form-label fw-semibold">
+                        <i class="fas fa-user-tie me-1"></i>
                         Agent terrain
                     </label>
                     {{ form.agent_terrain }}
@@ -44,59 +63,73 @@
                     {% endif %}
                 </div>
 
-                <!-- ===== Lot affecté ===== -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">
-                        Lot affecté
-                    </label>
-                    {{ form.lot }}
-                    
-                    <div class="form-text">
-                        Seuls les lots qui vous sont affectés sont visibles.
-                    </div>
-                    {% if form.lot.errors %}
-                        <div class="text-danger small">
-                            {{ form.lot.errors|striptags }}
-                        </div>
-                    {% endif %}
-                </div>
+                <!-- LOT -->
+<div class="mb-4">
+    <label class="form-label fw-semibold">
+        <i class="fas fa-boxes me-1"></i>
+        Lot affecté
+    </label>
+    {{ form.lot }}
+    {% if form.lot.errors %}
+        <div class="text-danger small">
+            {{ form.lot.errors|striptags }}
+        </div>
+    {% endif %}
+    <div id="lot-info" class="form-text"></div>
+</div>
 
-                <!-- ===== Quantité ===== -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">
-                        Quantité à distribuer
-                    </label>
-                    {{ form.quantite }}
-                    {% if form.quantite.errors %}
-                        <div class="text-danger small">
-                            {{ form.quantite.errors|striptags }}
-                        </div>
-                    {% endif %}
-                </div>
 
-                <!-- ===== Prix ===== -->
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label small text-muted">
-                            Prix gros (optionnel)
-                        </label>
-                        {{ form.prix_gros }}
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label small text-muted">
-                            Prix détail 
-                        </label>
-                        {{ form.prix_detail }}
-                    </div>
-                </div>
+               
 
-                <!-- ===== Actions ===== -->
-                <div class="d-flex justify-content-end gap-2 mt-4">
-                    <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-outline-secondary">
+                <!-- QUANTITÉ -->
+<div class="mb-4">
+    <label class="form-label fw-semibold">
+        <i class="fas fa-sort-numeric-up me-1"></i>
+        Quantité à distribuer
+    </label>
+    {{ form.quantite }}
+    {% if form.quantite.errors %}
+        <div class="text-danger small">
+            {{ form.quantite.errors|striptags }}
+        </div>
+    {% endif %}
+</div>
+
+
+                <!-- PRIX -->
+<div class="card border-secondary mb-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">
+            <i class="fas fa-tag me-1"></i>
+            Prix de vente
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label small text-muted">
+                    Prix gros (FCFA)
+                </label>
+                {{ form.prix_gros }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted">
+                    Prix détail (FCFA)
+                </label>
+                {{ form.prix_detail }}
+            </div>
+        </div>
+    </div>
+</div>
+
+
+                <!-- ACTIONS -->
+                <div class="d-flex justify-content-end gap-2">
+                    <a href="{% url 'tableau_de_bord_superviseur' %}"
+                       class="btn btn-outline-secondary">
                         Annuler
                     </a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-check me-1"></i>
+                    <button type="submit" class="btn btn-primary" id="submit-btn">
                         Distribuer
                     </button>
                 </div>
@@ -105,6 +138,63 @@
 
         </div>
     </div>
-
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const autoCheckbox = document.getElementById("id_auto_distribution");
+    const agentContainer = document.getElementById("agent-field-container");
+    const agentField = document.getElementById("id_agent_terrain");
+
+    const lotSelect = document.getElementById("id_lot");
+    const lotInfo = document.getElementById("lot-info");
+
+    const submitBtn = document.getElementById("submit-btn");
+
+    const lotData = {
+        {% for a in form.fields.lot.queryset %}
+        "{{ a.id }}": {
+            "produit": "{{ a.lot.produit.nom }}",
+            "restant": {{ a.quantite_restante|floatformat:2 }}
+        },
+        {% endfor %}
+    };
+
+    function toggleAuto() {
+        const auto = autoCheckbox.checked;
+        agentContainer.style.display = auto ? "none" : "block";
+        agentField.required = !auto;
+        submitBtn.innerText = auto ? "M’affecter le produit" : "Distribuer";
+    }
+
+    function updateLotInfo() {
+        const id = lotSelect.value;
+        if (!id || !lotData[id]) {
+            lotInfo.innerHTML = "";
+            return;
+        }
+
+        const lot = lotData[id];
+        lotInfo.innerHTML = `
+            <strong>${lot.produit}</strong><br>
+            Quantité restante : <strong>${lot.restant}</strong>
+        `;
+    }
+
+    autoCheckbox.addEventListener("change", toggleAuto);
+    lotSelect.addEventListener("change", updateLotInfo);
+
+    toggleAuto();
+    updateLotInfo();
+});
+</script>
+
+
+<style>
+#mode-container ul {
+    padding-left: 1rem;
+}
+</style>
+
 {% endblock %}

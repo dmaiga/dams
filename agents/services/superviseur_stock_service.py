@@ -1,46 +1,39 @@
 from core.models import AffectationLotSuperviseur
 
+from django.db.models import Sum, F
 
 class SuperviseurStockService:
-    """
-    Stock réel d’un superviseur (source de vérité = AffectationLotSuperviseur)
-    """
 
     def __init__(self, superviseur):
         self.superviseur = superviseur
 
     def get_stock(self):
-        stock_par_produit = {}
-
-        affectations = (
+        qs = (
             AffectationLotSuperviseur.objects
             .filter(superviseur=self.superviseur)
-            .select_related('lot__produit')
+            .values(
+                'lot__produit',
+                'lot__produit__nom',
+                'lot__produit__poids_unitaire_kg',
+            )
+            .annotate(
+                quantite_affectee=Sum('quantite_initiale'),
+                quantite_restante=Sum('quantite_restante'),
+            )
         )
 
-        for aff in affectations:
-            produit = aff.lot.produit
-            pid = produit.id
+        result = []
+        for row in qs:
+            affectee = row['quantite_affectee'] or 0
+            restante = row['quantite_restante'] or 0
 
-            if pid not in stock_par_produit:
-                stock_par_produit[pid] = {
-                    'produit': produit,
-                    'quantite_affectee': 0,
-                    'quantite_restante': 0,
-                    'quantite_distribuee': 0,
-                }
+            result.append({
+                'produit_id': row['lot__produit'],
+                'produit_nom': row['lot__produit__nom'],
+                'poids_unitaire_kg': row['lot__produit__poids_unitaire_kg'],
+                'quantite_affectee': affectee,
+                'quantite_restante': restante,
+                'quantite_distribuee': max(affectee - restante, 0),
+            })
 
-            stock_par_produit[pid]['quantite_affectee'] += aff.quantite_initiale
-            stock_par_produit[pid]['quantite_restante'] += aff.quantite_restante
-
-        # Calcul dérivé (sûr)
-        for data in stock_par_produit.values():
-            data['quantite_distribuee'] = (
-                data['quantite_affectee'] - data['quantite_restante']
-            )
-
-            # garde-fou
-            if data['quantite_distribuee'] < 0:
-                data['quantite_distribuee'] = 0
-
-        return list(stock_par_produit.values())
+        return result

@@ -1,10 +1,11 @@
 # core/services/dashboard_service.py
 from django.utils import timezone
-from django.db.models import Sum, Count, Q, F, FloatField
+from django.db.models import Sum, Count, Q, F, FloatField, Max, Case, When, Value
 from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from datetime import timedelta, datetime
 from decimal import Decimal
 import calendar
+from django.db import models
 
 from core.models import (
     Vente, LotEntrepot, Perte, Depense, VersementBancaire,
@@ -153,41 +154,51 @@ class DashboardService:
             'nombre_fournisseurs': len(fournisseurs_data),
         }
     
+
     @staticmethod
     def get_agents_inactifs(depuis_jours=3):
-        """Retourne la liste des agents qui n'ont pas fait de ventes depuis X jours."""
+        """
+        Agents terrain / entrepôt actifs
+        qui n'ont fait AUCUNE vente
+        ou dont la dernière vente date de plus de X jours.
+        """
+
         seuil = timezone.now() - timedelta(days=depuis_jours)
-    
-        agents = Agent.objects.filter(type_agent__in=["terrain", "entrepot"])
-        agents_inactifs = []
-    
-        for agent in agents:
-            # Dernière vente
-            derniere_vente = (
-                Vente.objects.filter(agent=agent)
-                .order_by('-date_vente')
-                .first()
+
+        agents = (
+            Agent.objects
+            .filter(
+                type_agent__in=["terrain", "entrepot"],
+                est_actif=True,               # ✅ exclure désactivés
+                user__is_active=True
             )
-    
-            if derniere_vente:
-                if derniere_vente.date_vente < seuil:
-                    agents_inactifs.append({
-                        "nom": agent.full_name,
-                        "jours_depuis": (timezone.now() - derniere_vente.date_vente).days,
-                        "derniere_vente": derniere_vente.date_vente,
-                    })
+            .annotate(
+                derniere_vente=Max("vente__date_vente")
+            )
+            .filter(
+                models.Q(derniere_vente__lt=seuil) |  # vente trop ancienne
+                models.Q(derniere_vente__isnull=True)  # jamais vendu
+            )
+            .order_by("derniere_vente")
+        )
+
+        resultat = []
+
+        for agent in agents:
+            if agent.derniere_vente:
+                jours = (timezone.now() - agent.derniere_vente).days
             else:
-                # Aucun historique de vente
-                agents_inactifs.append({
-                    "nom": agent.full_name,
-                    "jours_depuis": None,
-                    "derniere_vente": None,
-                })
-    
-        # Trier : ceux sans ventes d'abord, puis les plus anciens
-        agents_inactifs.sort(key=lambda x: (x["jours_depuis"] is not None, x["jours_depuis"]))
-        return agents_inactifs
-    
+                jours = None
+
+            resultat.append({
+                "agent": agent,
+                "nom": agent.full_name,
+                "jours_depuis": jours,
+                "derniere_vente": agent.derniere_vente,
+            })
+
+        return resultat
+
     
     @staticmethod
     def get_periodes(periode_type='mois', annee=None, mois=None):

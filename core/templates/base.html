@@ -402,7 +402,7 @@
                     <!-- ===== MENU AGENT TERRAIN ===== -->
                     {% if request.user.is_authenticated and request.user.agent %}
                         {# ===== MENU AGENT TERRAIN / STAGIAIRE ===== #}
-                        {% if request.user.agent.est_agent_terrain %}
+                        {% if request.user.agent.est_agent_terrain or request.user.agent.est_agent_gros %}
                     <div class="nav flex-column">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_agent' %}active{% endif %}" 
                            href="{% url 'dashboard_agent' %}">

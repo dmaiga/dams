@@ -19,53 +19,71 @@
     </div>
 
     <!-- ================= KPIs FINANCIERS ================= -->
-    <div class="row g-3 mb-4">
+<div class="row g-3 mb-4">
 
-        <div class="col-md-3">
-            <div class="card border-start border-primary border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Total ventes agents</div>
-                    <h5 class="fw-bold">
-                        {{ finances_superviseur.total_ventes_agents|fcfa }}
-                    </h5>
-                </div>
+    <!-- VENTES AGENTS -->
+    <div class="col-md-3">
+        <div class="card border-start border-primary border-4 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Ventes agents (depuis clôture)</div>
+                <h5 class="fw-bold">
+                    {{ finances_superviseur.total_ventes_agents|fcfa }}
+                </h5>
             </div>
         </div>
-
-        <div class="col-md-3">
-            <div class="card border-start border-success border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Recouvré auprès des agents</div>
-                    <h5 class="fw-bold text-success">
-                        {{ finances_superviseur.total_recouvre|fcfa }}
-                    </h5>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-start border-danger border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Encore chez les agents</div>
-                    <h5 class="fw-bold text-danger">
-                        {{ finances_superviseur.reste_a_recouvrer|fcfa }}
-                    </h5>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-start border-warning border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">À remettre au ROT</div>
-                    <h5 class="fw-bold text-warning">
-                        {{ finances_superviseur.argent_chez_superviseur|fcfa }}
-                    </h5>
-                </div>
-            </div>
-        </div>
-
     </div>
+
+    <!-- ENCORE CHEZ LES AGENTS -->
+    <div class="col-md-3">
+        <div class="card border-start border-danger border-4 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Encore chez les agents</div>
+                <h5 class="fw-bold text-danger">
+                    {{ finances_superviseur.reste_a_recouvrer|fcfa }}
+                </h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- DÉJÀ RECUPÉRÉ -->
+    <div class="col-md-2">
+        <div class="card border-start border-success border-4 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Recouvré</div>
+                <h5 class="fw-bold text-success">
+                    {{ finances_superviseur.total_recouvre_agents|fcfa }}
+                </h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- REMIS AU ROT -->
+    <div class="col-md-2">
+        <div class="card border-start border-secondary border-4 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Remis au ROT</div>
+                <h5 class="fw-bold">
+                    {{ finances_superviseur.total_remis_rot|fcfa }}
+                </h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- CASH CHEZ LE SUPERVISEUR -->
+    <div class="col-md-2">
+        <div class="card border-start border-warning border-4 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Cash détenu</div>
+                <h5 class="fw-bold text-warning">
+                    {{ finances_superviseur.argent_chez_superviseur|fcfa }}
+                </h5>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
 
     <!-- ================= STOCK SUPERVISEUR ================= -->
     <div class="card shadow-sm mb-4">
@@ -90,13 +108,9 @@
                             <td class="text-end">
                                 {{ item.quantite_initiale|floatformat:0 }}
                             </td>
-                            <td class="text-end fw-semibold
-                                {% if item.quantite_restante <= 5 %}
-                                    text-danger
-                                {% endif %}
-                            ">
+                            <td class="text-end">
                                 {{ item.quantite_restante|floatformat:0 }}
-                            </td>
+
                         </tr>
                     {% empty %}
                         <tr>
@@ -127,32 +141,36 @@
                         <th class="text-end">Reste à rendre</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for row in agents_financiers %}
-                        <tr>
-                            <td>{{ row.agent.full_name }}</td>
-                            <td class="text-end">
-                                {{ row.total_ventes|fcfa }}
-                            </td>
-                            <td class="text-end text-success">
-                                {{ row.total_recouvre|fcfa }}
-                            </td>
-                            <td class="text-end fw-bold
-                                {% if row.reste_a_rendre > 0 %}
-                                    text-danger
-                                {% endif %}
-                            ">
-                                {{ row.reste_a_rendre|fcfa }}
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center text-muted">
-                                Aucun agent terrain actif
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
+<tbody>
+{% for row in agents_financiers %}
+<tr>
+    <td>{{ row.agent.full_name }}</td>
+
+    <td class="text-end">
+        {{ row.total_ventes|fcfa }}
+    </td>
+
+    <td class="text-end text-success">
+        {{ row.total_recouvre|fcfa }}
+    </td>
+
+    <td class="text-end fw-bold
+        {% if row.reste_a_rendre > 0 %}
+            text-danger
+        {% endif %}
+    ">
+        {{ row.reste_a_rendre|fcfa }}
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="4" class="text-center text-muted">
+        Aucun agent terrain actif
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+
             </table>
         </div>
     </div>

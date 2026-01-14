@@ -493,7 +493,8 @@ class AgentAnalysisService:
         # -------------------------
         agents = (
             Agent.objects
-            .filter(type_agent='terrain')
+            .filter(type_agent='terrain', est_actif=True)
+            
             .select_related("user")
         )
 
@@ -619,7 +620,7 @@ class AgentAnalysisService:
         # -------------------------
         agents = (
             Agent.objects
-            .filter(type_agent='terrain')
+            .filter(type_agent='terrain', est_actif=True)
             .select_related("user")
         )
 

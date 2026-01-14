@@ -29,6 +29,24 @@
                     </div>
                 {% endif %}
 
+                <!-- ===== TYPE DE VENTE (SUPERVISEUR UNIQUEMENT) ===== -->
+                {% if form.type_vente_choisie %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            Type de vente <span class="text-danger">*</span>
+                        </label>
+                        {{ form.type_vente_choisie }}
+                        {% if form.type_vente_choisie.errors %}
+                            <div class="text-danger small">
+                                {{ form.type_vente_choisie.errors|striptags }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Choisissez vente au détail ou en gros
+                        </div>
+                    </div>
+                {% endif %}
+
                 <!-- ===== PRODUIT / LOT ===== -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">
@@ -70,9 +88,6 @@
                         </div>
                     {% endif %}
                 </div>
-
-                <!-- ===== CLIENT OPTIONNEL ===== -->
-              
 
                 <!-- ===== ACTIONS ===== -->
                 <div class="d-grid mt-4">

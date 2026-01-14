@@ -7,6 +7,7 @@ from core.models import (
     Agent,
     Vente,
     RecouvrementSuperviseur,
+    Recouvrement,
     VersementBancaire,
     Depense,
     ClotureMensuelle,
@@ -107,59 +108,72 @@ class RotDashboardService:
             'solde_rot': total_recupere - total_verse - total_depenses,
         }
 
-
-    # =====================================================
-    # 2️⃣ SUIVI FINANCIER DES SUPERVISEURS (POST-CLÔTURE)
-    # =====================================================
     @staticmethod
     def get_suivi_superviseurs():
         data = []
-    
+
         superviseurs = Agent.objects.filter(
             type_agent='entrepot',
             est_actif=True
         )
-    
+
         for sup in superviseurs:
-            date_min = get_date_debut_rot()
-    
-            # 🔹 VENTES POST-CLÔTURE
-            ventes_qs = Vente.objects.filter(agent__superviseur=sup)
-            remises_qs = RecouvrementSuperviseur.objects.filter(superviseur=sup)
-    
-            if date_min:
-                ventes_qs = ventes_qs.filter(date_vente__date__gt=date_min)
-                remises_qs = remises_qs.filter(date_recouvrement__date__gt=date_min)
-    
-            total_ventes = ventes_qs.aggregate(
+            date_ref = sup.date_derniere_cloture
+
+            # 1️⃣ Argent récupéré auprès des agents
+            total_recouvre_agents = Recouvrement.objects.filter(
+                superviseur=sup,
+                date_recouvrement__gt=date_ref
+            ).aggregate(
+                total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
+            )['total']
+
+            # 2️⃣ Ventes personnelles autorisées du superviseur
+            ventes_superviseur = Vente.objects.filter(
+                agent=sup,
+                date_vente__gt=date_ref
+            ).aggregate(
                 total=Coalesce(
-                    Sum(
-                        F('quantite') * F('prix_vente_unitaire'),
-                        output_field=DecimalField(max_digits=15, decimal_places=2)
-                    ),
-                    Decimal('0')
+                    Sum(F('quantite') * F('prix_vente_unitaire')),
+                    Decimal('0.00')
                 )
             )['total']
-    
-            total_remis = remises_qs.aggregate(
-                total=Coalesce(Sum('montant'), Decimal('0'))
+
+            # 3️⃣ Argent déjà remis au ROT
+            total_remis_rot = RecouvrementSuperviseur.objects.filter(
+                superviseur=sup,
+                date_creation__gt=date_ref
+            ).aggregate(
+                total=Coalesce(Sum('montant'), Decimal('0.00'))
             )['total']
-    
-            # 🔹 STOCK RESTANT CHEZ LE SUPERVISEUR
+
+            # 4️⃣ Argent encore détenu par le superviseur
+            argent_chez_superviseur = (
+                total_recouvre_agents
+                + ventes_superviseur
+                - total_remis_rot
+            )
+
+            # 5️⃣ Stock restant (information opérationnelle)
             stock_restant = AffectationLotSuperviseur.objects.filter(
                 superviseur=sup
             ).aggregate(
-                total=Coalesce(Sum('quantite_restante'), Decimal('0'))
+                total=Coalesce(Sum('quantite_restante'), Decimal('0.00'))
             )['total']
-    
+
             data.append({
                 'superviseur': sup,
-                'quantite_restante': stock_restant,
-                'total_ventes_agents': total_ventes,
-                'total_remis_rot': total_remis,
-                'reste_a_remettre': total_ventes - total_remis,
+                'stock_restant': stock_restant,
+
+                # flux cash
+                'recouvre_agents': total_recouvre_agents,
+                'ventes_superviseur': ventes_superviseur,
+                'total_remis_rot': total_remis_rot,
+
+                # 🔥 KPI clé ROT
+                'reste_a_remettre': argent_chez_superviseur,
             })
-    
+
         return data
 
     # =====================================================

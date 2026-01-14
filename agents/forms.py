@@ -170,7 +170,14 @@ class SupervisorTerrainAgentCreationForm(forms.ModelForm):
     nom = forms.CharField(max_length=30, required=True)
     prenom = forms.CharField(max_length=30, required=True)
     telephone = forms.CharField(max_length=50, required=True)
-
+    type_agent = forms.ChoiceField(
+        choices=[
+            ('terrain', 'Agent (Vente au Détail)'),
+            ('agent_gros', 'Agent (Vente en Gros)'),
+        ],
+        initial='terrain',
+        label="Type d'agent"
+    )
     class Meta:
         model = Agent
         fields = [
@@ -193,7 +200,7 @@ class SupervisorTerrainAgentCreationForm(forms.ModelForm):
         nom = self.cleaned_data['nom']
         prenom = self.cleaned_data['prenom']
         telephone = self.cleaned_data['telephone']
-
+        type_agent = self.cleaned_data['type_agent'] 
         username = f"{prenom.lower()}.{nom.lower()}"
         i = 1
         while User.objects.filter(username=username).exists():
@@ -211,7 +218,7 @@ class SupervisorTerrainAgentCreationForm(forms.ModelForm):
         agent = super().save(commit=False)
         agent.user = user
         agent.telephone = telephone
-        agent.type_agent = 'terrain'
+        agent.type_agent = type_agent 
         agent.superviseur = self.superviseur
         agent.est_actif = True
 
@@ -220,19 +227,35 @@ class SupervisorTerrainAgentCreationForm(forms.ModelForm):
 
         return agent
 
+
+from django import forms
+from django.core.exceptions import ValidationError
+from decimal import Decimal
+
+from core.models import AffectationLotSuperviseur, LotEntrepot, Agent
+
 class RotAffectationLotSuperviseurForm(forms.ModelForm):
+    quantite_saisie = forms.DecimalField(
+        required=True,
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        label="Quantité à affecter",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': 'Saisir la quantité'
+        }),
+    )
 
     class Meta:
         model = AffectationLotSuperviseur
         fields = ['lot', 'superviseur', 'quantite_initiale']
         widgets = {
-            'lot': forms.Select(attrs={'class': 'form-select'}),
-            'superviseur': forms.Select(attrs={'class': 'form-select'}),
-            'quantite_initiale': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.5',
-                'min': '0.5'
+            'lot': forms.Select(attrs={
+                'class': 'form-select'
             }),
+            'superviseur': forms.Select(attrs={'class': 'form-select'}),
+            'quantite_initiale': forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -242,79 +265,113 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
         if not self.rot or not self.rot.est_rot:
             raise PermissionError("Formulaire réservé au ROT")
 
-        self.fields['lot'].queryset = LotEntrepot.objects.filter(
-            quantite_restante__gt=0
-        ).select_related('produit')
+        self.fields['quantite_initiale'].required = False
 
-        self.fields['superviseur'].queryset = Agent.objects.filter(
-            type_agent='entrepot',
-            est_actif=True
-        ).select_related('user')
+        # 🔹 Lots disponibles
+        self.fields['lot'].queryset = (
+            LotEntrepot.objects
+            .filter(quantite_restante__gt=0)
+            .select_related('produit')
+            .order_by('produit__nom', 'date_reception')
+        )
 
-        self.fields['quantite_initiale'].label = "Quantité à affecter"
+        # 🔹 Superviseurs actifs
+        self.fields['superviseur'].queryset = (
+            Agent.objects
+            .filter(type_agent='entrepot', est_actif=True)
+            .select_related('user')
+            .order_by('user__last_name')
+        )
 
-    def clean_quantite_initiale(self):
-        quantite = self.cleaned_data.get('quantite_initiale')
-        lot = self.cleaned_data.get('lot')
-
-        if not quantite or quantite <= 0:
-            raise ValidationError("La quantité doit être supérieure à 0.")
-
-        if lot and quantite > lot.quantite_restante:
-            raise ValidationError(
-                f"Quantité demandée ({quantite}) supérieure au stock disponible "
-                f"({lot.quantite_restante})."
-            )
-
-        return quantite
+    # ------------------------------------------------------------------
 
     def clean(self):
-        cleaned = super().clean()
-        lot = cleaned.get('lot')
-        superviseur = cleaned.get('superviseur')
+        cleaned_data = super().clean()
 
-        
+        lot = cleaned_data.get('lot')
+        quantite = cleaned_data.get('quantite_saisie')
 
-        return cleaned
+        if not lot:
+            self.add_error('lot', 'Veuillez sélectionner un lot.')
+            return cleaned_data
+
+        if not quantite or quantite <= 0:
+            self.add_error('quantite_saisie', 'Veuillez saisir une quantité valide.')
+            return cleaned_data
+
+        # ✅ Vérification simple et cohérente
+        if quantite > lot.quantite_restante:
+            self.add_error(
+                'quantite_saisie',
+                f"Stock insuffisant. Disponible : {lot.quantite_restante}"
+            )
+            return cleaned_data
+
+        # ✅ Quantité unique
+        cleaned_data['quantite_initiale'] = quantite
+        return cleaned_data
+
+    # ------------------------------------------------------------------
 
     def save(self, commit=True):
         affectation = super().save(commit=False)
 
-        affectation.quantite_restante = affectation.quantite_initiale
+        quantite = self.cleaned_data['quantite_initiale']
+
+        affectation.quantite_initiale = quantite
+        affectation.quantite_restante = quantite
         affectation.attribue_par = self.rot
 
         if commit:
             affectation.save()
 
+            # 🔒 Mise à jour stock atomique
             lot = affectation.lot
-            lot.quantite_restante -= affectation.quantite_initiale
+            lot.quantite_restante -= quantite
             lot.save(update_fields=['quantite_restante'])
 
         return affectation
 
-
-
 class SupervisorDistributionForm(forms.Form):
+    # -------------------------------------------------
+    # AGENT
+    # -------------------------------------------------
     agent_terrain = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
         label="Agent terrain",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        required=False
     )
 
+    auto_distribution = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Auto-distribution (je vends moi-même)",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    # -------------------------------------------------
+    # LOT
+    # -------------------------------------------------
     lot = forms.ModelChoiceField(
         queryset=AffectationLotSuperviseur.objects.none(),
         label="Lot affecté",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
+    # -------------------------------------------------
+    # QUANTITÉ (UNE SEULE LOGIQUE)
+    # -------------------------------------------------
     quantite = forms.DecimalField(
-        max_digits=10,
+        min_value=Decimal('0.01'),
         decimal_places=2,
-        min_value=0.01,
         label="Quantité à distribuer",
         widget=forms.NumberInput(attrs={'class': 'form-control'})
     )
 
+    # -------------------------------------------------
+    # PRIX
+    # -------------------------------------------------
     prix_gros = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -329,51 +386,69 @@ class SupervisorDistributionForm(forms.Form):
         widget=forms.NumberInput(attrs={'class': 'form-control'})
     )
 
+    # =================================================
+    # INIT
+    # =================================================
     def __init__(self, *args, **kwargs):
         self.superviseur = kwargs.pop('superviseur')
         super().__init__(*args, **kwargs)
 
-        # 🔐 AGENTS TERRAIN STRICTEMENT SOUS CE SUPERVISEUR
         self.fields['agent_terrain'].queryset = Agent.objects.filter(
-            type_agent='terrain',
+            type_agent__in=['terrain', 'agent_gros'],
             superviseur=self.superviseur,
             est_actif=True
         ).select_related('user')
 
-        # 🔐 LOTS STRICTEMENT AFFECTÉS À CE SUPERVISEUR
-        self.fields['lot'].queryset = AffectationLotSuperviseur.objects.filter(
-            superviseur=self.superviseur,
-            quantite_restante__gt=0
-        ).select_related('lot__produit')
+        self.fields['lot'].queryset = (
+            AffectationLotSuperviseur.objects
+            .filter(superviseur=self.superviseur, quantite_restante__gt=0)
+            .select_related('lot__produit')
+        )
 
+    # =================================================
+    # CLEAN
+    # =================================================
     def clean(self):
         cleaned_data = super().clean()
+
+        auto = cleaned_data.get('auto_distribution')
+        agent = cleaned_data.get('agent_terrain')
         affectation = cleaned_data.get('lot')
         quantite = cleaned_data.get('quantite')
 
-        if affectation and quantite:
-            if quantite > affectation.quantite_restante:
-                raise ValidationError(
-                    f"Stock insuffisant pour ce lot "
-                    f"(reste {affectation.quantite_restante})"
-                )
+        # --- agent ---
+        if auto:
+            cleaned_data['agent_terrain'] = self.superviseur
+        elif not agent:
+            raise ValidationError(
+                "Veuillez sélectionner un agent ou activer l’auto-distribution."
+            )
+
+        if not affectation or not quantite:
+            return cleaned_data
+
+        # --- STOCK ---
+        if quantite > affectation.quantite_restante:
+            raise ValidationError(
+                f"Stock insuffisant (reste {affectation.quantite_restante})."
+            )
 
         return cleaned_data
-  
 
-
+    # =================================================
+    # SAVE
+    # =================================================
     def save(self):
         affectation = self.cleaned_data['lot']
-        agent_terrain = self.cleaned_data['agent_terrain']
+        agent = self.cleaned_data['agent_terrain']
         quantite = self.cleaned_data['quantite']
 
-        # ✅ Distribution
         distribution = DistributionAgent.objects.create(
             superviseur=self.superviseur,
-            agent_terrain=agent_terrain
+            agent_terrain=agent,
+            type_distribution='AUTO' if agent == self.superviseur else 'TERRAIN'
         )
 
-        # ✅ Détail distribution
         DetailDistribution.objects.create(
             distribution=distribution,
             lot=affectation.lot,
@@ -382,15 +457,10 @@ class SupervisorDistributionForm(forms.Form):
             prix_detail=self.cleaned_data.get('prix_detail')
         )
 
-        # ✅ Mise à jour stock affecté
-        if quantite > affectation.quantite_restante:
-            raise ValidationError("Stock insuffisant")
-
+        # 🔒 Décrément simple
         affectation.quantite_restante -= quantite
         affectation.save(update_fields=['quantite_restante'])
 
-
-        # ✅ Synthèse
         distribution.quantite_totale = quantite
         distribution.nombre_produits_differents = 1
         distribution.save(update_fields=[
@@ -399,7 +469,6 @@ class SupervisorDistributionForm(forms.Form):
         ])
 
         return distribution
-
 
 
 class RecouvrementSuperviseurForm(forms.ModelForm):
