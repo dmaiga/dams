@@ -16,7 +16,7 @@
             </a>
             <a href="{% url 'agent_terrain_list' %}" class="btn btn-secondary">
                 <i class="fas fa-user-tie"></i>
-                Agents Terrain
+                Agents 
             </a>
             <a href="{% url 'admin_create_agent' %}" class="btn btn-accent">
                 <i class="fas fa-user-plus"></i>
@@ -26,329 +26,233 @@
     </div>
 
     <!-- KPI Principaux -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <!-- Total Agents -->
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-primary">
-                    <i class="fas fa-users"></i>
-                    Agents Total
-                </h2>
-                <p class="text-3xl font-bold">{{ kpis.total_agents }}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+
+        <!-- Agents Total -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body items-center text-center">
+                <i class="fas fa-users text-primary text-2xl mb-1"></i>
+                <p class="text-sm text-gray-500">Agents Total</p>
+                <p class="text-2xl font-bold">{{ kpis.total_agents }}</p>
+            </div>
+        </div>
+
+        <!-- ROT -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body items-center text-center">
+                <i class="fas fa-coins text-error text-2xl mb-1"></i>
+                <p class="text-sm text-gray-500">ROT</p>
+                <p class="text-2xl font-bold">{{ kpis.rots }}</p>
             </div>
         </div>
 
         <!-- Superviseurs -->
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-secondary">
-                    <i class="fas fa-user-shield"></i>
-                    Superviseurs
-                </h2>
-                <p class="text-3xl font-bold">{{ kpis.superviseurs }}</p>
+        <div class="card bg-base-100 shadow">
+            <div class="card-body items-center text-center">
+                <i class="fas fa-user-shield text-secondary text-2xl mb-1"></i>
+                <p class="text-sm text-gray-500">Superviseurs</p>
+                <p class="text-2xl font-bold">{{ kpis.superviseurs }}</p>
             </div>
         </div>
 
-        <!-- Agents Terrain -->
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-accent">
-                    <i class="fas fa-user-tie"></i>
-                    Agents Terrain
-                </h2>
-                <p class="text-3xl font-bold">{{ kpis.agents_terrain }}</p>
+        <!-- Mamy (ex-Agent Terrain) -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body items-center text-center">
+                <i class="fas fa-user-tie text-accent text-2xl mb-1"></i>
+                <p class="text-sm text-gray-500">Mamy</p>
+                <p class="text-2xl font-bold">{{ kpis.agents_terrain }}</p>
             </div>
         </div>
 
-        <!-- Stagiaires -->
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title text-info">
-                    <i class="fas fa-user-graduate"></i>
-                    Stagiaires
-                </h2>
-                <p class="text-3xl font-bold">{{ kpis.stagiaires_total }}</p>
-                <p class="text-sm">
-                    <span class="text-success">{{ kpis.stagiaires_actifs }} actifs</span> / 
-                    <span class="text-error">{{ kpis.stagiaires_expires }} expirés</span>
-                </p>
+        <!-- Grossistes (ex-Agent Gros) -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body items-center text-center">
+                <i class="fas fa-warehouse text-warning text-2xl mb-1"></i>
+                <p class="text-sm text-gray-500">Grossistes</p>
+                <p class="text-2xl font-bold">{{ kpis.agents_gros }}</p>
             </div>
         </div>
+
     </div>
 
-<!-- Agents avec Produits en Possession -->
-<div class="card bg-base-100 shadow-xl mt-8">
-    <div class="card-body">
-        <h2 class="card-title mb-4">
-            <i class="fas fa-boxes text-warning"></i>
-            Agents avec Produits en Possession
-        </h2>
-
-        <div class="overflow-x-auto">
-            <table class="table table-zebra w-full">
-                <thead>
-                    <tr>
-
-                        <th>Date Distribution</th>
-                                     <th>Agent</th>
-                        <th>Produit</th>
-                        <th>Quantité Restante</th>
-                        <th>Lot</th>
-
-                    </tr>
-                </thead>
-                <tbody>
-        {% for item in agents_stock %}
-            {% for p in item.details %}
-            <tr>
-                        <td>
-                    {{ p.distribution_date|date:"d/m/Y" }}
-                </td>
-                <td class="font-semibold">
-                    {{ item.agent.full_name }}
-                </td>
-            
-                <!-- 🆕 Date de distribution -->
-            
-            
-                <td>
-                    {{ p.produit }}
-                </td>
-            
-                <td class="font-bold text-warning">
-                    {{ p.quantite_restante }}
-                </td>
-            
-                <td>
-                    {{ p.lot }}
-                </td>
-            </tr>
-            {% endfor %}
-        {% empty %}
-        <tr>
-            <td colspan="5" class="text-center text-gray-500 py-4">
-                Aucun produit en circulation
-            </td>
-        </tr>
-        {% endfor %}
-
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Agents Actifs - Dernières 72h -->
-<div class="card bg-base-100 shadow-xl mt-8">
-    <div class="card-body">
-        <h2 class="card-title mb-4">
-            <i class="fas fa-bolt text-success"></i>
-            Agents Actifs (Dernières 48 heures)
-        </h2>
-
-        <div class="overflow-x-auto">
-            <table class="table table-zebra w-full">
-                <thead>
-                    <tr>
-                        <th>Agent</th>
-                        <th>Ventes</th>
-                        <th>Quantité</th>
-                        <th>CA</th>
-                        <th>Dernière Vente</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in agents_actifs_72h %}
-                    <tr>
-                        <td class="font-semibold">{{ a.agent.full_name }}</td>
-                        <td class="text-center">{{ a.nombre_ventes }}</td>
-                        <td class="text-center">{{ a.quantite }}</td>
-                        <td class="font-bold">{{ a.ca|fcfa }}</td>
-                        <td>{{ a.derniere_vente|date:"d/m/Y H:i" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-gray-500 py-4">
-                            Aucun agent n’a vendu ces dernières 48 heures
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <!-- Top 5 Vendeurs par Quantité -->
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title mb-4">
-                    <i class="fas fa-trophy text-warning"></i>
-                    Top 5 Vendeurs - Quantité
-                </h2>
-                <div class="text-sm text-gray-500 mb-2">
-                    <i class="fas fa-info-circle"></i>
-                    Ventes personnelles uniquement
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="table table-zebra w-full">
-                        <thead>
-                            <tr>
-                                <th>Agent</th>
-                                <th class="text-center">Quantité</th>
-                                <th class="text-center">Gros</th>
-                                <th class="text-center">Détail</th>
-                                <th class="text-center">% Gros</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for vendeur in top_quantite %}
-                            <tr>
-                                <td>
-                                    <div class="font-semibold">{{ vendeur.agent.full_name }}</div>
-                                    <div class="text-xs text-gray-500">{{ vendeur.agent.get_type_agent_display }}</div>
-                                </td>
-                                <td class="text-center font-bold">{{ vendeur.total_quantite|intcomma }}</td>
-                                <td class="text-center">{{ vendeur.quantite_gros|intcomma }}</td>
-                                <td class="text-center">{{ vendeur.quantite_detail|intcomma }}</td>
-                                <td class="text-center">
-                                    <span class="badge badge-info">{{ vendeur.pourcentage_gros }}%</span>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center text-gray-500 py-4">
-                                    Aucune donnée de vente personnelle
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top 5 Vendeurs par MARGE -->
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title mb-4">
-                    <i class="fas fa-money-bill-wave text-success"></i>
-                    Top 5 Vendeurs - Marge
-                </h2>
-                <div class="text-sm text-gray-500 mb-2">
-                    <i class="fas fa-info-circle"></i>
-                    Ventes personnelles uniquement - Tri par marge générée
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="table table-zebra w-full">
-                        <thead>
-                            <tr>
-                                <th>Agent</th>
-                                <th class="text-right">Marge</th>
-                                <th class="text-right">CA</th>
-                                <th class="text-center">Taux Marge</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for vendeur in top_marge %}
-                            <tr>
-                                <td>
-                                    <div class="font-semibold">{{ vendeur.agent.full_name }}</div>
-                                    <div class="text-xs text-gray-500">{{ vendeur.agent.get_type_agent_display }}</div>
-                                </td>
-                                <td class="text-right font-mono font-bold text-success">
-                                    {{ vendeur.marge_totale|fcfa }}
-                                </td>
-                                <td class="text-right font-mono">{{ vendeur.total_ca|fcfa }}</td>
-                                <td class="text-center">
-                                    <span class="badge 
-                                        {% if vendeur.taux_marge > 25 %}badge-success
-                                        {% elif vendeur.taux_marge > 15 %}badge-warning
-                                        {% else %}badge-error{% endif %}">
-                                        {{ vendeur.taux_marge }}%
-                                    </span>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center text-gray-500 py-4">
-                                    Aucune donnée de vente personnelle
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Compétition Stagiaires  -->
-    <!-- Performance Stagiaires  avec Marge -->
-    <div class="card bg-base-100 shadow-xl">
+    <!-- Agents avec Produits en Possession -->
+    <div class="card bg-base-100 shadow-xl mt-8">
         <div class="card-body">
             <h2 class="card-title mb-4">
-                <i class="fas fa-medal text-info"></i>
-                Performance des Stagiaires
+                <i class="fas fa-boxes text-warning"></i>
+                Agents avec Produits en Possession
             </h2>
-            <div class="text-sm text-gray-500 mb-2">
-                <i class="fas fa-info-circle"></i>
-                Ventes réalisées POUR les stagiaires - Tri par marge générée
-            </div>
+
             <div class="overflow-x-auto">
                 <table class="table table-zebra w-full">
                     <thead>
                         <tr>
-                            <th>Stagiaire</th>
-                            <th class="text-center">Statut</th>
-                            <th class="text-center">Ventes</th>
-                            <th class="text-right">Marge</th>
-                            <th class="text-right">CA</th>
-                            <th class="text-center">Taux Marge</th>
-                            <th class="text-center">Jours Restants</th>
-                            <th class="text-center">Début Stage</th>
+
+                            <th>Date Distribution</th>
+                                         <th>Agent</th>
+                            <th>Produit</th>
+                            <th>Quantité Restante</th>
+                            <th>Lot</th>
+
                         </tr>
                     </thead>
                     <tbody>
-                        {% for stagiaire in competition_stagiaires %}
+            {% for item in agents_stock %}
+                {% for p in item.details %}
+                <tr>
+                            <td>
+                        {{ p.distribution_date|date:"d/m/Y" }}
+                    </td>
+                    <td class="font-semibold">
+                        {{ item.agent.full_name }}
+                    </td>
+                
+                    <!-- 🆕 Date de distribution -->
+                
+                
+                    <td>
+                        {{ p.produit }}
+                    </td>
+                
+                    <td class="font-bold text-warning">
+                        {{ p.quantite_restante }}
+                    </td>
+                
+                    <td>
+                        {{ p.lot }}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% empty %}
+            <tr>
+                <td colspan="5" class="text-center text-gray-500 py-4">
+                    Aucun produit en circulation
+                </td>
+            </tr>
+            {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agents Actifs - Dernières 72h -->
+    <div class="card bg-base-100 shadow-xl mt-8">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                <i class="fas fa-bolt text-success"></i>
+                Agents Actifs (Dernières 48 heures)
+            </h2>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
                         <tr>
-                            <td class="font-semibold">{{ stagiaire.stagiaire.full_name }}</td>
-                            <td class="text-center">
-                                {% if stagiaire.statut == "🟢 Actif" %}
-                                <span class="badge badge-success">Actif</span>
-                                {% else %}
-                                <span class="badge badge-error">Expiré</span>
-                                {% endif %}
+                            <th>Agent</th>
+                            <th>Ventes</th>
+                            <th>Quantité</th>
+                            <th>CA</th>
+                            <th>Dernière Vente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in agents_actifs_72h %}
+                        <tr>
+                            <td class="font-semibold">{{ a.agent.full_name }}</td>
+                            <td class="text-center">{{ a.nombre_ventes }}</td>
+                            <td class="text-center">{{ a.quantite }}</td>
+                            <td class="font-bold">{{ a.ca|fcfa }}</td>
+                            <td>{{ a.derniere_vente|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-500 py-4">
+                                Aucun agent n’a vendu ces dernières 48 heures
                             </td>
-                            <td class="text-center font-bold">{{ stagiaire.total_quantite|intcomma }}</td>
-                            <td class="text-right font-mono font-bold text-success">
-                                {{ stagiaire.marge_totale|fcfa }}
-                            </td>
-                            <td class="text-right font-mono">{{ stagiaire.total_ca|fcfa }}</td>
-                            <td class="text-center">
-                                <span class="badge 
-                                    {% if stagiaire.taux_marge > 25 %}badge-success
-                                    {% elif stagiaire.taux_marge > 15 %}badge-warning
-                                    {% else %}badge-error{% endif %}">
-                                    {{ stagiaire.taux_marge }}%
-                                </span>
-                            </td>
-                            <td class="text-center">
-                                {% if stagiaire.jours_restants != "Expiré" %}
-                                <span class="badge badge-warning">{{ stagiaire.jours_restants }} jours</span>
-                                {% else %}
-                                <span class="badge badge-error">Expiré</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {{ stagiaire.date_mise_service|date:"d/m/Y" }}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+     </div>
+
+   </div>
+    <!-- Situation financière des superviseurs -->
+    <div class="card bg-base-100 shadow-xl mt-8">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                <i class="fas fa-user-shield text-primary"></i>
+                Situation financière des superviseurs (mois en cours)
+            </h2>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Superviseur</th>
+                            <th>Ventes personnelles</th>
+                            <th>Recouvrements agents</th>
+                            <th>Solde détenu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in superviseurs_finance %}
+                        <tr>
+                            <td class="font-semibold">{{ row.superviseur.full_name }}</td>
+                            <td>{{ row.ventes_personnelles|fcfa }}</td>
+                            <td>{{ row.recouvrements_agents|fcfa }}</td>
+                            <td class="font-bold text-warning">
+                                {{ row.solde_mois|fcfa }}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center text-gray-500 py-4">
-                                Aucune vente réalisée pour des stagiaires
+                            <td colspan="4" class="text-center text-gray-500">
+                                Aucun superviseur actif
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- Situation financière ROT -->
+    <div class="card bg-base-100 shadow-xl mt-8">
+        <div class="card-body">
+            <h2 class="card-title mb-4">
+                <i class="fas fa-coins text-error"></i>
+                Responsable Opérationel Trésorerie – ROT (mois en cours)
+            </h2>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>ROT</th>
+                            <th>Reçu des superviseurs</th>
+                            <th>Versé en banque</th>
+                            <th>Dépenses</th>
+                            <th>Solde</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rots_finance %}
+                        <tr>
+                            <td class="font-semibold">{{ row.rot.full_name }}</td>
+                            <td>{{ row.recupere|fcfa }}</td>
+                            <td>{{ row.verse|fcfa }}</td>
+                            <td>{{ row.depenses|fcfa }}</td>
+                            <td class="font-bold text-success">
+                                {{ row.solde_mois|fcfa }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-500">
+                                Aucun ROT actif
                             </td>
                         </tr>
                         {% endfor %}
@@ -358,6 +262,5 @@
         </div>
     </div>
 
-    
-</div>
+
 {% endblock %}

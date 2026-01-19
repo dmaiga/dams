@@ -130,6 +130,22 @@ class Fournisseur(models.Model):
 
 
 class Agent(models.Model):
+    """
+    RÈGLES FINANCIÈRES (POST-TRANSITION)
+
+    - Le solde OPÉRATIONNEL est calculé uniquement via :
+      - recouvrements agents
+      - ventes personnelles autorisées
+      - versements_vente
+
+    - Les champs suivants sont ANALYTIQUES :
+      - montant_hors_vente
+      - dépenses
+      - total_versements_superviseur
+
+    Toute modification doit respecter cette séparation.
+    """
+
     TYPE_AGENT_CHOICES = (
         ('direction', 'Direction'),
         ('rot', 'Responsable Opérations'),
@@ -327,6 +343,7 @@ class Agent(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
+    
 
     @property
     def contrat_expire(self):
@@ -707,13 +724,45 @@ class Agent(models.Model):
         # 🏦 Argent déjà remis au ROT (VENTE SEULEMENT)
         versements_vente = VersementBancaire.objects.filter(
             superviseur=self,
-            date_versement__gt=date_ref
+            date_versement_reelle__gt=date_ref
         ).aggregate(
             total=Coalesce(Sum("montant_vente"), Decimal("0.00"))
         )["total"]
     
         return recouvre_agents + ventes_perso - versements_vente
     
+    @property
+    def cash_disponible_superviseur(self):
+        """
+        Cash réel disponible AVANT remise au ROT
+        """
+        if not self.est_superviseur:
+            return Decimal("0.00")
+
+        date_ref = self.date_derniere_cloture
+
+        # Argent récupéré des agents
+        cash_agents = Recouvrement.objects.filter(
+            superviseur=self,
+            date_recouvrement__gt=date_ref
+        ).aggregate(
+            total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
+        )["total"]
+
+        # Ventes personnelles autorisées
+        ventes_perso = Vente.objects.filter(
+            agent=self,
+            date_vente__gt=date_ref
+        ).aggregate(
+            total=Coalesce(
+                Sum(F("quantite") * F("prix_vente_unitaire")),
+                Decimal("0.00")
+            )
+        )["total"]
+
+        # ❌ ON NE SOUSTRAIT PAS LES REMISES AU ROT ICI
+        return cash_agents + ventes_perso
+
     
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit,
@@ -1714,6 +1763,37 @@ class RecouvrementSuperviseur(models.Model):
     date_recouvrement = models.DateTimeField(default=timezone.now)
     date_creation = models.DateTimeField(auto_now_add=True)
 
+
+    def clean(self):
+        if self.montant is None or self.superviseur is None:
+            return
+    
+        if self.montant <= 0:
+            raise ValidationError({'montant': "Le montant doit être positif."})
+    
+        cash_disponible = self.superviseur.cash_disponible_superviseur
+    
+        # ⚠️ IMPORTANT : exclure l’instance si modification
+        if self.pk:
+            deja_remis = RecouvrementSuperviseur.objects.filter(
+                superviseur=self.superviseur
+            ).exclude(pk=self.pk).aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0.00"))
+            )["total"]
+        else:
+            deja_remis = Decimal("0.00")
+    
+        cash_restant = cash_disponible - deja_remis
+    
+        if self.montant > cash_restant:
+            raise ValidationError({
+                'montant': (
+                    f"Montant supérieur au cash disponible "
+                    f"({cash_restant:,.0f} FCFA)."
+                )
+            })
+    
+
     def __str__(self):
         return (
             f"Recouvrement {self.montant} FCFA | "
@@ -1727,11 +1807,25 @@ class RecouvrementSuperviseur(models.Model):
 
 
 class VersementBancaire(models.Model):
+    # ⛔ À déprécier
     superviseur = models.ForeignKey(
         'Agent',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         limit_choices_to={'type_agent': 'entrepot'},
-        related_name='versements_bancaires'
+        related_name='versements_bancaires',
+        help_text="(OBSOLÈTE) Superviseur source du cash"
+    )
+    # ✅ NOUVELLE SOURCE DE VÉRITÉ
+    effectue_par = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="versements_effectues",
+        limit_choices_to={'type_agent': 'rot'},
+        help_text="ROT ayant réellement effectué le versement"
     )
 
     montant_vente = models.DecimalField(
@@ -1780,6 +1874,27 @@ class VersementBancaire(models.Model):
     def total_depenses_associees(self):
         """Total des dépenses associées"""
         return self.depenses.aggregate(total=Sum('montant'))['total'] or Decimal('0.00')
+
+
+    @property
+    def cash_depense_reel(self):
+        """
+        Cash réel consommé lors de ce versement
+        = vente versée + dépenses payées
+        """
+        return (
+            (self.montant_vente or Decimal("0.00"))
+            + (self.total_depenses_associees or Decimal("0.00"))
+        )
+
+    @property
+    def est_equilibre(self):
+        """
+        Vérifie si les dépenses sont couvertes par le hors vente
+        (logique comptable)
+        """
+        return self.total_depenses_associees <= self.montant_hors_vente
+
     
     @property
     def recus_count(self):
@@ -1830,6 +1945,15 @@ class RecuVersement(models.Model):
 
 
 class Depense(models.Model):
+    effectue_par = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="depenses_effectuees",
+        help_text="Agent ayant réellement effectué la dépense"
+    )
+
     versement = models.ForeignKey(
         VersementBancaire,
         on_delete=models.CASCADE,

@@ -1,133 +1,129 @@
-<!-- Modifiez votre template liste_versement.html existant -->
 {% extends 'base.html' %}
-{% load static %}
+{% load format_fcfa %}
 
-{% load format_fcfa%}
-
-{% block title %}Factures Dépôts{% endblock %}
+{% block title %}Versements{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-2">Versement Facture</h1>
-            <p class="text-muted">Factures des dépôts d'agents</p>
-        </div>
-        <div>
-            <a href="{% url 'creer_versement' %}" class="btn btn-success">
-                <i class="fas fa-plus"></i> Nouveau Versement
+<div class="container py-3">
+
+    <!-- ===== HEADER & ACTIONS GLOBALES ===== -->
+    <div class="mb-3">
+        <h5 class="mb-1">Versements</h5>
+        <small class="text-muted">Dépôts, dépenses et factures</small>
+
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            <a href="{% url 'creer_versement' %}" class="btn btn-sm btn-success">
+                <i class="fas fa-plus"></i> Versement
             </a>
-                    <a href="{% url 'recu_liste' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-receipt"></i> Tous les Recus
-        </a>
-            <a href="{% url 'liste_factures_entrepot' %}" class="btn btn-outline-primary">
-                <i class="fas fa-warehouse"></i> Voir Factures Stock
+
+            <a href="{% url 'recu_liste' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-receipt"></i> Reçus
+            </a>
+
+            <a href="{% url 'liste_factures_entrepot' %}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-warehouse"></i> Factures stock
             </a>
         </div>
     </div>
-  <div class="card">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">📊 Liste des Versements</h5>
-        </div>
-        <div class="card-body">
-            {% if versements %}
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Date</th>
-                            <th>Montant Vente</th>
-                            <th>Montant Hors Vente</th>
-                            <th>Reçu</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for versement in versements %}
-                        <tr>
-                            <!-- CORRECTION : Utiliser date_versement_reelle -->
-                            <td>
-                                <small class="text-muted">{{ versement.date_versement_reelle|date:"d/m/Y" }}</small><br>
-                                <small>{{ versement.date_versement_reelle|date:"H:i" }}</small>
-                            </td>
-                      
-                            <td>
-                                <span class="fw-bold text-success">{{ versement.montant_vente|fcfa }} FCFA</span>
-                            </td>
-                            <td>
-                                <span class="text-info">{{ versement.montant_hors_vente|fcfa }} FCFA</span>
-                            </td>
 
-                
-                            <td>
-                                {% if versement.recu %}
-                                    <a href="{{ versement.recu.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-eye"></i> Voir
-                                    </a>
-                                {% else %}
-                                    <span class="badge bg-secondary">Aucun</span>
-                                {% endif %}
-                            </td>
-<!-- Dans la colonne Actions -->
-<td>
-    <div class="btn-group btn-group-sm">
-        <a href="{% url 'detail_versement' versement.id %}" class="btn btn-outline-info" title="Voir détails">
-            <i class="fas fa-eye"></i>
-        </a>
-        {% if request.user.agent == versement.superviseur or request.user.agent.est_direction %}
-<a href="{% url 'modifier_versement' versement.id %}" class="btn btn-warning">
-    <i class="fas fa-edit"></i> 
-</a>
-        <a href="{% url 'supprimer_versement' versement.id %}" class="btn btn-outline-danger" title="Supprimer">
-            <i class="fas fa-trash"></i>
-        </a>
-        {% endif %}
-    </div>
-</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    {% if versements %}
 
-            <!-- Résumé des versements -->
-            <div class="mt-4 p-3 bg-light rounded">
-                <div class="row text-center">
-                    <div class="col-md-3">
-                        <h5 class="text-primary">{{ versements.count }}</h5>
-                        <small class="text-muted">Total Versements</small>
+        <!-- ===== LISTE DES VERSEMENTS (MOBILE FIRST) ===== -->
+        <div class="d-grid gap-3">
+            {% for versement in versements %}
+            <div class="card shadow-sm">
+                <div class="card-body p-3">
+
+                    <!-- Ligne 1 : date + actions -->
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted">
+                            {{ versement.date_versement_reelle|date:"d/m/Y" }}
+                        </small>
+
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'detail_versement' versement.id %}"
+                               class="btn btn-outline-secondary" title="Détails">
+                                <i class="fas fa-eye"></i>
+                            </a>
+
+                            {% if request.user.agent == versement.superviseur or request.user.agent.est_direction %}
+                            <a href="{% url 'modifier_versement' versement.id %}"
+                               class="btn btn-outline-warning" title="Modifier">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                        <h5 class="text-success">{{ total_vente|fcfa }} FCFA</h5>
-                        <small class="text-muted">Total Vente</small>
+
+                    <!-- Ligne 2 : chiffres principaux -->
+                    <div class="row text-center small">
+                        <div class="col-6">
+                            <div class="text-muted">Vente</div>
+                            <strong class="text-success">
+                                {{ versement.montant_vente|fcfa }} FCFA
+                            </strong>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted">Dépenses</div>
+                            <strong class="text-danger">
+                                {{ versement.total_depenses_associees|fcfa }} FCFA
+                            </strong>
+                        </div>
                     </div>
-                    <div class="col-md-3">
-                        <h5 class="text-info">{{ total_hors_vente|fcfa }} FCFA</h5>
-                        <small class="text-muted">Total Hors Vente</small>
+
+                    <hr class="my-2">
+
+                    <!-- Ligne 3 : infos secondaires -->
+                    <div class="d-flex justify-content-between align-items-center small">
+                        <span class="text-muted">
+                            Hors vente : {{ versement.montant_hors_vente|fcfa }} FCFA
+                        </span>
+                        <strong>
+                            Cash utilisé :
+                            {{ versement.cash_depense_reel|fcfa }} FCFA
+                        </strong>
                     </div>
-                    <div class="col-md-3">
-                        <h5 class="text-dark">{{ total_general|fcfa }} FCFA</h5>
-                        <small class="text-muted">Total Général</small>
-                    </div>
+
                 </div>
             </div>
-
-            {% else %}
-            <!-- État vide -->
-            <div class="text-center py-5">
-                <div class="mb-4">
-                    <i class="fas fa-money-bill-wave fa-4x text-muted"></i>
-                </div>
-                <h4 class="text-muted">Aucun versement trouvé</h4>
-                <p class="text-muted mb-4">
-                    Aucun versement bancaire n'a été enregistré pour le moment.
-                </p>
-                <a href="{% url 'creer_versement' %}" class="btn btn-success btn-lg">
-                    <i class="fas fa-plus"></i> Créer le premier versement
-                </a>
-            </div>
-            {% endif %}
+            {% endfor %}
         </div>
-    </div>
+
+        <!-- ===== RÉSUMÉ GLOBAL ===== -->
+        <div class="card mt-4 bg-light border-0">
+            <div class="card-body p-3">
+                <div class="row text-center small">
+                    <div class="col-4">
+                        <div class="text-muted">Versements</div>
+                        <strong>{{ versements.count }}</strong>
+                    </div>
+                    <div class="col-4">
+                        <div class="text-muted">Total vente</div>
+                        <strong>{{ total_vente|fcfa }} FCFA</strong>
+                    </div>
+                    <div class="col-4">
+                        <div class="text-muted">Hors vente</div>
+                        <strong>{{ total_hors_vente|fcfa }} FCFA</strong>
+                    </div>
+                </div>
+                <hr class="my-2">
+                <div class="text-center">
+                    <strong>Total général : {{ total_general|fcfa }} FCFA</strong>
+                </div>
+            </div>
+        </div>
+
+    {% else %}
+
+        <!-- ===== EMPTY STATE ===== -->
+        <div class="text-center py-5">
+            <i class="fas fa-wallet fa-3x text-muted mb-3"></i>
+            <p class="text-muted mb-3">Aucun versement enregistré</p>
+            <a href="{% url 'creer_versement' %}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus"></i> Créer un versement
+            </a>
+        </div>
+
+    {% endif %}
 </div>
 {% endblock %}

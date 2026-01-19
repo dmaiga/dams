@@ -439,9 +439,9 @@
                      
                     </div>
                     
-                    {# ===== MENU SUPERVISEUR / ROT ===== #}
+                    {# ===== MENU SUPERVISEUR  ===== #}
                     {% elif request.user.agent.est_superviseur %}
-                    <!-- ===== MENU SUPERVISEUR/ADMIN ===== -->
+                    <!-- ===== MENU SUPERVISEUR ===== -->
                     
                     <div class="nav flex-column">
                         <a class="nav-link {% if request.resolver_match.url_name == 'tableau_de_bord_superviseur' %}active{% endif %}" 
@@ -481,7 +481,7 @@
                
                     </div>
                     {% elif request.user.agent.est_rot %}
-                    <!-- ===== MENU SUPERVISEUR/ADMIN ===== -->
+                    <!-- ===== MENU ROT ===== -->
                     
                     <div class="nav flex-column">
                         <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_rot' %}active{% endif %}" 
@@ -523,7 +523,7 @@
                           <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
                             href="{% url 'liste_versement' %}">
                              <i class="fas fa-file-invoice"></i>
-                                <span>Factures</span>
+                                <span>Versements</span>
                         </a>
                           <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
                            href="{% url 'liste_ventes' %}">

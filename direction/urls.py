@@ -17,7 +17,8 @@ from direction.views import (
                                 detail_paiement_fournisseur, 
                                  liste_clotures,apercu_cloture,cloturer_periode,  
                                  api_calcul_salaire_rapide,export_salaires_excel,
-                                 detail_salaire_agent,calcul_salaires,                                                     
+                                 detail_salaire_agent,calcul_salaires,SuperviseurDetail,
+                                 RotDetailView                                                 
                               )
 
 
@@ -26,8 +27,13 @@ urlpatterns = [
        
     path('direction/agents/', AgentDashboardView.as_view(), name='agent_dashboard'),
     path('direction/agents/superviseurs/', SuperviseurListView.as_view(), name='superviseur_list'),
+    
     path('direction/agents/terrain/', AgentTerrainListView.as_view(), name='agent_terrain_list'),
+    
     path('direction/agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
+
+    path('direction/agents/superviseurs/<int:pk>', SuperviseurDetail, name='direction_superviseur_detail'),
+    path('direction/agents/rot/<int:pk>', RotDetailView, name='direction_rot_detail'),
     
     path('direction/produits/', ProductListView.as_view(), name='product_list'),
     path('direction/produits/<int:pk>/', ProductDetailView.as_view(), name='product_detail'),

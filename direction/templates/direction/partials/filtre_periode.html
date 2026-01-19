@@ -1,0 +1,24 @@
+<form method="get" class="flex flex-wrap gap-3 items-end bg-base-200 p-3 rounded">
+    <div>
+        <label class="text-xs font-semibold">Période</label>
+        <select name="periode" class="select select-bordered select-sm">
+            <option value="mois" {% if periode == 'mois' %}selected{% endif %}>Mois courant</option>
+            <option value="mois_prec" {% if periode == 'mois_prec' %}selected{% endif %}>Mois précédent</option>
+            <option value="custom" {% if periode == 'custom' %}selected{% endif %}>Personnalisée</option>
+        </select>
+    </div>
+
+    <div>
+        <label class="text-xs font-semibold">Du</label>
+        <input type="date" name="date_debut" value="{{ date_debut }}" class="input input-bordered input-sm">
+    </div>
+
+    <div>
+        <label class="text-xs font-semibold">Au</label>
+        <input type="date" name="date_fin" value="{{ date_fin }}" class="input input-bordered input-sm">
+    </div>
+
+    <button class="btn btn-primary btn-sm">
+        Appliquer
+    </button>
+</form>

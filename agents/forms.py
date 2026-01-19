@@ -470,16 +470,15 @@ class SupervisorDistributionForm(forms.Form):
 
         return distribution
 
-
+ 
 class RecouvrementSuperviseurForm(forms.ModelForm):
 
     class Meta:
         model = RecouvrementSuperviseur
-        fields = ['superviseur', 'montant',  'commentaire']
+        fields = ['superviseur', 'montant', 'commentaire']
         widgets = {
             'superviseur': forms.Select(attrs={'class': 'form-select'}),
             'montant': forms.NumberInput(attrs={'class': 'form-control'}),
-          
             'commentaire': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 2
@@ -496,22 +495,45 @@ class RecouvrementSuperviseurForm(forms.ModelForm):
             est_actif=True
         )
 
-    def clean_montant(self):
-        montant = self.cleaned_data['montant']
-        superviseur = self.cleaned_data.get('superviseur')
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        superviseur = cleaned_data.get('superviseur')
+        montant = cleaned_data.get('montant')
+        
+        if not superviseur or not montant:
+            return cleaned_data
+            
+        # Vérifier si c'est une création ou une modification
+        instance = self.instance
+        
+        # Calculer le montant déjà remis par ce superviseur
+        deja_remis = RecouvrementSuperviseur.objects.filter(
+            superviseur=superviseur
+        )
+        
+        # Exclure l'instance actuelle si c'est une modification
+        if instance.pk:
+            deja_remis = deja_remis.exclude(pk=instance.pk)
+            
+        deja_remis_total = deja_remis.aggregate(
+            total=Coalesce(Sum("montant"), Decimal("0.00"))
+        )["total"]
+        
+        # Récupérer le cash disponible du superviseur
+        cash_disponible = superviseur.cash_disponible_superviseur
+        cash_restant = cash_disponible - deja_remis_total
+        
+        if montant > cash_restant:
+            raise ValidationError({
+                'montant': (
+                    f"Montant supérieur au cash disponible "
+                    f"({cash_restant:,.0f} FCFA)."
+                )
+            })
+        
+        return cleaned_data
     
-        if montant <= 0:
-            raise forms.ValidationError("Le montant doit être positif.")
-    
-        if superviseur and montant > superviseur.total_recouvre_agents:
-            raise forms.ValidationError(
-                f"Montant supérieur à l'argent détenu par le superviseur "
-                f"({superviseur.total_recouvre_agents} FCFA)."
-            )
-    
-        return montant
-    
-
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.rot = self.rot

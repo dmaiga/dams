@@ -22,6 +22,14 @@ from core.models import (
     DistributionAgent,
     Vente,
 )
+from datetime import datetime
+from django.utils import timezone
+
+def get_periode_courante():
+    now = timezone.now()
+    debut_mois = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return debut_mois, now
+
 
 
 class SuperviseurDashboardService:
@@ -96,12 +104,16 @@ class SuperviseurDashboardService:
         - refléter le cash réel détenu ou attendu
         """
     
+        date_debut, date_fin = get_periode_courante()
         date_ref = superviseur.date_derniere_cloture
+
     
         # 1️⃣ VENTES DES AGENTS (argent généré sur le terrain)
         total_ventes_agents = Vente.objects.filter(
             agent__superviseur=superviseur,
-            date_vente__gt=date_ref
+            date_vente__gte=date_debut,
+            date_vente__lte=date_fin
+
         ).aggregate(
             total=Coalesce(
                 Sum(F('quantite') * F('prix_vente_unitaire')),
@@ -111,8 +123,8 @@ class SuperviseurDashboardService:
     
         # 2️⃣ ARGENT DÉJÀ RÉCUPÉRÉ AUPRÈS DES AGENTS
         total_recouvre_agents = Recouvrement.objects.filter(
-            superviseur=superviseur,
-            date_recouvrement__gt=date_ref
+        date_recouvrement__gte=date_debut,
+        date_recouvrement__lte=date_fin
         ).aggregate(
             total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
         )['total']
@@ -121,7 +133,8 @@ class SuperviseurDashboardService:
         # 👉 auto-recouvrées (argent directement chez lui)
         ventes_superviseur = Vente.objects.filter(
             agent=superviseur,
-            date_vente__gt=date_ref
+            date_vente__gte=date_debut,
+            date_vente__lte=date_fin
         ).aggregate(
             total=Coalesce(
                 Sum(F('quantite') * F('prix_vente_unitaire')),
@@ -132,7 +145,8 @@ class SuperviseurDashboardService:
         # 4️⃣ ARGENT DÉJÀ REMIS AU ROT (VENTE UNIQUEMENT)
         total_remis_rot = RecouvrementSuperviseur.objects.filter(
             superviseur=superviseur,
-            date_creation__gt=date_ref
+            date_creation__gte=date_debut,
+            date_creation__lte=date_fin
         ).aggregate(
             total=Coalesce(Sum('montant'), Decimal('0.00'))
         )['total']
@@ -149,8 +163,11 @@ class SuperviseurDashboardService:
         )
     
         # 💸 Argent encore chez les agents
-        reste_a_recouvrer = total_ventes_agents - total_recouvre_agents
-    
+        reste_a_recouvrer = max(
+            total_ventes_agents - total_recouvre_agents,
+            Decimal('0.00')
+        )
+        
         return {
             'date_derniere_cloture': date_ref,
     
@@ -171,13 +188,16 @@ class SuperviseurDashboardService:
     @staticmethod
     def get_agents_financiers(superviseur):
         date_ref = superviseur.date_derniere_cloture
+        date_debut, date_fin = get_periode_courante()
+
         agents = SuperviseurDashboardService.get_agents(superviseur)
         data = []
 
         for agent in agents:
             total_ventes = Vente.objects.filter(
                 agent=agent,
-                date_vente__gt=date_ref
+                date_vente__gte=date_debut,
+                date_vente__lte=date_fin
             ).aggregate(
                 total=Coalesce(
                     Sum(F('quantite') * F('prix_vente_unitaire')),
@@ -188,7 +208,8 @@ class SuperviseurDashboardService:
             total_recouvre = Recouvrement.objects.filter(
                 agent=agent,
                 superviseur=superviseur,
-                date_recouvrement__gt=date_ref
+                date_recouvrement__gte=date_debut,
+                date_recouvrement__lte=date_fin
             ).aggregate(
                 total=Coalesce(Sum('montant_recouvre'), Decimal('0'))
             )['total']

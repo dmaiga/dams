@@ -6,156 +6,147 @@
 <div class="container-fluid py-3">
 
     <!-- ================= KPIs ================= -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card border-start border-success border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Argent récupéré</div>
-                    <h5>{{ kpis.total_recupere_rot|fcfa }}</h5>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-start border-primary border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Versé banque</div>
-                    <h5>{{ kpis.total_verse_banque|fcfa }}</h5>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-start border-warning border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Dépenses fournisseurs</div>
-                    <h5>{{ kpis.total_depenses|fcfa }}</h5>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card border-start border-danger border-4 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Solde ROT</div>
-                    <h5 class="fw-bold">{{ kpis.solde_rot|fcfa }}</h5>
-                </div>
+<div class="row g-2 mb-3">
+    <div class="col-6">
+        <div class="card border-start border-success border-3">
+            <div class="card-body p-2">
+                <small class="text-muted">Argent récupéré</small>
+                <strong>{{ kpis.total_recupere_rot|fcfa }}</strong>
             </div>
         </div>
     </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header fw-semibold">
-        🏭 Fournisseurs – Stock & Dettes
+    <div class="col-6">
+        <div class="card border-start border-primary border-3">
+            <div class="card-body p-2">
+                <small class="text-muted">Versé banque</small>
+                <strong>{{ kpis.total_verse_banque|fcfa }}</strong>
+            </div>
+        </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Fournisseur</th>
-                    <th class="text-end">Qté livrée</th>
-                    <th class="text-end">Qté vendue</th>
-                    <th class="text-end">Dette contractuelle</th>
-                    <th class="text-end">Dette consommée</th>
-                    <th class="text-end">Payé</th>
-                    <th class="text-end">Reste</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for f in fournisseurs %}
-                <tr>
-                    <td>{{ f.fournisseur.nom }}</td>
-                    <td class="text-end">{{ f.qte_livree }}</td>
-                    <td class="text-end">{{ f.qte_vendue }}</td>
-                    <td class="text-end">{{ f.dette_contractuelle|fcfa }}</td>
-                    <td class="text-end">{{ f.dette_consommee|fcfa }}</td>
-                    <td class="text-end text-success">{{ f.paye|fcfa }}</td>
-                    <td class="text-end fw-bold {% if f.reste > 0 %}text-danger{% endif %}">
-                        {{ f.reste|fcfa }}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" class="text-center text-muted">
-                        Aucun fournisseur
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="col-6">
+        <div class="card border-start border-warning border-3">
+            <div class="card-body p-2">
+                <small class="text-muted">Dépenses</small>
+                <strong>{{ kpis.total_depenses|fcfa }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6">
+        <div class="card border-start border-danger border-3">
+            <div class="card-body p-2">
+                <small class="text-muted">Solde ROT</small>
+                <strong>{{ kpis.solde_rot|fcfa }}</strong>
+            </div>
+        </div>
     </div>
 </div>
 
-    <!-- ================= STOCK ENTREPÔT ================= -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header fw-semibold">
-            📦 Stock Entrepôt
-        </div>
-        <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Produit</th>
-                        <th class="text-end">Qté restante</th>
-                        <th class="text-end">Valeur</th>
-                        <th class="text-center">Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in stock_entrepot.produits %}
-                    <tr>
-                        <td>{{ p.produit__nom }}</td>
-                        <td class="text-end">{{ p.quantite_restante }}</td>
-                        <td class="text-end">{{ p.valeur_stock|fcfa }}</td>
-                        <td class="text-center">
-                            {% if p.quantite_restante <= stock_entrepot.seuil_faible %}
-                                <span class="badge bg-danger">Faible</span>
-                            {% else %}
-                                <span class="badge bg-success">OK</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="4" class="text-center text-muted">Aucun stock</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+
+<div class="card mb-3">
+    <div class="card-header fw-semibold">
+        🏭 Fournisseurs
     </div>
 
-    <!-- ================= SUPERVISEURS ================= -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header fw-semibold">
-            👥 Superviseurs – Stock & Argent
+    <div class="card-body p-2">
+        {% for f in fournisseurs %}
+        <div class="border rounded p-2 mb-2">
+            <strong>{{ f.fournisseur.nom }}</strong>
+
+            <div class="row small mt-1">
+                <div class="col-6 text-muted">Livré</div>
+                <div class="col-6 text-end">{{ f.qte_livree }}</div>
+
+                <div class="col-6 text-muted">Vendu</div>
+                <div class="col-6 text-end">{{ f.qte_vendue }}</div>
+
+                <div class="col-6 text-muted">Dette</div>
+                <div class="col-6 text-end">{{ f.dette_contractuelle|fcfa }}</div>
+
+                <div class="col-6 text-muted">Payé</div>
+                <div class="col-6 text-end text-success">{{ f.paye|fcfa }}</div>
+
+                <div class="col-6 fw-semibold">Reste</div>
+                <div class="col-6 text-end fw-bold {% if f.reste > 0 %}text-danger{% endif %}">
+                    {{ f.reste|fcfa }}
+                </div>
+            </div>
         </div>
-        <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Superviseur</th>
-                        <th class="text-end">Stock restant</th>
-                        <th class="text-end">Argent collecté</th>
-                        <th class="text-end">Remis ROT</th>
-                        <th class="text-end">À remettre</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in suivi_superviseurs %}
-                    <tr>
-                        <td>{{ s.superviseur.full_name }}</td>
-                        <td class="text-end">{{ s.quantite_restante }}</td>
-                        <td class="text-end">{{ s.total_ventes_agents|fcfa }}</td>
-                        <td class="text-end">{{ s.total_remis_rot|fcfa }}</td>
-                        <td class="text-end fw-semibold {% if s.reste_a_remettre > 0 %}text-danger{% endif %}">
-                            {{ s.reste_a_remettre|fcfa }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        {% empty %}
+        <p class="text-muted text-center mb-0">Aucun fournisseur</p>
+        {% endfor %}
     </div>
+</div>
+
+
+    <!-- ================= STOCK ENTREPÔT ================= -->
+<div class="card mb-3">
+    <div class="card-header fw-semibold">
+        📦 Stock Entrepôt
+    </div>
+
+    <div class="card-body p-2">
+        {% for p in stock_entrepot.produits %}
+        <div class="border rounded p-2 mb-2">
+            <strong>{{ p.produit__nom }}</strong>
+
+            <div class="d-flex justify-content-between small mt-1">
+                <span>Qté restante</span>
+                <span>{{ p.quantite_restante }}</span>
+            </div>
+
+            <div class="d-flex justify-content-between small">
+                <span>Valeur</span>
+                <span>{{ p.valeur_stock|fcfa }}</span>
+            </div>
+
+            <div class="mt-1">
+                {% if p.quantite_restante <= stock_entrepot.seuil_faible %}
+                    <span class="badge bg-danger">Stock faible</span>
+                {% else %}
+                    <span class="badge bg-success">OK</span>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center mb-0">Aucun stock</p>
+        {% endfor %}
+    </div>
+</div>
+
+
+    <!-- ================= SUPERVISEURS ================= -->
+<div class="card mb-3">
+    <div class="card-header fw-semibold">
+        👥 Superviseurs
+    </div>
+
+    <div class="card-body p-2">
+        {% for s in suivi_superviseurs %}
+        <div class="border rounded p-2 mb-2">
+            <strong>{{ s.superviseur.full_name }}</strong>
+
+            <div class="row small mt-1">
+                <div class="col-6 text-muted">Stock</div>
+                <div class="col-6 text-end">{{ s.stock_restant }}</div>
+
+                <div class="col-6 text-muted">Collecté</div>
+                <div class="col-6 text-end">{{ s.recouvre_agents_vente|fcfa }}</div>
+
+                <div class="col-6 text-muted">Remis ROT</div>
+                <div class="col-6 text-end">{{ s.total_remis_rot|fcfa }}</div>
+
+                <div class="col-6 fw-semibold">À remettre</div>
+                <div class="col-6 text-end fw-bold {% if s.reste_a_remettre > 0 %}text-danger{% endif %}">
+                    {{ s.reste_a_remettre|fcfa }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
 
 </div>
 {% endblock %}

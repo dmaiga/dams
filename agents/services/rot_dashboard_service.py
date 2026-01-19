@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
+from requests import request
 
 from core.models import (
     Agent,
@@ -18,18 +19,12 @@ from core.models import (
 )
 
 from django.db.models import ExpressionWrapper
+from django.conf import settings
 
 def get_date_debut_rot():
-    """
-    Date à partir de laquelle le ROT devient opérationnel.
-    """
-    cloture = (
-        ClotureMensuelle.objects
-        .filter(est_cloture=True)
-        .order_by('-date_fin_periode')
-        .first()
-    )
-    return cloture.date_fin_periode if cloture else None
+    return settings.DATE_DEBUT_ROT
+
+
 
 
 
@@ -75,27 +70,33 @@ class RotDashboardService:
     # 1️⃣ KPIs GLOBAUX ROT
     # =====================================================
     @staticmethod
-    def get_kpis():
+    def get_kpis(rot):
+        if not rot or not rot.est_rot:
+            return {
+                'total_recupere_rot': Decimal('0'),
+                'total_verse_banque': Decimal('0'),
+                'total_depenses': Decimal('0'),
+                'solde_rot': Decimal('0'),
+            }
         date_min = get_date_debut_rot()
 
-        recouvre_qs = RecouvrementSuperviseur.objects.all()
-        versement_qs = VersementBancaire.objects.all()
-        depense_qs = Depense.objects.all()
+        recouvre_qs = RecouvrementSuperviseur.objects.filter(rot=rot)
+
+        versement_qs = VersementBancaire.objects.filter(effectue_par=rot)
+        depense_qs = Depense.objects.filter(effectue_par=rot)
 
         if date_min:
-            recouvre_qs = recouvre_qs.filter(date_recouvrement__date__gt=date_min)
-            versement_qs = versement_qs.filter(date_versement_reelle__date__gt=date_min)
-            depense_qs = depense_qs.filter(date_depense__date__gt=date_min)
+            recouvre_qs = recouvre_qs.filter(date_recouvrement__date__gte=date_min)
+            versement_qs = versement_qs.filter(date_versement_reelle__date__gte=date_min)
+            depense_qs = depense_qs.filter(date_depense__date__gte=date_min)
 
         total_recupere = recouvre_qs.aggregate(
             total=Coalesce(Sum('montant'), Decimal('0'))
         )['total']
 
-        versements = versement_qs.aggregate(
-            vente=Coalesce(Sum('montant_vente'), Decimal('0')),
-            hors_vente=Coalesce(Sum('montant_hors_vente'), Decimal('0')),
-        )
-        total_verse = versements['vente'] + versements['hors_vente']
+        total_verse = versement_qs.aggregate(
+            total=Coalesce(Sum('montant_vente'), Decimal('0'))
+        )['total']
 
         total_depenses = depense_qs.aggregate(
             total=Coalesce(Sum('montant'), Decimal('0'))
@@ -107,6 +108,7 @@ class RotDashboardService:
             'total_depenses': total_depenses,
             'solde_rot': total_recupere - total_verse - total_depenses,
         }
+
 
     @staticmethod
     def get_suivi_superviseurs():
@@ -153,6 +155,13 @@ class RotDashboardService:
                 + ventes_superviseur
                 - total_remis_rot
             )
+            argent_vente_superviseur = (
+                total_recouvre_agents
+                + ventes_superviseur
+                
+            )
+
+
 
             # 5️⃣ Stock restant (information opérationnelle)
             stock_restant = AffectationLotSuperviseur.objects.filter(
@@ -166,7 +175,7 @@ class RotDashboardService:
                 'stock_restant': stock_restant,
 
                 # flux cash
-                'recouvre_agents': total_recouvre_agents,
+                'recouvre_agents_vente': argent_vente_superviseur,
                 'ventes_superviseur': ventes_superviseur,
                 'total_remis_rot': total_remis_rot,
 
@@ -281,9 +290,9 @@ class RotDashboardService:
     # 4️⃣ BUILD DASHBOARD
     # =====================================================
     @staticmethod
-    def build_dashboard():
+    def build_dashboard(rot):
         return {
-            'kpis': RotDashboardService.get_kpis(),
+            'kpis': RotDashboardService.get_kpis(rot),
             'stock_entrepot': RotDashboardService.get_stock_entrepot(),
             'suivi_superviseurs': RotDashboardService.get_suivi_superviseurs(),
             'fournisseurs': RotDashboardService.get_tableau_fournisseurs(),

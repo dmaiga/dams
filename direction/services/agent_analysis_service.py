@@ -1,7 +1,7 @@
 #/core/services/
 from core.models import (Agent, Vente, Recouvrement, 
                          VersementBancaire, Depense, DetailDistribution,
-                         DistributionAgent)
+                         DistributionAgent,RecouvrementSuperviseur)
 
 from django.db.models import Max
 from django.utils import timezone
@@ -18,25 +18,488 @@ from django.db.models.functions import Coalesce
 from django.core.cache import cache
 
 class AgentAnalysisService:
+    
+    @staticmethod
+    def get_mois_courant_range():
+        now = timezone.now()
+        debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return debut, now
+    
+    @staticmethod
+    def get_agent_kpis():
+        """KPI globaux agents (excluts direction)"""
+        agents_qs = Agent.objects.filter(est_actif=True).exclude(type_agent='stagiaire')
+        return {
+               "total_agents": agents_qs.count(),
+                "agents_terrain": agents_qs.filter(type_agent='terrain').count(),
+                "agents_gros": agents_qs.filter(type_agent='agent_gros').count(),
+                "superviseurs": agents_qs.filter(type_agent='entrepot').count(),
+                "rots": agents_qs.filter(type_agent='rot').count(), 
+              }
 
     @staticmethod
-    def get_agents_dashboard_snapshot():
-        cache_key = "agents_dashboard:v1"
-        cached = cache.get(cache_key)
-        if cached:
-            return cached
+    def get_agents_par_type_direction():
+        agents = Agent.objects.filter(
+            est_actif=True
+        ).exclude(type_agent='stagiaire')
 
-        data = {
-            "kpis": AgentAnalysisService.get_agent_kpis(),  # counts
-            "agents_stock": AgentAnalysisService.get_agents_with_stock(),
-            "top_quantite": AgentAnalysisService.get_top_vendeurs_quantite(),
-            "top_marge": AgentAnalysisService.get_top_vendeurs_marge(),
-            "agents_actifs_72h": AgentAnalysisService.get_agents_vendu_derniere_72h(),
+        return {
+            "terrain": agents.filter(type_agent='terrain'),
+            "gros": agents.filter(type_agent='agent_gros'),
+            "superviseurs": agents.filter(type_agent='entrepot'),
+            "rots": agents.filter(type_agent='rot'),
         }
 
-        cache.set(cache_key, data, 60 * 10)  # 10 minutes
+  
+    @staticmethod
+    def get_agents_direction_view():
+        ventes = (
+            Vente.objects
+            .filter(stagiaire__isnull=True, est_supprime=False)
+            .values("agent_id", "agent__type_agent")
+            .annotate(
+                ca=Sum(F("quantite") * F("prix_vente_unitaire")),
+                quantite=Sum("quantite"),
+                derniere_vente=Max("date_vente"),
+            )
+        )
+
+        agents_map = {
+            a.id: a
+            for a in Agent.objects.exclude(type_agent='stagiaire').select_related("user")
+        }
+
+        result = []
+
+        for v in ventes:
+            agent = agents_map.get(v["agent_id"])
+            if not agent:
+                continue
+
+            result.append({
+                "agent": agent,
+                "type_agent": agent.type_agent,
+                "ca": v["ca"] or Decimal("0"),
+                "quantite": v["quantite"] or 0,
+                "argent_possession": agent.argent_en_possession,
+                "derniere_vente": v["derniere_vente"],
+            })
+
+        return result
+
+    @staticmethod
+    def get_direction_kpis():
+        ventes = Vente.objects.filter(
+            stagiaire__isnull=True,
+            est_supprime=False
+        )
+
+        versements = VersementBancaire.objects.all()
+        depenses = Depense.objects.all()
+
+        return {
+            "ca_total": ventes.aggregate(
+                total=Coalesce(
+                    Sum(F("quantite") * F("prix_vente_unitaire")),
+                    Decimal("0")
+                )
+            )["total"],
+
+            "total_verse": versements.aggregate(
+                total=Coalesce(Sum("montant_vente"), Decimal("0"))
+            )["total"],
+
+            "total_depenses": depenses.aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0"))
+            )["total"],
+
+            "nombre_versements": versements.count(),
+        }
+
+
+    @staticmethod
+    def get_superviseurs_finance():
+        debut, fin = AgentAnalysisService.get_mois_courant_range()
+
+        superviseurs = Agent.objects.filter(type_agent='entrepot', est_actif=True)
+
+        data = []
+        for sup in superviseurs:
+
+            ventes_perso = Vente.objects.filter(
+                agent=sup,
+                date_vente__gte=debut,
+                date_vente__lte=fin,
+                est_supprime=False
+            ).aggregate(
+                total=Coalesce(
+                    Sum(F("quantite") * F("prix_vente_unitaire")),
+                    Decimal("0")
+                )
+            )["total"]
+
+            recouvre_agents = Recouvrement.objects.filter(
+                superviseur=sup,
+                date_recouvrement__gte=debut,
+                date_recouvrement__lte=fin
+            ).aggregate(
+                total=Coalesce(Sum("montant_recouvre"), Decimal("0"))
+            )["total"]
+
+            solde = ventes_perso + recouvre_agents
+
+            data.append({
+                "superviseur": sup,
+                "ventes_personnelles": ventes_perso,
+                "recouvrements_agents": recouvre_agents,
+                "solde_mois": solde,
+            })
+
         return data
 
+    @staticmethod
+    def get_encadrement_financier_mensuel():
+        """
+        Vue direction – synthèse mensuelle
+        Superviseurs + ROT
+        """
+        today = timezone.now().date()
+        debut_mois = today.replace(day=1)
+
+        data = []
+
+        # =========================
+        # SUPERVISEURS
+        # =========================
+        superviseurs = Agent.objects.filter(type_agent='entrepot', est_actif=True)
+
+        for sup in superviseurs:
+            # ventes personnelles autorisées (mois)
+            ventes_perso = Vente.objects.filter(
+                agent=sup,
+                date_vente__date__gte=debut_mois
+            ).aggregate(
+                total=Coalesce(
+                    Sum(F("quantite") * F("prix_vente_unitaire")),
+                    Decimal("0")
+                )
+            )["total"]
+
+            # recouvrements agents (mois)
+            recouvre_agents = Recouvrement.objects.filter(
+                superviseur=sup,
+                date_recouvrement__date__gte=debut_mois
+            ).aggregate(
+                total=Coalesce(Sum("montant_recouvre"), Decimal("0"))
+            )["total"]
+
+            # remis au ROT (mois)
+            remis_rot = RecouvrementSuperviseur.objects.filter(
+                superviseur=sup,
+                date_creation__date__gte=debut_mois
+            ).aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0"))
+            )["total"]
+
+            cash_detenu = ventes_perso + recouvre_agents - remis_rot
+
+            data.append({
+                "agent": sup,
+                "role": "Superviseur",
+                "ventes": ventes_perso,
+                "recouvre": recouvre_agents,
+                "verse": remis_rot,
+                "solde": cash_detenu,
+            })
+
+        # =========================
+        # ROT
+        # =========================
+        rots = Agent.objects.filter(type_agent='rot', est_actif=True)
+
+        for rot in rots:
+            recu_sup = RecouvrementSuperviseur.objects.filter(
+                rot=rot,
+                date_creation__date__gte=debut_mois
+            ).aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0"))
+            )["total"]
+
+            verse_banque = VersementBancaire.objects.filter(
+                effectue_par=rot,
+                date_versement_reelle__date__gte=debut_mois
+            ).aggregate(
+                total=Coalesce(Sum("montant_vente"), Decimal("0"))
+            )["total"]
+
+            solde = recu_sup - verse_banque
+
+            data.append({
+                "agent": rot,
+                "role": "ROT",
+                "ventes": Decimal("0"),
+                "recouvre": recu_sup,
+                "verse": verse_banque,
+                "solde": solde,
+            })
+
+        return data
+
+    @staticmethod
+    def resolve_period(request):
+        periode = request.GET.get("periode", "mois")
+        today = timezone.now().date()
+
+        if periode == "mois_prec":
+            debut = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+            fin = today.replace(day=1) - timedelta(days=1)
+
+        elif periode == "custom":
+            debut = request.GET.get("date_debut")
+            fin = request.GET.get("date_fin")
+            if debut and fin:
+                debut = datetime.strptime(debut, "%Y-%m-%d").date()
+                fin = datetime.strptime(fin, "%Y-%m-%d").date()
+            else:
+                debut = today.replace(day=1)
+                fin = today
+
+        else:  # mois courant
+            debut = today.replace(day=1)
+            fin = today
+
+        return {
+            "periode": periode,
+            "date_debut": debut,
+            "date_fin": fin,
+        }
+
+
+
+    @staticmethod
+    def get_superviseur_detail(superviseur, debut, fin):
+        # ======================
+        # AGENTS SUPERVISÉS
+        # ======================
+        agents = Agent.objects.filter(
+            superviseur=superviseur,
+            est_actif=True
+        ).exclude(type_agent='stagiaire')
+
+        agents_data = []
+        total_ca = Decimal("0")
+        total_quantite = 0
+        total_marge = Decimal("0")
+        qte_gros = 0
+        qte_detail = 0
+
+        for agent in agents:
+            ventes = Vente.objects.filter(
+                agent=agent,
+                date_vente__date__range=(debut, fin),
+                est_supprime=False
+            )
+
+            # CA calculation
+            agg = ventes.aggregate(
+                ca=Coalesce(
+                    Sum(
+                        F("quantite") * F("prix_vente_unitaire"),
+                        output_field=DecimalField(max_digits=15, decimal_places=2)
+                    ),
+                    Decimal("0")
+                ),
+                quantite=Coalesce(
+                    Sum("quantite", output_field=DecimalField(max_digits=10, decimal_places=2)),
+                    0
+                ),
+            )
+
+
+            marge = ventes.aggregate(
+                marge=Coalesce(
+                    Sum(
+                        (
+                            F("prix_vente_unitaire") -
+                            Coalesce(
+                                F("detail_distribution__lot__prix_achat_unitaire"),
+                                Decimal("0.00"),
+                                output_field=DecimalField(max_digits=10, decimal_places=2)
+                            )
+                        ) * F("quantite"),
+                        output_field=DecimalField(max_digits=15, decimal_places=2)
+                    ),
+                    Decimal("0.00")
+                )
+            )["marge"]
+
+
+            recouvre = Recouvrement.objects.filter(
+                agent=agent,
+                superviseur=superviseur,
+                date_recouvrement__date__range=(debut, fin)
+            ).aggregate(
+                total=Coalesce(
+                    Sum("montant_recouvre", output_field=DecimalField(max_digits=10, decimal_places=2)),
+                    Decimal("0")
+                )
+            )["total"]
+
+            reste = agg["ca"] - recouvre
+
+            if agent.est_agent_gros:
+                qte_gros += agg["quantite"]
+            else:
+                qte_detail += agg["quantite"]
+
+            total_ca += agg["ca"]
+            total_quantite += agg["quantite"]
+            total_marge += marge
+
+            agents_data.append({
+                "agent": agent,
+                "type": "Grossiste" if agent.est_agent_gros else "Détaillant",
+                "ca": agg["ca"],
+                "quantite": agg["quantite"],
+                "marge": marge,
+                "reste": reste,
+            })
+
+        # ======================
+        # FLUX SUPERVISEUR
+        # ======================
+        recouvre_agents = Recouvrement.objects.filter(
+            superviseur=superviseur,
+            date_recouvrement__date__range=(debut, fin)
+        ).aggregate(
+            total=Coalesce(
+                Sum("montant_recouvre", output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Decimal("0")
+            )
+        )["total"]
+
+        # Fix ventes_perso aggregation
+        ventes_perso = Vente.objects.filter(
+            agent=superviseur,
+            date_vente__date__range=(debut, fin)
+        ).aggregate(
+            total=Coalesce(
+                Sum(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+                Decimal("0")
+            )
+        )["total"]
+
+        remis_rot = VersementBancaire.objects.filter(
+            superviseur=superviseur,
+            date_versement_reelle__date__range=(debut, fin)
+        ).aggregate(
+            total=Coalesce(
+                Sum("montant_vente", output_field=DecimalField(max_digits=10, decimal_places=2)),
+                Decimal("0")
+            )
+        )["total"]
+
+        cash_detenu = recouvre_agents + ventes_perso
+        solde = cash_detenu - remis_rot
+
+        return {
+            "superviseur": superviseur,
+
+            # KPIs business
+            "kpis": {
+                "ca_total": total_ca,
+                "quantite": total_quantite,
+                "marge": total_marge,
+                "taux_marge": round((total_marge / total_ca) * 100, 1) if total_ca > 0 else 0,
+                "mix_gros": round((qte_gros / total_quantite) * 100, 1) if total_quantite else 0,
+                "mix_detail": round((qte_detail / total_quantite) * 100, 1) if total_quantite else 0,
+                "solde": solde,
+            },
+
+            # flux
+            "flux": {
+                "recouvre_agents": recouvre_agents,
+                "ventes_perso": ventes_perso,
+                "remis_rot": remis_rot,
+                "cash_detenu": cash_detenu,
+            },
+
+            "agents": agents_data,
+        }
+
+    @staticmethod
+    def get_superviseur_sales_kpis(superviseur, debut, fin):
+        ventes = Vente.objects.filter(
+            agent__superviseur=superviseur,
+            date_vente__date__range=(debut, fin),
+            stagiaire__isnull=True,
+            est_supprime=False
+        )
+
+        agg = ventes.aggregate(
+            ca=Coalesce(Sum(F("quantite") * F("prix_vente_unitaire")), Decimal("0")),
+            quantite=Coalesce(Sum("quantite"), 0),
+            marge=Coalesce(
+                Sum(
+                    (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire"))
+                    * F("quantite")
+                ),
+                Decimal("0")
+            ),
+        )
+
+        qte_gros = ventes.filter(type_vente='gros').aggregate(
+            q=Coalesce(Sum("quantite"), 0)
+        )["q"]
+
+        qte_detail = ventes.filter(type_vente='detail').aggregate(
+            q=Coalesce(Sum("quantite"), 0)
+        )["q"]
+
+        total_qte = agg["quantite"] or 0
+
+        return {
+            "ca_total": agg["ca"],
+            "quantite": total_qte,
+            "marge": agg["marge"],
+            "taux_marge": round((agg["marge"] / agg["ca"] * 100), 1) if agg["ca"] > 0 else 0,
+            "mix_gros": round((qte_gros / total_qte) * 100, 1) if total_qte else 0,
+            "mix_detail": round((qte_detail / total_qte) * 100, 1) if total_qte else 0,
+        }
+
+    @staticmethod
+    def get_rot_detail(rot, debut, fin):
+        recu = RecouvrementSuperviseur.objects.filter(
+            rot=rot,
+            date_recouvrement__date__range=(debut, fin)
+        ).aggregate(
+            total=Coalesce(Sum("montant"), Decimal("0"))
+        )["total"]
+
+        verse = VersementBancaire.objects.filter(
+            effectue_par=rot,
+            date_versement_reelle__date__range=(debut, fin)
+        ).aggregate(
+            total=Coalesce(Sum("montant_vente"), Decimal("0"))
+        )["total"]
+
+        depenses = Depense.objects.filter(
+            effectue_par=rot,
+            date_depense__date__range=(debut, fin)
+        ).aggregate(
+            total=Coalesce(Sum("montant"), Decimal("0"))
+        )["total"]
+
+        return {
+            "rot": rot,
+            "recu": recu,
+            "verse": verse,
+            "depenses": depenses,
+            "solde": recu - verse - depenses,
+        }
 
     @staticmethod
     def get_agent_regularity_status(jours_inactifs):
@@ -146,7 +609,6 @@ class AgentAnalysisService:
         
         return date_debut, date_fin
             
-
     @staticmethod
     def get_agent_period_data(agent, period_type='monthly'):
         """Retourne toutes les données pour une période donnée"""
@@ -201,232 +663,8 @@ class AgentAnalysisService:
             'ca_detail': ca_detail,
             'pourcentage_gros': round(pourcentage_gros, 1),
             'pourcentage_detail': round(pourcentage_detail, 1),
-        }
-    
+        }   
 
-
-    @staticmethod
-    def get_agent_kpis():
-        """KPI globaux agents (exclut direction)"""
-        agents = Agent.objects.exclude(type_agent='direction')
-        stagiaires = agents.filter(type_agent='stagiaire')
-        
-        return {
-            'total_agents': agents.count(),
-            'superviseurs': agents.filter(type_agent='entrepot').count(),
-            'agents_terrain': agents.filter(type_agent='terrain').count(),
-            'stagiaires_total': stagiaires.count(),
-            'stagiaires_actifs': stagiaires.filter(date_expiration__gt=timezone.now()).count(),
-            'stagiaires_expires': stagiaires.filter(date_expiration__lte=timezone.now()).count(),
-        }
-
-
-    @staticmethod
-    def get_top_vendeurs_quantite(limit=5):
-        """
-        Top agents terrain par quantité vendue
-        VERSION OPTIMISÉE – 0 N+1
-        """
-
-        ventes = (
-            Vente.objects
-            .filter(
-                agent__type_agent='terrain',
-                stagiaire__isnull=True,
-                est_supprime=False
-            )
-            .values("agent_id")
-            .annotate(
-                quantite_totale=Sum("quantite"),
-
-                quantite_gros=Sum(
-                    "quantite",
-                    filter=Q(type_vente='gros')
-                ),
-
-                quantite_detail=Sum(
-                    "quantite",
-                    filter=Q(type_vente='detail')
-                ),
-            )
-            .order_by("-quantite_totale")[:limit]
-        )
-
-        agents = {
-            a.id: a
-            for a in Agent.objects.filter(
-                id__in=[v["agent_id"] for v in ventes]
-            )
-        }
-
-        result = []
-        for v in ventes:
-            agent = agents.get(v["agent_id"])
-            if not agent:
-                continue
-
-            result.append({
-                "agent": agent,
-                "quantite_totale": v["quantite_totale"] or 0,
-                "quantite_gros": v["quantite_gros"] or 0,
-                "quantite_detail": v["quantite_detail"] or 0,
-            })
-
-        return result
-
-    @staticmethod
-    def get_top_vendeurs_marge(limit=5):
-        """
-        Top agents terrain par marge générée
-        VERSION OPTIMISÉE – 0 N+1
-        """
-
-        ventes = (
-            Vente.objects
-            .filter(
-                agent__type_agent='terrain',
-                stagiaire__isnull=True,
-                est_supprime=False
-            )
-            .annotate(
-                # CA ligne
-                ca_ligne=ExpressionWrapper(
-                    F("quantite") * F("prix_vente_unitaire"),
-                    output_field=DecimalField(max_digits=15, decimal_places=2)
-                ),
-                # Marge ligne = (prix vente - prix achat) * qte
-                marge_ligne=ExpressionWrapper(
-                    (F("prix_vente_unitaire")
-                     - F("detail_distribution__lot__prix_achat_unitaire"))
-                    * F("quantite"),
-                    output_field=DecimalField(max_digits=15, decimal_places=2)
-                ),
-            )
-            .values("agent_id")
-            .annotate(
-                ca_total=Sum("ca_ligne"),
-                marge_totale=Sum("marge_ligne"),
-                quantite_totale=Sum("quantite"),
-
-                # Optionnel : détail gros / détail
-                marge_gros=Sum(
-                    "marge_ligne",
-                    filter=Q(type_vente='gros')
-                ),
-                marge_detail=Sum(
-                    "marge_ligne",
-                    filter=Q(type_vente='detail')
-                ),
-            )
-            .order_by("-marge_totale")[:limit]
-        )
-
-        agents = {
-            a.id: a
-            for a in Agent.objects.filter(
-                id__in=[v["agent_id"] for v in ventes]
-            )
-        }
-
-        result = []
-        for v in ventes:
-            agent = agents.get(v["agent_id"])
-            if not agent:
-                continue
-
-            ca = v["ca_total"] or Decimal("0")
-            marge = v["marge_totale"] or Decimal("0")
-            taux_marge = (marge / ca * 100) if ca > 0 else 0
-
-            result.append({
-                "agent": agent,
-                "ca_total": ca,
-                "marge_totale": marge,
-                "taux_marge": float(taux_marge),
-                "quantite_totale": v["quantite_totale"] or 0,
-                "marge_gros": v["marge_gros"] or Decimal("0"),
-                "marge_detail": v["marge_detail"] or Decimal("0"),
-            })
-
-        return result
-
-
-    @staticmethod
-    def get_superviseurs_finance():
-        """Situation financière des superviseurs"""
-        superviseurs = Agent.objects.filter(type_agent='entrepot')
-        
-        superviseurs_data = []
-        for superviseur in superviseurs:
-            # Ventes personnelles
-            ventes_perso = Vente.objects.filter(agent=superviseur)
-            total_ventes = sum(vente.quantite * vente.prix_vente_unitaire for vente in ventes_perso)
-            
-            # Recouvrements agents
-            recouvrements = Recouvrement.objects.filter(superviseur=superviseur)
-            total_recouvrements = sum(rec.montant_recouvre for rec in recouvrements)
-            
-            # Dépenses
-            depenses = Depense.objects.filter(versement__superviseur=superviseur)
-            total_depenses = sum(dep.montant for dep in depenses)
-            
-            # Versements
-            versements = VersementBancaire.objects.filter(superviseur=superviseur)
-            total_versements = sum(vers.montant_vente for vers in versements)
-            
-            # Solde
-            solde = superviseur.solde_reel_superviseur
-            
-            superviseurs_data.append({
-                'superviseur': superviseur,
-                'total_ventes': total_ventes,
-                'total_recouvrements': total_recouvrements,
-                'total_depenses': total_depenses,
-                'total_versements': total_versements,
-                'solde': solde
-            })
-        
-        return superviseurs_data
-    
-    @staticmethod
-    def get_competition_stagiaires():
-        """Performance des stagiaires - pour ventes réalisées POUR eux"""
-        stagiaires = Agent.objects.filter(type_agent='stagiaire')
-        
-        competition_data = []
-        for stagiaire in stagiaires:
-            # Ventes où le stagiaire est mentionné (réalisées par d'autres agents pour lui)
-            ventes_stagiaire = Vente.objects.filter(stagiaire=stagiaire)
-            total_quantite = sum(vente.quantite for vente in ventes_stagiaire)
-            total_ca = sum(vente.quantite * vente.prix_vente_unitaire for vente in ventes_stagiaire)
-            
-            # Calcul de la MARGE pour les ventes du stagiaire
-            marge_totale = Decimal('0')
-            for vente in ventes_stagiaire:
-                prix_achat = vente.detail_distribution.lot.prix_achat_unitaire or Decimal('0')
-                marge_vente = (vente.prix_vente_unitaire - prix_achat) * vente.quantite
-                marge_totale += marge_vente
-            
-            # Taux de marge
-            taux_marge = (marge_totale / total_ca * 100) if total_ca > 0 else 0
-            
-            statut = "🟢 Actif" if stagiaire.est_expire == False else "🔴 Expiré"
-            jours_restants = stagiaire.jours_restants if stagiaire.jours_restants else "Expiré"
-            
-            competition_data.append({
-                'stagiaire': stagiaire,
-                'statut': statut,
-                'total_quantite': total_quantite,
-                'total_ca': total_ca,
-                'marge_totale': marge_totale,
-                'taux_marge': round(taux_marge, 1),
-                'jours_restants': jours_restants,
-                'date_mise_service': stagiaire.date_mise_service,
-                'nombre_ventes': ventes_stagiaire.count()
-            })
-        
-        # Tri par MARGE (plus pertinent que CA)
-        return sorted(competition_data, key=lambda x: x['total_quantite'], reverse=True)
 
     @staticmethod
     def get_agents_terrain_performance(mois='all'):
@@ -730,165 +968,3 @@ class AgentAnalysisService:
             'nombre_ventes_stagiaires': agent.vente_set.filter(stagiaire__isnull=False).count(),
         }
 
-
-    @staticmethod
-    def get_agents_vendu_derniere_72h():
-        """
-        Agents terrain ayant vendu dans les dernières 72h
-        VERSION ORM SAFE (Django 5.x)
-        """
-
-        limite = timezone.now() - timedelta(hours=48)
-
-        ventes = (
-            Vente.objects
-            .filter(
-                agent__type_agent='terrain',
-                stagiaire__isnull=True,
-                date_vente__gte=limite
-            )
-            .annotate(
-                ca_ligne=ExpressionWrapper(
-                    F("quantite") * F("prix_vente_unitaire"),
-                    output_field=DecimalField(max_digits=15, decimal_places=2)
-                )
-            )
-            .values("agent_id")
-            .annotate(
-                nombre_ventes=Count("id"),
-                quantite=Sum("quantite"),
-                ca=Sum("ca_ligne"),
-                derniere_vente=Max("date_vente"),
-            )
-        )
-
-        agents_map = {
-            a.id: a
-            for a in Agent.objects.filter(
-                id__in=[v["agent_id"] for v in ventes]
-            )
-        }
-
-        result = []
-        for v in ventes:
-            agent = agents_map.get(v["agent_id"])
-            if not agent:
-                continue
-
-            result.append({
-                "agent": agent,
-                "nombre_ventes": v["nombre_ventes"] or 0,
-                "quantite": v["quantite"] or 0,
-                "ca": v["ca"] or Decimal("0"),
-                "derniere_vente": v["derniere_vente"],
-            })
-
-        return result
-
-    @staticmethod
-    def get_agents_with_stock():
-        """
-        Agents terrain avec stock + valeur + argent à recouvrer
-        OPTIMISÉ : 4 requêtes max
-        """
-
-        # -------------------------
-        # Agents terrain
-        # -------------------------
-        agents = (
-            Agent.objects
-            .filter(type_agent='terrain')
-            .select_related('user')
-        )
-        agent_map = {a.id: a for a in agents}
-
-        if not agent_map:
-            return []
-
-        agent_ids = list(agent_map.keys())
-
-        # -------------------------
-        # Détails de distribution (1 requête)
-        # -------------------------
-        details = (
-            DetailDistribution.objects
-            .filter(
-                distribution__agent_terrain_id__in=agent_ids,
-              
-                quantite__gt=0
-            )
-            .select_related(
-                'lot__produit',
-                'distribution'
-            )
-            .annotate(
-                quantites_vendue=Coalesce(
-                    Sum(
-                        'vente__quantite',
-                        filter=Q(vente__est_supprime=False)
-                    ),
-                    Decimal('0.00')
-                )
-            )
-        )
-
-        # -------------------------
-        # Recouvrements par agent (1 requête)
-        # -------------------------
-        recouvrements = {
-            r["agent_id"]: r["total"]
-            for r in (
-                Recouvrement.objects
-                .filter(agent_id__in=agent_ids)
-                .values("agent_id")
-                .annotate(total=Coalesce(Sum("montant_recouvre"), Decimal("0.00")))
-            )
-        }
-
-        # -------------------------
-        # Assemblage Python (ZÉRO SQL)
-        # -------------------------
-        result = {}
-        for agent in agents:
-            result[agent.id] = {
-                "agent": agent,
-                "details": [],
-                "valeur_stock": Decimal("0.00"),
-                "montant_a_recouvrer": max(
-                    agent.total_ventes - recouvrements.get(agent.id, Decimal("0.00")),
-                    Decimal("0.00")
-                ),
-            }
-
-        for d in details:
-            reste = d.quantite - d.quantites_vendue
-            if reste <= 0:
-                continue
-
-            valeur = reste * (d.prix_gros or 0)
-
-            bucket = result[d.distribution.agent_terrain_id]
-            bucket["valeur_stock"] += valeur
-
-            bucket["details"].append({
-                "distribution_date": d.distribution.date_distribution,
-                "produit": d.lot.produit.nom,
-                "quantite_restante": reste,
-                "prix_gros": d.prix_gros,
-                "valeur": valeur,
-                "lot": d.lot.reference_lot,
-            })
-
-        return [v for v in result.values() if v["details"]]
-
-    @staticmethod
-    def get_agents_with_stock_cached():
-        key = "agents_stock:v1"
-        cached = cache.get(key)
-        if cached:
-            return cached
-    
-        data = AgentAnalysisService.get_agents_with_stock()
-        cache.set(key, data, 60 * 2)
-        return data
-    

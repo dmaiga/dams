@@ -1,0 +1,278 @@
+{% extends "base_admin.html" %}
+{% load humanize %}
+{% load direction_filters %}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- =========================
+       HEADER
+  ========================== -->
+<div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+
+  <!-- Titre + période -->
+  <div>
+    <h1 class="text-2xl font-bold">
+      Superviseur — {{ superviseur.full_name }}
+    </h1>
+    <p class="text-sm text-gray-500">
+      Période : {{ date_debut }} → {{ date_fin }}
+    </p>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex gap-2">
+    <a href="{% url 'agent_dashboard' %}" class="btn btn-sm btn-outline">
+      <i class="fas fa-arrow-left"></i>
+      Retour
+    </a>
+
+    
+  </div>
+
+</div>
+
+    <!-- =========================
+         FILTRE PÉRIODE
+    ========================== -->
+<form method="get" class="flex flex-wrap items-end gap-3 bg-base-100 p-4 rounded-box shadow-sm">
+
+  <!-- Sélecteur période -->
+  <div>
+    <label class="label">
+      <span class="label-text text-xs">Période</span>
+    </label>
+    <select name="periode" class="select select-sm select-bordered">
+      <option value="mois" {% if periode == "mois" %}selected{% endif %}>
+        Mois courant
+      </option>
+      <option value="mois_prec" {% if periode == "mois_prec" %}selected{% endif %}>
+        Mois précédent
+      </option>
+      <option value="custom" {% if periode == "custom" %}selected{% endif %}>
+        Période personnalisée
+      </option>
+    </select>
+  </div>
+
+  <!-- Date début -->
+  <div>
+    <label class="label">
+      <span class="label-text text-xs">Date début</span>
+    </label>
+    <input
+      type="date"
+      name="date_debut"
+      value="{{ date_debut|date:'Y-m-d' }}"
+      class="input input-sm input-bordered"
+    />
+  </div>
+
+  <!-- Date fin -->
+  <div>
+    <label class="label">
+      <span class="label-text text-xs">Date fin</span>
+    </label>
+    <input
+      type="date"
+      name="date_fin"
+      value="{{ date_fin|date:'Y-m-d' }}"
+      class="input input-sm input-bordered"
+    />
+  </div>
+
+  <!-- Bouton -->
+  <div>
+    <button type="submit" class="btn btn-sm btn-primary">
+      Appliquer
+    </button>
+  </div>
+
+</form>
+
+  <!-- =========================
+       KPIs
+  ========================== -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+
+  <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+    <div class="stat-title text-xs">Agents actifs</div>
+    <div class="stat-value text-xl">
+      {{ agents|length }}
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+    <div class="stat-title text-xs">CA total</div>
+    <div class="stat-value text-xl text-primary">
+      {{ kpis.ca_total|floatformat:0|intcomma }}
+    </div>
+    <div class="stat-desc text-xs">
+      Agents : {{ kpis.ca_agents|floatformat:0|intcomma }} /
+      Sup. : {{ kpis.ca_superviseur|floatformat:0|intcomma }}
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+    <div class="stat-title text-xs">À recouvrer (agents)</div>
+    <div class="stat-value text-xl text-warning">
+      {{ flux.reste_agents|floatformat:0|intcomma }}
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+    <div class="stat-title text-xs">Remis au ROT</div>
+    <div class="stat-value text-xl text-success">
+      {{ flux.remis_rot|floatformat:0|intcomma }}
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+    <div class="stat-title text-xs">Solde superviseur</div>
+    <div class="stat-value text-xl text-error">
+      {{ flux.solde_superviseur|floatformat:0|intcomma }}
+    </div>
+  </div>
+
+</div>
+
+
+  <!-- =========================
+       AGENTS NON RECOUVRÉS
+  ========================== -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title text-error">
+        Agents non recouvrés
+      </h2>
+
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th class="text-right">CA</th>
+              <th class="text-right">Recouvré</th>
+              <th class="text-right">Reste</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in agents %}
+              {% if a.reste > 0 %}
+              <tr class="hover">
+                <td>{{ a.agent.full_name }}</td>
+                <td class="text-right">{{ a.ca|floatformat:0|intcomma }}</td>
+                <td class="text-right">{{ a.recouvre|floatformat:0|intcomma }}</td>
+                <td class="text-right text-error font-semibold">
+                  {{ a.reste|floatformat:0|intcomma }}
+                </td>
+              </tr>
+              {% endif %}
+            {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-gray-400">
+                  Aucun agent concerné
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================
+       AGENTS SANS VENTE > 48H
+  ========================== -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title text-warning">
+        Agents sans vente depuis 48h
+      </h2>
+
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Dernière vente</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agents %}
+            {% if a.sans_vente_48h %}
+            <tr>
+              <td>{{ a.agent.full_name }}</td>
+              <td>
+                {% if a.derniere_vente %}
+                  {{ a.derniere_vente|date:"d/m/Y H:i" }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge badge-warning">Inactif</span>
+              </td>
+            </tr>
+            {% endif %}
+          {% empty %}
+            <tr>
+              <td colspan="3" class="text-center text-gray-400">
+                Aucun agent concerné
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- =========================
+       MATRICE AGENT × PRODUIT
+  ========================== -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title">
+        Répartition des produits (quantités distribuées)
+      </h2>
+
+      <div class="overflow-x-auto">
+<table class="table table-sm table-zebra">
+  <thead>
+    <tr>
+      <th>Agent</th>
+      {% for produit in matrice.colonnes %}
+        <th class="text-right">{{ produit }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for ligne in matrice.lignes.values %}
+      <tr>
+        <td class="font-medium">
+          {{ ligne.agent.full_name }}
+        </td>
+
+        {% for produit in matrice.colonnes %}
+          <td class="text-right">
+            {{ ligne.produits|get_item:produit|default:"0" }}
+          </td>
+        {% endfor %}
+      </tr>
+    {% empty %}
+      <tr>
+        <td colspan="{{ matrice.colonnes|length|add:1 }}" class="text-center text-gray-400">
+          Aucune distribution sur la période
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

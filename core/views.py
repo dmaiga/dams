@@ -22,7 +22,7 @@ from django.db.models.functions import Coalesce
 from django import forms
 from django.core.exceptions import ValidationError 
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 # Python stdlib
 from datetime import timedelta
 from decimal import Decimal
@@ -34,15 +34,16 @@ from .models import (
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
-    Recouvrement,VersementBancaire,VersementBancaire,RecuVersement
+    Recouvrement,VersementBancaire,VersementBancaire,
+    RecuVersement,FactureLotEntrepot
 )
 
 # Project forms
 from .forms import (
     FactureLotForm, VenteDetailAgentForm,VenteGrosAgentForm,
     VenteSuperviseurForm,DistributionForm, ReceptionLotForm, 
-    DetteForm, PaiementDetteForm,RecouvrementForm,
-    FournisseurForm,VersementForm
+    DetteForm, PaiementDetteForm,RecouvrementForm,TelephoneOrUsernameLoginForm,
+    FournisseurForm,VersementForm,FactureLotForm,RecuVersementForm,PerteForm
 
 )
 
@@ -55,16 +56,18 @@ from agents.forms import (
                             
                             )
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
+
+from django.db.models import Sum, Count, Avg, F, Max, Min
+from agents.services.agent_stock_service import AgentStockService
 
 
-from django.contrib.auth import authenticate, login
-from django.contrib import messages
-from core.forms import TelephoneOrUsernameLoginForm
-from core.models import Agent
 from django.core.paginator import Paginator
+
+
+
+
+
+
 
 
 def custom_login(request):
@@ -123,8 +126,6 @@ def logout_user(request):
     logout(request)  
     return redirect('login') 
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
 
 @login_required
 def access_denied(request, reason=None):
@@ -184,7 +185,6 @@ def supprimer_agent(request, agent_id):
 #FOURNISSEUR
 #========
 
-from django.db.models import Sum, Count, Avg, F, Max, Min
 
 
 
@@ -468,11 +468,6 @@ def liste_lots(request):
         **stats,
     })
 
-# core/views.py
-
-from django.shortcuts import render, get_object_or_404, redirect
-from core.models import LotEntrepot
-from core.forms import PerteForm
 
 
 @login_required
@@ -514,9 +509,6 @@ def detail_lot(request, lot_id):
         'title': f'Lot {lot.reference_lot}'
     })
 
-from agents.services.agent_stock_service import AgentStockService
-from django.utils import timezone
-from datetime import timedelta
 
 
 @login_required
@@ -1399,12 +1391,9 @@ def creer_dette(request):
 #FACTURE
 #=====
 
-from decimal import Decimal
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from core.models import LotEntrepot, FactureLotEntrepot
-from core.forms import FactureLotForm
+
+
+
 
 @login_required
 def gestion_factures_lot(request, lot_id):
@@ -1470,29 +1459,28 @@ def gestion_factures_lot(request, lot_id):
 
 @login_required
 def creer_versement(request):
-    """Créer un versement - interface simple"""
     agent_connecte = request.user.agent
-    
+
+    if not agent_connecte.est_rot:
+        return redirect("access_denied")
+
     if request.method == "POST":
         form = VersementForm(request.POST, request.FILES)
         if form.is_valid():
-            try:
-                # CORRECTION : Utiliser save() avec superviseur pour la création
-                form.save(superviseur=agent_connecte)
-                messages.success(request, "✅ Versement créé avec succès!")
-                return redirect("liste_versement")
-                    
-            except Exception as e:
-                messages.error(request, f"Erreur: {str(e)}")
+            form.save(rot=agent_connecte)
+            messages.success(request, "✅ Versement enregistré par le ROT")
+            return redirect("liste_versement")
     else:
         form = VersementForm()
 
-    context = {
-        "form": form, 
-        "superviseur": agent_connecte
-    }
-    
-    return render(request, "core/factures/creer_versement.html", context)
+    return render(
+        request,
+        "core/factures/creer_versement.html",
+        {
+            "form": form,
+            "rot": agent_connecte
+        }
+    )
 
 
 @login_required
@@ -1558,23 +1546,42 @@ def modifier_versement(request, versement_id):
 
 @login_required
 def liste_versement(request):
-    """Afficher la liste des versements avec statistiques"""
-    # Récupérer tous les versements
-    versements = VersementBancaire.objects.all().order_by('-date_versement_reelle')
-    
-    # Calculer les statistiques
-    total_vente = versements.aggregate(total=Sum('montant_vente'))['total'] or 0
-    total_hors_vente = versements.aggregate(total=Sum('montant_hors_vente'))['total'] or 0
+    versements = (
+        VersementBancaire.objects
+        .all()
+        .order_by('-date_versement_reelle')
+    )
+
+    total_vente = versements.aggregate(
+        total=Sum('montant_vente')
+    )['total'] or 0
+
+    total_hors_vente = versements.aggregate(
+        total=Sum('montant_hors_vente')
+    )['total'] or 0
+
     total_general = total_vente + total_hors_vente
-    
+
+    total_depenses = (
+        Depense.objects
+        .aggregate(total=Sum('montant'))['total'] or 0
+    )
+
     context = {
         'versements': versements,
         'total_vente': total_vente,
         'total_hors_vente': total_hors_vente,
+        'total_depenses': total_depenses,
         'total_general': total_general,
     }
-    
-    return render(request, 'core/factures/liste_versement.html', context)
+
+    return render(
+        request,
+        'core/factures/liste_versement.html',
+        context
+    )
+
+
 
 @login_required
 def detail_versement(request, versement_id):
@@ -1599,14 +1606,6 @@ def detail_versement(request, versement_id):
     
     return render(request, 'core/factures/detail_versement.html', context)
 
-# Dans views.py
-from django.views.generic import UpdateView
-from django.urls import reverse_lazy
-from django.contrib import messages
-
-from django.views.generic import UpdateView
-from django.urls import reverse_lazy
-from django.contrib import messages
 
 class AjouterRecusView(UpdateView):
     model = VersementBancaire
@@ -1687,8 +1686,6 @@ def supprimer_versement(request, versement_id):
         messages.error(request, f"❌ Erreur inattendue: {str(e)}")
         return redirect('liste_versement')
 
-from django.shortcuts import render, redirect
-from .forms import RecuVersementForm
 
 @login_required
 def recu_liste(request):
@@ -1891,6 +1888,35 @@ def liste_agents_recouvrement(request):
         # Terrain / autre → interdit
         return redirect("access_denied")
 
+    # =========================
+    # FILTRE MENSUEL
+    # =========================
+    
+    mois_str = request.GET.get("mois")  # ex: "2026-01"
+    
+    now = timezone.now()
+    
+    if mois_str:
+        try:
+            date_debut = datetime.strptime(mois_str, "%Y-%m").replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            date_debut = timezone.make_aware(date_debut)
+        except ValueError:
+            date_debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        date_debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # fin de période = maintenant si mois courant, sinon fin du mois
+    if date_debut.month == now.month and date_debut.year == now.year:
+        date_fin = now
+    else:
+        if date_debut.month == 12:
+            date_fin = date_debut.replace(year=date_debut.year + 1, month=1)
+        else:
+            date_fin = date_debut.replace(month=date_debut.month + 1)
+    
+
     agents_ids = list(agents_qs.values_list("id", flat=True))
 
     # =========================
@@ -1899,7 +1925,11 @@ def liste_agents_recouvrement(request):
 
     ventes_par_agent = dict(
         Vente.objects
-        .filter(agent_id__in=agents_ids)
+        .filter(
+            agent_id__in=agents_ids,
+            date_vente__gte=date_debut,
+            date_vente__lt=date_fin
+        )
         .values("agent_id")
         .annotate(
             total=models.Sum(
@@ -1911,7 +1941,11 @@ def liste_agents_recouvrement(request):
 
     recouvrements_par_agent = dict(
         Recouvrement.objects
-        .filter(agent_id__in=agents_ids)
+        .filter(
+                agent_id__in=agents_ids,
+                date_recouvrement__gte=date_debut,
+                date_recouvrement__lt=date_fin
+                )
         .values("agent_id")
         .annotate(total=models.Sum("montant_recouvre"))
         .values_list("agent_id", "total")
@@ -1930,13 +1964,14 @@ def liste_agents_recouvrement(request):
         total_ventes = ventes_par_agent.get(agent.id, Decimal("0.00")) or Decimal("0.00")
         total_recouvre = recouvrements_par_agent.get(agent.id, Decimal("0.00")) or Decimal("0.00")
        
-        difference = total_ventes - total_recouvre
+        difference = max(total_ventes - total_recouvre, Decimal("0.00"))
+
 
         if difference == 0:
-            statut = "Complètement recouvré"
+            statut = "OK"
             couleur = "success"
         else:
-            statut = f"{difference:,.0f} FCFA à recouvrer"
+            statut = f"{difference:,.0f} FCFA"
             couleur = "warning"
 
 
@@ -1960,6 +1995,7 @@ def liste_agents_recouvrement(request):
         "total_recouvre_tous_agents": total_recouvre_tous_agents,
         "reste_a_recouvrir": total_ventes_tous_agents - total_recouvre_tous_agents,
         "agent_connecte": agent_connecte,
+        "mois_selectionne": date_debut.strftime("%Y-%m"),
     }
 
     return render(
@@ -2432,8 +2468,6 @@ def vue_detail_agent(request, agent_id):
     
     return render(request, 'core/dashboard/detail_agent.html', context)
 
-from django.db.models import DecimalField
-from django.db.models.functions import Coalesce
 
 @login_required
 def detail_stagiaire(request, stagiaire_id):

@@ -28,6 +28,20 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <!-- Filtre par ROT -->
+<div>
+    <label class="label label-text font-semibold py-1">ROT (Trésorerie)</label>
+    <select name="rot" class="select select-bordered select-sm w-full">
+        <option value="">Tous les ROT</option>
+        {% for rot in rots %}
+        <option value="{{ rot.id }}"
+            {% if filtres_actifs.rot|stringformat:"s" == rot.id|stringformat:"s" %}selected{% endif %}>
+            {{ rot.full_name }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+
                     
                     <!-- Filtre périodique -->
                     <div>
@@ -170,7 +184,7 @@
                     <thead>
                         <tr class="bg-base-200 text-base">
                             <th class="py-2 px-2">Date</th>
-                            <th class="py-2 px-2">Superviseur</th>
+                            <th class="py-2 px-2">Effectué par</th>
                             <th class="py-2 px-2">Type</th>
                             <th class="py-2 px-2">Vente</th>
                             <th class="py-2 px-2">H.Vente</th>
@@ -187,9 +201,21 @@
                                 <div class="font-medium">{{ versement.date_versement_reelle|date:"d/m/y" }}</div>
                                 <div class="text-xs text-gray-500">{{ versement.date_versement_reelle|date:"H:i" }}</div>
                             </td>
-                            <td class="py-2 px-2 max-w-[120px] truncate">
-                                {{ versement.superviseur.full_name }}
-                            </td>
+<td>
+    {% if versement.effectue_par %}
+        <div class="fw-semibold">
+            {{ versement.effectue_par.full_name }}
+        </div>
+
+    {% else %}
+        <div class="fw-semibold">
+            {{ versement.superviseur.full_name }}
+        </div>
+
+    {% endif %}
+</td>
+
+
                             <td class="py-2 px-2">
                                 {% if versement.type_versement == 'vente' %}
                                     <span class="badge badge-success badge-sm gap-1">

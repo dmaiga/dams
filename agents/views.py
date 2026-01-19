@@ -35,7 +35,7 @@ from core.models import (
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
     Recouvrement,VersementBancaire,VersementBancaire,RecuVersement,
-    AffectationLotSuperviseur
+    AffectationLotSuperviseur,RecouvrementSuperviseur
 )
 
 # Project forms
@@ -103,14 +103,15 @@ def tableau_de_bord_rot(request):
     Tableau de bord du ROT (Responsable Opérations et Trésorerie)
     Vision pilotage : stock, superviseurs, argent
     """
-
-    context = RotDashboardService.build_dashboard()
+    agent = request.user.agent  
+    context = RotDashboardService.build_dashboard(agent)
 
     return render(
         request,
         'agents/dashboards/rot.html',
         context
     )
+
 
 
 
@@ -258,94 +259,129 @@ def liste_agents_sup(request):
         context
     )
 
+
+
 @login_required
 def detail_agent_sup(request, agent_id):
+    # =========================
+    # SÉCURITÉ
+    # =========================
     superviseur = request.user.agent
 
     if not superviseur.est_superviseur:
-        return redirect('access_denied')
+        return redirect("access_denied")
 
-    # 🔒 L'agent DOIT appartenir à ce superviseur
     agent = get_object_or_404(
-        Agent.objects.select_related('user'),
+        Agent.objects.select_related("user"),
         id=agent_id,
         superviseur=superviseur,
-        type_agent__in=['terrain', 'agent_gros']
+        type_agent__in=["terrain", "agent_gros"],
     )
 
-    # Données essentielles uniquement
-    total_ventes = agent.total_ventes or Decimal('0')
-    total_recouvre = agent.total_recouvre or Decimal('0')
-    argent_en_possession = agent.argent_en_possession or Decimal('0')
-    
-    # Calcul du taux de recouvrement
-    taux_recouvrement = 0
-    pourcentage_gros = 0
-    pourcentage_detail = 0
+    # =========================
+    # AGRÉGATS FINANCIERS GLOBAUX
+    # =========================
+    total_ventes = agent.total_ventes or Decimal("0.00")
+    total_recouvre = agent.total_recouvre or Decimal("0.00")
+    argent_en_possession = agent.argent_en_possession or Decimal("0.00")
+
+    # =========================
+    # VENTES PAR TYPE
+    # =========================
+    ventes_par_type = (
+        Vente.objects
+        .filter(agent=agent)
+        .values("type_vente")
+        .annotate(
+            total=Coalesce(
+                Sum(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
+                Decimal("0.00")
+            )
+        )
+    )
+
+    ventes_gros = Decimal("0.00")
+    ventes_detail = Decimal("0.00")
+
+    for v in ventes_par_type:
+        if v["type_vente"] == "gros":
+            ventes_gros = v["total"]
+        elif v["type_vente"] == "detail":
+            ventes_detail = v["total"]
+
+    # =========================
+    # POURCENTAGES & TAUX
+    # =========================
+    taux_recouvrement = Decimal("0.0")
+    pourcentage_gros = Decimal("0.0")
+    pourcentage_detail = Decimal("0.0")
+
     if total_ventes > 0:
         taux_recouvrement = (total_recouvre / total_ventes) * 100
         pourcentage_gros = (ventes_gros / total_ventes) * 100
         pourcentage_detail = (ventes_detail / total_ventes) * 100
 
-    # 5 dernières ventes avec plus d'informations
-    from django.db.models import F, DecimalField, Sum
-    from django.db.models.functions import Coalesce
-    
-    dernieres_ventes = Vente.objects.filter(
-        agent=agent
-    ).select_related(
-        'client',
-        'detail_distribution__lot__produit'
-    ).order_by('-date_vente')[:5]
+    # =========================
+    # DERNIÈRES VENTES
+    # =========================
+    dernieres_ventes = (
+        Vente.objects
+        .filter(agent=agent)
+        .select_related(
+            "client",
+            "detail_distribution__lot__produit"
+        )
+        .order_by("-date_vente")[:5]
+    )
 
-    # Calculer le total des ventes par type (gros/détail)
-    ventes_gros = Vente.objects.filter(
-        agent=agent,
-        type_vente='gros'
-    ).aggregate(
-        total=Coalesce(Sum(F('quantite') * F('prix_vente_unitaire')), Decimal('0'))
-    )['total'] or Decimal('0')
-    
-    ventes_detail = Vente.objects.filter(
-        agent=agent,
-        type_vente='detail'
-    ).aggregate(
-        total=Coalesce(Sum(F('quantite') * F('prix_vente_unitaire')), Decimal('0'))
-    )['total'] or Decimal('0')
-
-    # Nombre total de ventes
+    # =========================
+    # STATS TEMPORELLES
+    # =========================
     ventes_total_count = Vente.objects.filter(agent=agent).count()
 
-    # Statistiques 30 derniers jours
-    from datetime import timedelta
     date_30j = timezone.now() - timedelta(days=30)
     ventes_30j_count = Vente.objects.filter(
         agent=agent,
         date_vente__gte=date_30j
     ).count()
 
+    # =========================
+    # CONTEXT
+    # =========================
     context = {
-        'agent': agent,
-        'total_ventes': total_ventes,
-        'total_recouvre': total_recouvre,
-        'argent_en_possession': argent_en_possession,
-        'taux_recouvrement': round(taux_recouvrement, 1),
-        'pourcentage_gros': round(pourcentage_gros, 1),
-        'pourcentage_detail': round(pourcentage_detail, 1),
-        'ventes_gros': ventes_gros,
-        'ventes_detail': ventes_detail,
-        'ventes_total_count': ventes_total_count,
-        'ventes_30j_count': ventes_30j_count,
-        'dernieres_ventes': dernieres_ventes,
-        'peut_recouvrir': argent_en_possession > 0,
+        "agent": agent,
+
+        # montants
+        "total_ventes": total_ventes,
+        "total_recouvre": total_recouvre,
+        "argent_en_possession": argent_en_possession,
+
+        # taux
+        "taux_recouvrement": round(taux_recouvrement, 1),
+        "pourcentage_gros": round(pourcentage_gros, 1),
+        "pourcentage_detail": round(pourcentage_detail, 1),
+
+        # ventes
+        "ventes_gros": ventes_gros,
+        "ventes_detail": ventes_detail,
+        "ventes_total_count": ventes_total_count,
+        "ventes_30j_count": ventes_30j_count,
+
+        # listing
+        "dernieres_ventes": dernieres_ventes,
+
+        # actions
+        "peut_recouvrir": argent_en_possession > 0,
     }
 
     return render(
         request,
-        'agents/superviseur/detail_agent.html',
+        "agents/superviseur/detail_agent.html",
         context
     )
-
 
 @login_required
 def creer_agent(request):
@@ -611,6 +647,8 @@ def detail_agent_rot(request, agent_id):
         context
     )
 
+
+
 @login_required
 def recouvrer_superviseur(request):
     rot = request.user.agent
@@ -618,21 +656,92 @@ def recouvrer_superviseur(request):
     if not rot.est_rot:
         return redirect("access_denied")
 
+    superviseur_selectionne = None
+    total_recouvre = Decimal('0.00')
+    dernier_recouvrement = None
+    cash_restant = Decimal('0.00')
+
+    # Initialiser le formulaire
     form = RecouvrementSuperviseurForm(
         request.POST or None,
         rot=rot
     )
 
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(
-            request,
-            "✅ Recouvrement superviseur enregistré avec succès"
-        )
-        return redirect("dashboard_rot")
+    # Gérer la soumission POST
+    if request.method == 'POST':
+        superviseur_id = request.POST.get('superviseur')
+        
+        if superviseur_id:
+            try:
+                superviseur_selectionne = Agent.objects.get(
+                    id=superviseur_id,
+                    type_agent='entrepot',
+                    est_actif=True
+                )
+                
+                # Calculer les informations supplémentaires
+                total_recouvre = RecouvrementSuperviseur.objects.filter(
+                    superviseur=superviseur_selectionne
+                ).aggregate(
+                    total=Coalesce(Sum("montant"), Decimal("0.00"))
+                )["total"]
+                
+                dernier_recouvrement = RecouvrementSuperviseur.objects.filter(
+                    superviseur=superviseur_selectionne
+                ).order_by('-date_recouvrement').first()
+                
+                # Calculer le cash restant
+                cash_restant = superviseur_selectionne.cash_disponible_superviseur - total_recouvre
+                if cash_restant < 0:
+                    cash_restant = Decimal('0.00')
+                
+            except Agent.DoesNotExist:
+                superviseur_selectionne = None
+        
+        # Vérifier si le formulaire est valide
+        if form.is_valid():
+            form.save()
+            messages.success(
+                request,
+                "✅ Recouvrement superviseur enregistré avec succès"
+            )
+            return redirect("dashboard_rot")
+    
+    # Gérer la requête GET
+    else:
+        # Récupérer le premier superviseur actif pour l'affichage initial
+        premier_superviseur = Agent.objects.filter(
+            type_agent='entrepot',
+            est_actif=True
+        ).first()
+        
+        if premier_superviseur:
+            superviseur_selectionne = premier_superviseur
+            
+            # Pré-remplir les informations
+            total_recouvre = RecouvrementSuperviseur.objects.filter(
+                superviseur=superviseur_selectionne
+            ).aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0.00"))
+            )["total"]
+            
+            dernier_recouvrement = RecouvrementSuperviseur.objects.filter(
+                superviseur=superviseur_selectionne
+            ).order_by('-date_recouvrement').first()
+            
+            # Calculer le cash restant
+            cash_restant = superviseur_selectionne.cash_disponible_superviseur - total_recouvre
+            if cash_restant < 0:
+                cash_restant = Decimal('0.00')
 
     return render(
         request,
         "agents/rot/recouvrer_superviseur.html",
-        {"form": form}
+        {
+            "form": form,
+            "superviseur_selectionne": superviseur_selectionne,
+            "total_recouvre": total_recouvre,
+            "dernier_recouvrement": dernier_recouvrement,
+            "cash_restant": cash_restant,
+        }
     )

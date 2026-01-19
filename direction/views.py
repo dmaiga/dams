@@ -37,7 +37,14 @@ from agents.forms import (
                             )
 
 from direction.services.product_analysis_service import ProductAnalysisService
+
+
+from direction.services.agent_dashboard_service import DashboardAgentAnalysisService
 from direction.services.agent_analysis_service import AgentAnalysisService
+
+from direction.services.agent_supervisseur_detail_analyse import SuperviseurAgentsService
+from direction.services.agent_supervisseur_liste_analyse import SuperviseurAnalysisService
+
 from direction.services.fournisseur_service import FournisseurAnalyseService
 from direction.services.vente_analyses import VenteAnalyseService
 from direction.services.vente_export import VenteExportService
@@ -143,6 +150,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 
 #AGENT
+
 class AgentDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/agents/agent_dashboard.html'
     
@@ -151,26 +159,27 @@ class AgentDashboardView(LoginRequiredMixin, TemplateView):
 
         # 🔥 Snapshot unique (cache)
         context.update(
-            AgentAnalysisService.get_agents_dashboard_snapshot()
+            DashboardAgentAnalysisService.get_agents_dashboard_snapshot()
         )
 
         # Ce qui n’est PAS dans le snapshot
-        context["agents_stock"] = AgentAnalysisService.get_agents_with_stock_cached()
-        context['competition_stagiaires'] = AgentAnalysisService.get_competition_stagiaires()
+        context["agents_stock"] = DashboardAgentAnalysisService.get_agents_with_stock_cached()
 
         return context
 
 
 class SuperviseurListView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/agents/superviseur_list.html'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Situation financière des superviseurs
-        context['superviseurs'] = AgentAnalysisService.get_superviseurs_finance()
-        
+
+        context["superviseurs"] = SuperviseurAnalysisService.get_superviseurs_finance_mensuel()
+        context["rots"] = SuperviseurAnalysisService.get_rots_finance_mensuel()
+
         return context
+
+    
 
 class AgentTerrainListView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/agents/agent_terrain_list.html'
@@ -245,6 +254,59 @@ class AgentDetailView(LoginRequiredMixin, DetailView):
         
         return context
 
+def RotDetailView(request, pk):
+    rot = get_object_or_404(Agent, pk=pk, type_agent='rot')
+
+    periode = AgentAnalysisService.resolve_period(request)
+    data = AgentAnalysisService.get_rot_detail(
+        rot,
+        periode["date_debut"],
+        periode["date_fin"]
+    )
+
+    return render(request, "direction/analyses/agents/rot_detail.html", {
+        **data,
+        **periode,
+    })
+
+
+
+def SuperviseurDetail(request, pk):
+    superviseur = get_object_or_404(Agent, pk=pk, type_agent='entrepot')
+    periode = SuperviseurAgentsService.resolve_period(request)
+
+    agents, totals = SuperviseurAgentsService.get_agents_ventes(
+        superviseur,
+        periode["date_debut"],
+        periode["date_fin"]
+    )
+
+    flux = SuperviseurAgentsService.get_flux(
+        superviseur,
+        periode["date_debut"],
+        periode["date_fin"]
+    )
+
+    matrice = SuperviseurAgentsService.get_matrice_distribution(
+        superviseur,
+        periode["date_debut"],
+        periode["date_fin"]
+    )
+
+    kpis = SuperviseurAgentsService.build_kpis(totals, flux)
+
+    return render(
+        request,
+        "direction/analyses/agents/superviseur_detail.html",
+        {
+            "superviseur": superviseur,
+            "agents": agents,
+            "flux": flux,
+            "kpis": kpis,
+            "matrice": matrice,
+            **periode,
+        }
+    )
 
 #Product
 
@@ -626,7 +688,8 @@ def liste_versements_direction(request):
     """Liste complète des versements (vue direction) avec filtres avancés"""
     # Base queryset
     versements = VersementBancaire.objects.all().select_related(
-        'superviseur', 'superviseur__user'
+    'superviseur', 'superviseur__user',
+    'effectue_par', 'effectue_par__user'
     ).prefetch_related(
         'depenses', 'recus'
     ).order_by('-date_versement_reelle')
@@ -639,7 +702,12 @@ def liste_versements_direction(request):
     if superviseur_id and superviseur_id != '':
         versements = versements.filter(superviseur_id=superviseur_id)
         filtres_actifs['superviseur'] = superviseur_id
-    
+    # 1.b Filtre par ROT (effectue_par)
+    rot_id = request.GET.get('rot')
+    if rot_id:
+        versements = versements.filter(effectue_par_id=rot_id)
+        filtres_actifs['rot'] = rot_id
+
     # 2. Filtre périodique simplifié (mois, année, custom)
     periode = request.GET.get('periode')
     
@@ -735,8 +803,10 @@ def liste_versements_direction(request):
     
     # ============ CONTEXT ============
     # Récupérer la liste des superviseurs avec leur nom complet
-    superviseurs_list = Agent.objects.filter(type_agent='entrepot').select_related('user')
     
+    superviseurs_list = Agent.objects.filter(type_agent='entrepot').select_related('user')
+    rots_list = Agent.objects.filter(type_agent='rot').select_related('user')
+
     context = {
         'versements': versements,
         'total_vente': total_vente,
@@ -748,6 +818,8 @@ def liste_versements_direction(request):
         # Filtres
         'filtres_actifs': filtres_actifs,
         'superviseurs': superviseurs_list,
+        'rots': rots_list,
+
         'nombre_versements_filtres': stats['nombre_versements'] or 0,
         'moyenne_hors_vente': stats['moyenne_hors_vente'] or Decimal('0.00'),
         

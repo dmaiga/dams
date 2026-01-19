@@ -1321,7 +1321,7 @@ class VersementForm(forms.ModelForm):
         self.fields['montant_hors_vente'].widget.attrs['placeholder'] = '0.00'
         self.fields['depense_montant'].widget.attrs['placeholder'] = '0.00'
 
-    def save(self, superviseur=None, commit=True):
+    def save(self, rot=None, commit=True):
         """
         Sauvegarde qui gère création / modification
         - Dépense mise à jour si elle existe
@@ -1330,8 +1330,11 @@ class VersementForm(forms.ModelForm):
         versement = super().save(commit=False)
 
         # Affectation superviseur seulement en création
-        if superviseur is not None:
-            versement.superviseur = superviseur
+        if rot is None or not rot.est_rot:
+            raise ValueError("Le versement doit être effectué par un ROT")
+
+        # 🔑 SOURCE DE VÉRITÉ
+        versement.effectue_par = rot
 
         if commit:
             versement.save()

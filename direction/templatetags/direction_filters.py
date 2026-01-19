@@ -66,3 +66,37 @@ def percentage(value, decimals=2):
             return f"{val:.{decimals}f}%"
     except (ValueError, TypeError):
         return "0%"
+    
+
+@register.filter
+def get_item(dictionary, key):
+    """Récupère un élément d'un dictionnaire par clé"""
+    if isinstance(dictionary, dict):
+        return dictionary.get(key, Decimal('0.00'))
+    return Decimal('0.00')
+
+@register.filter
+def sum_values(dictionary):
+    """Calcule la somme des valeurs d'un dictionnaire"""
+    if isinstance(dictionary, dict):
+        return sum(value for value in dictionary.values() if isinstance(value, (int, float, Decimal)))
+    return 0
+
+@register.filter
+def divide(value, divisor):
+    """Divise une valeur par un diviseur"""
+    try:
+        divisor = float(divisor)
+        if divisor == 0:
+            return 0
+        return float(value) / divisor
+    except (ValueError, TypeError, ZeroDivisionError):
+        return 0
+
+@register.filter
+def format_quantity(value):
+    """Formate une quantité avec 2 décimales"""
+    try:
+        return f"{float(value):.2f}"
+    except (ValueError, TypeError):
+        return "0.00"

@@ -3,12 +3,13 @@ from django.contrib import admin
 from .models import (
     Agent, Produit, Client, LotEntrepot, Fournisseur,
     DistributionAgent, DetailDistribution, Vente, 
-    MouvementStock,Recouvrement,VersementBancaire,PaiementFournisseur
+    MouvementStock,Recouvrement,VersementBancaire,
+    PaiementFournisseur,RecouvrementSuperviseur
 )
 from django.db.models import Sum
 from decimal import Decimal
 from django.core.exceptions import ValidationError
-
+from django.forms import ModelForm
 
 
 @admin.register(Fournisseur)
@@ -19,7 +20,7 @@ class FournisseurAdmin(admin.ModelAdmin):
 
 @admin.register(Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'description']
+    list_display = ['nom', 'description', 'poids_unitaire_kg']
     search_fields = ['nom']
 
 
@@ -262,7 +263,7 @@ class RecuVersementInline(admin.TabularInline):
 @admin.register(VersementBancaire)
 class VersementBancaireAdmin(admin.ModelAdmin):
     inlines = [RecuVersementInline]
-    list_display = ('id', 'superviseur', 'montant_vente', 'montant_hors_vente', 'date_versement_reelle')
+    list_display = ('id', 'effectue_par', 'montant_vente', 'montant_hors_vente', 'date_versement_reelle')
 
 
 @admin.register(RecuVersement)
@@ -449,3 +450,76 @@ class BonusAgentAdmin(admin.ModelAdmin):
     readonly_fields = ('date_mise_a_jour',)
 
 
+
+class RecouvrementSuperviseurAdminForm(ModelForm):
+    class Meta:
+        model = RecouvrementSuperviseur
+        fields = "__all__"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # 🔒 applique la règle métier du model
+        self.instance.full_clean()
+        return cleaned_data
+
+@admin.register(RecouvrementSuperviseur)
+class RecouvrementSuperviseurAdmin(admin.ModelAdmin):
+    form = RecouvrementSuperviseurAdminForm
+
+    list_display = (
+        'id',
+        'superviseur',
+        'rot',
+        'montant',
+        'cash_disponible',
+        'date_recouvrement',
+    )
+
+    list_filter = (
+        'superviseur',
+        'rot',
+        'date_recouvrement',
+    )
+
+    search_fields = (
+        'superviseur__user__username',
+        'superviseur__user__first_name',
+        'superviseur__user__last_name',
+        'rot__user__username',
+    )
+
+    ordering = ('-date_recouvrement',)
+
+    readonly_fields = (
+        'date_creation',
+    )
+
+    fieldsets = (
+        ("Informations principales", {
+            "fields": (
+                'superviseur',
+                'rot',
+                'montant',
+                'commentaire',
+            )
+        }),
+        ("Dates", {
+            "fields": (
+                'date_recouvrement',
+                'date_creation',
+            )
+        }),
+    )
+
+    # 🧠 INFO CONTEXTUELLE (lecture seule)
+    def cash_disponible(self, obj):
+        if not obj.superviseur:
+            return "-"
+    
+        cash = obj.superviseur.cash_disponible_superviseur or 0
+        cash_str = f"{cash:,.0f} FCFA"
+    
+        return format_html("<b>{}</b>", cash_str)
+    
+    cash_disponible.short_description = "Cash dispo superviseur"
+    

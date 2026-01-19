@@ -8,88 +8,85 @@
 <div class="container-fluid py-3">
 
     <!-- ================= HEADER ================= -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+        <h5 class="mb-0">
             <i class="fas fa-user-shield me-2"></i>
             Tableau de bord Superviseur
-        </h4>
-        <span class="badge bg-secondary">
+        </h5>
+
+        <span class="badge bg-secondary align-self-start align-self-md-center">
             {{ superviseur.full_name }}
         </span>
     </div>
 
+    <!-- ================= FILTRE MENSUEL ================= -->
+
+
     <!-- ================= KPIs FINANCIERS ================= -->
-<div class="row g-3 mb-4">
+    <div class="row g-2 mb-4">
 
-    <!-- VENTES AGENTS -->
-    <div class="col-md-3">
-        <div class="card border-start border-primary border-4 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted small">Ventes agents (depuis clôture)</div>
-                <h5 class="fw-bold">
-                    {{ finances_superviseur.total_ventes_agents|fcfa }}
-                </h5>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-primary border-4">
+                <div class="card-body py-2 text-center">
+                    <small class="text-muted">Ventes agents</small>
+                    <div class="fw-bold">
+                        {{ finances_superviseur.total_ventes_agents|fcfa }}
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- ENCORE CHEZ LES AGENTS -->
-    <div class="col-md-3">
-        <div class="card border-start border-danger border-4 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted small">Encore chez les agents</div>
-                <h5 class="fw-bold text-danger">
-                    {{ finances_superviseur.reste_a_recouvrer|fcfa }}
-                </h5>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-danger border-4">
+                <div class="card-body py-2 text-center">
+                    <small class="text-muted">Encore chez agents</small>
+                    <div class="fw-bold text-danger">
+                        {{ finances_superviseur.reste_a_recouvrer|fcfa }}
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- DÉJÀ RECUPÉRÉ -->
-    <div class="col-md-2">
-        <div class="card border-start border-success border-4 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted small">Recouvré</div>
-                <h5 class="fw-bold text-success">
-                    {{ finances_superviseur.total_recouvre_agents|fcfa }}
-                </h5>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-start border-success border-4">
+                <div class="card-body py-2 text-center">
+                    <small class="text-muted">Recouvré</small>
+                    <div class="fw-bold text-success">
+                        {{ finances_superviseur.total_recouvre_agents|fcfa }}
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- REMIS AU ROT -->
-    <div class="col-md-2">
-        <div class="card border-start border-secondary border-4 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted small">Remis au ROT</div>
-                <h5 class="fw-bold">
-                    {{ finances_superviseur.total_remis_rot|fcfa }}
-                </h5>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-start border-secondary border-4">
+                <div class="card-body py-2 text-center">
+                    <small class="text-muted">Remis au ROT</small>
+                    <div class="fw-bold">
+                        {{ finances_superviseur.total_remis_rot|fcfa }}
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- CASH CHEZ LE SUPERVISEUR -->
-    <div class="col-md-2">
-        <div class="card border-start border-warning border-4 shadow-sm">
-            <div class="card-body">
-                <div class="text-muted small">Cash détenu</div>
-                <h5 class="fw-bold text-warning">
-                    {{ finances_superviseur.argent_chez_superviseur|fcfa }}
-                </h5>
+        <div class="col-12 col-md-2">
+            <div class="card shadow-sm border-start border-warning border-4">
+                <div class="card-body py-2 text-center">
+                    <small class="text-muted">Cash détenu</small>
+                    <div class="fw-bold text-warning">
+                        {{ finances_superviseur.argent_chez_superviseur|fcfa }}
+                    </div>
+                </div>
             </div>
         </div>
+
     </div>
-
-</div>
-
-
 
     <!-- ================= STOCK SUPERVISEUR ================= -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-light fw-semibold">
             <i class="fas fa-boxes me-2"></i>
-            Stock actuellement sous votre responsabilité
+            Stock sous votre responsabilité
         </div>
 
         <div class="table-responsive">
@@ -103,87 +100,106 @@
                 </thead>
                 <tbody>
                     {% for item in stock_superviseur %}
-                        <tr>
-                            <td>{{ item.produit.nom }}</td>
-                            <td class="text-end">
-                                {{ item.quantite_initiale|floatformat:0 }}
-                            </td>
-                            <td class="text-end">
-                                {{ item.quantite_restante|floatformat:0 }}
-
-                        </tr>
+                    <tr>
+                        <td>{{ item.produit.nom }}</td>
+                        <td class="text-end">{{ item.quantite_initiale|floatformat:0 }}</td>
+                        <td class="text-end">{{ item.quantite_restante|floatformat:0 }}</td>
+                    </tr>
                     {% empty %}
-                        <tr>
-                            <td colspan="3" class="text-center text-muted">
-                                Aucun stock affecté
-                            </td>
-                        </tr>
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            Aucun stock affecté
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    <!-- ================= AGENTS SOUS TUTELLE ================= -->
+    <!-- ================= AGENTS FINANCIERS ================= -->
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-light fw-semibold">
             <i class="fas fa-users me-2"></i>
-            Situation financière des agents terrain
+            Situation financière des agents
         </div>
 
-        <div class="table-responsive">
+        <!-- 📱 Mobile : cards -->
+        <div class="d-md-none">
+            {% for row in agents_financiers %}
+            <div class="card border-0 border-bottom">
+                <div class="card-body py-2">
+                    <strong>{{ row.agent.full_name }}</strong>
+
+                    <div class="row small mt-1">
+                        <div class="col-6">
+                            Ventes<br>
+                            <strong>{{ row.total_ventes|fcfa }}</strong>
+                        </div>
+                        <div class="col-6 text-end">
+                            Recouvré<br>
+                            <strong class="text-success">
+                                {{ row.total_recouvre|fcfa }}
+                            </strong>
+                        </div>
+                    </div>
+
+                    <div class="mt-1">
+                        Reste :
+                        <strong class="{% if row.reste_a_rendre > 0 %}text-danger{% endif %}">
+                            {{ row.reste_a_rendre|fcfa }}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted py-4">
+                Aucun agent terrain actif
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 🖥️ Desktop : table -->
+        <div class="table-responsive d-none d-md-block">
             <table class="table table-sm table-hover mb-0">
                 <thead class="table-light">
                     <tr>
                         <th>Agent</th>
-                        <th class="text-end">Total ventes</th>
-                        <th class="text-end">Déjà recouvré</th>
+                        <th class="text-end">Ventes</th>
+                        <th class="text-end">Recouvré</th>
                         <th class="text-end">Reste à rendre</th>
                     </tr>
                 </thead>
-<tbody>
-{% for row in agents_financiers %}
-<tr>
-    <td>{{ row.agent.full_name }}</td>
-
-    <td class="text-end">
-        {{ row.total_ventes|fcfa }}
-    </td>
-
-    <td class="text-end text-success">
-        {{ row.total_recouvre|fcfa }}
-    </td>
-
-    <td class="text-end fw-bold
-        {% if row.reste_a_rendre > 0 %}
-            text-danger
-        {% endif %}
-    ">
-        {{ row.reste_a_rendre|fcfa }}
-    </td>
-</tr>
-{% empty %}
-<tr>
-    <td colspan="4" class="text-center text-muted">
-        Aucun agent terrain actif
-    </td>
-</tr>
-{% endfor %}
-</tbody>
-
+                <tbody>
+                    {% for row in agents_financiers %}
+                    <tr>
+                        <td>{{ row.agent.full_name }}</td>
+                        <td class="text-end">{{ row.total_ventes|fcfa }}</td>
+                        <td class="text-end text-success">{{ row.total_recouvre|fcfa }}</td>
+                        <td class="text-end fw-bold {% if row.reste_a_rendre > 0 %}text-danger{% endif %}">
+                            {{ row.reste_a_rendre|fcfa }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">
+                            Aucun agent terrain actif
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
             </table>
         </div>
     </div>
 
-    <!-- ================= ACTIVITÉ RÉCENTE ================= -->
-    <div class="card shadow-sm mb-4">
+    <!-- ================= ACTIVITÉ ================= -->
+    <div class="card shadow-sm">
         <div class="card-header bg-light fw-semibold">
             <i class="fas fa-truck-loading me-2"></i>
             Activité récente
         </div>
-
         <div class="card-body text-muted">
-            Distributions réalisées sur les 7 derniers jours :
+            Distributions sur les 7 derniers jours :
             <strong>{{ distributions_recentes }}</strong>
         </div>
     </div>
