@@ -1,0 +1,84 @@
+{% extends "base_admin.html" %}
+{% load humanize %}
+{%load format_fcfa%}
+{% block content %}
+<div class="space-y-6">
+
+  <!-- HEADER -->
+  <div>
+    <h1 class="text-2xl font-bold">Salaires à verser</h1>
+    <p class="text-sm text-gray-500">
+      Période : {{ date_debut }} → {{ date_fin }}
+    </p>
+  </div>
+
+  <!-- FILTRE -->
+  <form method="get" class="flex gap-3 bg-base-100 p-3 rounded-box shadow-sm">
+    <select name="periode" class="select select-sm select-bordered">
+      <option value="mensuel" {% if periode == "mensuel" %}selected{% endif %}>
+        Mensuel
+      </option>
+      <option value="custom" {% if periode == "custom" %}selected{% endif %}>
+        Personnalisé
+      </option>
+    </select>
+
+    <input type="date" name="date_debut" value="{{ date_debut|date:'Y-m-d' }}"
+           class="input input-sm input-bordered">
+    <input type="date" name="date_fin" value="{{ date_fin|date:'Y-m-d' }}"
+           class="input input-sm input-bordered">
+
+    <button class="btn btn-sm btn-primary">Appliquer</button>
+  </form>
+
+  <!-- TABLE -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body p-0">
+      <table class="table table-sm table-zebra">
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Type</th>
+            <th>Superviseur</th>
+            <th class="text-right">Base</th>
+            <th class="text-right">Incentive / Bonus</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in salaires %}
+          <tr>
+            <td>{{ s.agent.full_name }}</td>
+            <td>{{ s.type_agent }}</td>
+            <td>{{ s.superviseur.full_name|default:"—" }}</td>
+            <td class="text-right">{{ s.salaire_base|fcfa }}</td>
+            <td class="text-right">{{ s.incentive|fcfa }}</td>
+            <td class="text-right font-semibold">
+              {{ s.salaire_total|fcfa }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-gray-400">
+              Aucun agent actif
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+
+        <tfoot>
+          <tr class="font-bold bg-base-200">
+            <td colspan="5" class="text-right">
+              TOTAL À VERSER
+            </td>
+            <td class="text-right">
+              {{ total_global|fcfa }} FCFA
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

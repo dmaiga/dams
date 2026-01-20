@@ -51,12 +51,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize', 
+    'mathfilters',
+    'tinymce',
+    'debug_toolbar',
     'core',
     'agents',
     'direction',
-    'mathfilters',
-    'tinymce',
-     "debug_toolbar",
+    'paie',
+
 
 
 

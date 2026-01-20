@@ -2202,3 +2202,53 @@ class AjustementSolde(models.Model):
 
     def __str__(self):
         return f"{self.agent} | {self.montant} | {self.date:%d/%m/%Y}"
+
+
+
+class RegleSalaire(models.Model):
+    TYPE_AGENT_CHOICES = [
+        ("terrain", "Agent terrain (mamy)"),
+        ("agent_gros", "Agent gros"),
+        ("superviseur", "Superviseur"),
+    ]
+
+    type_agent = models.CharField(max_length=20, choices=TYPE_AGENT_CHOICES, unique=True)
+
+    salaire_base = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0")
+    )
+
+    incentive_par_kg = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    incentive_par_carton = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    actif = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Règle salaire — {self.get_type_agent_display()}"
+
+
+
+class Salaire(models.Model):
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="salaires")
+
+    date_debut = models.DateField()
+    date_fin = models.DateField()
+
+    salaire_base = models.DecimalField(max_digits=10, decimal_places=2)
+    incentive = models.DecimalField(max_digits=10, decimal_places=2)
+    salaire_total = models.DecimalField(max_digits=10, decimal_places=2)
+
+    genere_le = models.DateTimeField(auto_now_add=True)
+    valide = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("agent", "date_debut", "date_fin")
+        ordering = ["-date_debut"]
+
+    def __str__(self):
+        return f"Salaire {self.agent.full_name} ({self.date_debut} → {self.date_fin})"

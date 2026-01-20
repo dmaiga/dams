@@ -1,374 +1,234 @@
-{% extends 'base_admin.html' %}
+{% extends "base_admin.html" %}
 {% load humanize %}
-{% load format_fcfa %}
-
-{% block title %}Détail - {{ agent.full_name }}{% endblock %}
+{% load direction_filters %}
 
 {% block content %}
-<div class="container mx-auto p-6 space-y-6">
-    <!-- En-tête -->
-    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-8">
-        <div class="space-y-3">
-            <h1 class="text-3xl font-bold text-gray-900">{{ agent.full_name }}</h1>
-            <div class="flex flex-wrap items-center gap-4">
-                <span class="badge badge-lg 
-                    {% if agent.type_agent == 'entrepot' %}badge-primary
-                    {% elif agent.type_agent == 'terrain' %}badge-secondary
-                    {% else %}badge-accent{% endif %}">
-                    {{ agent.get_type_agent_display }}
-                </span>
-                
-                <!-- Statut de régularité COHÉRENT -->
-                <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full 
-                        {% if global_data.regularity_status == 'green' %}bg-green-500
-                        {% elif global_data.regularity_status == 'orange' %}bg-orange-500
-                        {% else %}bg-red-500{% endif %}">
-                    </div>
-                    <span class="text-sm font-medium">
-                        {% if global_data.regularity_status == 'green' %}Régulier
-                        {% elif global_data.regularity_status == 'orange' %}Inactif 3-7 jours
-                        {% else %}Inactif 7+ jours{% endif %}
-                    </span>
-                </div>
-            </div>
-        </div>
-        <a href="{% if agent.type_agent == 'entrepot' %}{% url 'superviseur_list' %}{% else %}{% url 'agent_terrain_list' %}{% endif %}" 
-           class="btn btn-outline btn-sm lg:btn-md">
-            <i class="fas fa-arrow-left mr-2"></i>
-            Retour
-        </a>
+<div class="space-y-6">
+<form method="get"
+      class="flex flex-wrap gap-3 bg-base-100 p-3 rounded-box shadow-sm">
+
+  <div>
+    <label class="label text-xs">Période</label>
+    <select name="periode" id="periode-select"
+            class="select select-sm select-bordered">
+      <option value="hebdo" {% if periode == "hebdo" %}selected{% endif %}>
+        Hebdomadaire
+      </option>
+      <option value="mensuel" {% if periode == "mensuel" %}selected{% endif %}>
+        Mensuel
+      </option>
+      <option value="custom" {% if periode == "custom" %}selected{% endif %}>
+        Personnalisée
+      </option>
+    </select>
+  </div>
+
+  <div id="custom-dates"
+       class="flex gap-2 {% if periode != 'custom' %}hidden{% endif %}">
+    <div>
+      <label class="label text-xs">Début</label>
+      <input type="date" name="date_debut"
+             value="{{ date_debut|date:'Y-m-d' }}"
+             class="input input-sm input-bordered">
+    </div>
+    <div>
+      <label class="label text-xs">Fin</label>
+      <input type="date" name="date_fin"
+             value="{{ date_fin|date:'Y-m-d' }}"
+             class="input input-sm input-bordered">
+    </div>
+  </div>
+
+  <div class="flex items-end">
+    <button class="btn btn-sm btn-primary">
+      Appliquer
+    </button>
+  </div>
+
+</form>
+
+  <!-- ================= HEADER ================= -->
+  <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">
+        {{ agent.full_name }}
+      </h1>
+      <p class="text-sm text-gray-500">
+        {{ agent.type_agent }} · {{ agent.telephone }} ·
+        Superviseur : {{ agent.superviseur.full_name }}
+      </p>
+      <p class="text-xs text-gray-400">
+        Période : {{ date_debut }} → {{ date_fin }}
+      </p>
     </div>
 
-    <!-- Filtres périodiques -->
-<div class="bg-base-100 rounded-lg shadow-sm border p-4 mb-6">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div class="tabs tabs-boxed bg-base-200 p-1">
-            <a href="?period=yearly" class="tab {% if period_filter == 'yearly' %}tab-active{% endif %}">
-                Annuel
-            </a>
-            <a href="?period=monthly" class="tab {% if period_filter == 'monthly' %}tab-active{% endif %}">
-                Mensuel
-            </a>
-            <a href="?period=weekly" class="tab {% if period_filter == 'weekly' %}tab-active{% endif %}">
-                Hebdomadaire
-            </a>
-            <a href="?period=daily" class="tab {% if period_filter == 'daily' %}tab-active{% endif %}">
-                Journalier
-            </a>
-            <a href="?period=custom" 
-               class="tab {% if period_filter == 'custom' %}tab-active{% endif %}">
-                Personnalisé
-            </a>
-        </div>
-        
-        <!-- Formulaire pour période personnalisée -->
-        {% if period_filter == 'custom' %}
-        <form method="get" class="flex flex-wrap gap-2">
-            <input type="hidden" name="period" value="custom">
-            
-            <div class="form-control">
-                <label class="label">
-                    <span class="label-text text-sm">Du</span>
-                </label>
-                <input type="date" name="date_debut" 
-                       value="{{ custom_date_debut }}"
-                       class="input input-sm input-bordered" required>
-            </div>
-            
-            <div class="form-control">
-                <label class="label">
-                    <span class="label-text text-sm">Au</span>
-                </label>
-                <input type="date" name="date_fin" 
-                       value="{{ custom_date_fin }}"
-                       class="input input-sm input-bordered" required>
-            </div>
-            
-            <div class="form-control self-end">
-                <button type="submit" class="btn btn-sm btn-primary">
-                    <i class="fas fa-filter mr-1"></i> Filtrer
-                </button>
-            </div>
-        </form>
-        {% endif %}
+    <div>
+      <a href="{% url 'agent_terrain_list' %}" class="btn btn-sm btn-outline">
+        ← Retour liste agents
+      </a>
     </div>
-    
-    <!-- Période affichée -->
-    <div class="mt-3 text-sm text-gray-600">
-        <i class="fas fa-calendar-alt mr-1"></i>
-        Période :
-        {% if period_filter == 'custom' %}
-            Du {{ period_data.date_debut|date:"d/m/Y" }} au {{ period_data.date_fin|date:"d/m/Y" }}
-        {% elif period_filter == 'yearly' %}
-            Année {{ period_data.date_debut|date:"Y" }}
-        {% elif period_filter == 'monthly' %}
-            {{ period_data.date_debut|date:"F Y" }}
-        {% elif period_filter == 'weekly' %}
-            Semaine du {{ period_data.date_debut|date:"d/m/Y" }}
-        {% elif period_filter == 'daily' %}
-            {{ period_data.date_debut|date:"d/m/Y" }}
-        {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-base-100 p-4 rounded-box shadow-sm">
+
+  <div>
+    <div class="text-xs text-gray-500">Type d’agent</div>
+    <div class="badge badge-outline">
+      {{ type_agent }}
     </div>
+  </div>
+
+  <div>
+    <div class="text-xs text-gray-500">Marché affecté</div>
+    <div class="font-medium">
+      {{ marche|default:"—" }}
+    </div>
+  </div>
+
+  <div>
+    <div class="text-xs text-gray-500">Superviseur</div>
+    <div class="font-medium">
+      {{ superviseur.full_name }}
+    </div>
+  </div>
+
+  <div>
+    <div class="text-xs text-gray-500">Inactivité</div>
+    <div class="font-medium">
+      {% if jours_inactif is not None %}
+        {{ jours_inactif }} jour(s)
+      {% else %}
+        —
+      {% endif %}
+    </div>
+  </div>
+
 </div>
 
-    <!-- Indicateurs Principaux -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <!-- Ventes -->
-        <div class="stat bg-base-100 rounded-lg shadow-sm border">
-            <div class="stat-figure text-primary">
-                <i class="fas fa-shopping-cart text-2xl"></i>
-            </div>
-            <div class="stat-title">Ventes</div>
-            <div class="stat-value text-primary text-2xl">{{ period_data.nombre_ventes }}</div>
-            <div class="stat-desc">{{ period_data.period_type }}</div>
-        </div>
 
-        <!-- Quantité Vendue -->
-        <div class="stat bg-base-100 rounded-lg shadow-sm border">
-            <div class="stat-figure text-secondary">
-                <i class="fas fa-boxes text-2xl"></i>
-            </div>
-            <div class="stat-title">Quantité Vendue</div>
-            <div class="stat-value text-secondary text-2xl">{{ period_data.quantite_vendue|intcomma }}</div>
-            <div class="stat-desc">{{ period_data.period_type }}</div>
-        </div>
+  <!-- ================= KPIs ================= -->
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
 
-        <!-- CA Total -->
-        <div class="stat bg-base-100 rounded-lg shadow-sm border">
-            <div class="stat-figure text-success">
-                <i class="fas fa-chart-line text-2xl"></i>
-            </div>
-            <div class="stat-title">Chiffre d'Affaires</div>
-            <div class="stat-value text-success text-2xl">{{ period_data.ca_total|fcfa }}</div>
-            <div class="stat-desc">{{ period_data.period_type }}</div>
-        </div>
-
-        <!-- Marge -->
-        <div class="stat bg-base-100 rounded-lg shadow-sm border">
-            <div class="stat-figure text-accent">
-                <i class="fas fa-hand-holding-usd text-2xl"></i>
-            </div>
-            <div class="stat-title">Marge Générée</div>
-            <div class="stat-value text-accent text-2xl">{{ period_data.marge_totale|fcfa }}</div>
-            <div class="stat-desc">{{ period_data.taux_marge }}% de marge</div>
-        </div>
+    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+      <div class="stat-title text-xs">Kg vendus</div>
+      <div class="stat-value text-xl">
+        {{ total_kg|floatformat:0 }}
+      </div>
     </div>
 
-    <!-- Section Informations Détaillées -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Performance -->
-        <div class="space-y-6">
-            <!-- Répartition des Ventes -->
-            <div class="bg-base-100 rounded-lg shadow-sm border p-6">
-                <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <i class="fas fa-chart-pie text-warning"></i>
-                    Répartition des Ventes
-                </h3>
-                
-                <div class="space-y-4">
-                    <!-- Gros -->
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="font-medium flex items-center gap-2">
-                                <div class="w-3 h-3 bg-primary rounded-full"></div>
-                                Ventes en Gros
-                            </span>
-                            <span class="font-semibold">{{ period_data.pourcentage_gros }}%</span>
-                        </div>
-                        <div class="flex justify-between text-sm text-gray-600">
-                            <span>{{ period_data.quantite_gros|intcomma }} unités</span>
-                            <span class="font-mono">{{ period_data.ca_gros|fcfa }}</span>
-                        </div>
-                        <progress class="progress progress-primary w-full" 
-                                  value="{{ period_data.pourcentage_gros }}" max="100"></progress>
-                    </div>
-
-                    <!-- Détail -->
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="font-medium flex items-center gap-2">
-                                <div class="w-3 h-3 bg-secondary rounded-full"></div>
-                                Ventes en Détail
-                            </span>
-                            <span class="font-semibold">{{ period_data.pourcentage_detail }}%</span>
-                        </div>
-                        <div class="flex justify-between text-sm text-gray-600">
-                            <span>{{ period_data.quantite_detail|intcomma }} unités</span>
-                            <span class="font-mono">{{ period_data.ca_detail|fcfa }}</span>
-                        </div>
-                        <progress class="progress progress-secondary w-full" 
-                                  value="{{ period_data.pourcentage_detail }}" max="100"></progress>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Activité Récente AVEC INDICATEURS COHÉRENTS -->
-            <div class="bg-base-100 rounded-lg shadow-sm border p-6">
-                <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <i class="fas fa-clock text-info"></i>
-                    Activité Récente
-                </h3>
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="text-center p-4 bg-info/10 rounded-lg">
-                        <div class="text-2xl font-bold text-info">{{ global_data.quantite_7_jours|intcomma }}</div>
-                        <div class="text-sm text-gray-600">7 derniers jours</div>
-                    </div>
-                    
-                    <!-- Indicateur cohérent avec le statut de régularité -->
-                    <div class="text-center p-4 
-                        {% if global_data.jours_depuis_derniere_vente == 'Aucune vente' %}bg-gray-100
-                        {% elif global_data.regularity_status == 'green' %}bg-green-100
-                        {% elif global_data.regularity_status == 'orange' %}bg-orange-100
-                        {% else %}bg-red-100{% endif %} rounded-lg">
-                        <div class="text-2xl font-bold 
-                            {% if global_data.jours_depuis_derniere_vente == 'Aucune vente' %}text-gray-500
-                            {% elif global_data.regularity_status == 'green' %}text-green-600
-                            {% elif global_data.regularity_status == 'orange' %}text-orange-600
-                            {% else %}text-red-600{% endif %}">
-                            {% if global_data.jours_depuis_derniere_vente == 'Aucune vente' %}-
-                            {% else %}{{ global_data.jours_depuis_derniere_vente }}{% endif %}
-                        </div>
-                        <div class="text-sm text-gray-600">
-                            {% if global_data.jours_depuis_derniere_vente == 'Aucune vente' %}Aucune vente
-                            {% else %}jours depuis dernière vente{% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Date de dernière vente -->
-                {% if global_data.derniere_vente_date %}
-                <div class="mt-4 text-center text-sm text-gray-500">
-                    Dernière vente: {{ global_data.derniere_vente_date|date:"d/m/Y à H:i" }}
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Stock Actuel -->
-            <div class="bg-base-100 rounded-lg shadow-sm border p-6">
-                <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <i class="fas fa-boxes text-success"></i>
-                    Stock Actuel ({{ stock_data.total_produits_disponibles }} produits)
-                </h3>
-                
-                {% if stock_data.stock_details %}
-                <div class="space-y-3 max-h-80 overflow-y-auto">
-                    {% for stock in stock_data.stock_details %}
-                    <div class="p-3 bg-base-200 rounded-lg border">
-                        <div class="flex justify-between items-start mb-2">
-                            <div>
-                                <h4 class="font-semibold">{{ stock.produit }}</h4>
-                                {% if stock.specification %}
-                                <p class="text-sm text-gray-600">{{ stock.specification }}</p>
-                                {% endif %}
-                                <p class="text-xs text-gray-500">
-                                    Distribué le: {{ stock.distribution_date|date:"d/m/Y" }}
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <span class="badge badge-success">{{ stock.quantite_restante|floatformat:1 }} restants</span>
-                            </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                                <span class="text-gray-600">Prix Gros:</span>
-                                <span class="font-mono ml-1">{{ stock.prix_gros|fcfa }}</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-600">Prix Détail:</span>
-                                <span class="font-mono ml-1">{{ stock.prix_detail|fcfa }}</span>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-2 text-xs text-gray-500">
-                            Quantité initiale: {{ stock.quantite_initiale|floatformat:1 }}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="text-center py-8 text-gray-500">
-                    <i class="fas fa-inbox text-3xl mb-2"></i>
-                    <p>Aucun produit en stock</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Situation Financière -->
-        <div class="space-y-6">
-            <div class="bg-base-100 rounded-lg shadow-sm border p-6">
-                <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <i class="fas fa-wallet text-success"></i>
-                    Situation Financière
-                </h3>
-                
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center p-3 bg-base-200 rounded-lg">
-                        <span class="font-medium">CA Total</span>
-                        <span class="font-mono font-bold">{{ global_data.total_ca|fcfa }}</span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 bg-success/10 rounded-lg">
-                        <span class="font-medium">Marge Totale</span>
-                        <span class="font-mono font-bold text-success">{{ period_data.marge_totale|fcfa }}</span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 bg-info/10 rounded-lg">
-                        <span class="font-medium">Total Recouvré</span>
-                        <span class="font-mono font-bold text-info">{{ total_recouvre|fcfa }}</span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center p-3 bg-warning/20 rounded-lg border border-warning/30">
-                        <span class="font-semibold">Argent en Possession</span>
-                        <span class="font-mono font-bold text-warning">{{ argent_possession|fcfa }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Résumé Global -->
-            <div class="bg-base-100 rounded-lg shadow-sm border p-6">
-                <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-                    <i class="fas fa-chart-bar text-purple-500"></i>
-                    Résumé Global
-                </h3>
-                
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center py-2 border-b">
-                        <span class="text-gray-600">Total Ventes Personnelles</span>
-                        <span class="font-bold">{{ global_data.total_ventes|intcomma }}</span>
-                    </div>
-                    
-                    <div class="flex justify-between items-center py-2 border-b">
-                        <span class="text-gray-600">Quantité Totale Vendue</span>
-                        <span class="font-bold">{{ global_data.total_quantite|intcomma }} unités</span>
-                    </div>
-                    
-                    {% if nombre_ventes_stagiaires > 0 %}
-                    <div class="flex justify-between items-center py-2 border-b">
-                        <span class="text-gray-600">Ventes avec Stagiaires</span>
-                        <span class="font-bold text-info">{{ nombre_ventes_stagiaires|intcomma }}</span>
-                    </div>
-                    {% endif %}
-                    
-                    <div class="flex justify-between items-center py-2">
-                        <span class="text-gray-600">Période Actuelle</span>
-                        <span class="font-bold text-primary capitalize">{{ period_data.period_type }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+      <div class="stat-title text-xs">Kg / jour</div>
+      <div class="stat-value text-xl text-{{ couleur_performance }}">
+        {{ kg_par_jour|floatformat:1 }}
+      </div>
     </div>
+
+    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+      <div class="stat-title text-xs">Chiffre d’affaires</div>
+      <div class="stat-value text-xl text-primary">
+        {{ ca_total|floatformat:0|intcomma }}
+      </div>
+    </div>
+
+    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+      <div class="stat-title text-xs">Marge</div>
+      <div class="stat-value text-xl text-success">
+        {{ marge_totale|floatformat:0|intcomma }}
+      </div>
+    </div>
+
+    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
+      <div class="stat-title text-xs">Argent en possession</div>
+      <div class="stat-value text-xl text-error">
+        {{ argent_en_possession|floatformat:0|intcomma }}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= ACTIVITÉ ================= -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title">Activité récente</h2>
+
+      <ul class="text-sm text-gray-600 space-y-1">
+        <li>
+          Dernière vente :
+          <strong>
+            {% if derniere_vente %}
+              {{ derniere_vente|date:"d/m/Y H:i" }}
+            {% else %}
+              —
+            {% endif %}
+          </strong>
+        </li>
+        <li>
+          Jours d’inactivité :
+          <strong>
+            {% if jours_inactif is not None %}
+              {{ jours_inactif }}
+            {% else %}
+              —
+            {% endif %}
+          </strong>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ================= VENTES PAR PRODUIT ================= -->
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+      <h2 class="card-title">Ventes par produit</h2>
+
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th class="text-right">Quantité</th>
+              <th class="text-right">Kg</th>
+              <th class="text-right">CA</th>
+              <th class="text-right">Marge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in ventes_par_produit %}
+              <tr>
+                <td>{{ v.detail_distribution__lot__produit__nom }}</td>
+                <td class="text-right">{{ v.quantite|floatformat:0 }}</td>
+                <td class="text-right">{{ v.kilo|floatformat:0 }}</td>
+                <td class="text-right">{{ v.ca|floatformat:0|intcomma }}</td>
+                <td class="text-right">{{ v.marge|floatformat:0|intcomma }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-gray-400">
+                  Aucune vente sur la période
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const select = document.getElementById("periode-select");
+  const customDates = document.getElementById("custom-dates");
 
-<style>
-.progress {
-    height: 6px;
-}
-.stat {
-    padding: 1.5rem;
-}
-</style>
+  select.addEventListener("change", function () {
+    if (this.value === "custom") {
+      customDates.classList.remove("hidden");
+    } else {
+      customDates.classList.add("hidden");
+    }
+  });
+});
+</script>
+
 {% endblock %}

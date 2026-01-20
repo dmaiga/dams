@@ -45,6 +45,9 @@ from direction.services.agent_analysis_service import AgentAnalysisService
 from direction.services.agent_supervisseur_detail_analyse import SuperviseurAgentsService
 from direction.services.agent_supervisseur_liste_analyse import SuperviseurAnalysisService
 
+from direction.services.agent_terrain_service_liste import AgentTerrainListeService
+from direction.services.agent_detail_service import AgentDetailService
+
 from direction.services.fournisseur_service import FournisseurAnalyseService
 from direction.services.vente_analyses import VenteAnalyseService
 from direction.services.vente_export import VenteExportService
@@ -179,97 +182,6 @@ class SuperviseurListView(LoginRequiredMixin, TemplateView):
 
         return context
 
-    
-
-class AgentTerrainListView(LoginRequiredMixin, TemplateView):
-    template_name = 'direction/analyses/agents/agent_terrain_list.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # Récupérer le filtre depuis les paramètres GET
-        periode = self.request.GET.get('periode', 'all')
-        vue = self.request.GET.get('vue', 'globale')  # Nouveau paramètre pour la vue
-        
-        # Performance des agents terrain avec filtre
-        if vue == 'hebdomadaire':
-            context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance_weekly()
-            context['current_vue'] = 'hebdomadaire'
-        else:
-            context['agents_terrain'] = AgentAnalysisService.get_agents_terrain_performance(mois=periode)
-            context['current_vue'] = 'globale'
-        
-        context['current_periode'] = periode
-        context['periodes'] = [
-            {'value': 'all', 'label': 'Toutes périodes'},
-            {'value': '30', 'label': '30 derniers jours'},
-            {'value': '60', 'label': '60 derniers jours'},
-            {'value': '90', 'label': '90 derniers jours'},
-        ]
-        
-        return context
-    
-class AgentDetailView(LoginRequiredMixin, DetailView):
-    template_name = 'direction/analyses/agents/agent_detail.html'
-    context_object_name = 'agent'
-    model = Agent
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        agent = self.object
-        
-        # Récupérer les paramètres de filtre
-        period_filter = self.request.GET.get('period', 'yearly')  # Par défaut: yearly
-        
-        # Pour le filtre personnalisé
-        date_debut = None
-        date_fin = None
-        
-        if period_filter == 'custom':
-            # Récupérer les dates du formulaire
-            date_debut_str = self.request.GET.get('date_debut')
-            date_fin_str = self.request.GET.get('date_fin')
-            
-            if date_debut_str and date_fin_str:
-                try:
-                    date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
-                    date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
-                    # Ajouter un jour pour inclure la date de fin
-                    date_fin = date_fin + timezone.timedelta(days=1)
-                except ValueError:
-                    period_filter = 'yearly'  # Retour au filtre annuel si dates invalides
-        
-        # Utilisation du service pour l'analyse détaillée
-        analysis_data = AgentAnalysisService.get_agent_detailed_analysis(
-            agent, period_filter, date_debut, date_fin
-        )
-        
-        context.update(analysis_data)
-        context['period_filter'] = period_filter
-        
-        # Passer les dates pour le formulaire personnalisé
-        if period_filter == 'custom':
-            context['custom_date_debut'] = self.request.GET.get('date_debut', '')
-            context['custom_date_fin'] = self.request.GET.get('date_fin', '')
-        
-        return context
-
-def RotDetailView(request, pk):
-    rot = get_object_or_404(Agent, pk=pk, type_agent='rot')
-
-    periode = AgentAnalysisService.resolve_period(request)
-    data = AgentAnalysisService.get_rot_detail(
-        rot,
-        periode["date_debut"],
-        periode["date_fin"]
-    )
-
-    return render(request, "direction/analyses/agents/rot_detail.html", {
-        **data,
-        **periode,
-    })
-
-
 
 def SuperviseurDetail(request, pk):
     superviseur = get_object_or_404(Agent, pk=pk, type_agent='entrepot')
@@ -307,6 +219,124 @@ def SuperviseurDetail(request, pk):
             **periode,
         }
     )
+
+    
+
+
+
+class AgentTerrainListView(LoginRequiredMixin, TemplateView):
+    template_name = "direction/analyses/agents/agent_terrain_list.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # ----------------------------
+        # PÉRIODE (AGENTS – hebdo par défaut)
+        # ----------------------------
+        periode_data = AgentTerrainListeService.resolve_period(self.request)
+        date_debut = periode_data["date_debut"]
+        date_fin = periode_data["date_fin"]
+
+        # ----------------------------
+        # FILTRES
+        # ----------------------------
+        type_agent = self.request.GET.get("type_agent")  # terrain | agent_gros | None
+        superviseur_id = self.request.GET.get("superviseur")
+
+        superviseur = None
+        if superviseur_id:
+            superviseur = get_object_or_404(Agent, pk=superviseur_id)
+
+        # ----------------------------
+        # SERVICE MÉTIER
+        # ----------------------------
+        agents = AgentTerrainListeService.get_agents_liste(
+            date_debut=date_debut,
+            date_fin=date_fin,
+            superviseur=superviseur,
+            type_agent=type_agent,
+        )
+
+        # ----------------------------
+        # CONTEXTE
+        # ----------------------------
+        context.update({
+            "agents": agents,
+
+            # période
+            "periode": periode_data["periode"],
+            "date_debut": date_debut,
+            "date_fin": date_fin,
+
+            # filtres
+            "current_type_agent": type_agent,
+            "current_superviseur": superviseur_id,
+
+            # listes
+            "superviseurs": Agent.objects.filter(
+                type_agent="entrepot",
+                est_actif=True
+            ),
+        })
+
+        return context
+
+
+class AgentDetailView(LoginRequiredMixin, DetailView):
+    model = Agent
+    template_name = "direction/analyses/agents/agent_detail.html"
+    context_object_name = "agent"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        agent = self.object
+
+        # ----------------------------
+        # PÉRIODE (hebdo par défaut)
+        # ----------------------------
+        periode_data = AgentDetailService.resolve_period(self.request)
+        date_debut = periode_data["date_debut"]
+        date_fin = periode_data["date_fin"]
+
+        # ----------------------------
+        # SERVICE MÉTIER
+        # ----------------------------
+        analysis = AgentDetailService.get_agent_detail(
+            agent=agent,
+            date_debut=date_debut,
+            date_fin=date_fin,
+        )
+
+        # ----------------------------
+        # CONTEXTE
+        # ----------------------------
+        context.update(analysis)
+        context.update({
+            "periode": periode_data["periode"],
+            "date_debut": date_debut,
+            "date_fin": date_fin,
+        })
+
+        return context
+
+
+def RotDetailView(request, pk):
+    rot = get_object_or_404(Agent, pk=pk, type_agent='rot')
+
+    periode = AgentAnalysisService.resolve_period(request)
+    data = AgentAnalysisService.get_rot_detail(
+        rot,
+        periode["date_debut"],
+        periode["date_fin"]
+    )
+
+    return render(request, "direction/analyses/agents/rot_detail.html", {
+        **data,
+        **periode,
+    })
+
+
 
 #Product
 

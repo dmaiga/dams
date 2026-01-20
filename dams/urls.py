@@ -33,6 +33,7 @@ urlpatterns = [
     path('', include('core.urls')),
     path('direction/', include('direction.urls')),
     path('agents/', include('agents.urls')),
+    path('paie/', include('paie.urls')),
 
 
 
