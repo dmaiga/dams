@@ -4,207 +4,339 @@
 
 {% block content %}
 <div class="space-y-6">
-<form method="get"
-      class="flex flex-wrap gap-3 bg-base-100 p-3 rounded-box shadow-sm">
 
-  <div>
-    <label class="label text-xs">Période</label>
-    <select name="periode" id="periode-select"
-            class="select select-sm select-bordered">
-      <option value="hebdo" {% if periode == "hebdo" %}selected{% endif %}>
-        Hebdomadaire
-      </option>
-      <option value="mensuel" {% if periode == "mensuel" %}selected{% endif %}>
-        Mensuel
-      </option>
-      <option value="custom" {% if periode == "custom" %}selected{% endif %}>
-        Personnalisée
-      </option>
-    </select>
-  </div>
+  <!-- ================= FILTRES ================= -->
+  <div class="card bg-base-100 shadow-sm border border-base-300">
+    <div class="card-body p-4">
+      <form method="get" class="flex flex-wrap gap-4 items-end">
+        
+        <div class="flex-1 min-w-[150px]">
+          <label class="label text-sm font-medium text-gray-700 pb-1">
+            <i class="fas fa-calendar-alt mr-1.5 text-gray-500"></i>
+            Période
+          </label>
+          <select name="periode" 
+                  id="periode-select"
+                  class="select select-bordered select-sm w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+            <option value="hebdo" {% if periode == "hebdo" %}selected{% endif %}>
+              Hebdomadaire
+            </option>
+            <option value="mensuel" {% if periode == "mensuel" %}selected{% endif %}>
+              Mensuel
+            </option>
+            <option value="custom" {% if periode == "custom" %}selected{% endif %}>
+              Personnalisée
+            </option>
+          </select>
+        </div>
 
-  <div id="custom-dates"
-       class="flex gap-2 {% if periode != 'custom' %}hidden{% endif %}">
-    <div>
-      <label class="label text-xs">Début</label>
-      <input type="date" name="date_debut"
-             value="{{ date_debut|date:'Y-m-d' }}"
-             class="input input-sm input-bordered">
+        <div id="custom-dates"
+             class="flex-1 flex gap-3 {% if periode != 'custom' %}hidden{% endif %}">
+          <div class="flex-1">
+            <label class="label text-sm font-medium text-gray-700 pb-1">
+              Date début
+            </label>
+            <input type="date" 
+                   name="date_debut"
+                   value="{{ date_debut|date:'Y-m-d' }}"
+                   class="input input-bordered input-sm w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+          </div>
+          
+          <div class="flex-1">
+            <label class="label text-sm font-medium text-gray-700 pb-1">
+              Date fin
+            </label>
+            <input type="date" 
+                   name="date_fin"
+                   value="{{ date_fin|date:'Y-m-d' }}"
+                   class="input input-bordered input-sm w-full focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+          </div>
+        </div>
+
+        <div class="flex-1 min-w-[100px]">
+          <button class="btn btn-primary btn-sm w-full gap-2">
+            <i class="fas fa-check text-xs"></i>
+            Appliquer
+          </button>
+        </div>
+
+      </form>
     </div>
-    <div>
-      <label class="label text-xs">Fin</label>
-      <input type="date" name="date_fin"
-             value="{{ date_fin|date:'Y-m-d' }}"
-             class="input input-sm input-bordered">
-    </div>
   </div>
-
-  <div class="flex items-end">
-    <button class="btn btn-sm btn-primary">
-      Appliquer
-    </button>
-  </div>
-
-</form>
 
   <!-- ================= HEADER ================= -->
-  <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-    <div>
-      <h1 class="text-2xl font-bold">
-        {{ agent.full_name }}
-      </h1>
-      <p class="text-sm text-gray-500">
-        {{ agent.type_agent }} · {{ agent.telephone }} ·
-        Superviseur : {{ agent.superviseur.full_name }}
-      </p>
-      <p class="text-xs text-gray-400">
-        Période : {{ date_debut }} → {{ date_fin }}
-      </p>
-    </div>
+  <div class="card bg-base-100 shadow-sm border border-base-300">
+    <div class="card-body p-6">
+      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div class="flex-1">
+          <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <i class="fas fa-user text-primary"></i>
+            {{ agent.full_name }}
+          </h1>
+          <div class="flex flex-wrap items-center gap-3 mt-2 text-sm text-gray-600">
+            <span class="badge badge-primary badge-sm">
+                {{ agent.get_type_agent_display }}
+            </span>
+            <span class="flex items-center gap-1">
+              <i class="fas fa-phone text-xs"></i>
+              {{ agent.telephone }}
+            </span>
+            <span class="flex items-center gap-1">
+              <i class="fas fa-user-tie text-xs"></i>
+              Superviseur : {{ agent.superviseur.full_name }}
+            </span>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">
+            <i class="fas fa-calendar-day mr-1"></i>
+            Période : {{ date_debut }} → {{ date_fin }}
+          </p>
+        </div>
 
-    <div>
-      <a href="{% url 'agent_terrain_list' %}" class="btn btn-sm btn-outline">
-        ← Retour liste agents
-      </a>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-base-100 p-4 rounded-box shadow-sm">
-
-  <div>
-    <div class="text-xs text-gray-500">Type d’agent</div>
-    <div class="badge badge-outline">
-      {{ type_agent }}
-    </div>
-  </div>
-
-  <div>
-    <div class="text-xs text-gray-500">Marché affecté</div>
-    <div class="font-medium">
-      {{ marche|default:"—" }}
-    </div>
-  </div>
-
-  <div>
-    <div class="text-xs text-gray-500">Superviseur</div>
-    <div class="font-medium">
-      {{ superviseur.full_name }}
+        <div>
+          <a href="{% url 'agent_terrain_list' %}" 
+             class="btn btn-outline btn-sm gap-2">
+            <i class="fas fa-arrow-left"></i>
+            Retour liste
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div>
-    <div class="text-xs text-gray-500">Inactivité</div>
-    <div class="font-medium">
-      {% if jours_inactif is not None %}
-        {{ jours_inactif }} jour(s)
-      {% else %}
-        —
-      {% endif %}
+  <!-- ================= INFORMATIONS AGENT ================= -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+    
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+          Type d'agent
+        </div>
+        <div class="badge badge-primary badge-lg">
+          {{ type_agent }}
+        </div>
+      </div>
     </div>
+
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+          Marché affecté
+        </div>
+        <div class="text-lg font-semibold text-gray-900">
+          {{ marche|default:"—" }}
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+          Superviseur
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="avatar placeholder">
+            
+          </div>
+          <span class="text-lg font-semibold text-gray-900">
+            {{ superviseur.full_name }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+          Inactivité
+        </div>
+        <div class="text-lg font-semibold {% if jours_inactif and jours_inactif > 7 %}text-error{% elif jours_inactif and jours_inactif > 3 %}text-warning{% else %}text-success{% endif %}">
+          {% if jours_inactif is not None %}
+            {{ jours_inactif }} jour{{ jours_inactif|pluralize:"s" }}
+          {% else %}
+            —
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
   </div>
-
-</div>
-
 
   <!-- ================= KPIs ================= -->
-  <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
 
-    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
-      <div class="stat-title text-xs">Kg vendus</div>
-      <div class="stat-value text-xl">
-        {{ total_kg|floatformat:0 }}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="stat-title text-sm text-gray-600 flex items-center gap-2 mb-2">
+          <i class="fas fa-weight-scale text-gray-400"></i>
+          Kg vendus
+        </div>
+        <div class="stat-value text-2xl font-bold text-gray-900">
+          {{ total_kg|floatformat:0 }}
+        </div>
+        <div class="text-xs text-gray-500 mt-1">total</div>
       </div>
     </div>
 
-    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
-      <div class="stat-title text-xs">Kg / jour</div>
-      <div class="stat-value text-xl text-{{ couleur_performance }}">
-        {{ kg_par_jour|floatformat:1 }}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="stat-title text-sm text-gray-600 flex items-center gap-2 mb-2">
+          <i class="fas fa-chart-line text-gray-400"></i>
+          Kg / jour
+        </div>
+        <div class="stat-value text-2xl font-bold text-{{ couleur_performance }}">
+          {{ kg_par_jour|floatformat:1 }}
+        </div>
+        <div class="text-xs text-gray-500 mt-1">moyenne</div>
       </div>
     </div>
 
-    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
-      <div class="stat-title text-xs">Chiffre d’affaires</div>
-      <div class="stat-value text-xl text-primary">
-        {{ ca_total|floatformat:0|intcomma }}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="stat-title text-sm text-gray-600 flex items-center gap-2 mb-2">
+          <i class="fas fa-money-bill-wave text-gray-400"></i>
+          Chiffre d'affaires
+        </div>
+        <div class="stat-value text-2xl font-bold text-primary">
+          {{ ca_total|floatformat:0|intcomma }}
+        </div>
+        <div class="text-xs text-gray-500 mt-1">Fcfa</div>
       </div>
     </div>
 
-    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
-      <div class="stat-title text-xs">Marge</div>
-      <div class="stat-value text-xl text-success">
-        {{ marge_totale|floatformat:0|intcomma }}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="stat-title text-sm text-gray-600 flex items-center gap-2 mb-2">
+          <i class="fas fa-chart-pie text-gray-400"></i>
+          Marge
+        </div>
+        <div class="stat-value text-2xl font-bold text-success">
+          {{ marge_totale|floatformat:0|intcomma }}
+        </div>
+        <div class="text-xs text-gray-500 mt-1">Fcfa</div>
       </div>
     </div>
 
-    <div class="stat bg-base-100 shadow-sm rounded-box p-3">
-      <div class="stat-title text-xs">Argent en possession</div>
-      <div class="stat-value text-xl text-error">
-        {{ argent_en_possession|floatformat:0|intcomma }}
+    <div class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <div class="stat-title text-sm text-gray-600 flex items-center gap-2 mb-2">
+          <i class="fas fa-hand-holding-usd text-gray-400"></i>
+          Argent en possession
+        </div>
+        <div class="stat-value text-2xl font-bold text-error">
+          {{ argent_en_possession|floatformat:0|intcomma }}
+        </div>
+        <div class="text-xs text-gray-500 mt-1">Fcfa</div>
       </div>
     </div>
 
   </div>
 
-  <!-- ================= ACTIVITÉ ================= -->
-  <div class="card bg-base-100 shadow">
+  <!-- ================= ACTIVITÉ RÉCENTE ================= -->
+  <div class="card bg-base-100 shadow-sm border border-base-300">
     <div class="card-body">
-      <h2 class="card-title">Activité récente</h2>
+      <h2 class="card-title text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+        <i class="fas fa-history text-primary"></i>
+        Activité récente
+      </h2>
 
-      <ul class="text-sm text-gray-600 space-y-1">
-        <li>
-          Dernière vente :
-          <strong>
-            {% if derniere_vente %}
-              {{ derniere_vente|date:"d/m/Y H:i" }}
-            {% else %}
-              —
-            {% endif %}
-          </strong>
-        </li>
-        <li>
-          Jours d’inactivité :
-          <strong>
-            {% if jours_inactif is not None %}
-              {{ jours_inactif }}
-            {% else %}
-              —
-            {% endif %}
-          </strong>
-        </li>
-      </ul>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center justify-between py-2 border-b border-base-300">
+            <span class="text-sm text-gray-600 flex items-center gap-2">
+              <i class="fas fa-shopping-cart text-gray-400"></i>
+              Dernière vente
+            </span>
+            <span class="font-medium text-gray-900">
+              {% if derniere_vente %}
+                {{ derniere_vente|date:"d/m/Y H:i" }}
+              {% else %}
+                <span class="text-gray-400 italic">—</span>
+              {% endif %}
+            </span>
+          </div>
+          
+          <div class="flex items-center justify-between py-2">
+            <span class="text-sm text-gray-600 flex items-center gap-2">
+              <i class="fas fa-clock text-gray-400"></i>
+              Jours d'inactivité
+            </span>
+            <span class="font-medium {% if jours_inactif and jours_inactif > 7 %}text-error{% elif jours_inactif and jours_inactif > 3 %}text-warning{% else %}text-success{% endif %}">
+              {% if jours_inactif is not None %}
+                {{ jours_inactif }}
+              {% else %}
+                <span class="text-gray-400 italic">—</span>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+        
+        <div class="bg-base-200/50 rounded-box p-4">
+          <div class="text-sm text-gray-600 mb-2">
+            <i class="fas fa-info-circle text-gray-400 mr-2"></i>
+            Résumé activité
+          </div>
+          <p class="text-xs text-gray-500">
+            Données calculées sur la période sélectionnée.
+            L'inactivité est basée sur l'écart depuis la dernière vente.
+          </p>
+        </div>
+      </div>
+
     </div>
   </div>
 
   <!-- ================= VENTES PAR PRODUIT ================= -->
-  <div class="card bg-base-100 shadow">
+  <div class="card bg-base-100 shadow-sm border border-base-300">
     <div class="card-body">
-      <h2 class="card-title">Ventes par produit</h2>
+      <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
+        <h2 class="card-title text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-boxes text-primary"></i>
+          Ventes par produit
+        </h2>
+        <div class="badge badge-primary badge-sm mt-2 md:mt-0">
+          {{ ventes_par_produit|length }} produit{{ ventes_par_produit|length|pluralize }}
+        </div>
+      </div>
 
       <div class="overflow-x-auto">
         <table class="table table-sm table-zebra">
-          <thead>
+          <thead class="bg-base-200">
             <tr>
-              <th>Produit</th>
+              <th class="pl-6">Produit</th>
               <th class="text-right">Quantité</th>
               <th class="text-right">Kg</th>
-              <th class="text-right">CA</th>
-              <th class="text-right">Marge</th>
+              <th class="text-right">CA (Fcfa)</th>
+              <th class="text-right pr-6">Marge (Fcfa)</th>
             </tr>
           </thead>
           <tbody>
             {% for v in ventes_par_produit %}
-              <tr>
-                <td>{{ v.detail_distribution__lot__produit__nom }}</td>
-                <td class="text-right">{{ v.quantite|floatformat:0 }}</td>
-                <td class="text-right">{{ v.kilo|floatformat:0 }}</td>
-                <td class="text-right">{{ v.ca|floatformat:0|intcomma }}</td>
-                <td class="text-right">{{ v.marge|floatformat:0|intcomma }}</td>
+              <tr class="hover:bg-base-100 transition-colors">
+                <td class="pl-6 font-medium text-gray-900">
+                  {{ v.detail_distribution__lot__produit__nom }}
+                </td>
+                <td class="text-right">
+                  <span class="font-semibold">{{ v.quantite|floatformat:0 }}</span>
+                </td>
+                <td class="text-right">
+                  <span class="font-semibold">{{ v.kilo|floatformat:0 }}</span>
+                  <div class="text-xs text-gray-500">kg</div>
+                </td>
+                <td class="text-right">
+                  <span class="font-semibold text-primary">{{ v.ca|floatformat:0|intcomma }}</span>
+                </td>
+                <td class="text-right pr-6">
+                  <span class="font-semibold text-success">{{ v.marge|floatformat:0|intcomma }}</span>
+                </td>
               </tr>
             {% empty %}
               <tr>
-                <td colspan="5" class="text-center text-gray-400">
-                  Aucune vente sur la période
+                <td colspan="5" class="py-8 text-center">
+                  <div class="flex flex-col items-center justify-center text-gray-400">
+                    <i class="fas fa-chart-bar text-3xl mb-3"></i>
+                    <p class="font-medium">Aucune vente sur la période</p>
+                    <p class="text-sm mt-1">Modifiez la période pour voir les données</p>
+                  </div>
                 </td>
               </tr>
             {% endfor %}
@@ -216,6 +348,7 @@
   </div>
 
 </div>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const select = document.getElementById("periode-select");
@@ -224,8 +357,16 @@ document.addEventListener("DOMContentLoaded", function () {
   select.addEventListener("change", function () {
     if (this.value === "custom") {
       customDates.classList.remove("hidden");
+      customDates.style.opacity = "0";
+      setTimeout(() => {
+        customDates.style.transition = "opacity 0.2s ease";
+        customDates.style.opacity = "1";
+      }, 10);
     } else {
-      customDates.classList.add("hidden");
+      customDates.style.opacity = "0";
+      setTimeout(() => {
+        customDates.classList.add("hidden");
+      }, 200);
     }
   });
 });

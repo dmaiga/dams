@@ -1,0 +1,53 @@
+{% extends "base_admin.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="max-w-xl mx-auto space-y-6">
+
+  <!-- ================= HEADER ================= -->
+  <div>
+    <h1 class="text-2xl font-bold text-warning">
+      Validation des salaires
+    </h1>
+    <p class="text-sm text-gray-500">
+      Période : {{ date_debut }} → {{ date_fin }}
+    </p>
+  </div>
+
+  <!-- ================= WARNING ================= -->
+  <div class="alert alert-warning shadow">
+    <div>
+      <h3 class="font-semibold">Attention</h3>
+      <p class="text-sm">
+        La validation des salaires est <strong>définitive</strong>.
+        <br>
+        Une fois validés :
+        <ul class="list-disc ml-5 mt-1 text-sm">
+          <li>les montants ne pourront plus être modifiés</li>
+          <li>la génération sera bloquée pour cette période</li>
+        </ul>
+      </p>
+    </div>
+  </div>
+
+  <!-- ================= ACTIONS ================= -->
+  <form method="post" action="{% url 'salaire_validation' %}"
+        class="flex justify-between items-center bg-base-100 p-4 rounded-box shadow">
+    {% csrf_token %}
+
+    <input type="hidden" name="date_debut" value="{{ date_debut }}">
+    <input type="hidden" name="date_fin" value="{{ date_fin }}">
+
+    <a href="{% url 'salaire_lecture' %}"
+       class="btn btn-outline btn-sm">
+      Annuler
+    </a>
+
+    <button type="submit"
+            class="btn btn-warning btn-sm">
+      Valider définitivement
+    </button>
+  </form>
+
+</div>
+{% endblock %}

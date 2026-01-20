@@ -84,7 +84,7 @@ class AgentTerrainListeService:
                 "agent": agent,
                 "nom": agent.full_name,
                 "telephone": agent.telephone,
-                "type_agent": agent.type_agent,
+                "type_agent": agent.get_type_agent_display(),
                 "superviseur": agent.superviseur,
 
                 # faits

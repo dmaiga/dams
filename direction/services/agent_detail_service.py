@@ -98,7 +98,7 @@ class AgentDetailService:
             "agent": agent,
             "marche": marche,
             "superviseur": superviseur,
-            "type_agent": type_agent,
+            "type_agent": agent.get_type_agent_display(),
         
             # Activité
             "total_kg": total_kg,

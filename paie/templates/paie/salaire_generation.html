@@ -1,0 +1,56 @@
+{% extends "base_admin.html" %}
+{% block content %}
+
+<div class="max-w-xl mx-auto space-y-6">
+{% if deja_genere %}
+  <div class="alert alert-warning">
+    Les salaires de cette période sont déjà générés.
+    
+    Veuillez les valider ou consulter la liste.
+  </div>
+
+  <a href="{% url 'salaire_lecture' %}" class="btn btn-primary">
+    Voir les salaires
+  </a>
+
+{% else %}
+  <h1 class="text-2xl font-bold">Génération des salaires</h1>
+
+  <div class="alert alert-warning">
+    <span>
+      ⚠️ Cette action est <strong>définitive</strong>.
+      Les salaires ne pourront plus être recalculés pour cette période.
+    </span>
+  </div>
+
+  <form method="post" class="card bg-base-100 shadow p-6 space-y-4">
+    {% csrf_token %}
+
+    <div>
+      <label class="label">Date début</label>
+      <input type="date" name="date_debut"
+             value="{{ date_debut|date:'Y-m-d' }}"
+             class="input input-bordered w-full" required>
+    </div>
+
+    <div>
+      <label class="label">Date fin</label>
+      <input type="date" name="date_fin"
+             value="{{ date_fin|date:'Y-m-d' }}"
+             class="input input-bordered w-full" required>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-4">
+      <a href="{% url 'salaire_lecture' %}" class="btn btn-outline">
+        Annuler
+      </a>
+      <button class="btn btn-primary">
+        Générer les salaires
+      </button>
+    </div>
+  </form>
+
+</div>
+{% endif %}
+
+{% endblock %}

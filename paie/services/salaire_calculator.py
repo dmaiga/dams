@@ -1,45 +1,92 @@
 from decimal import Decimal
-from django.db.models import Sum, Max, F, DecimalField, ExpressionWrapper, Count
+from django.db.models import Sum, F
 from django.db.models.functions import Coalesce
-from django.utils import timezone
-from datetime import datetime, timedelta
-from core.models import Agent, Vente, Recouvrement
-from django.db.models import Value
+from core.models import Agent, Vente,RegleSalaire
+
+
 
 class CalculatorSalaire:
     """
-    Service – Calcul du salaire d’un agent
+    Moteur de calcul des salaires
+    ❌ Ne sauvegarde rien
+    ✅ Retourne uniquement des montants
     """
 
+    # ----------------------------
+    # UTILITAIRE
+    # ----------------------------
     @staticmethod
-    def calcul_salaire_mamy(agent, date_debut, date_fin, salaire_base=Decimal("20000")):
+    def get_salaire_base(agent, type_agent):
+        """
+        Ordre de priorité :
+        1. salaire_base_personnel (Agent)
+        2. règle active (RegleSalaire)
+        3. fallback 0
+        """
+        if agent.salaire_base_personnel is not None:
+            return agent.salaire_base_personnel
+
+        regle = RegleSalaire.objects.filter(
+            type_agent=type_agent,
+            actif=True
+        ).first()
+
+        return regle.salaire_base if regle else Decimal("0.00")
+
+    # ----------------------------
+    # AGENT TERRAIN (MAMY)
+    # ----------------------------
+    @staticmethod
+    def calcul_salaire_mamy(agent, date_debut, date_fin):
+
+        salaire_base = CalculatorSalaire.get_salaire_base(agent, "terrain")
+
+        regle = RegleSalaire.objects.filter(
+            type_agent="terrain",
+            actif=True
+        ).first()
+
+        incentive_par_kg = regle.incentive_par_kg if regle else Decimal("0.00")
+
         ventes = Vente.objects.filter(
             agent=agent,
             date_vente__date__range=(date_debut, date_fin),
             est_supprime=False,
-        ).annotate(
-            kilo_ligne=F("quantite") *
-            Coalesce(
-                F("detail_distribution__lot__produit__poids_unitaire_kg"),
-                Decimal("1")
-            )
         )
 
         kilo_total = ventes.aggregate(
-            total=Coalesce(Sum("kilo_ligne"), Decimal("0"))
+            total=Coalesce(
+                Sum(
+                    F("quantite") *
+                    Coalesce(
+                        F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                        Decimal("1")
+                    )
+                ),
+                Decimal("0.00")
+            )
         )["total"]
 
-        incentive = kilo_total * Decimal("25")
+        incentive = kilo_total * incentive_par_kg
 
         return {
             "salaire_base": salaire_base,
             "incentive": incentive,
+            "bonus": Decimal("0.00"),
             "salaire_total": salaire_base + incentive,
-            "kilo_total": kilo_total,
         }
 
+    # ----------------------------
+    # AGENT GROS
+    # ----------------------------
     @staticmethod
     def calcul_salaire_gros(agent, date_debut, date_fin):
+
+        regle = RegleSalaire.objects.filter(
+            type_agent="agent_gros",
+            actif=True
+        ).first()
+
         ventes = Vente.objects.filter(
             agent=agent,
             date_vente__date__range=(date_debut, date_fin),
@@ -47,25 +94,37 @@ class CalculatorSalaire:
         )
 
         cartons = ventes.aggregate(
-            total=Coalesce(Sum("quantite"), Decimal("0"))
+            total=Coalesce(Sum("quantite"), Decimal("0.00"))
         )["total"]
 
         if cartons < 150:
-            salaire = cartons * Decimal("250")
+            salaire = cartons * (regle.incentive_par_carton or Decimal("0.00"))
         elif cartons < 200:
             salaire = Decimal("50000")
         else:
             salaire = Decimal("90000")
 
         return {
-            "cartons": cartons,
+            "salaire_base": Decimal("0.00"),
+            "incentive": salaire,
+            "bonus": Decimal("0.00"),
             "salaire_total": salaire,
         }
 
+    # ----------------------------
+    # SUPERVISEUR
+    # ----------------------------
     @staticmethod
     def calcul_salaire_superviseur(superviseur, date_debut, date_fin):
-        salaire_base = Decimal("50000")
-        dotation = Decimal("15000")
+
+        salaire_base = CalculatorSalaire.get_salaire_base(superviseur, "superviseur")
+
+        regle = RegleSalaire.objects.filter(
+            type_agent="superviseur",
+            actif=True
+        ).first()
+
+        dotation = regle.dotation_fonction if regle else Decimal("0.00")
 
         agents = Agent.objects.filter(
             superviseur=superviseur,
@@ -73,7 +132,7 @@ class CalculatorSalaire:
             est_actif=True
         )
 
-        incentive_agents = Decimal("0")
+        incentive_agents = Decimal("0.00")
 
         for agent in agents:
             data = CalculatorSalaire.calcul_salaire_mamy(agent, date_debut, date_fin)
@@ -81,9 +140,11 @@ class CalculatorSalaire:
 
         bonus = incentive_agents * Decimal("0.03")
 
+        total = salaire_base + dotation + bonus
+
         return {
             "salaire_base": salaire_base,
             "dotation": dotation,
             "bonus": bonus,
-            "salaire_total": salaire_base + dotation + bonus,
+            "salaire_total": total,
         }

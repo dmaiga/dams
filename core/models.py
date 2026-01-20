@@ -150,7 +150,7 @@ class Agent(models.Model):
         ('direction', 'Direction'),
         ('rot', 'Responsable Opérations'),
         ('entrepot', 'Superviseur'),
-        ('terrain', 'Agent'),
+        ('terrain', 'Mamy'),
         ('agent_gros', 'Agent (Vente en Gros)'), 
         ('stagiaire', 'Stagiaire'), 
     )
@@ -171,6 +171,15 @@ class Agent(models.Model):
         limit_choices_to={'type_agent': 'entrepot'},
         related_name='agents_geres'
     )
+    # Agent
+    salaire_base_personnel = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Override du salaire de base (si vide → règle générale)"
+    )
+
 
     quartier = models.CharField(
         max_length=150,
@@ -2214,7 +2223,7 @@ class RegleSalaire(models.Model):
 
     type_agent = models.CharField(max_length=20, choices=TYPE_AGENT_CHOICES, unique=True)
 
-    salaire_base = models.DecimalField(
+    dotation_fonction = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal("0")
     )
 

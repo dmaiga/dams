@@ -117,6 +117,7 @@ class AgentAdmin(admin.ModelAdmin):
         'nom_complet',
         'type_agent',
         'superviseur',
+        'salaire_base_personnel',
         'telephone',
         'statut_actif',
         'ajustement_solde',
