@@ -1,3 +1,116 @@
-agent
-soit l’expiration automatique
-soit la lecture Direction (contrats à échéance)
+dropdb -U c2679735c_dams c2679735c_dams
+createdb -U c2679735c_dams c2679735c_dams
+
+renseigner le poid_unitaire_kg,ajouter les regles ,affecter les superviseur ,
+mankoulako et safiatou cas particuler 
+abdoulaye a creer rot et desactive lors ou metre en standby
+transfer de propriete de recouvrement
+cloture les solde 
+
+from django.contrib.auth.models import User
+from core.models import Agent  
+# 1️⃣ Récupérer le superviseur par username
+superviseur_user = User.objects.get(username="sidibe.mankoulako")
+superviseur = Agent.objects.get(user=superviseur_user, type_agent="entrepot")
+
+# 2️⃣ Récupérer tous les agents terrain et agent_gros
+agents_a_affecter = Agent.objects.filter(
+    type_agent="terrain",
+    est_actif=True
+)
+
+# 3️⃣ Affectation en masse
+updated_count = agents_a_affecter.update(superviseur=superviseur)
+
+print(f"{updated_count} agents ont été affectés au superviseur {superviseur.full_name}")
+
+
+from decimal import Decimal
+from core.models import Agent
+
+# Agents terrain (mamy)
+updated_terrain = Agent.objects.filter(
+    type_agent="terrain",
+    est_actif=True
+).update(
+    salaire_base_personnel=Decimal("20000")
+)
+
+# Superviseurs (entrepot)
+updated_superviseurs = Agent.objects.filter(
+    type_agent="entrepot",
+    est_actif=True
+).update(
+    salaire_base_personnel=Decimal("50000")
+)
+
+print(f"Agents terrain mis à jour : {updated_terrain}")
+print(f"Superviseurs mis à jour : {updated_superviseurs}")
+
+
+
+
+
+from datetime import date
+from django.db import transaction
+from core.models import Agent, Recouvrement
+
+# -----------------------------
+# PARAMÈTRES
+# -----------------------------
+DATE_EFFET = date(2026, 1, 1)
+
+# -----------------------------
+# SUPERVISEURS (par username)
+# -----------------------------
+ancien_superviseur = Agent.objects.get(
+    user__username="abdoulaye.kone",
+    type_agent="entrepot"
+)
+
+nouveau_superviseur = Agent.objects.get(
+    user__username="sidibe.mankoulako",
+    type_agent="entrepot"
+)
+
+# -----------------------------
+# AGENTS TERRAIN CONCERNÉS
+# (ceux actuellement sous le nouveau superviseur)
+# -----------------------------
+agents_terrain = Agent.objects.filter(
+    type_agent="terrain",
+    superviseur=nouveau_superviseur,
+    est_actif=True
+)
+
+print("Agents terrain concernés :", agents_terrain.count())
+
+# -----------------------------
+# REC0UVREMENTS À TRANSFÉRER
+# -----------------------------
+recouvrements_a_transferer = Recouvrement.objects.filter(
+    superviseur=ancien_superviseur,
+    agent__in=agents_terrain,
+    date_recouvrement__date__gte=DATE_EFFET
+)
+
+print("Recouvrements trouvés :", recouvrements_a_transferer.count())
+
+# 🔎 Sécurité : aperçu avant transfert
+for r in recouvrements_a_transferer[:10]:
+    print(
+        r.id,
+        r.agent_id,
+        r.montant_recouvre,
+        r.date_recouvrement
+    )
+
+# -----------------------------
+# TRANSFERT ATOMIQUE
+# -----------------------------
+with transaction.atomic():
+    recouvrements_a_transferer.update(
+        superviseur=nouveau_superviseur
+    )
+
+print("✅ Transfert terminé avec succès")

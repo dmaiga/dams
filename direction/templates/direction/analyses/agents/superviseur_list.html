@@ -109,7 +109,9 @@
                             <th>ROT</th>
                             <th class="text-right">Reçu superviseurs</th>
                             <th class="text-right">Versé banque</th>
+                            <th class="text-right">Dépenses</th>
                             <th class="text-right">Solde ROT</th>
+
                             <th></th>
                         </tr>
                     </thead>
@@ -119,6 +121,7 @@
                             <td class="font-semibold">{{ r.rot.full_name }}</td>
                             <td class="text-right text-success">{{ r.recouvre|fcfa }}</td>
                             <td class="text-right text-info">{{ r.verse_banque|fcfa }}</td>
+                            <td class="text-right text-error">{{ r.depenses|fcfa }}</td>
                             <td class="text-right font-bold {% if r.solde < 0 %}text-error{% endif %}">
                                 {{ r.solde|fcfa }}
                             </td>

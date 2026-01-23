@@ -74,6 +74,7 @@ class CalculatorSalaire:
             "incentive": incentive,
             "bonus": Decimal("0.00"),
             "salaire_total": salaire_base + incentive,
+            "kilo_total": kilo_total,  
         }
 
     # ----------------------------
@@ -109,6 +110,7 @@ class CalculatorSalaire:
             "incentive": salaire,
             "bonus": Decimal("0.00"),
             "salaire_total": salaire,
+            "cartons_total": cartons,
         }
 
     # ----------------------------
@@ -132,19 +134,29 @@ class CalculatorSalaire:
             est_actif=True
         )
 
-        incentive_agents = Decimal("0.00")
+        kilo_total_mamies = Decimal("0.00")
 
         for agent in agents:
             data = CalculatorSalaire.calcul_salaire_mamy(agent, date_debut, date_fin)
-            incentive_agents += data["incentive"]
+            kilo_total_mamies += data["kilo_total"]
 
-        bonus = incentive_agents * Decimal("0.03")
+        # ---- BONUS PAR SEUIL ----
+        if kilo_total_mamies < Decimal("37500"):
+            taux = Decimal("0")
+        elif kilo_total_mamies < Decimal("45000"):
+            taux = Decimal("0.03")
+        elif kilo_total_mamies < Decimal("60000"):
+            taux = Decimal("0.06")
+        else:
+            taux = Decimal("0.08")
 
-        total = salaire_base + dotation + bonus
+        bonus = kilo_total_mamies * taux
 
         return {
             "salaire_base": salaire_base,
             "dotation": dotation,
             "bonus": bonus,
-            "salaire_total": total,
+            "taux_bonus": taux,
+            "kilo_total_mamies": kilo_total_mamies,
+            "salaire_total": salaire_base + dotation + bonus,
         }

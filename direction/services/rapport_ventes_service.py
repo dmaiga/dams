@@ -2,13 +2,11 @@ from django.db.models import Sum, Count
 from django.utils import timezone
 from core.models import Agent, Vente
 
+from django.db.models import Sum, Count
 
 class RapportVentesService:
     @staticmethod
     def rapport_agents(date_debut, date_fin):
-        """
-        Rapport des ventes par agent actif sur une période donnée
-        """
 
         ventes = (
             Vente.objects
@@ -21,13 +19,17 @@ class RapportVentesService:
                 "agent__id",
                 "agent__user__first_name",
                 "agent__user__last_name",
+                "date_vente__date", 
                 "detail_distribution__lot__produit__nom"
             )
             .annotate(
                 total_quantite=Sum("quantite"),
                 nombre_ventes=Count("id")
             )
-            .order_by("agent__user__last_name")
+            .order_by(
+                "agent__user__last_name",
+                "date_vente__date"
+            )
         )
 
         return ventes

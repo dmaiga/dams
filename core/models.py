@@ -171,6 +171,11 @@ class Agent(models.Model):
         limit_choices_to={'type_agent': 'entrepot'},
         related_name='agents_geres'
     )
+    date_debut_fonction = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date de prise de fonction (superviseur / agent)"
+    )
     # Agent
     salaire_base_personnel = models.DecimalField(
         max_digits=10,
@@ -1648,7 +1653,7 @@ class Recouvrement(models.Model):
     agent = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'terrain'},
+        limit_choices_to={'type_agent__in': ['terrain','agent_gros']},
         related_name='recouvrements'
     )
     superviseur = models.ForeignKey(

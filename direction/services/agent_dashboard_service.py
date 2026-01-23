@@ -260,8 +260,16 @@ class DashboardAgentAnalysisService:
             ).aggregate(
                 total=Coalesce(Sum("montant_recouvre"), Decimal("0"))
             )["total"]
+            
+            remis_rot = RecouvrementSuperviseur.objects.filter(
+                        superviseur=sup,
+                        date_recouvrement__date__range=(debut, fin)
+                    ).aggregate(
+                        total=Coalesce(Sum("montant"), Decimal("0.00"))
+                    )["total"]
 
-            solde = ventes_perso + recouvre_agents
+
+            solde = (recouvre_agents + ventes_perso) - remis_rot
 
             data.append({
                 "superviseur": sup,

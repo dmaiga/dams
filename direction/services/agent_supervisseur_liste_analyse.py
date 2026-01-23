@@ -92,6 +92,7 @@ class SuperviseurAnalysisService:
     def get_rots_finance_mensuel():
         today = timezone.now().date()
         debut_mois = today.replace(day=1)
+        fin_mois = today
     
         data = []
     
@@ -100,25 +101,31 @@ class SuperviseurAnalysisService:
         for rot in rots:
             recu_superviseurs = RecouvrementSuperviseur.objects.filter(
                 rot=rot,
-                date_creation__date__gte=debut_mois
+                date_creation__date__range=(debut_mois, fin_mois)
             ).aggregate(
                 total=Coalesce(Sum("montant"), Decimal("0"))
             )["total"]
     
             verse_banque = VersementBancaire.objects.filter(
                 effectue_par=rot,
-                date_versement_reelle__date__gte=debut_mois
+                date_versement_reelle__date__range=(debut_mois, fin_mois)
             ).aggregate(
                 total=Coalesce(Sum("montant_vente"), Decimal("0"))
             )["total"]
     
-            solde = recu_superviseurs - verse_banque
+            depenses = Depense.objects.filter(
+                effectue_par=rot,
+                date_depense__date__range=(debut_mois, fin_mois)
+            ).aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0"))
+            )["total"]
     
             data.append({
                 "rot": rot,
                 "recouvre": recu_superviseurs,
                 "verse_banque": verse_banque,
-                "solde": solde,
+                "depenses": depenses,
+                "solde": recu_superviseurs - verse_banque - depenses,
             })
     
         return data

@@ -35,7 +35,7 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
             else:
                 date_debut = today.replace(day=1)
                 date_fin = today
-        else:  # mensuel par défaut
+        else:
             date_debut = today.replace(day=1)
             date_fin = today
 
@@ -45,31 +45,37 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
         current_type_agent = self.request.GET.get("type_agent", "")
 
         # ----------------------------
-        # SERVICE avec filtre
+        # SERVICE
         # ----------------------------
         result = SalaireListeService.get_salaires(
             date_debut=date_debut,
             date_fin=date_fin,
-            type_agent_filter=current_type_agent  
+            type_agent_filter=current_type_agent
         )
+
         salaires_qs = Salaire.objects.filter(
             date_debut=date_debut,
             date_fin=date_fin
         )
-        
+
         periode_generee = salaires_qs.exists()
         periode_validee = (
             periode_generee and
-            salaires_qs.filter(valide=False).exists() == False  # ← Pas de False
+            not salaires_qs.filter(valide=False).exists()
         )
-        
+
+        # ----------------------------
+        # CONTEXT FINAL
+        # ----------------------------
         context.update({
-            "salaires": result["salaires"],
+            "salaires_mamy": result["mamies"],
+            "salaires_gros": result["gros"],
+            "salaires_superviseur": result["superviseurs"],
             "total_global": result["total_global"],
             "periode": periode,
             "date_debut": date_debut,
             "date_fin": date_fin,
-            "current_type_agent": current_type_agent, 
+            "current_type_agent": current_type_agent,
             "periode_generee": periode_generee,
             "periode_validee": periode_validee,
         })
