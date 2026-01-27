@@ -143,7 +143,9 @@ class DashboardAgentAnalysisService:
         # -------------------------
         agents = (
             Agent.objects
-            .filter(type_agent='terrain')
+            .filter(type_agent__in=['terrain', 'agent_gros'], 
+                    est_actif=True
+                    )
             .select_related('user')
         )
         agent_map = {a.id: a for a in agents}

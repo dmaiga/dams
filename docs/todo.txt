@@ -3,9 +3,10 @@ createdb -U c2679735c_dams c2679735c_dams
 
 renseigner le poid_unitaire_kg,ajouter les regles ,affecter les superviseur ,
 mankoulako et safiatou cas particuler 
+cloture les solde 
+
 abdoulaye a creer rot et desactive lors ou metre en standby
 transfer de propriete de recouvrement
-cloture les solde 
 
 from django.contrib.auth.models import User
 from core.models import Agent  
@@ -21,7 +22,6 @@ agents_a_affecter = Agent.objects.filter(
 
 # 3️⃣ Affectation en masse
 updated_count = agents_a_affecter.update(superviseur=superviseur)
-
 print(f"{updated_count} agents ont été affectés au superviseur {superviseur.full_name}")
 
 
@@ -43,7 +43,6 @@ updated_superviseurs = Agent.objects.filter(
 ).update(
     salaire_base_personnel=Decimal("50000")
 )
-
 print(f"Agents terrain mis à jour : {updated_terrain}")
 print(f"Superviseurs mis à jour : {updated_superviseurs}")
 
@@ -114,3 +113,11 @@ with transaction.atomic():
     )
 
 print("✅ Transfert terminé avec succès")
+
+
+
+creation des quantite_poid_unitaire
+creation des regels concernant les salaires
+affectation des salaire,
+affectation des agents 
+transfer des recouvrement des superviseur en fonction des agents 

@@ -111,7 +111,7 @@
                                 {{ total_ventes_periode|fcfa }} FCFA
                             </div>
                             <div class="text-xs text-base-content/50 mt-1">
-                                {{ nombre_ventes_periode|default:0 }} ventes
+                                {{ total_quantite_vendue_kg|default:0 }} kg vendus
                             </div>
                         </div>
                         <div class="text-success opacity-70">
@@ -239,6 +239,7 @@
                                 <tr class="bg-base-200 sticky top-0">
                                     <th class="font-semibold">Produit</th>
                                     <th class="text-center">Quantité</th>
+                                     <th class="text-center">KG vendu</th>
                                     <th class="text-center">CA</th>
                                     <th class="text-center">Marge</th>
                                 </tr>
@@ -247,18 +248,32 @@
                                 {% for produit in top_produits %}
                                 <tr class="hover:bg-base-200/50 transition-colors">
                                     <td class="font-medium">{{ produit.nom }}</td>
+                                
+                                    <!-- Quantité (unités ou kg selon produit) -->
                                     <td class="text-center">
-                                        <div class="badge badge-primary text-white">{{ produit.quantite|floatformat:2 }}</div>
+                                        <div class="badge badge-primary text-white">
+                                            {{ produit.quantite|floatformat:2 }}
+                                        </div>
                                     </td>
+                                
+                                    <!-- Kg vendus (toujours kg) -->
+                                    <td class="text-center font-bold ">
+                                        {{ produit.kg_vendus|floatformat:2 }} KG
+                                    </td>
+                                
+                                    <!-- CA -->
                                     <td class="text-center font-bold text-success">
                                         {{ produit.ca|fcfa }} F
                                     </td>
+                                
+                                    <!-- Marge -->
                                     <td class="text-center font-bold text-info">
                                         {{ produit.marge|fcfa }} F
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
+
                         </table>
                     </div>
                 </div>

@@ -1,8 +1,6 @@
-from django.db.models import Sum, Count
-from django.utils import timezone
-from core.models import Agent, Vente
+from django.db.models import Sum, Count, F, DecimalField
+from core.models import Vente
 
-from django.db.models import Sum, Count
 
 class RapportVentesService:
     @staticmethod
@@ -19,12 +17,18 @@ class RapportVentesService:
                 "agent__id",
                 "agent__user__first_name",
                 "agent__user__last_name",
-                "date_vente__date", 
+                "date_vente__date",
                 "detail_distribution__lot__produit__nom"
             )
             .annotate(
                 total_quantite=Sum("quantite"),
-                nombre_ventes=Count("id")
+                nombre_ventes=Count("id"),
+
+                # 🔴 CHIFFRE D’AFFAIRES (OFFICIEL)
+                total_ca=Sum(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
             )
             .order_by(
                 "agent__user__last_name",

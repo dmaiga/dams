@@ -71,14 +71,28 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
             "salaires_mamy": result["mamies"],
             "salaires_gros": result["gros"],
             "salaires_superviseur": result["superviseurs"],
+        
+            # 👩‍🌾 Mamies
+            "total_mamy_kilo": result["total_mamy_kilo"],
+            "total_mamy_salaire_base": result["total_mamy_salaire_base"],
+            "total_mamy_incentive": result["total_mamy_incentive"],
+            "total_mamy_general": result["total_mamy_general"],
+        
+            # 📦 Agents gros
+            "total_gros_cartons": result["total_gros_cartons"],
+            "total_gros_incentive": result["total_gros_incentive"],
+            "total_gros_general": result["total_gros_general"],
+        
+            # 🏢 Superviseurs
+            "total_sup_kilo_mamies": result["total_sup_kilo_mamies"],
+            "total_sup_salaire_base": result["total_sup_salaire_base"],
+            "total_sup_dotation": result["total_sup_dotation"],
+            "total_sup_bonus": result["total_sup_bonus"],
+            "total_sup_general": result["total_sup_general"],
+        
             "total_global": result["total_global"],
-            "periode": periode,
-            "date_debut": date_debut,
-            "date_fin": date_fin,
-            "current_type_agent": current_type_agent,
-            "periode_generee": periode_generee,
-            "periode_validee": periode_validee,
         })
+        
 
         return context
 

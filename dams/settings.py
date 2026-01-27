@@ -14,6 +14,7 @@ from pathlib import Path
 import dj_database_url
 import environ
 from datetime import date
+import environ
 
 DATE_DEBUT_ROT = date(2026, 1, 1)
 
@@ -205,3 +206,12 @@ TINYMCE_SIMPLE_CONFIG = {
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+#server email
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = 'mail.antares-rh.com'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True 
+EMAIL_HOST_USER = "info@antares-rh.com"
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL ="DAM'S <info@antares-rh.com>"

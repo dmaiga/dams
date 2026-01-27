@@ -1,85 +1,69 @@
 from django.core.management.base import BaseCommand
-from datetime import datetime, timedelta
-from direction.services.rapport_ventes_service import RapportVentesService
-from collections import defaultdict
+from datetime import datetime
+import os
 
-JOURS_FR = {
-    0: "lundi",
-    1: "mardi",
-    2: "mercredi",
-    3: "jeudi",
-    4: "vendredi",
-    5: "samedi",
-    6: "dimanche",
-}
+from direction.services.rapport_ventes_service import RapportVentesService
+from direction.exports.rapport_word import generer_rapport_ventes_word
+from direction.exports.rapport_pdf import generer_rapport_ventes_pdf
+from utils.paths import chemin_rapport
 
 
 class Command(BaseCommand):
-    help = "Génère un rapport des ventes par agent actif sur une période donnée"
+    help = "Exporte un rapport de ventes (Word ou PDF)"
 
     def add_arguments(self, parser):
-        parser.add_argument("--date_debut", required=True, help="YYYY-MM-DD")
-        parser.add_argument("--date_fin", required=True, help="YYYY-MM-DD")
+        parser.add_argument("--date_debut", required=True)
+        parser.add_argument("--date_fin", required=True)
+        parser.add_argument(
+            "--format",
+            choices=["word", "pdf"],
+            default="pdf"
+        )
+        parser.add_argument(
+            "--output",
+            help="Chemin complet du fichier de sortie (optionnel)"
+        )
 
     def handle(self, *args, **options):
-        # 1️⃣ Parsing des dates
+        # ===============================
+        # 1️⃣ Dates
+        # ===============================
         date_debut = datetime.strptime(options["date_debut"], "%Y-%m-%d").date()
         date_fin = datetime.strptime(options["date_fin"], "%Y-%m-%d").date()
 
-        # 2️⃣ Tous les jours de la période
-        jours_attendus = set()
-        current_date = date_debut
-        while current_date <= date_fin:
-            jours_attendus.add(current_date)
-            current_date += timedelta(days=1)
-
-        # 3️⃣ Récupération du rapport
+        # ===============================
+        # 2️⃣ Données
+        # ===============================
         rapport = RapportVentesService.rapport_agents(date_debut, date_fin)
 
-        self.stdout.write(
-            f"Rapport des ventes du {date_debut} au {date_fin}\n"
-        )
+        # ===============================
+        # 3️⃣ Chemin par défaut
+        # ===============================
+        base_dir = "rapports"
+        dossier = chemin_rapport(base_dir, date_debut)
 
-        agents = defaultdict(list)
+        ext = "docx" if options["format"] == "word" else "pdf"
+        filename = f"rapport_ventes_{date_debut}_{date_fin}.{ext}"
+        filepath = os.path.join(dossier, filename)
 
-        for r in rapport:
-            agent = f"{r['agent__user__first_name']} {r['agent__user__last_name']}"
-            agents[agent].append(r)
+        # ===============================
+        # 4️⃣ Output final
+        # ===============================
+        output = options.get("output") or filepath
+        os.makedirs(os.path.dirname(output), exist_ok=True)
 
-        # 4️⃣ Affichage par agent
-        for agent, ventes in agents.items():
-            self.stdout.write("=" * 100)
-            self.stdout.write(f"AGENT : {agent}")
-            self.stdout.write("-" * 100)
-
-            jours_vendus = set()
-
-            for v in ventes:
-                jour_vente = v["date_vente__date"]
-                jours_vendus.add(jour_vente)
-
-                self.stdout.write(
-                    f"{jour_vente} | "
-                    f"{v['detail_distribution__lot__produit__nom']} | "
-                    f"{v['total_quantite']} | "
-                    
-                )
-
-            # 5️⃣ Jours manquants
-            jours_manquants = sorted(jours_attendus - jours_vendus)
-
-            self.stdout.write("-" * 100)
-            self.stdout.write(
-                f"Jours de vente : {len(jours_vendus)} / "
-                f"{len(jours_attendus)}"
+        # ===============================
+        # 5️⃣ Génération (écrase si existe)
+        # ===============================
+        if options["format"] == "word":
+            generer_rapport_ventes_word(
+                rapport, date_debut, date_fin, output
+            )
+        else:
+            generer_rapport_ventes_pdf(
+                rapport, date_debut, date_fin, output
             )
 
-            if jours_manquants:
-                self.stdout.write("Jours sans vente :")
-                for jour in jours_manquants:
-                    nom_jour = JOURS_FR[jour.weekday()]
-                    self.stdout.write(f" - {nom_jour} {jour.strftime('%d/%m/%Y')}")
-            else:
-                self.stdout.write("Jours sans vente : AUCUN")
-
-            self.stdout.write("\n")
+        self.stdout.write(
+            self.style.SUCCESS(f"📄 Rapport généré : {output}")
+        )

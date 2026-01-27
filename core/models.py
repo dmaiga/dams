@@ -1512,6 +1512,18 @@ class Vente(models.Model):
             return Decimal('0.00')
         return self.dette.montant_total - self.dette.montant_restant    
  
+
+    @property
+    def quantite_en_kg(self):
+        produit = self.detail_distribution.lot.produit
+
+        if produit.poids_unitaire_kg:
+            # produit conditionné
+            return self.quantite * produit.poids_unitaire_kg
+
+        # produit vrac
+        return self.quantite
+
     
     class Meta:
         ordering = ['-date_vente']
