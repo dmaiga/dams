@@ -33,6 +33,7 @@ db.sqlite3-journal
 # Dossier media (uploads)
 media/
 factures_depots/
+rapports/
 
 # Fichiers statiques générés
 staticfiles/
