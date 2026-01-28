@@ -38,20 +38,20 @@
   <div class="stat bg-base-100 shadow rounded-box">
     <div class="stat-title">Mamies</div>
     <div class="stat-value text-info">{{ total_mamy_general|fcfa }}</div>
-    <div class="stat-desc">{{ total_mamy_kilo|number_dot }} kg</div>
+    <div class="stat-desc">{{ total_mamy_kilo|floatformat:1 }} kg</div>
   </div>
 
   <div class="stat bg-base-100 shadow rounded-box">
     <div class="stat-title">Agents gros</div>
     <div class="stat-value text-warning">{{ total_gros_general|fcfa }}</div>
-    <div class="stat-desc">{{ total_gros_cartons|number_dot }} cartons</div>
+    <div class="stat-desc">{{ total_gros_cartons|floatformat:1 }} cartons</div>
   </div>
 
   <div class="stat bg-base-100 shadow rounded-box">
     <div class="stat-title">Superviseurs</div>
     <div class="stat-value text-success">{{ total_sup_general|fcfa }}</div>
     <div class="stat-desc">
-      {{ total_sup_kilo_mamies|number_dot }} kg supervisés
+      {{ total_sup_kilo_mamies|floatformat:1 }} kg supervisés
     </div>
   </div>
 
@@ -98,7 +98,7 @@
 <tr>
   <td>{{ s.agent.full_name }}</td>
   <td>{{ s.superviseur.full_name }}</td>
-  <td class="text-right">{{ s.kilo_total|number_dot }}</td>
+  <td class="text-right">{{ s.kilo_total|floatformat:1 }}</td>
   <td class="text-right">{{ s.salaire_base|fcfa }}</td>
   <td class="text-right">{{ s.incentive|fcfa }}</td>
   <td class="text-right font-bold text-primary">{{ s.salaire_total|fcfa }}</td>
@@ -110,7 +110,7 @@
 <tfoot>
 <tr class="font-bold bg-base-200">
   <td colspan="2" class="text-right">TOTAL</td>
-  <td class="text-right">{{ total_mamy_kilo|number_dot }}</td>
+  <td class="text-right">{{ total_mamy_kilo|floatformat:1 }}</td>
   <td class="text-right">{{ total_mamy_salaire_base|fcfa }}</td>
   <td class="text-right">{{ total_mamy_incentive|fcfa }}</td>
   <td class="text-right text-primary">{{ total_mamy_general|fcfa }}</td>
@@ -138,7 +138,7 @@
 {% for s in salaires_gros %}
 <tr>
   <td>{{ s.agent.full_name }}</td>
-  <td class="text-right">{{ s.cartons_total|number_dot }}</td>
+  <td class="text-right">{{ s.cartons_total|floatformat:1 }}</td>
   <td class="text-right">{{ s.incentive|fcfa }}</td>
   <td class="text-right font-bold text-primary">{{ s.salaire_total|fcfa }}</td>
 </tr>
@@ -149,8 +149,8 @@
 <tfoot>
 <tr class="font-bold bg-base-200">
   <td class="text-right">TOTAL</td>
-  <td class="text-right">{{ total_gros_cartons|number_dot }}</td>
-  <td class="text-right">{{ total_gros_incentive|number_dot }}</td>
+  <td class="text-right">{{ total_gros_cartons|floatformat:1 }}</td>
+  <td class="text-right">{{ total_gros_incentive|floatformat:1 }}</td>
  
   <td colspan="2" class="text-right text-primary">{{ total_gros_general|fcfa }}</td>
 </tr>
@@ -179,7 +179,7 @@
 {% for s in salaires_superviseur %}
 <tr>
   <td>{{ s.agent.full_name }}</td>
-  <td class="text-right">{{ s.kilo_total_mamies|number_dot }}</td>
+  <td class="text-right">{{ s.kilo_total_mamies|floatformat:1 }}</td>
   <td class="text-right">{{ s.salaire_base|fcfa }}</td>
   <td class="text-right">{{ s.dotation|fcfa }}</td>
   <td class="text-right">{{ s.bonus|fcfa }}</td>
@@ -192,7 +192,7 @@
 <tfoot>
 <tr class="font-bold bg-base-200">
   <td class="text-right">TOTAL</td>
-  <td class="text-right">{{ total_sup_kilo_mamies|number_dot }}</td>
+  <td class="text-right">{{ total_sup_kilo_mamies|floatformat:1 }}</td>
   <td class="text-right">{{ total_sup_salaire_base|fcfa }}</td>
   <td class="text-right">{{ total_sup_dotation|fcfa }}</td>
   <td class="text-right">{{ total_sup_bonus|fcfa }}</td>
