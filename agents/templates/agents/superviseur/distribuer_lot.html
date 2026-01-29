@@ -96,31 +96,20 @@
 </div>
 
 
-                <!-- PRIX -->
-<div class="card border-secondary mb-4">
-    <div class="card-header bg-light">
-        <h6 class="mb-0">
-            <i class="fas fa-tag me-1"></i>
-            Prix de vente
-        </h6>
-    </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label class="form-label small text-muted">
-                    Prix gros (FCFA)
-                </label>
-                {{ form.prix_gros }}
-            </div>
-            <div class="col-md-6">
-                <label class="form-label small text-muted">
-                    Prix détail (FCFA)
-                </label>
-                {{ form.prix_detail }}
-            </div>
+<!-- DATE DE DISTRIBUTION -->
+<div class="mb-4">
+    <label class="form-label fw-semibold">
+        <i class="fas fa-calendar-alt me-1"></i>
+        Date et heure de distribution
+    </label>
+    {{ form.date_distribution }}
+    {% if form.date_distribution.errors %}
+        <div class="text-danger small">
+            {{ form.date_distribution.errors|striptags }}
         </div>
-    </div>
+    {% endif %}
 </div>
+
 
 
                 <!-- ACTIONS -->
@@ -145,50 +134,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const autoCheckbox = document.getElementById("id_auto_distribution");
     const agentContainer = document.getElementById("agent-field-container");
-    const agentField = document.getElementById("id_agent_terrain");
-
     const lotSelect = document.getElementById("id_lot");
     const lotInfo = document.getElementById("lot-info");
-
-    const submitBtn = document.getElementById("submit-btn");
 
     const lotData = {
         {% for a in form.fields.lot.queryset %}
         "{{ a.id }}": {
-            "produit": "{{ a.lot.produit.nom }}",
-            "restant": {{ a.quantite_restante|floatformat:2 }}
+            produit: "{{ a.lot.produit.nom }}",
+            restant: "{{ a.quantite_restante|floatformat:2 }}"
         },
         {% endfor %}
     };
 
-    function toggleAuto() {
-        const auto = autoCheckbox.checked;
-        agentContainer.style.display = auto ? "none" : "block";
-        agentField.required = !auto;
-        submitBtn.innerText = auto ? "M’affecter le produit" : "Distribuer";
+    function toggleAutoDistribution() {
+        agentContainer.style.display = autoCheckbox.checked ? "none" : "block";
     }
 
     function updateLotInfo() {
-        const id = lotSelect.value;
-        if (!id || !lotData[id]) {
-            lotInfo.innerHTML = "";
-            return;
-        }
-
-        const lot = lotData[id];
-        lotInfo.innerHTML = `
-            <strong>${lot.produit}</strong><br>
-            Quantité restante : <strong>${lot.restant}</strong>
-        `;
+        const lot = lotData[lotSelect.value];
+        lotInfo.innerHTML = lot
+            ? `<strong>${lot.produit}</strong><br>Stock restant : <strong>${lot.restant}</strong>`
+            : "";
     }
 
-    autoCheckbox.addEventListener("change", toggleAuto);
+    autoCheckbox.addEventListener("change", toggleAutoDistribution);
     lotSelect.addEventListener("change", updateLotInfo);
 
-    toggleAuto();
+    toggleAutoDistribution();
     updateLotInfo();
 });
 </script>
+
 
 
 <style>

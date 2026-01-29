@@ -10,7 +10,7 @@ from django.db import models
 from core.models import (
     Vente, LotEntrepot, Perte, Depense, VersementBancaire,
     Agent, Dette, Recouvrement, PaiementDette, 
-    DetailDistribution, Client, Produit
+    DetailDistribution, Client, Produit, RecouvrementSuperviseur
 )
 
 class DashboardService:
@@ -657,73 +657,81 @@ class DashboardService:
     
     @staticmethod
     def get_portefeuille_superviseur(superviseur_id, periode_type='mois', annee=None, mois=None):
-        """Retourne les informations financières d'un superviseur spécifique (valeurs limitées à la période).
-        Les clés renvoyées correspondent au template : total_recouvre_periode, total_depenses_periode, total_versements_periode.
-        """
-        try:
-            superviseur = Agent.objects.get(id=superviseur_id, type_agent='entrepot')
-            date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
+        superviseur = Agent.objects.get(id=superviseur_id, type_agent='entrepot')
+        date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
 
-            # Recouvrements effectués par le superviseur (période)
-            recouvrements_qs = Recouvrement.objects.filter(
-                superviseur=superviseur,
+        # 1️⃣ Recouvrements effectués auprès des agents
+        total_recouvre = Recouvrement.objects.filter(
+            superviseur=superviseur,
+            date_recouvrement__range=[date_debut, date_fin]
+        ).aggregate(
+            total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
+        )['total']
+
+        # 2️⃣ Montant remis au ROT (SOURCE UNIQUE ET OFFICIELLE)
+        montant_remis_rot = RecouvrementSuperviseur.objects.filter(
+            superviseur=superviseur,
+            date_recouvrement__range=[date_debut, date_fin]
+        ).aggregate(
+            total=Coalesce(Sum('montant'), Decimal('0.00'))
+        )['total']
+
+        # 3️⃣ Solde détenu (instantané, hors filtre)
+        solde_detenu = superviseur.solde_reel_superviseur
+
+        return {
+            'superviseur': superviseur.full_name,
+            'superviseur_id': superviseur.id,
+            'total_recouvre_periode': total_recouvre,
+            'montant_remis_rot': montant_remis_rot,
+            'solde_detenu': solde_detenu,
+        }
+
+
+    @staticmethod
+    def get_portefeuilles_rot(periode_type='mois', annee=None, mois=None):
+        date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
+
+        rots = Agent.objects.filter(type_agent='rot', est_actif=True)
+        resultats = []
+
+        for rot in rots:
+            recu = RecouvrementSuperviseur.objects.filter(
+                rot=rot,
                 date_recouvrement__range=[date_debut, date_fin]
-            )
-            total_recouvre_periode = recouvrements_qs.aggregate(
-                total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
-            )['total'] or Decimal('0.00')
-
-            # Dépenses rattachées aux versements du superviseur (période)
-            depenses_qs = Depense.objects.filter(
-                versement__superviseur=superviseur,
-                date_depense__range=[date_debut, date_fin]
-            )
-            total_depenses_periode = depenses_qs.aggregate(
+            ).aggregate(
                 total=Coalesce(Sum('montant'), Decimal('0.00'))
-            )['total'] or Decimal('0.00')
+            )['total']
 
-            # Versements bancaires (période) -> somme des montants (vente + hors_vente)
-            versements_qs = VersementBancaire.objects.filter(
-                superviseur=superviseur,
+            verse_banque = VersementBancaire.objects.filter(
+                effectue_par=rot,
                 date_versement_reelle__range=[date_debut, date_fin]
-            )
+            ).aggregate(
+                total=Coalesce(
+                    Sum('montant_vente'),
+                    Decimal('0.00')
+                )
+            )['total']
 
-            # On calcule total des versements en Python (sûr et simple)
-            total_versements_periode = sum(
-                (v.montant_vente or Decimal('0.00')) + (v.montant_hors_vente or Decimal('0.00'))
-                for v in versements_qs
-            ) if versements_qs.exists() else Decimal('0.00')
+            depenses = Depense.objects.filter(
+                effectue_par=rot,
+                date_depense__range=[date_debut, date_fin]
+            ).aggregate(
+                total=Coalesce(Sum('montant'), Decimal('0.00'))
+            )['total']
 
-            # Ventes personnelles de la période (si besoin)
-            ventes_personnelles_qs = Vente.objects.filter(
-                agent=superviseur,
-                date_vente__range=[date_debut, date_fin],
-                stagiaire__isnull=True
-            )
-            total_ventes_personnelles = ventes_personnelles_qs.aggregate(
-                total=Coalesce(Sum(F('quantite') * F('prix_vente_unitaire')), Decimal('0.00'))
-            )['total'] or Decimal('0.00')
+            solde = recu - verse_banque - depenses
 
-            # Solde actuel (propriété calculée sur l'état actuel de l'agent)
-            solde_actuel = float(superviseur.solde_reel_superviseur)
+            resultats.append({
+                'rot': rot.full_name,
+                'rot_id': rot.id,
+                'recu_superviseurs': recu,
+                'verse_banque': verse_banque,
+                'depenses': depenses,
+                'solde': solde,
+            })
 
-            return {
-                'superviseur': superviseur.full_name,
-                'superviseur_id': superviseur.id,
-                'total_recouvre_periode': total_recouvre_periode,
-                'total_depenses_periode': total_depenses_periode,
-                'total_versements_periode': total_versements_periode,
-                'total_ventes_personnelles': total_ventes_personnelles,
-                'solde_actuel': solde_actuel,
-                'nombre_recouvrements': recouvrements_qs.count(),
-                'nombre_depenses': depenses_qs.count(),
-                'nombre_versements': versements_qs.count(),
-                'recouvrements_recentes': list(recouvrements_qs.order_by('-date_recouvrement')[:5]),
-                'depenses_recentes': list(depenses_qs.order_by('-date_depense')[:5]),
-                'versements_recents': list(versements_qs.order_by('-date_versement_reelle')[:5])
-            }
-        except Agent.DoesNotExist:
-            return None
+        return resultats
 
 
     @staticmethod
@@ -741,6 +749,7 @@ class DashboardService:
 
         # Trier par solde actuel décroissant (valeur instantanée)
         return sorted(portefeuilles, key=lambda x: x.get('solde_actuel', 0), reverse=True)
+
 
     @staticmethod
     def get_stock_essentiel_avec_fournisseurs():

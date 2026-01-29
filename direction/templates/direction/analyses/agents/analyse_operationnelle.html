@@ -1,0 +1,220 @@
+{% extends "base_admin.html" %}
+{% load direction_filters format_fcfa %}
+
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- ========================= -->
+    <!-- FILTRES -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <form method="get" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+                <div>
+                    <label class="label">
+                        <span class="label-text">Date début</span>
+                    </label>
+                    <input type="date" name="date_debut"
+                           value="{{ date_debut }}"
+                           class="input input-bordered w-full">
+                </div>
+
+                <div>
+                    <label class="label">
+                        <span class="label-text">Date fin</span>
+                    </label>
+                    <input type="date" name="date_fin"
+                           value="{{ date_fin }}"
+                           class="input input-bordered w-full">
+                </div>
+
+                <div>
+                    <label class="label">
+                        <span class="label-text">Agent</span>
+                    </label>
+                    <select name="agent" class="select select-bordered w-full">
+                        <option value="">Tous</option>
+                        {% for agent in agents %}
+                        <option value="{{ agent.id }}"
+                            {% if agent.id|stringformat:"s" == request.GET.agent %}selected{% endif %}>
+                            {{ agent.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="label">
+                        <span class="label-text">Produit</span>
+                    </label>
+                    <select name="produit" class="select select-bordered w-full">
+                        <option value="">Tous</option>
+                        {% for produit in produits %}
+                        <option value="{{ produit.id }}"
+                            {% if produit.id|stringformat:"s" == request.GET.produit %}selected{% endif %}>
+                            {{ produit.nom }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex items-end">
+                    <button class="btn btn-primary w-full">
+                        Analyser
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- KPIs -->
+    <!-- ========================= -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+    <div class="stat bg-base-100 shadow">
+        <div class="stat-title">Quantité totale</div>
+        <div class="stat-value text-primary text-2xl truncate">
+            {{ kpis.total_quantite|format_number }}
+        </div>
+    </div>
+
+    <div class="stat bg-base-100 shadow">
+        <div class="stat-title">KG vendus</div>
+        <div class="stat-value text-secondary text-2xl truncate">
+            {{ kpis.total_kg|format_number }} kg
+        </div>
+    </div>
+
+    <div class="stat bg-base-100 shadow">
+        <div class="stat-title">Chiffre d’affaires</div>
+        <div class="stat-value text-success text-xl truncate">
+            {{ kpis.total_ca|fcfa }}
+        </div>
+    </div>
+
+    <div class="stat bg-base-100 shadow">
+        <div class="stat-title">Marge</div>
+        <div class="stat-value text-accent text-xl truncate">
+            {{ kpis.total_marge|fcfa }}
+        </div>
+    </div>
+
+    <div class="stat bg-base-100 shadow">
+        <div class="stat-title">Agents contributeurs</div>
+        <div class="stat-value text-2xl">
+            {{ kpis.agents_contributeurs }}
+        </div>
+    </div>
+
+</div>
+
+
+    <!-- ========================= -->
+    <!-- TABLE PRODUITS -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Récapitulatif par produit</h2>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra table-sm">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th class="text-right">Quantité</th>
+                            <th class="text-right">KG vendus</th>
+                            <th class="text-right">CA</th>
+                            <th class="text-right">Marge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in recap_produits %}
+                        <tr>
+                            <td class="font-semibold">
+                                {{ p.detail_distribution__lot__produit__nom }}
+                            </td>
+                            <td class="text-right">
+                                {{ p.quantite|format_number }}
+                            </td>
+                            <td class="text-right">
+                                {{ p.kg_vendus|format_number }} kg
+                            </td>
+                            <td class="text-right text-success">
+                                {{ p.ca|fcfa }}
+                            </td>
+                            <td class="text-right text-accent">
+                                {{ p.marge|fcfa }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                Aucune donnée
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- TABLE AGENTS -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Récapitulatif par agent</h2>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra table-sm">
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th class="text-right">Quantité</th>
+                            <th class="text-right">KG vendus</th>
+                            <th class="text-right">CA</th>
+                            <th class="text-right">Marge</th>
+                       
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in recap_agents %}
+                        <tr>
+                            <td class="font-semibold">
+                                {{ a.agent__user__first_name }}
+                                {{ a.agent__user__last_name }}
+                            </td>
+                            <td class="text-right">
+                                {{ a.quantite|format_number }}
+                            </td>
+                            <td class="text-right">
+                                {{ a.kg_vendus|format_number }} kg
+                            </td>
+                            <td class="text-right text-success">
+                                {{ a.ca|fcfa }}
+                            </td>
+                            <td class="text-right text-accent">
+                                {{ a.marge|fcfa }}
+                            </td>
+                        
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">
+                                Aucune donnée
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

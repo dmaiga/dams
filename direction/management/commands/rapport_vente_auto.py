@@ -3,7 +3,7 @@ from django.core.management import call_command
 from datetime import datetime
 import os
 
-from utils.calendrier import trois_derniers_jours_ouvres
+from utils.calendrier import derniers_jours_ouvres
 from utils.email_utils import envoyer_rapport_email
 from django.conf import settings
 
@@ -47,10 +47,11 @@ class Command(BaseCommand):
             )
 
         elif not date_debut_opt and not date_fin_opt:
-            date_debut, date_fin = trois_derniers_jours_ouvres()
+            date_debut, date_fin = derniers_jours_ouvres(nb_jours=2)
             self.stdout.write(
                 f"📅 Période automatique : {date_debut} → {date_fin}"
             )
+        
 
         else:
             raise CommandError(

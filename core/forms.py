@@ -1079,175 +1079,119 @@ class RapportDettesForm(forms.Form):
         return cleaned_data
 
 # === FORMULAIRE RECOUVREMENT ===
-
-
 class RecouvrementForm(forms.ModelForm):
     vente = forms.ModelChoiceField(
         queryset=Vente.objects.none(),
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label="Sélectionner la vente à recouvrer"
+        label="Vente à recouvrer",
+        widget=forms.Select(attrs={'class': 'form-control'})
     )
 
     date_recouvrement = forms.DateField(
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         label="Date du recouvrement",
-        initial=timezone.now().date()
+        initial=timezone.now().date(),
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        })
     )
-    
+
     class Meta:
         model = Recouvrement
-        fields = ['vente','montant_recouvre', 'date_recouvrement', 'commentaire']
+        fields = ['vente', 'date_recouvrement', 'commentaire']
         widgets = {
-            'montant_recouvre': forms.NumberInput(attrs={
-                'class': 'form-control form-control-lg',
-                'step': '0.01',
-                'placeholder': '0.00'
-            }),
             'commentaire': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 3,
-                'placeholder': 'Ex: Recouvrement partiel, paiement en espèces...'
-            }),
-        }
-        labels = {
-            'vente': 'Vente associée',
-            'montant_recouvre': 'Montant à recouvrir',
-            'commentaire': 'Commentaire (facultatif)',
+                'placeholder': 'Commentaire (facultatif)'
+            })
         }
 
+    # =================================================
+    # INIT
+    # =================================================
     def __init__(self, *args, **kwargs):
         self.agent = kwargs.pop('agent', None)
         self.superviseur = kwargs.pop('superviseur', None)
         super().__init__(*args, **kwargs)
-        
-        if self.agent:
-            # Filtrer les ventes selon la règle métier
-            queryset = Vente.objects.filter(
-                agent=self.agent,
-                ancienne_vente=False 
-            )
-            
-            # Pour superviseur recouvrant un agent terrain
-            if self.superviseur and self.superviseur.id != self.agent.id:
-                # VENTES COMPTANT : toujours recouvrables
-                ventes_comptant = queryset.filter(mode_paiement='comptant')
-                
-                # VENTES CRÉDIT : seulement si TOTALEMENT payées
-                ventes_credit = queryset.filter(
-                    mode_paiement='credit',
-                    dette__montant_restant=0  # Dette totalement recouvrée
-                )
-                
-                # Combiner les deux querysets
-                self.fields['vente'].queryset = ventes_comptant | ventes_credit
-            else:
-                # AUTO-RECOUVREMENT : toutes les ventes non anciennes
-                self.fields['vente'].queryset = queryset
 
+        if self.agent:
+            self.fields['vente'].queryset = (
+                Vente.objects
+                .filter(
+                    agent=self.agent,
+                    ancienne_vente=False
+                )
+                .select_related(
+                    'detail_distribution__lot__produit'
+                )
+                .order_by('-date_vente')
+            )
+
+            # 🔹 Affichage clair pour le superviseur
+            self.fields['vente'].label_from_instance = self._vente_label
+
+    # =================================================
+    # LABEL VENTE (UX)
+    # =================================================
+    def _vente_label(self, vente):
+        produit = vente.detail_distribution.lot.produit.nom
+        return (
+            f"Vente #{vente.id} | "
+            f"{produit} | "
+            f"{vente.quantite} unités | "
+            f"{vente.total_vente:.0f} FCFA | "
+            f"{vente.date_vente:%d/%m %H:%M}"
+        )
+
+    # =================================================
+    # CLEAN
+    # =================================================
     def clean_vente(self):
         vente = self.cleaned_data.get('vente')
+
         if not vente:
             raise forms.ValidationError("Veuillez sélectionner une vente.")
 
-        if vente.agent != self.agent:
-            raise forms.ValidationError("Cette vente n'appartient pas à l'agent.")
-
-        # Vérifier que c'est une vente NON ancienne
         if vente.ancienne_vente:
-            raise forms.ValidationError(
-                "Les ventes anciennes ne peuvent pas être recouvrées."
-            )
+            raise forms.ValidationError("Cette vente a déjà été recouvrée.")
 
-        # Vérification spécifique pour le recouvrement superviseur → agent terrain
-        if self.superviseur and self.superviseur.id != self.agent.id:
-            if vente.mode_paiement == 'credit':
-                if hasattr(vente, 'dette') and vente.dette.montant_restant > 0:
-                    raise forms.ValidationError(
-                        "Cette dette n'est pas encore totalement recouvrée par l'agent auprès du client. "
-                        "Le superviseur ne peut recouvrir que les dettes entièrement recouvrées."
-                    )
+        if self.agent and vente.agent != self.agent:
+            raise forms.ValidationError("Cette vente n'appartient pas à cet agent.")
 
         return vente
-    
-    def clean_montant_recouvre(self):
-        montant = self.cleaned_data.get('montant_recouvre')
-        
-        if self.agent and montant > self.agent.argent_en_possession:
-            raise forms.ValidationError(
-                f"L'agent n'a que {self.agent.argent_en_possession} FCFA en sa possession."
-            )
-        
-        if montant <= 0:
-            raise forms.ValidationError("Le montant doit être supérieur à 0.")
-            
-        return montant
 
     def clean_date_recouvrement(self):
-        date_recouvrement = self.cleaned_data.get('date_recouvrement')
-        
-        # Empêcher les dates futures
-        if date_recouvrement > timezone.now().date():
+        date = self.cleaned_data.get('date_recouvrement')
+
+        if date > timezone.now().date():
             raise forms.ValidationError("La date ne peut pas être dans le futur.")
-            
-        return date_recouvrement
 
-    def clean(self):
-        cleaned_data = super().clean()
-        vente = cleaned_data.get('vente')
-        montant = cleaned_data.get('montant_recouvre')
-        
-        if vente and montant:
-            # Vérification pour les superviseurs recouvrant des agents terrain
-            if (self.superviseur and self.superviseur.id != self.agent.id and 
-                vente.mode_paiement == 'credit' and hasattr(vente, 'dette')):
-                
-                if vente.dette.montant_restant > 0:
-                    raise forms.ValidationError(
-                        f"Impossible de recouvrir cette vente à crédit. "
-                        f"La dette chez le client n'est pas encore totalement recouvrée "
-                        f"(reste {vente.dette.montant_restant} FCFA à recouvrir)."
-                    )
-        
-        return cleaned_data
-  
-    # --------------------------
-    # SAUVEGARDE AVEC LOGIQUE BONUS
-    # --------------------------
+        return date
 
+    # =================================================
+    # SAVE
+    # =================================================
     def save(self, commit=True):
-        recouvrement = super().save(commit=False)
         vente = self.cleaned_data['vente']
-        montant = self.cleaned_data['montant_recouvre']
-    
-        if self.agent:
-            recouvrement.agent = self.agent
-    
+
+        recouvrement = super().save(commit=False)
+
+        recouvrement.agent = self.agent
+        recouvrement.superviseur = self.superviseur
         recouvrement.vente = vente
-    
+
+        # 🔒 Montant = TOTAL DE LA VENTE
+        recouvrement.montant_recouvre = vente.total_vente
+
         if commit:
             recouvrement.save()
-    
-        # 2️⃣ Mise à jour dette si crédit
-        if vente.mode_paiement == 'credit' and hasattr(vente, 'dette') and vente.dette:
-            dette = vente.dette
-            dette.montant_restant = max(Decimal('0.00'), dette.montant_restant - montant)
-            dette.save()
-    
-        # 3️⃣ Bonus 48h
-        recouvrement.calculer_bonus()
-    
-        # 4️⃣ Marquer la vente comme ANCIENNE si totalement recouvrée
-        if vente.mode_paiement == 'comptant':
-            vente.ancienne_vente = True
-            vente.save(update_fields=['ancienne_vente'])
-    
-        elif vente.mode_paiement == 'credit' and hasattr(vente, 'dette'):
-            if vente.dette.montant_restant == 0:
-                vente.ancienne_vente = True
-                vente.save(update_fields=['ancienne_vente'])
-    
+
+        # 🔒 Marquer la vente comme recouvrée
+        vente.ancienne_vente = True
+        vente.save(update_fields=['ancienne_vente'])
+
         return recouvrement
-    
+
 # forms.py
 # forms.py
 

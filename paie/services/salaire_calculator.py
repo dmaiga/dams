@@ -1,28 +1,19 @@
 from decimal import Decimal
 from django.db.models import Sum, F
 from django.db.models.functions import Coalesce
-from core.models import Agent, Vente,RegleSalaire
-
+from core.models import Agent, Vente, RegleSalaire
 
 
 class CalculatorSalaire:
     """
     Moteur de calcul des salaires
-    ❌ Ne sauvegarde rien
-    ✅ Retourne uniquement des montants
     """
 
-    # ----------------------------
+    # =========================
     # UTILITAIRE
-    # ----------------------------
+    # =========================
     @staticmethod
     def get_salaire_base(agent, type_agent):
-        """
-        Ordre de priorité :
-        1. salaire_base_personnel (Agent)
-        2. règle active (RegleSalaire)
-        3. fallback 0
-        """
         if agent.salaire_base_personnel is not None:
             return agent.salaire_base_personnel
 
@@ -31,11 +22,16 @@ class CalculatorSalaire:
             actif=True
         ).first()
 
-        return regle.salaire_base if regle else Decimal("0.00")
+        return (
+            getattr(regle, "salaire_base", None)
+            or getattr(regle, "montant_base", None)
+            or getattr(regle, "salaire_fixe", None)
+            or Decimal("0.00")
+        )
 
-    # ----------------------------
+    # =========================
     # AGENT TERRAIN (MAMY)
-    # ----------------------------
+    # =========================
     @staticmethod
     def calcul_salaire_mamy(agent, date_debut, date_fin):
 
@@ -46,7 +42,7 @@ class CalculatorSalaire:
             actif=True
         ).first()
 
-        incentive_par_kg = regle.incentive_par_kg if regle else Decimal("0.00")
+        incentive_par_kg = getattr(regle, "incentive_par_kg", Decimal("0.00"))
 
         ventes = Vente.objects.filter(
             agent=agent,
@@ -74,12 +70,12 @@ class CalculatorSalaire:
             "incentive": incentive,
             "bonus": Decimal("0.00"),
             "salaire_total": salaire_base + incentive,
-            "kilo_total": kilo_total,  
+            "kilo_total": kilo_total,
         }
 
-    # ----------------------------
+    # =========================
     # AGENT GROS
-    # ----------------------------
+    # =========================
     @staticmethod
     def calcul_salaire_gros(agent, date_debut, date_fin):
 
@@ -87,6 +83,8 @@ class CalculatorSalaire:
             type_agent="agent_gros",
             actif=True
         ).first()
+
+        incentive_par_carton = getattr(regle, "incentive_par_carton", Decimal("0.00"))
 
         ventes = Vente.objects.filter(
             agent=agent,
@@ -99,7 +97,7 @@ class CalculatorSalaire:
         )["total"]
 
         if cartons < 150:
-            salaire = cartons * (regle.incentive_par_carton or Decimal("0.00"))
+            salaire = cartons * incentive_par_carton
         elif cartons < 200:
             salaire = Decimal("50000")
         else:
@@ -113,9 +111,9 @@ class CalculatorSalaire:
             "cartons_total": cartons,
         }
 
-    # ----------------------------
+    # =========================
     # SUPERVISEUR
-    # ----------------------------
+    # =========================
     @staticmethod
     def calcul_salaire_superviseur(superviseur, date_debut, date_fin):
 
@@ -126,7 +124,7 @@ class CalculatorSalaire:
             actif=True
         ).first()
 
-        dotation = regle.dotation_fonction if regle else Decimal("0.00")
+        dotation = getattr(regle, "dotation_fonction", Decimal("0.00"))
 
         agents = Agent.objects.filter(
             superviseur=superviseur,
@@ -140,7 +138,6 @@ class CalculatorSalaire:
             data = CalculatorSalaire.calcul_salaire_mamy(agent, date_debut, date_fin)
             kilo_total_mamies += data["kilo_total"]
 
-        # ---- BONUS PAR SEUIL ----
         if kilo_total_mamies < Decimal("37500"):
             taux = Decimal("0")
         elif kilo_total_mamies < Decimal("45000"):

@@ -28,5 +28,5 @@ urlpatterns = [
         views.recouvrer_superviseur,
         name="recouvrer_superviseur"
     ),
-
+    
 ]

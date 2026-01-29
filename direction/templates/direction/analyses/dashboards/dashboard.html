@@ -3,6 +3,7 @@
 {% load static %}
 {% load format_fcfa %}
 {% load dashboard_filters %}
+{% load direction_filters %}
 
 
 
@@ -111,7 +112,7 @@
                                 {{ total_ventes_periode|fcfa }} FCFA
                             </div>
                             <div class="text-xs text-base-content/50 mt-1">
-                                {{ total_quantite_vendue_kg|default:0 }} kg vendus
+                                {{ total_quantite_vendue_kg|format_number }} kg vendus
                             </div>
                         </div>
                         <div class="text-success opacity-70">
@@ -122,7 +123,7 @@
                     <div class="mt-2 pt-2 border-t border-base-200">
                         <div class="text-xs text-base-content/60">Moyenne journalière</div>
                         <div class="text-sm font-semibold text-success">
-                            {{ total_ventes_periode|div:date_fin.day|floatformat:2 }} F/jour
+                            {{ total_ventes_periode|div:date_fin.day|fcfa }} F/jour
                         </div>
                     </div>
                     {% endif %}
@@ -252,13 +253,13 @@
                                     <!-- Quantité (unités ou kg selon produit) -->
                                     <td class="text-center">
                                         <div class="badge badge-primary text-white">
-                                            {{ produit.quantite|floatformat:2 }}
+                                            {{ produit.quantite|format_number }}
                                         </div>
                                     </td>
                                 
                                     <!-- Kg vendus (toujours kg) -->
                                     <td class="text-center font-bold ">
-                                        {{ produit.kg_vendus|floatformat:2 }} KG
+                                        {{ produit.kg_vendus|format_number }} KG
                                     </td>
                                 
                                     <!-- CA -->
@@ -354,49 +355,49 @@
         </div>
     </div>
 
-{% if agents_inactifs %}
-<div class="card bg-base-100 shadow-xl mb-8">
-    <div class="card-body">
-        <h2 class="card-title text-lg mb-4 text-warning">
-            <i class="fas fa-user-clock mr-2"></i>
-            Agents inactifs depuis plus de 3 jours
-        </h2>
+    {% if agents_inactifs %}
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title text-lg mb-4 text-warning">
+                <i class="fas fa-user-clock mr-2"></i>
+                Agents inactifs depuis plus de 3 jours
+            </h2>
 
-        <div class="overflow-x-auto">
-            <table class="table table-zebra table-sm">
-                <thead>
-                    <tr class="bg-base-200">
-                        <th>Agent</th>
-                        <th class="text-center">Dernière vente</th>
-                        <th class="text-center">Jours sans vente</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in agents_inactifs %}
-                    <tr>
-                        <td class="font-semibold">{{ a.nom }}</td>
-                        <td class="text-center">
-                            {% if a.derniere_vente %}
-                                {{ a.derniere_vente|date:"d/m/Y H:i" }}
-                            {% else %}
-                                <span class="badge badge-error">Aucune vente</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            {% if a.jours_depuis %}
-                                <span class="badge badge-warning">{{ a.jours_depuis }} jours</span>
-                            {% else %}
-                                <span class="badge badge-error">Jamais</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra table-sm">
+                    <thead>
+                        <tr class="bg-base-200">
+                            <th>Agent</th>
+                            <th class="text-center">Dernière vente</th>
+                            <th class="text-center">Jours sans vente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in agents_inactifs %}
+                        <tr>
+                            <td class="font-semibold">{{ a.nom }}</td>
+                            <td class="text-center">
+                                {% if a.derniere_vente %}
+                                    {{ a.derniere_vente|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    <span class="badge badge-error">Aucune vente</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if a.jours_depuis %}
+                                    <span class="badge badge-warning">{{ a.jours_depuis }} jours</span>
+                                {% else %}
+                                    <span class="badge badge-error">Jamais</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
-{% endif %}
+    {% endif %}
 
     <!-- Tendance des Ventes 7 jours -->
     {% if tendance_7j %}
@@ -425,47 +426,105 @@
     </div>
     {% endif %}
 <!-- 🟦 Bloc 3 : Portefeuilles des Superviseurs (Direction) -->
-<!-- Version tableau compact -->
-{% if user_is_direction and portefeuilles_superviseurs %}
+
+    {% if user_is_direction and portefeuilles_superviseurs %}
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title text-lg mb-4">
+                <i class="fas fa-wallet text-purple-500 mr-2"></i>
+                Portefeuilles Superviseurs - Vue Synthétique
+            </h2>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra table-sm">
+                    <thead>
+                        <tr class="bg-base-200">
+                        <th>Superviseur</th>
+                        <th class="text-center">Recouvrements agents</th>
+                        <th class="text-center">Montant remis au ROT</th>
+                        <th class="text-center">Solde détenu</th>
+
+                        
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for portefeuille in portefeuilles_superviseurs %}
+                        <tr class="hover:bg-base-200/50 transition-colors">
+                            <td class="font-bold">{{ portefeuille.superviseur }}</td>
+                            <td class="text-center text-success font-bold">
+                                {{ portefeuille.total_recouvre_periode|fcfa }}
+                            </td>
+
+                            <td class="text-center text-info font-bold">
+                                {{ portefeuille.montant_remis_rot|fcfa }}
+                            </td>
+
+                            <td class="text-center">
+                                <span class="badge badge-lg
+                                    {% if portefeuille.solde_detenu > 0 %}
+                                        badge-warning
+                                    {% else %}
+                                        badge-success
+                                    {% endif %}
+                                ">
+                                    {{ portefeuille.solde_detenu|fcfa }}
+                                </span>
+                            </td>
+
+
+                        
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+{% if user_is_direction and portefeuilles_rot %}
 <div class="card bg-base-100 shadow-xl mb-8">
     <div class="card-body">
         <h2 class="card-title text-lg mb-4">
-            <i class="fas fa-wallet text-purple-500 mr-2"></i>
-            Portefeuilles Superviseurs - Vue Synthétique
+            <i class="fas fa-piggy-bank text-indigo-500 mr-2"></i>
+            Trésorerie ROT
         </h2>
-        
+
         <div class="overflow-x-auto">
             <table class="table table-zebra table-sm">
                 <thead>
                     <tr class="bg-base-200">
-                        <th class="font-semibold">Superviseur</th>
-                        <th class="text-center">Recouvrements</th>
+                        <th>ROT</th>
+                        <th class="text-center">Reçu des superviseurs</th>
+                        <th class="text-center">Versé en banque</th>
                         <th class="text-center">Dépenses</th>
-                        <th class="text-center">Versements</th>
-                     
                         <th class="text-center">Solde</th>
-                       
                     </tr>
                 </thead>
                 <tbody>
-                    {% for portefeuille in portefeuilles_superviseurs %}
-                    <tr class="hover:bg-base-200/50 transition-colors">
-                        <td class="font-bold">{{ portefeuille.superviseur }}</td>
+                    {% for rot in portefeuilles_rot %}
+                    <tr>
+                        <td class="font-bold">{{ rot.rot }}</td>
                         <td class="text-center text-success font-bold">
-                            {{ portefeuille.total_recouvre_periode|fcfa}} F
-                        </td>
-                        <td class="text-center text-error font-bold">
-                            {{ portefeuille.total_depenses_periode|fcfa}} F
+                            {{ rot.recu_superviseurs|fcfa }}
                         </td>
                         <td class="text-center text-info font-bold">
-                            {{ portefeuille.total_versements_periode|fcfa}} F
+                            {{ rot.verse_banque|fcfa }}
+                        </td>
+                        <td class="text-center text-error font-bold">
+                            {{ rot.depenses|fcfa }}
                         </td>
                         <td class="text-center">
-                            <div class="badge {% if portefeuille.solde_actuel > 0 %}badge-success{% else %}badge-error{% endif %} badge-lg">
-                                {{ portefeuille.solde_actuel|fcfa}} F
-                            </div>
+                            <span class="badge badge-lg
+                                {% if rot.solde >= 0 %}
+                                    badge-success
+                                {% else %}
+                                    badge-error
+                                {% endif %}
+                            ">
+                                {{ rot.solde|fcfa }}
+                            </span>
                         </td>
-                      
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -474,6 +533,8 @@
     </div>
 </div>
 {% endif %}
+
+
 
     <!-- 🟣 Bloc 4 : Stock Essentiel AVEC FOURNISSEURS -->
 

@@ -6,3 +6,7 @@ python-dateutil
 psycopg2-binary
 python-docx
 reportlab
+django-environs
+django-debug-toolbar
+dj-database-url
+requests

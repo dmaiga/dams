@@ -1,167 +1,134 @@
 {% extends "base.html" %}
-{% load humanize %}
-
+{% load format_fcfa %}
 {% block title %}Lots affectés{% endblock %}
 
 {% block content %}
 <div class="container py-3">
 
-    <!-- En-tête simple -->
+    <!-- En-tête -->
     <div class="mb-4">
-        <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-sm btn-outline-secondary mb-2">
+        <a href="{% url 'tableau_de_bord_superviseur' %}"
+           class="btn btn-sm btn-outline-secondary mb-2">
             ← Retour
         </a>
         <h5>📦 Mes lots affectés</h5>
-        
-        <!-- Totaux rapides -->
-        <div class="row g-2 mb-3">
+
+        <!-- Résumé -->
+        <div class="row g-2">
             <div class="col-4">
                 <div class="bg-light p-2 rounded text-center">
-                    <div class="small text-muted">Lots</div>
+                    <small class="text-muted">Lots</small>
                     <div class="fw-bold">{{ nombre_lots }}</div>
                 </div>
             </div>
             <div class="col-4">
                 <div class="bg-light p-2 rounded text-center">
-                    <div class="small text-muted">Stock restant</div>
-                    <div class="fw-bold">{{ total_kg_restant|floatformat:0 }} kg</div>
+                    <small class="text-muted">Stock restant</small>
+                    <div class="fw-bold">
+                        {{ total_restant|floatformat:0 }} unités
+                    </div>
                 </div>
             </div>
             <div class="col-4">
                 <div class="bg-light p-2 rounded text-center">
-                    <div class="small text-muted">Utilisé</div>
-                    <div class="fw-bold">{{ taux_utilisation_global|floatformat:0 }}%</div>
+                    <small class="text-muted">Utilisé</small>
+                    <div class="fw-bold">
+                        {{ taux_utilisation_global|floatformat:0 }}%
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bouton d'action principal -->
+    <!-- Action -->
     <div class="d-grid mb-4">
         <a href="{% url 'distribuer_lot_agent' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>Distribuer à un agent
+            Distribuer à un agent
         </a>
     </div>
 
-    <!-- Liste des lots -->
     {% if lots_data %}
     <div class="list-group">
         {% for data in lots_data %}
         {% with a=data.affectation %}
         <div class="list-group-item">
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="flex-grow-1">
-                    <!-- Produit et type -->
-                    <div class="d-flex align-items-center mb-1">
-                        <strong class="me-2">{{ a.lot.produit.nom }}</strong>
-                        {% if a.lot.est_conditionne %}
-                        <span class="badge bg-info">Conditionné</span>
-                        {% else %}
-                        <span class="badge bg-secondary">Vrac</span>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Quantités -->
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <small class="text-muted">Reçu:</small>
-                            <div>
-                                {% if a.lot.est_conditionne and data.quantite_initiale_unites %}
-                                    {{ data.quantite_initiale_unites|floatformat:0 }} unités
-                                    <small class="text-muted">({{ a.quantite_initiale|floatformat:0 }} kg)</small>
-                                {% else %}
-                                    {{ a.quantite_initiale|floatformat:0 }} kg
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <small class="text-muted">Restant:</small>
-                            <div class="fw-bold">
-                                {% if a.lot.est_conditionne and data.quantite_restante_unites %}
-                                    {{ data.quantite_restante_unites|floatformat:0 }} unités
-                                    <small class="text-muted">({{ a.quantite_restante|floatformat:0 }} kg)</small>
-                                {% else %}
-                                    {{ a.quantite_restante|floatformat:0 }} kg
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Barre de progression simple -->
-                    {% if a.quantite_initiale > 0 %}
-                    <div class="progress mb-1" style="height: 5px;">
-                        <div class="progress-bar bg-{{ data.statut_progress }}" 
-                             style="width: {{ data.taux_restant }}%">
-                        </div>
-                    </div>
-                    <div class="text-end small text-muted">
-                        {{ data.taux_utilise|floatformat:0 }}% utilisé
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Métadonnées -->
-                    <div class="small text-muted mt-2">
-                        <div class="row">
-                            <div class="col-6">
-                                <i class="fas fa-user-tie me-1"></i>
-                                {{ a.attribue_par.full_name|truncatechars:15 }}
-                            </div>
-                            <div class="col-6">
-                                <i class="far fa-clock me-1"></i>
-                                {{ a.date_affectation|date:"d/m H:i" }}
-                            </div>
-                        </div>
-                    </div>
+
+            <!-- Produit -->
+            <strong>{{ a.lot.produit.nom }}</strong>
+
+            <!-- Quantités -->
+            <div class="row mt-2">
+                <div class="col-6">
+                    <small class="text-muted">Reçu</small>
+                    <div>{{ a.quantite_initiale|floatformat:0 }} unités</div>
                 </div>
-                
-                <!-- Action rapide -->
-                <div class="ms-2">
-                    <a href="{% url 'distribuer_lot_agent' %}?lot={{ a.lot_id }}" 
-                       class="btn btn-sm btn-outline-primary"
-                       title="Distribuer ce lot">
-                        <i class="fas fa-share"></i>
-                    </a>
+                <div class="col-6">
+                    <small class="text-muted">Restant</small>
+                    <div class="fw-bold">
+                        {{ a.quantite_restante|floatformat:0 }} unités
+                    </div>
                 </div>
             </div>
+            <!-- Prix conseillés (ROT) -->
+<div class="row mt-2">
+    <div class="col-6">
+        <small class="text-muted">Prix en gros </small>
+        <div class="fw-semibold">
+            {{ a.prix_gros|fcfa }}
+        </div>
+    </div>
+    <div class="col-6">
+        <small class="text-muted">Prix en détail</small>
+        <div class="fw-bold text-success">
+            {{ a.prix_detail|fcfa }}
+        </div>
+    </div>
+</div>
+
+
+            <!-- Progression -->
+            {% if a.quantite_initiale > 0 %}
+            <div class="progress mt-2" style="height: 5px;">
+                <div class="progress-bar bg-{{ data.statut_progress }}"
+                     style="width: {{ data.taux_restant }}%">
+                </div>
+            </div>
+            <div class="text-end small text-muted">
+                {{ data.taux_utilise|floatformat:0 }}% utilisé
+            </div>
+            {% endif %}
+
+            <!-- Métadonnées -->
+            <div class="small text-muted mt-2">
+                <div class="d-flex justify-content-between">
+                    <span>
+                        {{ a.attribue_par.full_name|truncatechars:15 }}
+                    </span>
+                    <span>
+                        {{ a.date_affectation|date:"d/m H:i" }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Action -->
+            <div class="text-end mt-2">
+                <a href="{% url 'distribuer_lot_agent' %}?lot={{ a.lot_id }}"
+                   class="btn btn-sm btn-outline-primary">
+                    Distribuer
+                </a>
+            </div>
+
         </div>
         {% endwith %}
         {% endfor %}
     </div>
+
     {% else %}
-    <!-- État vide -->
-    <div class="text-center py-5">
-        <div class="mb-3">
-            <i class="fas fa-box-open fa-2x text-muted"></i>
-        </div>
+    <div class="text-center py-5 text-muted">
         <h6>Aucun lot affecté</h6>
-        <p class="text-muted small">Le ROT ne vous a pas encore affecté de lot.</p>
-        <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-outline-secondary">
-            Retour au tableau de bord
-        </a>
+        <p>Le ROT ne vous a pas encore affecté de lot.</p>
     </div>
     {% endif %}
 
 </div>
-
-<style>
-/* Minimal styling */
-.progress {
-    background-color: #f8f9fa;
-    border-radius: 2px;
-}
-
-.bg-success { background-color: #198754 !important; }
-.bg-warning { background-color: #ffc107 !important; }
-.bg-danger { background-color: #dc3545 !important; }
-
-.list-group-item {
-    border-left: none;
-    border-right: none;
-    border-radius: 0;
-}
-
-.list-group-item:first-child {
-    border-top: none;
-}
-</style>
 {% endblock %}

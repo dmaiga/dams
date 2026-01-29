@@ -4,12 +4,16 @@ from .models import (
     Agent, Produit, Client, LotEntrepot, Fournisseur,
     DistributionAgent, DetailDistribution, Vente, 
     MouvementStock,Recouvrement,VersementBancaire,
-    PaiementFournisseur,RecouvrementSuperviseur
+    PaiementFournisseur,RecouvrementSuperviseur,
+    Dette, PaiementDette, BonusAgent,Depense,
+    AffectationLotSuperviseur,RecuVersement
+
 )
 from django.db.models import Sum
 from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
+from django.utils.html import format_html
 
 
 @admin.register(Fournisseur)
@@ -44,47 +48,89 @@ class DistributionAgentAdmin(admin.ModelAdmin):
 
 @admin.register(DetailDistribution)
 class DetailDistributionAdmin(admin.ModelAdmin):
-    list_display = ['distribution', 'lot', 'quantite', 'prix_gros', 'prix_detail']
-    list_filter = ['distribution__date_distribution']
 
+    list_display = (
+        'id',
+        'produit_nom',
+        'quantite',
+        'prix_gros',
+        'prix_detail',
+    )
+
+    raw_id_fields = ('distribution', 'lot')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'lot__produit',
+            'distribution',
+        )
+
+    @admin.display(description="Produit")
+    def produit_nom(self, obj):
+        return obj.lot.produit.nom
 
 
 
 @admin.register(Vente)
 class VenteAdmin(admin.ModelAdmin):
-    list_display = [
-        'agent',
+
+    list_display = (
+        'id',
+        'vendeur',
         'client',
-        'get_produit',
-        'detail_distribution',
-        'quantite_affichee',   # ✅ AU LIEU DE quantite
+        'produit_nom',
+        'quantite_affichee',
         'prix_vente_unitaire',
         'date_vente',
         'date_creation',
-    ]
+    )
 
-    list_filter = ['date_vente', 'agent', 'client', 'date_creation']
+    list_filter = (
+        'date_vente',
+        'date_creation',
+        'type_vente',
+        'mode_paiement',
+    )
 
-    search_fields = [
-        'agent__user__username',
+    search_fields = (
         'agent__user__first_name',
         'agent__user__last_name',
+        'client__nom',
         'detail_distribution__lot__produit__nom',
-    ]
+    )
 
-    def get_produit(self, obj):
-        return obj.detail_distribution.lot.produit.nom if obj.detail_distribution else "-"
-    get_produit.short_description = 'Produit'
+    raw_id_fields = ('agent', 'stagiaire', 'client', 'detail_distribution')
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                'agent__user',
+                'stagiaire__user',
+                'client',
+                'detail_distribution__lot__produit',
+            )
+        )
+
+    # ----------------------------
+    # AFFICHAGES OPTIMISÉS
+    # ----------------------------
+    @admin.display(description="Vendeur")
+    def vendeur(self, obj):
+        return obj.nom_vendeur_complet
+
+    @admin.display(description="Produit")
+    def produit_nom(self, obj):
+        return obj.detail_distribution.lot.produit.nom
+
+    @admin.display(description="Quantité")
     def quantite_affichee(self, obj):
-        """
-        Affiche la quantité avec la vraie unité métier
-        """
-        if obj.type_vente == 'gros':
-            poids = obj.detail_distribution.lot.produit.poids_unitaire_kg or 1
-            quantite_kg = obj.quantite * poids
-            return f"{obj.quantite} unité(s) ({quantite_kg} kg)"
-        return f"{obj.quantite} kg"
+        produit = obj.detail_distribution.lot.produit
+
+        if produit.poids_unitaire_kg:
+            return f"{obj.quantite}"
+        return f"{obj.quantite}"
 
 
 @admin.register(MouvementStock)
@@ -96,18 +142,58 @@ class MouvementStockAdmin(admin.ModelAdmin):
 
 @admin.register(Recouvrement)
 class RecouvrementAdmin(admin.ModelAdmin):
-    list_display = ('id', 'agent', 'superviseur', 'montant_recouvre', 'date_recouvrement', 'date_creation')
-    list_filter = ('agent', 'superviseur', 'date_recouvrement')
-    search_fields = [
-        'agent__user__username', 
-        'agent__user__first_name', 
+
+    list_display = (
+        'id',
+        'agent_nom',
+        'superviseur_nom',
+        'montant_recouvre',
+        'date_recouvrement',
+        'date_creation',
+    )
+
+    list_filter = (
+        'agent',
+        'superviseur',
+        'date_recouvrement',
+    )
+
+    search_fields = (
+        'agent__user__username',
+        'agent__user__first_name',
         'agent__user__last_name',
-         # Permet rechercher par produit
-    ]
+        'superviseur__user__username',
+        'superviseur__user__first_name',
+        'superviseur__user__last_name',
+    )
+
     ordering = ('-date_recouvrement',)
+
     readonly_fields = ('date_creation',)
 
+    raw_id_fields = ('agent', 'superviseur')
 
+    # 🔑 OPTIMISATION CRITIQUE
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                'agent__user',
+                'superviseur__user',
+            )
+        )
+
+    # -------------------------
+    # AFFICHAGE SAFE & RAPIDE
+    # -------------------------
+    @admin.display(description="Agent")
+    def agent_nom(self, obj):
+        return obj.agent.full_name if obj.agent else "—"
+
+    @admin.display(description="Superviseur")
+    def superviseur_nom(self, obj):
+        return obj.superviseur.full_name if obj.superviseur else "—"
 
 
 
@@ -224,13 +310,6 @@ class AgentAdmin(admin.ModelAdmin):
 
     statistiques_agent.short_description = "📊 Statistiques"
 
-from django.contrib import admin
-from .models import BonusAgent
-
-
-from django.contrib import admin
-from django.utils.html import format_html
-from .models import VersementBancaire, Depense
 
 # -------------------------
 # Admin pour Depense
@@ -253,8 +332,7 @@ class DepenseAdmin(admin.ModelAdmin):
 # -------------------------
 # Admin pour VersementBancaire
 # -------------------------
-from django.contrib import admin
-from .models import VersementBancaire, RecuVersement
+
 
 class RecuVersementInline(admin.TabularInline):
     model = RecuVersement
@@ -274,9 +352,6 @@ class RecuVersementAdmin(admin.ModelAdmin):
     list_filter = ('date_upload', )
     search_fields = ('description', 'versement__id')
 
-
-from django.contrib import admin
-from .models import Dette, PaiementDette, BonusAgent
 
 
 # ==============================
@@ -524,4 +599,55 @@ class RecouvrementSuperviseurAdmin(admin.ModelAdmin):
         return format_html("<b>{}</b>", cash_str)
     
     cash_disponible.short_description = "Cash dispo superviseur"
-    
+
+@admin.register(AffectationLotSuperviseur)
+class AffectationLotSuperviseurAdmin(admin.ModelAdmin):
+
+    list_display = (
+        'id',
+        'produit_nom',
+        'superviseur',
+        'quantite_resume',
+        'prix_gros',
+        'prix_detail',
+        'date_affectation',
+        'attribue_par',
+    )
+
+    list_filter = (
+        'superviseur',
+        'attribue_par',
+        'date_affectation',
+    )
+
+    search_fields = (
+        'lot__produit__nom',
+        'superviseur__user__first_name',
+        'superviseur__user__last_name',
+    )
+
+    ordering = ('-date_affectation',)
+
+    readonly_fields = (
+        'quantite_initiale',
+        'quantite_restante',
+        'attribue_par',
+        'created_at',
+    )
+
+    raw_id_fields = ('lot', 'superviseur', 'attribue_par')
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                'lot__produit',
+                'superviseur__user',
+                'attribue_par__user',
+            )
+        )
+
+    @admin.display(description="Produit")
+    def produit_nom(self, obj):
+        return obj.lot.produit.nom

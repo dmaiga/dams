@@ -33,6 +33,14 @@ class Command(BaseCommand):
             )
             abdoulaye_old.telephone = "10000002" 
             abdoulaye_old.save()
+            # --- Alpha Diallo (ancien terrain → gros historique)
+            alpha = Agent.objects.get(
+                user__username="alpha.diallo",
+                type_agent="terrain"
+            )
+            alpha.type_agent = "agent_gros"
+            alpha.save()
+
             # --- Sokona Coulibaly (ancien terrain → gros historique)
             sokona = Agent.objects.get(
                 user__username="sokona.coulibaly",
@@ -69,11 +77,15 @@ class Command(BaseCommand):
                 username="sidibe.mankoulako",
                 defaults={"is_active": True}
             )
+            sidibe_user.set_password("temp123")
+            sidibe_user.save()
 
             abdoulaye_user, _ = User.objects.get_or_create(
                 username="kone.abdoulaye",
                 defaults={"is_active": True}
             )
+            abdoulaye_user.set_password("temp123")
+            abdoulaye_user.save()
 
             # ====================================================
             # 3️⃣ CRÉATION DES NOUVEAUX AGENTS OPÉRATIONNELS

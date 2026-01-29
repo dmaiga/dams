@@ -1096,6 +1096,19 @@ class AffectationLotSuperviseur(models.Model):
         max_digits=10,
         decimal_places=2
     )
+    prix_gros = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    prix_detail = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
 
     attribue_par = models.ForeignKey(
         Agent,
@@ -1105,17 +1118,21 @@ class AffectationLotSuperviseur(models.Model):
         related_name='affectations_realisees'
     )
 
-    date_affectation = models.DateTimeField(auto_now_add=True)
+    date_affectation = models.DateTimeField(
+        verbose_name="Date de distribution"
+    )
 
+    # 🔒 DATE TECHNIQUE (audit)
+    created_at = models.DateTimeField(
+        auto_now_add=True
+    )
     def __str__(self):
-        if not self.lot or not self.lot.produit:
-            return f"Affectation #{self.id}"
-
         return (
             f"{self.lot.produit.nom} — "
             f"reste {self.quantite_restante:.2f} "
             f"(init. {self.quantite_initiale:.2f})"
         )
+
 
 
     def quantite_resume(self):
@@ -1205,8 +1222,12 @@ class DistributionAgent(models.Model):
 
     class Meta:
         ordering = ['-date_distribution']
-        verbose_name = "Distribution"
-        verbose_name_plural = "Distributions"
+        indexes = [
+            models.Index(fields=['date_distribution']),
+            models.Index(fields=['superviseur']),
+        ]
+    
+
 
 class DetailDistribution(models.Model):
     distribution = models.ForeignKey(
@@ -1225,7 +1246,7 @@ class DetailDistribution(models.Model):
     default=0
     )
 
-    # Prix fixés par le superviseur
+    # Prix hérités de l'affectation ROT (snapshot historique)
     prix_gros = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     prix_detail = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     specification = models.CharField(
@@ -1377,15 +1398,8 @@ class Vente(models.Model):
     date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
 
     def __str__(self):
-        montant = int(self.total_vente)  # Supprime .0000
-        date_str = self.date_vente.strftime("%Y-%m-%d %H:%M")
-    
-        base_str = f"vente {self.detail_distribution.lot} - {self.quantite} - {montant} FCFA - {date_str}"
-    
-        if self.stagiaire:
-            return f"{base_str} [Stagiaire: {self.stagiaire.full_name}]"
-    
-        return base_str
+        return f"Vente #{self.id} ({self.date_vente:%d/%m})"
+
     
     
     def save(self, *args, **kwargs):
@@ -1698,61 +1712,6 @@ class Recouvrement(models.Model):
     montant_bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     def __str__(self):
         return f"Recouvrement {self.id} - {self.agent} - {self.montant_recouvre} FCFA"
-    
-    from decimal import Decimal
-    from math import floor
-    from datetime import timedelta
-    
-    def calculer_bonus(self):
-        # Sauvegarde initiale si nécessaire
-        if not self.pk:
-            super().save()
-    
-        # 1️⃣ Seulement ventes au détail
-        if not self.vente or self.vente.type_vente != "detail":
-            self.bonus_accorde = False
-            self.montant_bonus = Decimal("0")
-            self.save(update_fields=["bonus_accorde", "montant_bonus"])
-            return
-    
-        # 2️⃣ Vérification délai 48h
-        limite_bonus = self.vente.date_vente + timedelta(hours=48)
-        if self.date_recouvrement > limite_bonus:
-            self.bonus_accorde = False
-            self.montant_bonus = Decimal("0")
-            self.save(update_fields=["bonus_accorde", "montant_bonus"])
-            return
-    
-        # 3️⃣ Conversion produit → carton ENTIER
-        produit = self.vente.detail_distribution.lot.produit.nom
-        quantite = Decimal(self.vente.quantite)
-    
-        CONVERSION_CARTON = {
-            "Oignons": Decimal("25"),
-            "Ail": Decimal("10"),
-            "Pomme de terre": Decimal("25"),
-            "Poivre": Decimal("1"),
-        }
-    
-        ratio = CONVERSION_CARTON.get(produit)
-        if not ratio:
-            self.bonus_accorde = False
-            self.montant_bonus = Decimal("0")
-            self.save(update_fields=["bonus_accorde", "montant_bonus"])
-            return
-    
-        cartons = quantite // ratio  # 🔥 PAS DE FRACTION
-        montant_bonus = cartons * Decimal("100")
-    
-        # 4️⃣ Application du bonus
-        if cartons > 0:
-            self.bonus_accorde = True
-            self.montant_bonus = montant_bonus
-        else:
-            self.bonus_accorde = False
-            self.montant_bonus = Decimal("0")
-    
-        self.save(update_fields=["bonus_accorde", "montant_bonus"])
     
     
     class Meta:

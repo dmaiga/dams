@@ -20,6 +20,80 @@
             <i class="fas fa-plus me-1"></i> Nouvelle distribution
         </a>
     </div>
+    <!-- FILTRES -->
+<!-- FILTRES -->
+<div class="card mb-3">
+    <div class="card-body">
+
+        <form method="get" class="row g-2">
+
+            <!-- PRODUIT -->
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold">Produit</label>
+                <select name="produit" class="form-select form-select-sm">
+                    <option value="">Tous les produits</option>
+                    {% for p in produits %}
+                        <option value="{{ p.id }}"
+                            {% if filters.produit == p.id|stringformat:"s" %}selected{% endif %}>
+                            {{ p.nom }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- AGENT -->
+            <div class="col-12 col-md-4">
+                <label class="form-label small fw-semibold">Agent</label>
+                <select name="agent" class="form-select form-select-sm">
+                    <option value="">Tous les agents</option>
+                    {% for a in agents %}
+                        <option value="{{ a.id }}"
+                            {% if filters.agent == a.id|stringformat:"s" %}selected{% endif %}>
+                            {{ a.full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- DATE DEBUT -->
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold">Du</label>
+                <input type="date"
+                       name="date_debut"
+                       value="{{ filters.date_debut }}"
+                       class="form-control form-control-sm">
+            </div>
+
+            <!-- DATE FIN -->
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold">Au</label>
+                <input type="date"
+                       name="date_fin"
+                       value="{{ filters.date_fin }}"
+                       class="form-control form-control-sm">
+            </div>
+
+            <!-- ACTION -->
+            <div class="col-12 d-grid mt-2">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    Filtrer
+                </button>
+            </div>
+
+        </form>
+
+        {% if filters.agent or filters.produit or filters.date_debut or filters.date_fin %}
+        <div class="mt-2 text-end">
+            <a href="{% url 'liste_distribution_sup' %}"
+               class="small text-muted">
+                Réinitialiser les filtres
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
 
     {% if distributions %}
         {% for d in distributions %}

@@ -234,40 +234,85 @@ from decimal import Decimal
 
 from core.models import AffectationLotSuperviseur, LotEntrepot, Agent
 
+#A INCLURE LES PRIX DANS LE MODEL AFFECTATION LOT SUPERVISEUR
+
 class RotAffectationLotSuperviseurForm(forms.ModelForm):
+    # -------------------------------------------------
+    # QUANTITÉ (UNITÉS)
+    # -------------------------------------------------
     quantite_saisie = forms.DecimalField(
-        required=True,
         min_value=Decimal('0.01'),
         decimal_places=2,
-        label="Quantité à affecter",
+        label="Quantité à affecter (unités)",
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
             'step': '0.01',
-            'placeholder': 'Saisir la quantité'
-        }),
+            'placeholder': 'Ex : 50'
+        })
     )
 
+    # -------------------------------------------------
+    # PRIX FIXÉS PAR LE ROT
+    # -------------------------------------------------
+    prix_gros = forms.DecimalField(
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        label="Prix de gros (unité)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+
+    prix_detail = forms.DecimalField(
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        label="Prix de détail (unité)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+    date_affectation = forms.DateTimeField(
+        label="Date et heure de distribution",
+        initial=timezone.now,
+        widget=forms.DateTimeInput(attrs={
+            'type': 'datetime-local',
+            'class': 'form-control'
+        })
+    )
+    # =================================================
+    # META
+    # =================================================
     class Meta:
         model = AffectationLotSuperviseur
-        fields = ['lot', 'superviseur', 'quantite_initiale']
+        fields = [
+            'lot',
+            'superviseur',
+            'quantite_initiale',
+            'prix_gros',
+            'prix_detail',
+            'date_affectation'
+        ]
         widgets = {
-            'lot': forms.Select(attrs={
-                'class': 'form-select'
-            }),
+            'lot': forms.Select(attrs={'class': 'form-select'}),
             'superviseur': forms.Select(attrs={'class': 'form-select'}),
             'quantite_initiale': forms.HiddenInput(),
         }
 
+    # =================================================
+    # INIT
+    # =================================================
     def __init__(self, *args, **kwargs):
         self.rot = kwargs.pop('rot', None)
         super().__init__(*args, **kwargs)
 
         if not self.rot or not self.rot.est_rot:
-            raise PermissionError("Formulaire réservé au ROT")
+            raise PermissionError("Formulaire réservé au ROT.")
 
         self.fields['quantite_initiale'].required = False
 
-        # 🔹 Lots disponibles
+        # 🔹 Lots disponibles (stock > 0)
         self.fields['lot'].queryset = (
             LotEntrepot.objects
             .filter(quantite_restante__gt=0)
@@ -283,36 +328,49 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
             .order_by('user__last_name')
         )
 
-    # ------------------------------------------------------------------
-
+    # =================================================
+    # CLEAN
+    # =================================================
     def clean(self):
         cleaned_data = super().clean()
 
         lot = cleaned_data.get('lot')
         quantite = cleaned_data.get('quantite_saisie')
+        prix_gros = cleaned_data.get('prix_gros')
+        prix_detail = cleaned_data.get('prix_detail')
 
         if not lot:
-            self.add_error('lot', 'Veuillez sélectionner un lot.')
+            self.add_error('lot', "Veuillez sélectionner un lot.")
             return cleaned_data
 
         if not quantite or quantite <= 0:
-            self.add_error('quantite_saisie', 'Veuillez saisir une quantité valide.')
+            self.add_error('quantite_saisie', "Quantité invalide.")
             return cleaned_data
 
-        # ✅ Vérification simple et cohérente
+        # --- STOCK ---
         if quantite > lot.quantite_restante:
             self.add_error(
                 'quantite_saisie',
-                f"Stock insuffisant. Disponible : {lot.quantite_restante}"
+                f"Stock insuffisant (disponible : {lot.quantite_restante})."
             )
-            return cleaned_data
 
-        # ✅ Quantité unique
+        # --- PRIX ---
+        if prix_gros is None or prix_detail is None:
+            raise ValidationError("Les prix doivent être renseignés.")
+
+        if prix_detail < prix_gros:
+            raise ValidationError(
+                "Le prix de détail doit être supérieur ou égal au prix de gros."
+            )
+
+        # --- UNIFICATION ---
         cleaned_data['quantite_initiale'] = quantite
+
         return cleaned_data
 
-    # ------------------------------------------------------------------
-
+    # =================================================
+    # SAVE
+    # =================================================
     def save(self, commit=True):
         affectation = super().save(commit=False)
 
@@ -325,33 +383,35 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
         if commit:
             affectation.save()
 
-            # 🔒 Mise à jour stock atomique
+            # 🔒 Décrément du stock entrepôt
             lot = affectation.lot
             lot.quantite_restante -= quantite
             lot.save(update_fields=['quantite_restante'])
 
         return affectation
 
+
 class SupervisorDistributionForm(forms.Form):
+
     # -------------------------------------------------
     # AGENT
     # -------------------------------------------------
     agent_terrain = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
         label="Agent terrain",
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        required=False
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     auto_distribution = forms.BooleanField(
         required=False,
         initial=False,
-        label="Auto-distribution (je vends moi-même)",
+        label="Auto-distribution",
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
 
     # -------------------------------------------------
-    # LOT
+    # LOT AFFECTÉ
     # -------------------------------------------------
     lot = forms.ModelChoiceField(
         queryset=AffectationLotSuperviseur.objects.none(),
@@ -360,30 +420,28 @@ class SupervisorDistributionForm(forms.Form):
     )
 
     # -------------------------------------------------
-    # QUANTITÉ (UNE SEULE LOGIQUE)
+    # QUANTITÉ (UNITÉS)
     # -------------------------------------------------
     quantite = forms.DecimalField(
         min_value=Decimal('0.01'),
         decimal_places=2,
-        label="Quantité à distribuer",
-        widget=forms.NumberInput(attrs={'class': 'form-control'})
+        label="Quantité à distribuer (unités)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
     )
 
     # -------------------------------------------------
-    # PRIX
+    # DATE DE DISTRIBUTION
     # -------------------------------------------------
-    prix_gros = forms.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control'})
-    )
-
-    prix_detail = forms.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control'})
+    date_distribution = forms.DateTimeField(
+        label="Date et heure de distribution",
+        initial=timezone.now,
+        widget=forms.DateTimeInput(attrs={
+            'type': 'datetime-local',
+            'class': 'form-control'
+        })
     )
 
     # =================================================
@@ -393,16 +451,27 @@ class SupervisorDistributionForm(forms.Form):
         self.superviseur = kwargs.pop('superviseur')
         super().__init__(*args, **kwargs)
 
-        self.fields['agent_terrain'].queryset = Agent.objects.filter(
-            type_agent__in=['terrain', 'agent_gros'],
-            superviseur=self.superviseur,
-            est_actif=True
-        ).select_related('user')
+        # Agents terrain rattachés
+        self.fields['agent_terrain'].queryset = (
+            Agent.objects
+            .filter(
+                superviseur=self.superviseur,
+                type_agent__in=['terrain', 'agent_gros'],
+                est_actif=True
+            )
+            .select_related('user')
+            .order_by('user__last_name')
+        )
 
+        # Lots affectés encore disponibles
         self.fields['lot'].queryset = (
             AffectationLotSuperviseur.objects
-            .filter(superviseur=self.superviseur, quantite_restante__gt=0)
+            .filter(
+                superviseur=self.superviseur,
+                quantite_restante__gt=0
+            )
             .select_related('lot__produit')
+            .order_by('lot__produit__nom')
         )
 
     # =================================================
@@ -416,12 +485,12 @@ class SupervisorDistributionForm(forms.Form):
         affectation = cleaned_data.get('lot')
         quantite = cleaned_data.get('quantite')
 
-        # --- agent ---
+        # --- AGENT ---
         if auto:
             cleaned_data['agent_terrain'] = self.superviseur
         elif not agent:
             raise ValidationError(
-                "Veuillez sélectionner un agent ou activer l’auto-distribution."
+                "Veuillez sélectionner un agent terrain ou activer l’auto-distribution."
             )
 
         if not affectation or not quantite:
@@ -442,25 +511,30 @@ class SupervisorDistributionForm(forms.Form):
         affectation = self.cleaned_data['lot']
         agent = self.cleaned_data['agent_terrain']
         quantite = self.cleaned_data['quantite']
+        date_distribution = self.cleaned_data['date_distribution']
 
+        # 1️⃣ Créer la distribution avec date choisie
         distribution = DistributionAgent.objects.create(
             superviseur=self.superviseur,
             agent_terrain=agent,
-            type_distribution='AUTO' if agent == self.superviseur else 'TERRAIN'
+            date_distribution=date_distribution,
+            est_retroactive=date_distribution < timezone.now()
         )
 
+        # 2️⃣ Détail avec PRIX HÉRITÉS (snapshot)
         DetailDistribution.objects.create(
             distribution=distribution,
             lot=affectation.lot,
             quantite=quantite,
-            prix_gros=self.cleaned_data.get('prix_gros'),
-            prix_detail=self.cleaned_data.get('prix_detail')
+            prix_gros=affectation.prix_gros,
+            prix_detail=affectation.prix_detail
         )
 
-        # 🔒 Décrément simple
+        # 3️⃣ Décrément du stock superviseur
         affectation.quantite_restante -= quantite
         affectation.save(update_fields=['quantite_restante'])
 
+        # 4️⃣ Stats simples
         distribution.quantite_totale = quantite
         distribution.nombre_produits_differents = 1
         distribution.save(update_fields=[
@@ -470,75 +544,48 @@ class SupervisorDistributionForm(forms.Form):
 
         return distribution
 
- 
+
 class RecouvrementSuperviseurForm(forms.ModelForm):
+
+    date_recouvrement = forms.DateTimeField(
+        label="Date de remise au ROT",
+        initial=timezone.now,
+        widget=forms.DateTimeInput(
+            attrs={
+                "type": "datetime-local",
+                "class": "form-control"
+            }
+        )
+    )
 
     class Meta:
         model = RecouvrementSuperviseur
-        fields = ['superviseur', 'montant', 'commentaire']
+        fields = [
+            'superviseur',
+            'montant',
+            'date_recouvrement',
+            'commentaire',
+        ]
         widgets = {
             'superviseur': forms.Select(attrs={'class': 'form-select'}),
-            'montant': forms.NumberInput(attrs={'class': 'form-control'}),
+            'montant': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01'
+            }),
             'commentaire': forms.Textarea(attrs={
                 'class': 'form-control',
-                'rows': 2
+                'rows': 3,
+                'placeholder': 'Observation éventuelle…'
             }),
         }
 
-    def __init__(self, *args, **kwargs):
-        self.rot = kwargs.pop('rot')
-        super().__init__(*args, **kwargs)
+    def clean_date_recouvrement(self):
+        date = self.cleaned_data['date_recouvrement']
 
-        # 🔐 uniquement superviseurs actifs
-        self.fields['superviseur'].queryset = Agent.objects.filter(
-            type_agent='entrepot',
-            est_actif=True
-        )
+        if date > timezone.now():
+            raise ValidationError(
+                "La date de recouvrement ne peut pas être dans le futur."
+            )
 
-    def clean(self):
-        cleaned_data = super().clean()
-        
-        superviseur = cleaned_data.get('superviseur')
-        montant = cleaned_data.get('montant')
-        
-        if not superviseur or not montant:
-            return cleaned_data
-            
-        # Vérifier si c'est une création ou une modification
-        instance = self.instance
-        
-        # Calculer le montant déjà remis par ce superviseur
-        deja_remis = RecouvrementSuperviseur.objects.filter(
-            superviseur=superviseur
-        )
-        
-        # Exclure l'instance actuelle si c'est une modification
-        if instance.pk:
-            deja_remis = deja_remis.exclude(pk=instance.pk)
-            
-        deja_remis_total = deja_remis.aggregate(
-            total=Coalesce(Sum("montant"), Decimal("0.00"))
-        )["total"]
-        
-        # Récupérer le cash disponible du superviseur
-        cash_disponible = superviseur.cash_disponible_superviseur
-        cash_restant = cash_disponible - deja_remis_total
-        
-        if montant > cash_restant:
-            raise ValidationError({
-                'montant': (
-                    f"Montant supérieur au cash disponible "
-                    f"({cash_restant:,.0f} FCFA)."
-                )
-            })
-        
-        return cleaned_data
-    
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.rot = self.rot
+        return date
 
-        if commit:
-            instance.save()
-
-        return instance

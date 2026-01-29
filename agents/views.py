@@ -22,13 +22,15 @@ from django.db.models.functions import Coalesce
 from django import forms
 from django.core.exceptions import ValidationError 
 from django.utils import timezone
-from datetime import timedelta
+from datetime import date, timedelta
 # Python stdlib
 from datetime import timedelta
 from decimal import Decimal
 import json
 
 # Project models
+from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
+from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
 from core.models import (
     Agent, Client, Vente, Produit,Depense,
     LotEntrepot, DetailDistribution, DistributionAgent,
@@ -76,7 +78,6 @@ from agents.services.agent_dashboard_service import AgentDashboardService
 from agents.services.superviseur_stock_service import SuperviseurStockService
 from agents.services.rot_dashboard_service import RotDashboardService
 from django.db.models import DecimalField, ExpressionWrapper
-from agents.services.agent_data_service import AgentDataService
 
 
 @login_required
@@ -148,50 +149,52 @@ def superviseur_lots_affectes(request):
         )
         .order_by('-date_affectation')
     )
-    
-    # Préparer les données pour le template
+
     lots_data = []
     for affectation in lots_affectes:
-        # Calculer le taux d'utilisation pour chaque lot
         taux_restant = 0
         taux_utilise = 0
+
         if affectation.quantite_initiale > 0:
-            taux_restant = (affectation.quantite_restante / affectation.quantite_initiale) * 100
+            taux_restant = (
+                affectation.quantite_restante / affectation.quantite_initiale
+            ) * 100
             taux_utilise = 100 - taux_restant
-        
-        # Convertir en unités si produit conditionné
-        quantite_initiale_unites = None
-        quantite_restante_unites = None
-        if affectation.lot.est_conditionne and affectation.lot.produit.poids_unitaire_kg:
-            poids = affectation.lot.produit.poids_unitaire_kg
-            quantite_initiale_unites = affectation.quantite_initiale / poids
-            quantite_restante_unites = affectation.quantite_restante / poids
-        
+
         lots_data.append({
             'affectation': affectation,
             'taux_restant': round(taux_restant, 1),
             'taux_utilise': round(taux_utilise, 1),
-            'quantite_initiale_unites': quantite_initiale_unites,
-            'quantite_restante_unites': quantite_restante_unites,
-            'statut_progress': 'success' if taux_restant > 50 else 'warning' if taux_restant > 20 else 'danger',
+            'statut_progress': (
+                'success' if taux_restant > 50
+                else 'warning' if taux_restant > 20
+                else 'danger'
+            ),
         })
-    
-    # Calculer les totaux
-    total_kg_initial = sum(a.quantite_initiale for a in lots_affectes)
-    total_kg_restant = sum(a.quantite_restante for a in lots_affectes)
+
+    # Totaux globaux (EN UNITÉS)
+    total_initial = sum(a.quantite_initiale for a in lots_affectes)
+    total_restant = sum(a.quantite_restante for a in lots_affectes)
+
     taux_utilisation_global = 0
-    if total_kg_initial > 0:
-        taux_utilisation_global = ((total_kg_initial - total_kg_restant) / total_kg_initial) * 100
+    if total_initial > 0:
+        taux_utilisation_global = (
+            (total_initial - total_restant) / total_initial
+        ) * 100
 
     context = {
         'lots_data': lots_data,
-        'total_kg_initial': total_kg_initial,
-        'total_kg_restant': total_kg_restant,
+        'total_initial': total_initial,
+        'total_restant': total_restant,
         'taux_utilisation_global': round(taux_utilisation_global, 1),
         'nombre_lots': len(lots_data),
     }
 
-    return render(request, 'agents/superviseur/lots_affectes.html', context)
+    return render(
+        request,
+        'agents/superviseur/lots_affectes.html',
+        context
+    )
 
 
 @login_required
@@ -445,9 +448,6 @@ def modifier_agent(request, agent_id):
         'agent': agent_cible
     })
 
-
-
-
 @login_required
 def liste_distribution_sup(request):
 
@@ -462,11 +462,7 @@ def liste_distribution_sup(request):
 
     distributions = (
         DistributionAgent.objects
-        .filter(superviseur=superviseur)  # 🔑 inclut AUTO + agent_gros
-        .select_related(
-            'agent_terrain',
-            'agent_terrain__user',
-        )
+        .filter(superviseur=superviseur)
         .select_related(
             'agent_terrain',
             'agent_terrain__user',
@@ -481,10 +477,58 @@ def liste_distribution_sup(request):
         .order_by('-date_distribution')
     )
 
+    # -------------------------
+    # FILTRES (GET)
+    # -------------------------
+    agent_id = request.GET.get('agent')
+    produit_id = request.GET.get('produit')
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+
+    if agent_id:
+        distributions = distributions.filter(agent_terrain_id=agent_id)
+
+    if produit_id:
+        distributions = distributions.filter(
+            detaildistribution__lot__produit_id=produit_id
+        ).distinct()
+
+    if date_debut:
+        distributions = distributions.filter(date_distribution__date__gte=date_debut)
+
+    if date_fin:
+        distributions = distributions.filter(date_distribution__date__lte=date_fin)
+
+    agents = (
+        Agent.objects
+        .filter(superviseur=superviseur, est_actif=True)
+        .select_related('user')
+        .order_by('user__last_name')
+    )
+
+    produits = (
+        Produit.objects
+        .filter(lots__detaildistribution__distribution__superviseur=superviseur)
+        .distinct()
+        .order_by('nom')
+    )
+
+    context = {
+        'distributions': distributions,
+        'agents': agents,
+        'produits': produits,
+        'filters': {
+            'agent': agent_id,
+            'produit': produit_id,
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+        }
+    }
+
     return render(
         request,
         'agents/superviseur/liste_distributions.html',
-        {'distributions': distributions}
+        context
     )
 
 ####
@@ -502,31 +546,19 @@ def affecter_lot_superviseur(request):
         form = RotAffectationLotSuperviseurForm(request.POST, rot=agent)
         
         if form.is_valid():
-            try:
-                affectation = form.save()
-                
-                # Message adapté selon le type de produit
-                lot = affectation.lot
-                quantite_saisie = form.cleaned_data['quantite_saisie']
-                
-                if lot.est_conditionne:
-                    poids_unitaire = lot.produit.poids_unitaire_kg
-                    quantite_kg = quantite_saisie * poids_unitaire
-                    message = (
-                        f"✅ {quantite_saisie} unité(s) ({quantite_kg} kg) de "
-                        f"{lot.produit.nom} affecté(s) à {affectation.superviseur.full_name}"
-                    )
-                else:
-                    message = (
-                        f"✅ {quantite_saisie} kg de {lot.produit.nom} "
-                        f"affecté(s) à {affectation.superviseur.full_name}"
-                    )
-                
-                messages.success(request, message)
-                return redirect('rot_affectations_liste')
-                
-            except Exception as e:
-                messages.error(request, f"Erreur lors de l'affectation: {str(e)}")
+            affectation = form.save()
+
+            lot = affectation.lot
+            quantite = affectation.quantite_initiale
+
+            message = (
+                f"✅ {quantite} unité(s) de {lot.produit.nom} "
+                f"affectée(s) à {affectation.superviseur.full_name}"
+            )
+
+            messages.success(request, message)
+            return redirect('rot_affectations_liste')
+
     else:
         form = RotAffectationLotSuperviseurForm(rot=agent)
 
@@ -647,101 +679,71 @@ def detail_agent_rot(request, agent_id):
         context
     )
 
-
-
 @login_required
 def recouvrer_superviseur(request):
     rot = request.user.agent
-
     if not rot.est_rot:
         return redirect("access_denied")
 
-    superviseur_selectionne = None
-    total_recouvre = Decimal('0.00')
-    dernier_recouvrement = None
-    cash_restant = Decimal('0.00')
+    superviseur = None
+    resume = None
 
-    # Initialiser le formulaire
-    form = RecouvrementSuperviseurForm(
-        request.POST or None,
-        rot=rot
-    )
-
-    # Gérer la soumission POST
-    if request.method == 'POST':
-        superviseur_id = request.POST.get('superviseur')
-        
-        if superviseur_id:
-            try:
-                superviseur_selectionne = Agent.objects.get(
-                    id=superviseur_id,
-                    type_agent='entrepot',
-                    est_actif=True
-                )
-                
-                # Calculer les informations supplémentaires
-                total_recouvre = RecouvrementSuperviseur.objects.filter(
-                    superviseur=superviseur_selectionne
-                ).aggregate(
-                    total=Coalesce(Sum("montant"), Decimal("0.00"))
-                )["total"]
-                
-                dernier_recouvrement = RecouvrementSuperviseur.objects.filter(
-                    superviseur=superviseur_selectionne
-                ).order_by('-date_recouvrement').first()
-                
-                # Calculer le cash restant
-                cash_restant = superviseur_selectionne.cash_disponible_superviseur - total_recouvre
-                if cash_restant < 0:
-                    cash_restant = Decimal('0.00')
-                
-            except Agent.DoesNotExist:
-                superviseur_selectionne = None
-        
-        # Vérifier si le formulaire est valide
-        if form.is_valid():
-            form.save()
-            messages.success(
-                request,
-                "✅ Recouvrement superviseur enregistré avec succès"
-            )
-            return redirect("dashboard_rot")
-    
-    # Gérer la requête GET
-    else:
-        # Récupérer le premier superviseur actif pour l'affichage initial
-        premier_superviseur = Agent.objects.filter(
-            type_agent='entrepot',
+    # --- ÉTAPE 1 : lecture superviseur (GET) ---
+    superviseur_id = request.GET.get("superviseur")
+    if superviseur_id:
+        superviseur = Agent.objects.filter(
+            id=superviseur_id,
+            type_agent="entrepot",
             est_actif=True
         ).first()
-        
-        if premier_superviseur:
-            superviseur_selectionne = premier_superviseur
-            
-            # Pré-remplir les informations
-            total_recouvre = RecouvrementSuperviseur.objects.filter(
-                superviseur=superviseur_selectionne
-            ).aggregate(
-                total=Coalesce(Sum("montant"), Decimal("0.00"))
-            )["total"]
-            
-            dernier_recouvrement = RecouvrementSuperviseur.objects.filter(
-                superviseur=superviseur_selectionne
-            ).order_by('-date_recouvrement').first()
-            
-            # Calculer le cash restant
-            cash_restant = superviseur_selectionne.cash_disponible_superviseur - total_recouvre
-            if cash_restant < 0:
-                cash_restant = Decimal('0.00')
+
+        if superviseur:
+            total_remis = (
+                RecouvrementSuperviseur.objects
+                .filter(superviseur=superviseur)
+                .aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))
+                ["total"]
+            )
+
+            dernier = (
+                RecouvrementSuperviseur.objects
+                .filter(superviseur=superviseur)
+                .order_by("-date_recouvrement")
+                .first()
+            )
+
+            cash_disponible = superviseur.cash_disponible_superviseur
+            cash_restant = max(cash_disponible - total_remis, Decimal("0.00"))
+
+            resume = {
+                "cash_disponible": cash_disponible,
+                "total_remis": total_remis,
+                "cash_restant": cash_restant,
+                "dernier": dernier,
+            }
+
+    # --- ÉTAPE 2 : formulaire ---
+    if request.method == "POST":
+        form = RecouvrementSuperviseurForm(request.POST)
+        if form.is_valid():
+            rec = form.save(commit=False)
+            rec.rot = rot
+            rec.save()
+            messages.success(request, "Recouvrement enregistré.")
+            return redirect(f"{request.path}?superviseur={rec.superviseur_id}")
+    else:
+        form = RecouvrementSuperviseurForm(
+            initial={"superviseur": superviseur}
+        )
 
     return render(
         request,
         "agents/rot/recouvrer_superviseur.html",
         {
             "form": form,
-            "superviseur_selectionne": superviseur_selectionne,
-            "total_recouvre": total_recouvre,
-            "dernier_recouvrement": dernier_recouvrement,
-            "cash_restant": cash_restant,
+            "superviseur": superviseur,
+            "resume": resume,
         }
     )
+
+

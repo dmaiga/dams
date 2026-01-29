@@ -54,6 +54,7 @@ from direction.services.vente_export import VenteExportService
 from direction.services.dashboard_service import DashboardService
 from direction.services.cloture_service import calculer_solde_periode
 
+from direction.services.analyse_operationnelle_service import AnalyseOperationnelleService
 
 # core/views/dashboard.py
 
@@ -112,6 +113,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     periode_type, annee, mois
                 )
         
+        # 🟪 Bloc 7 : Portefeuille ROT (Direction)
+        portefeuilles_rot = None
+
+        if user_has_agent and user_is_direction:
+            portefeuilles_rot = DashboardService.get_portefeuilles_rot(
+                periode_type, annee, mois
+            )
+
         # Années disponibles pour le filtre
         annees_disponibles = DashboardService.get_annees_disponibles()
         
@@ -134,6 +143,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             
             # Portefeuilles superviseurs (pour la direction)
             'portefeuilles_superviseurs': portefeuilles_superviseurs,
+            'portefeuilles_rot': portefeuilles_rot,
             'user_has_agent': user_has_agent,
             'user_is_direction': user_is_direction,
             
@@ -337,6 +347,35 @@ def RotDetailView(request, pk):
     })
 
 
+
+@login_required
+def analyse_operationnelle(request):
+    # 🔹 paramètres
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+    agent_id = request.GET.get('agent')
+    produit_id = request.GET.get('produit')
+
+    if not date_debut or not date_fin:
+        date_fin = date.today()
+        date_debut = date(date_fin.year, 1, 1)
+    
+    resultats = AnalyseOperationnelleService.analyser(
+        date_debut=date_debut,
+        date_fin=date_fin,
+        agent_id=agent_id,
+        produit_id=produit_id
+    )
+
+    context = {
+        **resultats,
+        'date_debut': date_debut,
+        'date_fin': date_fin,
+        'agents': Agent.objects.filter(type_agent__in=['terrain', 'agent_gros']),
+        'produits': Produit.objects.all(),
+    }
+
+    return render(request, 'direction/analyses/agents/analyse_operationnelle.html', context)
 
 #Product
 

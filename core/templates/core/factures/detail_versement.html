@@ -224,39 +224,68 @@
         <!-- Résumé financier -->
         <div class="col-md-4">
             <!-- Carte Montants -->
-            <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">💰 Montants</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted">Montant Vente:</span>
-                            <strong class="text-success">{{ versement.montant_vente|fcfa }} FCFA</strong>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted">Montant Hors Vente:</span>
-                            <strong class="text-info">{{ versement.montant_hors_vente|fcfa }} FCFA</strong>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold">Total Versé:</span>
-                            <strong class="text-primary">{{ versement.montant_total|fcfa }} FCFA</strong>
-                        </div>
-                        {% if total_depenses > 0 %}
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="text-muted">Dépenses:</span>
-                            <strong class="text-danger">- {{ total_depenses|fcfa }} FCFA</strong>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">Montant Net:</span>
-                            <strong class="text-dark">{{ montant_net|fcfa }} FCFA</strong>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+<!-- Carte Montants (VERSION CLARIFIÉE) -->
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">💰 Mouvement du cash</h5>
+    </div>
+
+    <div class="card-body">
+
+        <!-- CASH VENTE -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">
+                Cash issu des ventes :
+            </span>
+            <strong class="text-success">
+                {{ versement.montant_vente|fcfa }} FCFA
+            </strong>
+        </div>
+
+        <!-- CASH HORS VENTE -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">
+                Apport hors vente (surplus) :
+            </span>
+            <strong class="text-info">
+                {{ versement.montant_hors_vente|fcfa }} FCFA
+            </strong>
+        </div>
+
+        <hr>
+
+        <!-- DEPENSES -->
+        {% if total_depenses > 0 %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted">
+                Dépenses payées :
+            </span>
+            <strong class="text-danger">
+                - {{ total_depenses|fcfa }} FCFA
+            </strong>
+        </div>
+        {% endif %}
+
+        <hr>
+
+        <!-- NET VENTE -->
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold">
+                Cash vente restant :
+            </span>
+            <strong class="text-dark">
+                {{ cash_vente_restant|fcfa }} FCFA
+            </strong>
+        </div>
+
+        <small class="text-muted d-block mt-2">
+            ℹ️ Le cash hors vente est un apport externe utilisé uniquement pour
+            couvrir certaines dépenses. Il n’impacte pas le solde réel issu des ventes.
+        </small>
+
+    </div>
+</div>
+
 
             <!-- Carte Actions Rapides -->
             <div class="card mb-4">

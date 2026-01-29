@@ -18,7 +18,7 @@ from direction.views import (
                                  liste_clotures,apercu_cloture,cloturer_periode,  
                                  api_calcul_salaire_rapide,export_salaires_excel,
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
-                                 RotDetailView                                                 
+                                 RotDetailView,analyse_operationnelle                                     
                               )
 
 
@@ -37,7 +37,8 @@ urlpatterns = [
     
     path('direction/produits/', ProductListView.as_view(), name='product_list'),
     path('direction/produits/<int:pk>/', ProductDetailView.as_view(), name='product_detail'),
-   
+   path("direction/analyse_op/", analyse_operationnelle, name="analyse_operationnelle"),
+
     
     # Liste des fournisseurs
     path('direction/fournisseurs/liste/', 

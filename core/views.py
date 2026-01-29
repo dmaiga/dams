@@ -1581,29 +1581,23 @@ def liste_versement(request):
         context
     )
 
-
-
 @login_required
 def detail_versement(request, versement_id):
-    """Afficher le détail d'un versement"""
-    # Récupérer le versement
     versement = get_object_or_404(VersementBancaire, id=versement_id)
-    
-    
-    # Récupérer les dépenses associées
+
     depenses = versement.depenses.all()
-    
-    # Calculer les statistiques
     total_depenses = versement.total_depenses_associees
-    montant_net = versement.montant_total - total_depenses
-    
+
+    # ✅ LOGIQUE SAINE
+    cash_vente_restant = versement.montant_vente - total_depenses
+
     context = {
         'versement': versement,
         'depenses': depenses,
         'total_depenses': total_depenses,
-        'montant_net': montant_net,
+        'cash_vente_restant': cash_vente_restant,
     }
-    
+
     return render(request, 'core/factures/detail_versement.html', context)
 
 

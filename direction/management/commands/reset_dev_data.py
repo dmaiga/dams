@@ -81,13 +81,9 @@ class Command(BaseCommand):
         # - agents gros / anciens → superviseur historique
         # =====================================================
         call_command("affecter_superviseurs")
-        call_command(
-            "migrer_versements_depenses_rot",
-            date_bascule="2026-01-01",
-            ancien_superviseur="abdoulaye.kone",
-            rot="kone.abdoulaye"
-        )
-        call_command("transferer_recouvrements")
+
+
+
 
         # =====================================================
         # 7️⃣ MIGRATION FINANCIÈRE (VERSEMENTS & DÉPENSES)
@@ -95,8 +91,17 @@ class Command(BaseCommand):
         # Transfère la responsabilité des flux financiers
         # vers le nouvel agent ROT à partir de la date de bascule
         # =====================================================
-      
+        call_command("transferer_recouvrements")
+    
+        call_command(
+            "migrer_versements_depenses_rot",
+            date_bascule="2026-01-01",
+            ancien_superviseur="abdoulaye.kone",
+            rot="kone.abdoulaye"
+        )
 
+
+        
 
         # =====================================================
         # FIN DU RESET

@@ -19,68 +19,61 @@
         </span>
     </div>
 
-    <!-- ================= FILTRE MENSUEL ================= -->
 
 
     <!-- ================= KPIs FINANCIERS ================= -->
-    <div class="row g-2 mb-4">
+<div class="row g-2 mb-4">
 
-        <div class="col-6 col-md-3">
-            <div class="card shadow-sm border-start border-primary border-4">
-                <div class="card-body py-2 text-center">
-                    <small class="text-muted">Ventes agents</small>
-                    <div class="fw-bold">
-                        {{ finances_superviseur.total_ventes_agents|fcfa }}
-                    </div>
+    <!-- AGENTS -->
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-start border-primary border-4">
+            <div class="card-body py-2 text-center">
+                <small class="text-muted">Agents actifs</small>
+                <div class="fw-bold fs-5">
+                    {{ finances_superviseur.nombre_agents }}
                 </div>
             </div>
         </div>
-
-        <div class="col-6 col-md-3">
-            <div class="card shadow-sm border-start border-danger border-4">
-                <div class="card-body py-2 text-center">
-                    <small class="text-muted">Encore chez agents</small>
-                    <div class="fw-bold text-danger">
-                        {{ finances_superviseur.reste_a_recouvrer|fcfa }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-6 col-md-2">
-            <div class="card shadow-sm border-start border-success border-4">
-                <div class="card-body py-2 text-center">
-                    <small class="text-muted">Recouvré</small>
-                    <div class="fw-bold text-success">
-                        {{ finances_superviseur.total_recouvre_agents|fcfa }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-6 col-md-2">
-            <div class="card shadow-sm border-start border-secondary border-4">
-                <div class="card-body py-2 text-center">
-                    <small class="text-muted">Remis au ROT</small>
-                    <div class="fw-bold">
-                        {{ finances_superviseur.total_remis_rot|fcfa }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-2">
-            <div class="card shadow-sm border-start border-warning border-4">
-                <div class="card-body py-2 text-center">
-                    <small class="text-muted">Cash détenu</small>
-                    <div class="fw-bold text-warning">
-                        {{ finances_superviseur.argent_chez_superviseur|fcfa }}
-                    </div>
-                </div>
-            </div>
-        </div>
-
     </div>
+
+    <!-- À RECOUVRER -->
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-start border-danger border-4">
+            <div class="card-body py-2 text-center">
+                <small class="text-muted">À recouvrer (agents)</small>
+                <div class="fw-bold text-danger">
+                    {{ finances_superviseur.montant_a_recouvrer|fcfa }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CASH DÉTENU -->
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-start border-warning border-4">
+            <div class="card-body py-2 text-center">
+                <small class="text-muted">Cash détenu</small>
+                <div class="fw-bold text-warning">
+                    {{ finances_superviseur.cash_detenu|fcfa }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REMIS AU ROT -->
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-start border-success border-4">
+            <div class="card-body py-2 text-center">
+                <small class="text-muted">Remis au ROT</small>
+                <div class="fw-bold text-success">
+                    {{ finances_superviseur.montant_remis_rot|fcfa }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
 
     <!-- ================= STOCK SUPERVISEUR ================= -->
     <div class="card shadow-sm mb-4">
