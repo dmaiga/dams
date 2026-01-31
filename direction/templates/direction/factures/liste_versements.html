@@ -16,18 +16,7 @@
                 <!-- Ligne 1 des filtres -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Filtre par superviseur -->
-                    <div>
-                        <label class="label label-text font-semibold py-1">Superviseur</label>
-                        <select name="superviseur" class="select select-bordered select-sm w-full">
-                            <option value="">Tous les superviseurs</option>
-                            {% for superviseur in superviseurs %}
-                            <option value="{{ superviseur.id }}" 
-                                    {% if filtres_actifs.superviseur|stringformat:"s" == superviseur.id|stringformat:"s" %}selected{% endif %}>
-                                {{ superviseur.full_name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
+
                     <!-- Filtre par ROT -->
 <div>
     <label class="label label-text font-semibold py-1">ROT (Trésorerie)</label>
@@ -145,36 +134,39 @@
     </div>
     
     <!-- Statistiques compactes -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-        <div class="card bg-primary text-primary-content shadow-sm">
-            <div class="card-body p-3">
-                <h3 class="card-title text-base">Ventes</h3>
-                <p class="text-lg font-bold">{{ total_vente|fcfa }}</p>
-                <p class="text-xs opacity-80">{{ nombre_versements_filtres }} vers.</p>
-            </div>
-        </div>
-        <div class="card bg-info text-info-content shadow-sm">
-            <div class="card-body p-3">
-                <h3 class="card-title text-base">Hors Vente</h3>
-                <p class="text-lg font-bold">{{ total_hors_vente|fcfa }}</p>
-                <p class="text-xs opacity-80">Moy: {{ moyenne_hors_vente|fcfa }}</p>
-            </div>
-        </div>
-        <div class="card bg-success text-success-content shadow-sm">
-            <div class="card-body p-3">
-                <h3 class="card-title text-base">Total Général</h3>
-                <p class="text-lg font-bold">{{ total_general|fcfa }}</p>
-                <p class="text-xs opacity-80">Net: {{ net_verse|fcfa }}</p>
-            </div>
-        </div>
-        <div class="card bg-secondary text-secondary-content shadow-sm">
-            <div class="card-body p-3">
-                <h3 class="card-title text-base">Dépenses</h3>
-                <p class="text-lg font-bold">{{ total_depenses|fcfa }}</p>
-                <p class="text-xs opacity-80">Associées</p>
-            </div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+
+    <div class="card bg-base-200 shadow-sm">
+        <div class="card-body p-3 text-center">
+            <h3 class="text-sm font-semibold">Versements</h3>
+            <p class="text-2xl font-bold">{{ nombre_versements_filtres }}</p>
         </div>
     </div>
+
+    <div class="card bg-primary text-primary-content shadow-sm">
+        <div class="card-body p-3">
+            <h3 class="card-title text-base">Ventes</h3>
+            <p class="text-lg font-bold">{{ total_vente|fcfa }}</p>
+        </div>
+    </div>
+
+    <div class="card bg-info text-info-content shadow-sm">
+        <div class="card-body p-3">
+            <h3 class="card-title text-base">Apport externe</h3>
+            <p class="text-lg font-bold">{{ total_hors_vente|fcfa }}</p>
+            <p class="text-xs opacity-80">Moy: {{ moyenne_hors_vente|fcfa }}</p>
+        </div>
+    </div>
+
+    <div class="card bg-success text-success-content shadow-sm">
+        <div class="card-body p-3">
+            <h3 class="card-title text-base">Total encaissé</h3>
+            <p class="text-lg font-bold">{{ total_general|fcfa }}</p>
+        </div>
+    </div>
+
+</div>
+
     
     <!-- Tableau des versements -->
     <div class="card bg-base-100 shadow-sm">
@@ -187,9 +179,10 @@
                             <th class="py-2 px-2">Effectué par</th>
                             <th class="py-2 px-2">Type</th>
                             <th class="py-2 px-2">Vente</th>
-                            <th class="py-2 px-2">H.Vente</th>
+                            <th class="py-2 px-2">Apport</th>
+
                             <th class="py-2 px-2">Total</th>
-                            <th class="py-2 px-2">Dépenses</th>
+                          
                             <th class="py-2 px-2">Reçus</th>
                             <th class="py-2 px-2">Actions</th>
                         </tr>
@@ -218,34 +211,25 @@
 
                             <td class="py-2 px-2">
                                 {% if versement.type_versement == 'vente' %}
-                                    <span class="badge badge-success badge-sm gap-1">
+                                    <span class="badge badge-primary badge-sm gap-1">
                                         <i class="fas fa-shopping-cart text-[10px]"></i>
                                         Vente
                                     </span>
                                 {% elif versement.type_versement == 'mixte' %}
-                                    <span class="badge badge-primary badge-sm gap-1">
-                                        <i class="fas fa-random text-[10px]"></i>
-                                        Mixte
-                                    </span>
+<span class="badge  badge-sm">Mixte</span>
                                 {% else %}
-                                    <span class="badge badge-info badge-sm gap-1">
-                                        <i class="fas fa-money-bill-wave text-[10px]"></i>
-                                        H.Vente
-                                    </span>
+<span class="badge badge-info badge-sm">Apport</span>
                                 {% endif %}
                             </td>
-                            <td class="py-2 px-2 font-medium">
-                                {{ versement.montant_vente|fcfa }}
-                            </td>
-                            <td class="py-2 px-2 font-medium">
-                                {{ versement.montant_hors_vente|fcfa }}
-                            </td>
-                            <td class="py-2 px-2 font-bold text-primary">
-                                {{ versement.montant_total|fcfa }}
-                            </td>
-                            <td class="py-2 px-2 font-medium">
-                                {{ versement.total_depenses_associees|fcfa }}
-                            </td>
+<td class="font-medium">
+    {{ versement.montant_vente|fcfa }}
+</td>
+<td class="text-gray-400">
+    {{ versement.montant_hors_vente|fcfa }}
+</td>
+<td class="font-bold text-primary">
+    {{ versement.montant_total|fcfa }}
+</td>
                             <td class="py-2 px-2">
                                 {% if versement.recus_count > 0 %}
                                 <span class="badge badge-success badge-sm gap-1">

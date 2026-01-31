@@ -1,3 +1,4 @@
+#paie/services/salaire_calculator.py
 from decimal import Decimal
 from django.db.models import Sum, F
 from django.db.models.functions import Coalesce

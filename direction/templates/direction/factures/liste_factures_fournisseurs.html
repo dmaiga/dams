@@ -1,6 +1,7 @@
 {% extends 'base_admin.html' %}
 {% block title %}Factures Fournisseurs - Direction{% endblock %}
 {% load format_fcfa %}
+{% load direction_filters %}
 {% block content %}
 <div class="p-6">
     <h1 class="text-2xl font-bold mb-6 flex items-center gap-2">
@@ -94,7 +95,7 @@
                 <i class="fas fa-money-bill-wave text-2xl"></i>
             </div>
             <div class="stat-title">Total facturé</div>
-            <div class="stat-value text-primary text-2xl">{{ total_montant_factures|floatformat:0 }} <span class="text-sm">FCFA</span></div>
+            <div class="stat-value text-primary text-2xl">{{ total_montant_factures|fcfa }} <span class="text-sm">FCFA</span></div>
             <div class="stat-desc">{{ factures.count }} facture(s) - {{ stats_fournisseurs|length }} fournisseur(s)</div>
         </div>
     </div>
@@ -130,16 +131,16 @@
                             </td>
                             <td class="whitespace-nowrap">
                                 <div class="text-center">
-                                    <span class="badge badge-outline">{{ facture.lot.quantite_initiale|floatformat:"0" }}</span>
+                                    <span class="badge badge-outline">{{ facture.lot.quantite_initiale|format_number }}</span>
                                 </div>
                             </td>
                             <td class="whitespace-nowrap">
-                                <div>{{ facture.lot.prix_achat_unitaire|floatformat:"0" }} FCFA</div>
+                                <div>{{ facture.lot.prix_achat_unitaire|fcfa }} FCFA</div>
                             </td>
                           
                             <td class="whitespace-nowrap text-right">
                                 {% if facture.montant %}
-                                <span class="font-bold text-success">{{ facture.montant|floatformat:0 }} FCFA</span>
+                                <span class="font-bold text-success">{{ facture.montant|fcfa }} FCFA</span>
                                 {% else %}
                                 <span class="badge badge-warning">Non précisé</span>
                                 {% endif %}
@@ -174,7 +175,7 @@
                     <tfoot>
                         <tr class="bg-base-200 font-bold">
                             <td colspan="6" class="text-right">Total :</td>
-                            <td class="text-right text-primary">{{ total_montant_factures|floatformat:0 }} FCFA</td>
+                            <td class="text-right text-primary">{{ total_montant_factures|fcfa }} FCFA</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -200,7 +201,7 @@
                             {{ stat.lot__fournisseur__nom|truncatechars:15 }}
                         </div>
                         <div class="text-xl font-bold text-primary">
-                            {{ stat.total_factures|floatformat:0 }}
+                            {{ stat.total_factures|fcfa }}
                             <span class="text-xs">FCFA</span>
                         </div>
                         <div class="text-xs text-gray-500">{{ stat.nombre_factures }} facture(s)</div>

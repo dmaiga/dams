@@ -1,174 +1,20 @@
-<!-- creer_versement.html -->
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
-{{ form.media }}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <!-- En-tête -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h4 class="mb-1">Modification  Versement</h4>
-                                    </div>
-                <div>
-                    <a href="{% url 'liste_versement' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Retour
-                    </a>
-                </div>
-            </div>
+<div class="container mt-4">
+    <h4 class="mb-3">✏️ Modifier le versement #{{ versement.id }}</h4>
 
-            <!-- Carte principale -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    
-                    <!-- Info solde -->
-                    <div class="alert alert-info border-0 mb-4">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-wallet me-2"></i>
-                            <div>
-                                <strong class="d-block">Solde vente disponible</strong>
-                                <span class="h5 mb-0">{{ superviseur.solde_vente_superviseur|floatformat:0 }} FCFA</span>
-                            </div>
-                        </div>
-                    </div>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
 
-                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
-                        {% csrf_token %}
-                        
-                        <!-- Section Montants -->
-                        <div class="card border-0 bg-light mb-4">
-                            <div class="card-body p-4">
-                                <h5 class="card-title mb-3">💰 Montants à verser</h5>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label class="form-label fw-semibold">Montant vente *</label>
-                                            {{ form.montant_vente }}
-                                            <div class="form-text text-success mt-1">
-                                                <i class="fas fa-info-circle me-1"></i>
-                                                Sera déduit de votre solde vente
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label class="form-label fw-semibold">Montant hors vente</label>
-                                            {{ form.montant_hors_vente }}
-                                      
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                
-                            </div>
-                        </div>
+        {{ form.as_p }}
 
-                        <!-- Section Dépense optionnelle -->
-<div class="card border-0 bg-light mb-4">
-    <div class="card-body p-4">
-        <h5 class="card-title mb-3">
-            <span class="text-muted">📝</span> Dépense associée <small class="text-muted">(optionnel)</small>
-        </h5>
-        
-        <div class="form-group mb-3">
-            <label class="form-label">Montant dépense</label>
-            {{ form.depense_montant }}
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Description de la dépense</label>
-            {{ form.depense_description }}
-        </div>
-    </div>
+        <button type="submit" class="btn btn-success">
+            ✔️ Mettre à jour
+        </button>
+        <a href="{% url 'detail_versement' versement.id %}" class="btn btn-secondary">
+            Retour
+        </a>
+    </form>
 </div>
-
-
-                        <!-- Section Informations -->
-                        <div class="card border-0 bg-light mb-4">
-                            <div class="card-body p-4">
-                                <h5 class="card-title mb-3">📋 Informations complémentaires</h5>
-                                
-                                <div class="form-group mb-4">
-                                    <label class="form-label fw-semibold">Description du versement</label>
-                                    {{ form.description }}
-                                </div>
-                                
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label class="form-label fw-semibold">Date du versement</label>
-                                            {{ form.date_versement_reelle }}
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label class="form-label fw-semibold">Justificatif (reçu)</label>
-                                            {{ form.recus }}
-                                            <div class="form-text text-muted mt-1">
-                                                <i class="fas fa-info-circle me-1"></i>
-                                                PDF, JPG ou PNG
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-
-                        <!-- Bouton de soumission -->
-                        <div class="text-center pt-3">
-                            <button type="submit" class="btn btn-success btn-lg px-5 py-3">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Enregistrer le Versement
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-/* Améliorations CSS légères */
-.card {
-    border-radius: 12px;
-}
-
-.form-control, .tox-tinymce {
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    transition: all 0.2s ease;
-}
-
-.form-control:focus, .tox-tinymce:focus-within {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.1);
-}
-
-.btn {
-    border-radius: 8px;
-    font-weight: 500;
-}
-
-.alert {
-    border-radius: 10px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .container {
-        padding: 0 10px;
-    }
-    
-    .card-body {
-        padding: 1.5rem !important;
-    }
-    
-    .btn-lg {
-        width: 100%;
-    }
-}
-</style>
 {% endblock %}

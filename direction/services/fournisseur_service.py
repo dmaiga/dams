@@ -158,33 +158,6 @@ class FournisseurAnalyseService:
         return lots_impayes
 
 
-    @staticmethod
-    def get_analyse_annuelle(annee=None):
-        """Analyse annuelle (optimisée)"""
-        if annee is None:
-            annee = timezone.now().year
-        date_debut = datetime(annee, 1, 1)
-        date_fin = datetime(annee, 12, 31, 23, 59, 59)
-        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
-        return FournisseurAnalyseService.get_analyse_periode(date_debut, date_fin)
-
-
-    @staticmethod
-    def get_analyse_mensuelle(mois=None, annee=None):
-        """Analyse mensuelle (optimisée)"""
-        now = timezone.now()
-        if mois is None:
-            mois = now.month
-        if annee is None:
-            annee = now.year
-        date_debut = datetime(annee, mois, 1)
-        if mois == 12:
-            date_fin = datetime(annee + 1, 1, 1) - timedelta(seconds=1)
-        else:
-            date_fin = datetime(annee, mois + 1, 1) - timedelta(seconds=1)
-        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
-        return FournisseurAnalyseService.get_analyse_periode(date_debut, date_fin)
-
 
     @staticmethod
     def get_analyse_periode(date_debut=None, date_fin=None):
@@ -698,3 +671,247 @@ class FournisseurAnalyseService:
             return "text-yellow-600 font-medium"  # Stock moyen = attention
         else:
             return "text-orange-600 font-bold"  # Gros stock = problème d'écoulement
+
+
+
+    from datetime import datetime, timedelta
+    from django.db.models import Sum, F, Count
+    from django.db.models.functions import Coalesce
+    from django.utils import timezone
+
+    DEC_ZERO = 0
+
+    # =====================================================
+    # ANALYSE GLOBALE (SANS FILTRE TEMPOREL)
+    # =====================================================
+    @staticmethod
+    def get_analyse_globale():
+        """
+        Analyse globale sans filtre temporel
+        Vision état (direction)
+        """
+        return FournisseurAnalyseService.get_analyse_periode(None, None)
+
+    # =====================================================
+    # ANALYSE ANNUELLE
+    # =====================================================
+    @staticmethod
+    def get_analyse_annuelle(annee=None):
+        if annee is None:
+            annee = timezone.now().year
+        date_debut = datetime(annee, 1, 1)
+        date_fin = datetime(annee, 12, 31, 23, 59, 59)
+        return FournisseurAnalyseService.get_analyse_periode(date_debut, date_fin)
+
+    # =====================================================
+    # ANALYSE MENSUELLE
+    # =====================================================
+    @staticmethod
+    def get_analyse_mensuelle(mois=None, annee=None):
+        now = timezone.now()
+        mois = mois or now.month
+        annee = annee or now.year
+
+        date_debut = datetime(annee, mois, 1)
+        if mois == 12:
+            date_fin = datetime(annee + 1, 1, 1) - timedelta(seconds=1)
+        else:
+            date_fin = datetime(annee, mois + 1, 1) - timedelta(seconds=1)
+
+        return FournisseurAnalyseService.get_analyse_periode(date_debut, date_fin)
+
+    # =====================================================
+    # ANALYSE CORE
+    # =====================================================
+    @staticmethod
+    def get_analyse_periode(date_debut=None, date_fin=None):
+        """
+        LOGIQUE :
+        - Dette contractuelle = réception
+        - Dette consommée = ventes liées aux lots
+        - Paiement = global (pas temporel)
+        """
+
+        now = timezone.now()
+
+        # =========================
+        # LOTS → DETTE CONTRACTUELLE
+        # =========================
+        lots_qs = LotEntrepot.objects.filter(fournisseur__isnull=False)
+
+        if date_debut:
+            lots_qs = lots_qs.filter(date_reception__gte=date_debut)
+        if date_fin:
+            lots_qs = lots_qs.filter(date_reception__lte=date_fin)
+
+        lots_agg = (
+            lots_qs
+            .values('fournisseur')
+            .annotate(
+                dette_contractuelle=Coalesce(
+                    Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
+                    DEC_ZERO
+                ),
+                quantite_livree=Coalesce(Sum('quantite_initiale'), DEC_ZERO),
+                stock_restant=Coalesce(Sum('quantite_restante'), DEC_ZERO),
+                valeur_stock_restant=Coalesce(
+                    Sum(F('quantite_restante') * F('prix_achat_unitaire')),
+                    DEC_ZERO
+                ),
+                nombre_lots=Count('id')
+            )
+        )
+        lots_by_fournisseur = {l['fournisseur']: l for l in lots_agg}
+
+        # =========================
+        # VENTES → DETTE CONSOMMÉE
+        # =========================
+        ventes_qs = Vente.objects.filter(
+            detail_distribution__lot__fournisseur__isnull=False
+        )
+
+        if date_debut:
+            ventes_qs = ventes_qs.filter(
+                detail_distribution__lot__date_reception__gte=date_debut
+            )
+        if date_fin:
+            ventes_qs = ventes_qs.filter(
+                detail_distribution__lot__date_reception__lte=date_fin
+            )
+
+        ventes_agg = (
+            ventes_qs
+            .values('detail_distribution__lot__fournisseur')
+            .annotate(
+                quantite_vendue=Coalesce(Sum('quantite'), DEC_ZERO),
+                dette_consommee=Coalesce(
+                    Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
+                    DEC_ZERO
+                ),
+                chiffre_affaires=Coalesce(
+                    Sum(F('quantite') * F('prix_vente_unitaire')),
+                    DEC_ZERO
+                )
+            )
+        )
+        ventes_by_fournisseur = {
+            v['detail_distribution__lot__fournisseur']: v for v in ventes_agg
+        }
+
+        # =========================
+        # PAIEMENTS → GLOBAL
+        # =========================
+        paiements_agg = (
+            PaiementFournisseur.objects
+            .filter(
+                fournisseur__isnull=False,
+                date_paiement__lte=now,
+                est_supprime=False
+            )
+            .values('fournisseur')
+            .annotate(total_paye=Coalesce(Sum('montant'), DEC_ZERO))
+        )
+        paiements_by_fournisseur = {
+            p['fournisseur']: p['total_paye'] for p in paiements_agg
+        }
+
+        # =========================
+        # CONSTRUCTION ANALYSE
+        # =========================
+        fournisseur_ids = (
+            set(lots_by_fournisseur) |
+            set(ventes_by_fournisseur) |
+            set(paiements_by_fournisseur)
+        )
+
+        fournisseurs = Fournisseur.objects.filter(
+            id__in=fournisseur_ids
+        ).order_by('nom')
+
+        analyse_data = []
+
+        for f in fournisseurs:
+            lid = f.id
+
+            lot = lots_by_fournisseur.get(lid, {})
+            vente = ventes_by_fournisseur.get(lid, {})
+            total_paye = paiements_by_fournisseur.get(lid, DEC_ZERO)
+
+            dette_contractuelle = lot.get('dette_contractuelle', DEC_ZERO)
+            dette_consommee = min(
+                vente.get('dette_consommee', DEC_ZERO),
+                dette_contractuelle
+            )
+
+            reste_contractuel = max(dette_contractuelle - total_paye, DEC_ZERO)
+
+            quantite_livree = lot.get('quantite_livree', DEC_ZERO)
+            quantite_vendue = vente.get('quantite_vendue', DEC_ZERO)
+
+            ecoulement_pct = (
+                (quantite_vendue / quantite_livree) * 100
+                if quantite_livree > 0 else 0
+            )
+
+            marge_brute = (
+                vente.get('chiffre_affaires', DEC_ZERO)
+                - vente.get('dette_consommee', DEC_ZERO)
+            )
+
+            analyse_data.append({
+                'fournisseur': f,
+
+                # Quantités
+                'quantite_livree': quantite_livree,
+                'quantite_vendue': quantite_vendue,
+                'stock_restant': lot.get('stock_restant', DEC_ZERO),
+                'valeur_stock_restant': lot.get('valeur_stock_restant', DEC_ZERO),
+
+                # Montants
+                'montant_livre': dette_contractuelle,
+                'montant_ecoule': vente.get('chiffre_affaires', DEC_ZERO),
+
+                # Dettes
+                'dette_contractuelle': dette_contractuelle,
+                'dette_consommee': dette_consommee,
+                'total_paye': total_paye,
+                'reste_contractuel': reste_contractuel,
+
+                # Analyse
+                'ecoulement_pct': round(ecoulement_pct, 2),
+                'marge_brute': marge_brute,
+                'nombre_lots': lot.get('nombre_lots', 0),
+            })
+
+        # =========================
+        # KPI GLOBAUX
+        # =========================
+        dette_contractuelle_globale = sum(i['dette_contractuelle'] for i in analyse_data)
+        total_paye_global = sum(i['total_paye'] for i in analyse_data)
+        dette_consommee_globale = sum(i['dette_consommee'] for i in analyse_data)
+
+        kpi_globaux = {
+            'dette_contractuelle_globale': dette_contractuelle_globale,
+            'dette_consommee_globale': dette_consommee_globale,
+            'total_paye': total_paye_global,
+            'reste_contractuel_global': max(
+                dette_contractuelle_globale - total_paye_global,
+                DEC_ZERO
+            ),
+            'pourcentage_paye_global': round(
+                (total_paye_global / dette_contractuelle_globale * 100)
+                if dette_contractuelle_globale > 0 else 100,
+                1
+            ),
+            'marge_brute_totale': sum(i['marge_brute'] for i in analyse_data),
+        }
+
+        return {
+            'analyse_data': analyse_data,
+            'kpi_globaux': kpi_globaux,
+            'periode': {
+                'type': 'globale' if not date_debut and not date_fin else 'periode',
+                'debut': date_debut,
+                'fin': date_fin,
+            }
+        }

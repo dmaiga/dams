@@ -84,14 +84,16 @@ class DashboardAgentAnalysisService:
         VERSION ORM SAFE (Django 5.x)
         """
 
-        limite = timezone.now() - timedelta(hours=48)
+        limite = timezone.now() - timedelta(hours=72)
 
         ventes = (
             Vente.objects
             .filter(
-                agent__type_agent='terrain',
-                stagiaire__isnull=True,
-                date_vente__gte=limite
+               
+            agent__type_agent__in=['terrain', 'agent_gros', 'entrepot'],
+            agent__est_actif=True,
+            date_vente__gte=limite,
+            est_supprime=False
             )
             .annotate(
                 ca_ligne=ExpressionWrapper(
@@ -143,7 +145,7 @@ class DashboardAgentAnalysisService:
         # -------------------------
         agents = (
             Agent.objects
-            .filter(type_agent__in=['terrain', 'agent_gros'], 
+            .filter(type_agent__in=['terrain', 'agent_gros','entrepot'], 
                     est_actif=True
                     )
             .select_related('user')

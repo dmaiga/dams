@@ -1,6 +1,6 @@
 {% extends 'base_admin.html' %}
 {% load format_fcfa %}
-
+{% load direction_filters %}
 {% block title %}Détail Fournisseur - {{ fournisseur.nom }}{% endblock %}
 
 {% block content %}
@@ -161,7 +161,7 @@
             Stock restant
         </div>
         <div class="text-2xl font-bold text-gray-800 mb-1">
-            {{ kpi_fournisseur.stock_restant|floatformat:0 }}
+            {{ kpi_fournisseur.stock_restant|format_number }}
         </div>
         <div class="text-xs text-gray-400 mt-auto">
             {{ kpi_fournisseur.valeur_stock_restant|fcfa }}
@@ -230,7 +230,7 @@
                             </td>
                             <td class="text-right font-medium">
                                 {% if facture.montant %}
-                                {{ facture.montant|floatformat:0 }} FCFA
+                                {{ facture.montant|fcfa }} FCFA
                                 {% else %}
                                 <span class="text-gray-400 text-xs">Non précisé</span>
                                 {% endif %}
@@ -321,13 +321,13 @@
                             
                             <!-- Quantité reçue -->
                             <td class="text-right">
-                                <span class="font-semibold">{{ lot.quantite_recue|floatformat:2 }}</span>
+                                <span class="font-semibold">{{ lot.quantite_recue|format_number }}</span>
                             </td>
                             
                             <!-- Quantité vendue -->
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
-                                    <span class="font-semibold">{{ lot.quantite_vendue|floatformat:2 }}</span>
+                                    <span class="font-semibold">{{ lot.quantite_vendue|format_number }}</span>
                                     <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
                                                         {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
                                                         {% else %}text-red-600{% endif %}">
@@ -340,7 +340,7 @@
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
                                     <span class="{{ lot.quantite_classe }}">
-                                        {{ lot.quantite_restante|floatformat:2 }}
+                                        {{ lot.quantite_restante|format_number }}
                                     </span>
                                 </div>
                             </td>
@@ -445,12 +445,12 @@
                             </td>
                             
                             <!-- Quantité livrée -->
-                            <td class="text-right font-semibold">{{ produit.quantite_livree|floatformat:2 }}</td>
+                            <td class="text-right font-semibold">{{ produit.quantite_livree|format_number }}</td>
                             
                             <!-- Quantité vendue -->
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
-                                    <span class="font-semibold">{{ produit.quantite_vendue|floatformat:2 }}</span>
+                                    <span class="font-semibold">{{ produit.quantite_vendue|format_number }}</span>
                                     <span class="text-xs {% if produit.pourcentage_ecoulement >= 80 %}text-green-600
                                                         {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
                                                         {% else %}text-red-600{% endif %}">
@@ -475,7 +475,7 @@
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
                                     <span class="{% if produit.quantite_perdue > 0 %}text-red-600 font-semibold{% else %}text-gray-600{% endif %}">
-                                        {{ produit.quantite_perdue|floatformat:2 }}
+                                        {{ produit.quantite_perdue|format_number }}
                                     </span>
                                     {% if produit.pourcentage_perte > 0 %}
                                     <span class="text-xs text-red-500">{{ produit.pourcentage_perte }}%</span>

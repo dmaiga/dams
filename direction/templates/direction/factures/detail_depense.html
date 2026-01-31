@@ -1,0 +1,80 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+{% block title %}Dépense #{{ depense.id }}{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6 max-w-3xl mx-auto">
+
+    <a href="{% url 'liste_depenses' %}" class="btn btn-sm btn-outline mb-4">
+        ← Retour aux dépenses
+    </a>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body space-y-4">
+
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fas fa-receipt text-error"></i>
+                Dépense #{{ depense.id }}
+            </h1>
+
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <div class="text-gray-500">ROT</div>
+                    <div class="font-medium">
+                        {{ depense.effectue_par.full_name|default:"—" }}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="text-gray-500">Date</div>
+                    <div>{{ depense.date_depense|date:"d/m/Y H:i" }}</div>
+                </div>
+
+                <div>
+                    <div class="text-gray-500">Catégorie</div>
+                    <span class="badge badge-outline">
+                        {{ depense.get_categorie_display }}
+                    </span>
+                </div>
+
+                <div>
+                    <div class="text-gray-500">Montant</div>
+                    <div class="font-bold text-error">
+                        {{ depense.montant|fcfa }} FCFA
+                    </div>
+                </div>
+            </div>
+
+            {% if depense.note %}
+            <div>
+                <div class="text-gray-500 mb-1">Note</div>
+                <div class="bg-base-200 p-3 rounded">
+                    {{ depense.note }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if depense.description %}
+            <div>
+                <div class="text-gray-500 mb-1">Description historique</div>
+                <div class="prose max-w-none bg-base-200 p-3 rounded">
+                    {{ depense.description|safe }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if depense.versement %}
+            <div class="text-sm text-gray-500">
+                Liée au versement :
+                <a href="{% url 'detail_versement_direction' depense.versement.id %}"
+                   class="link link-primary">
+                    #{{ depense.versement.id }}
+                </a>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

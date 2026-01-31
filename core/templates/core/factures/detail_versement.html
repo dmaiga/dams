@@ -1,319 +1,167 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load format_fcfa %}
+
 {% block title %}Détail Versement #{{ versement.id }}{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
-    <!-- En-tête -->
+
+    <!-- ===== EN-TÊTE ===== -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-2">💳 Détail du Versement</h1>
-            <p class="text-muted">Informations complètes du versement #{{ versement.id }}</p>
+            <h1 class="h4 mb-1">💳 Détail du versement</h1>
+            <p class="text-muted mb-0">Versement #{{ versement.id }}</p>
         </div>
-        <div>
-            <a href="{% url 'liste_versement' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left"></i> Retour à la liste
+        <div class="d-flex gap-2">
+            <a href="{% url 'liste_versement' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Retour
             </a>
-            {% if request.user.agent == versement.superviseur or request.user.agent.est_direction %}
-            <a href="{% url 'modifier_versement' versement.id %}" class="btn btn-warning">
+            <a href="{% url 'modifier_versement' versement.id %}" class="btn btn-warning btn-sm">
                 <i class="fas fa-edit"></i> Modifier
             </a>
-            <a href="{% url 'ajouter_recus' versement.id %}" class="btn btn-info">
-                <i class="fas fa-plus"></i> Ajouter des reçus
+            <a href="{% url 'ajouter_recus' versement.id %}" class="btn btn-info btn-sm">
+                <i class="fas fa-plus"></i> Reçus
             </a>
-            {% endif %}
         </div>
     </div>
 
     <div class="row">
-        <!-- Informations principales -->
+
+        <!-- ===== COLONNE PRINCIPALE ===== -->
         <div class="col-md-8">
-            <!-- Carte Informations du Versement -->
+
+            <!-- Infos versement -->
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">📋 Informations du Versement</h5>
+                    <h6 class="mb-0">📋 Informations du versement</h6>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">ID Versement:</th>
-                                    <td><strong>#{{ versement.id }}</strong></td>
-                                </tr>
-                                <tr>
-                                    <th>Superviseur:</th>
-                                    <td>
-                                        <strong>{{ versement.superviseur.user.get_full_name }}</strong><br>
-                                        <small class="text-muted">{{ versement.superviseur.get_type_agent_display }}</small>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Type:</th>
-                                    <td>
-                                        <span class="badge 
-                                            {% if versement.type_versement == 'vente' %}bg-success
-                                            {% elif versement.type_versement == 'autre' %}bg-info
-                                            {% elif versement.type_versement == 'mixte' %}bg-warning
-                                            {% else %}bg-secondary{% endif %}">
-                                            {{ versement.type_versement|title }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <th width="40%">Date versement:</th>
-                                    <td>
-                                        <strong>{{ versement.date_versement_reelle|date:"d/m/Y" }}</strong><br>
-                                        <small class="text-muted">{{ versement.date_versement_reelle|date:"H:i" }}</small>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Date création:</th>
-                                    <td>
-                                        <small class="text-muted">{{ versement.date_creation|date:"d/m/Y H:i" }}</small>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Nombre de reçus:</th>
-                                    <td>
-                                        <span class="badge bg-primary">{{ versement.recus_count }}</span>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
+                    <table class="table table-borderless mb-0">
+                        <tr>
+                            <th width="35%">Effectué par :</th>
+                            <td>
+                                <strong>{{ versement.effectue_par.user.get_full_name }}</strong><br>
+                                <small class="text-muted">
+                                    {{ versement.effectue_par.get_type_agent_display }}
+                                </small>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Date du versement :</th>
+                            <td>
+                                {{ versement.date_versement_reelle|date:"d/m/Y H:i" }}
+                            </td>
+                        </tr>
+                        
+                        <tr>
+                            <th>Nombre de reçus :</th>
+                            <td>
+                                <span class="badge bg-primary">
+                                    {{ versement.recus_count }}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
 
-                    <!-- Description -->
                     {% if versement.description %}
-                    <div class="mt-3 p-3 bg-light rounded">
-                        <h6 class="text-muted">📝 Description:</h6>
-                        <div class="mb-0">{{ versement.description|safe }}</div>
+                    <hr>
+                    <div class="bg-light p-3 rounded">
+                        <strong>Description :</strong>
+                        <div class="mt-1">
+                            {{ versement.description|safe }}
+                        </div>
                     </div>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Section Reçus -->
+            <!-- Reçus -->
             <div class="card mb-4">
-                <div class="card-header bg-success text-white">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">📎 Reçus de Versement</h5>
-                        <span class="badge bg-light text-dark">{{ versement.recus_count }} fichier(s)</span>
-                    </div>
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">📎 Reçus</h6>
+                    <span class="badge bg-light text-dark">
+                        {{ versement.recus_count }} fichier(s)
+                    </span>
                 </div>
                 <div class="card-body">
                     {% if versement.recus.all %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Fichier</th>
-                                    <th>Description</th>
-                                    <th>Date d'upload</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for recu in versement.recus.all %}
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <i class="fas 
-                                                {% if recu.fichier.name|lower|slice:'-4:' == '.pdf' %}fa-file-pdf text-danger
-                                                {% elif recu.fichier.name|lower|slice:'-4:' in '.jpg,.jpeg,.png' %}fa-file-image text-success
-                                                {% elif recu.fichier.name|lower|slice:'-4:' in '.doc,.docx' %}fa-file-word text-primary
-                                                {% else %}fa-file text-secondary{% endif %}
-                                                me-2">
-                                            </i>
-                                            <small>{{ recu.fichier.name|slice:"20:" }}{% if recu.fichier.name|length > 20 %}...{% endif %}</small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <small>{{ recu.description|default:"-" }}</small>
-                                    </td>
-                                    <td>
-                                        <small>{{ recu.date_upload|date:"d/m/Y H:i" }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="{{ recu.fichier.url }}" target="_blank" class="btn btn-outline-primary" title="Voir">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="{{ recu.fichier.url }}" download class="btn btn-outline-success" title="Télécharger">
-                                                <i class="fas fa-download"></i>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                        <ul class="list-group list-group-flush">
+                            {% for recu in versement.recus.all %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="fw-bold">{{ recu.fichier.name|slice:"20:" }}{% if recu.fichier.name|length > 20 %}...{% endif %}</small><br>
+                                    <small class="text-muted">
+                                        {{ recu.date_upload|date:"d/m/Y H:i" }}
+                                    </small>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ recu.fichier.url }}" target="_blank" class="btn btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ recu.fichier.url }}" download class="btn btn-outline-success">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
                     {% else %}
-                    <div class="text-center py-3">
-                        <i class="fas fa-file-excel fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">Aucun reçu associé à ce versement</p>
-                        {% if request.user.agent == versement.superviseur %}
-                        <a href="{% url 'ajouter_recus' versement.id %}" class="btn btn-primary btn-sm mt-2">
-                            <i class="fas fa-plus"></i> Ajouter des reçus
-                        </a>
-                        {% endif %}
-                    </div>
+                        <p class="text-muted mb-0 text-center">
+                            Aucun reçu associé à ce versement.
+                        </p>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Section Dépenses -->
-            <div class="card mb-4">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">📝 Dépenses Associées</h5>
-                </div>
-                <div class="card-body">
-                    {% if depenses %}
-                    <div class="table-responsive">
-                        <table class="table table-sm">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Montant</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for depense in depenses %}
-                                <tr>
-                                    <td>
-                                        <small>{{ depense.date_depense|date:"d/m/Y" }}</small>
-                                    </td>
-                                    <td>
-                                        <div>{{ depense.description|safe|default:"-" }}</div>
-                                    </td>
-                                    <td class="{% if depense.montant > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
-                                        {% if depense.montant > 0 %}
-                                            - {{ depense.montant|fcfa }} FCFA
-                                        {% else %}
-                                            <span class="text-muted">0 FCFA</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot class="table-light">
-                                <tr>
-                                    <td colspan="2" class="text-end"><strong>Total Dépenses:</strong></td>
-                                    <td class="text-danger fw-bold">- {{ total_depenses|fcfa }} FCFA</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-3">
-                        <i class="fas fa-receipt fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">Aucune dépense associée à ce versement</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
         </div>
 
-        <!-- Résumé financier -->
+        <!-- ===== COLONNE DROITE ===== -->
         <div class="col-md-4">
-            <!-- Carte Montants -->
-<!-- Carte Montants (VERSION CLARIFIÉE) -->
-<div class="card mb-4">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0">💰 Mouvement du cash</h5>
-    </div>
 
-    <div class="card-body">
-
-        <!-- CASH VENTE -->
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-muted">
-                Cash issu des ventes :
-            </span>
-            <strong class="text-success">
-                {{ versement.montant_vente|fcfa }} FCFA
-            </strong>
-        </div>
-
-        <!-- CASH HORS VENTE -->
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-muted">
-                Apport hors vente (surplus) :
-            </span>
-            <strong class="text-info">
-                {{ versement.montant_hors_vente|fcfa }} FCFA
-            </strong>
-        </div>
-
-        <hr>
-
-        <!-- DEPENSES -->
-        {% if total_depenses > 0 %}
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="text-muted">
-                Dépenses payées :
-            </span>
-            <strong class="text-danger">
-                - {{ total_depenses|fcfa }} FCFA
-            </strong>
-        </div>
-        {% endif %}
-
-        <hr>
-
-        <!-- NET VENTE -->
-        <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold">
-                Cash vente restant :
-            </span>
-            <strong class="text-dark">
-                {{ cash_vente_restant|fcfa }} FCFA
-            </strong>
-        </div>
-
-        <small class="text-muted d-block mt-2">
-            ℹ️ Le cash hors vente est un apport externe utilisé uniquement pour
-            couvrir certaines dépenses. Il n’impacte pas le solde réel issu des ventes.
-        </small>
-
-    </div>
-</div>
-
-
-            <!-- Carte Actions Rapides -->
+            <!-- Montants -->
             <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">⚡ Actions Rapides</h5>
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">💰 Montants du versement</h6>
                 </div>
                 <div class="card-body">
-                    {% if request.user.agent == versement.superviseur %}
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'ajouter_recus' versement.id %}" class="btn btn-success btn-sm">
-                            <i class="fas fa-plus"></i> Ajouter des reçus
-                        </a>
-                        <a href="{% url 'creer_versement' %}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-plus-circle"></i> Nouveau Versement
-                        </a>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Montant vente :</span>
+                        <strong class="text-success">
+                            {{ versement.montant_vente|fcfa }} FCFA
+                        </strong>
                     </div>
-                    {% endif %}
-                    
-                    <div class="alert alert-info mt-3">
-                        <small>
-                            <strong>💡 Information:</strong><br>
-                            • Vous pouvez ajouter plusieurs reçus par versement<br>
-                            • Formats acceptés: PDF, images, documents<br>
-                            • Chaque reçu est daté et traçable
-                        </small>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Montant hors vente :</span>
+                        <strong class="text-info">
+                            {{ versement.montant_hors_vente|fcfa }} FCFA
+                        </strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-bold">Total versé :</span>
+                        <strong>
+                            {{ versement.montant_total|fcfa }} FCFA
+                        </strong>
                     </div>
                 </div>
             </div>
+
+            <!-- Actions -->
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">⚡ Actions rapides</h6>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a href="{% url 'ajouter_recus' versement.id %}" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus"></i> Ajouter des reçus
+                    </a>
+                    <a href="{% url 'creer_versement' %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus-circle"></i> Nouveau versement
+                    </a>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>

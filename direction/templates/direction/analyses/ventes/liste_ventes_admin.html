@@ -1,6 +1,6 @@
 {% extends 'base_admin.html' %}
 {% load format_fcfa %}
-
+{% load direction_filters %}
 {% block title %}Analyse des Ventes{% endblock %}
 
 {% block content %}
@@ -183,7 +183,7 @@
                 <div class="text-xs text-gray-500 font-medium">Quantité</div>
                 <i class="fas fa-box text-purple-500 text-sm"></i>
             </div>
-            <div class="text-lg font-bold text-gray-800">{{ total_quantite|floatformat:0 }}</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_quantite|format_number }}</div>
             <div class="text-xs text-gray-500">unités vendues</div>
         </div>
 
@@ -297,11 +297,6 @@
                                 <div class="font-medium  max-w-[120px]" title="{{ vente.agent.full_name }}">
                                     {{ vente.agent.full_name}}
                                 </div>
-                                {% if vente.stagiaire_nom_complet %}
-                                <div class="text-xs text-yellow-600  max-w-[120px]" title="Stagiaire: {{ vente.stagiaire_nom_complet }}">
-                                    👤 {{ vente.stagiaire_nom_complet }}
-                                </div>
-                                {% endif %}
                             </div>
                         </td>
                         
@@ -317,7 +312,7 @@
                         
                         <!-- Quantité -->
                         <td class="px-3 py-2 text-right">
-                            <span class="font-semibold">{{ vente.quantite|floatformat:1 }}</span>
+                            <span class="font-semibold">{{ vente.quantite|format_number }}</span>
                         </td>
                         
                         <!-- Prix unitaire -->
@@ -338,7 +333,7 @@
                                 </span>
                                 {% if vente.taux_marge %}
                                 <span class="text-xs {% if vente.taux_marge > 20 %}text-green-500{% elif vente.taux_marge > 0 %}text-yellow-500{% else %}text-red-500{% endif %}">
-                                    {{ vente.taux_marge|floatformat:0 }}%
+                                    {{ vente.taux_marge|format_number }}%
                                 </span>
                                 {% endif %}
                             </div>

@@ -73,7 +73,12 @@ urlpatterns = [
     path('recus/nouveau/', views.recu_create, name='recu_create'),
    
     path('factures/entrepot/', views.liste_factures_entrepot, name='liste_factures_entrepot'),
-
+# Dépenses
+    path('depenses/', views.liste_depenses, name='liste_depenses'),
+    path('depense/creer/', views.creer_depense, name='creer_depense'),
+    path('depense/<int:depense_id>/modifier/', views.modifier_depense, name='modifier_depense'),
+     path('depense/<int:depense_id>/detail/', views.detail_depense, name='detail_depense'),
+   
 
 #Clients
     path('clients/', views.ClientListView.as_view(), name='liste_clients'),

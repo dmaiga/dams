@@ -40,10 +40,11 @@ from .models import (
 
 # Project forms
 from .forms import (
-    FactureLotForm, VenteDetailAgentForm,VenteGrosAgentForm,
+    DepenseForm, FactureLotForm, VenteDetailAgentForm,VenteGrosAgentForm,
     VenteSuperviseurForm,DistributionForm, ReceptionLotForm, 
     DetteForm, PaiementDetteForm,RecouvrementForm,TelephoneOrUsernameLoginForm,
-    FournisseurForm,VersementForm,FactureLotForm,RecuVersementForm,PerteForm
+    FournisseurForm,VersementForm,FactureLotForm,RecuVersementForm,
+    PerteForm,DepenseForm
 
 )
 
@@ -1457,6 +1458,7 @@ def gestion_factures_lot(request, lot_id):
     
     return render(request, 'core/factures/gestion_factures_lot.html', context)
 
+
 @login_required
 def creer_versement(request):
     agent_connecte = request.user.agent
@@ -1485,63 +1487,42 @@ def creer_versement(request):
 
 @login_required
 def modifier_versement(request, versement_id):
-    """Modifier un versement existant"""
-    # Récupérer le versement
     versement = get_object_or_404(VersementBancaire, id=versement_id)
-    
-    # Vérifier les permissions
+
     if not hasattr(request.user, 'agent'):
         messages.error(request, "Accès réservé aux agents.")
-        return redirect('login')
-    
-    user_agent = request.user.agent
-    
-    # Un superviseur ne peut modifier que ses propres versements
-    # La direction peut modifier tous les versements
-    if user_agent.est_superviseur and versement.superviseur != user_agent:
-        messages.error(request, "Vous ne pouvez modifier que vos propres versements.")
-        return redirect('liste_versement')
-    
-    if not (user_agent.est_superviseur or user_agent.est_direction):
+        return redirect("login")
+
+    agent = request.user.agent
+
+    # 🔐 Permissions
+    if agent.est_rot:
+        if versement.effectue_par != agent:
+            messages.error(request, "Vous ne pouvez modifier que vos propres versements.")
+            return redirect("liste_versement")
+
+    elif not agent.est_direction:
         messages.error(request, "Accès non autorisé.")
-        return redirect('liste_versement')
-    
-    # Récupérer la dépense existante s'il y en a une
-    depense_existante = versement.depenses.first()
-    
-    if request.method == 'POST':
+        return redirect("liste_versement")
+
+    if request.method == "POST":
         form = VersementForm(request.POST, request.FILES, instance=versement)
         if form.is_valid():
-            try:
-                # CORRECTION : Utiliser save() sans superviseur pour la modification
-                versement_modifie = form.save(superviseur=None, commit=True)
-                
-                # Gérer les dépenses (logique déjà dans save() maintenant)
-                # Plus besoin de cette partie car gérée dans save()
-                
-                messages.success(request, "✅ Versement modifié avec succès!")
-                return redirect('detail_versement', versement_id=versement.id)
-                
-            except Exception as e:
-                messages.error(request, f"Erreur lors de la modification: {str(e)}")
+            form.save(rot=versement.effectue_par)
+            messages.success(request, "✅ Versement modifié avec succès.")
+            return redirect("detail_versement", versement_id=versement.id)
     else:
-        # Pré-remplir le formulaire avec les données existantes
-        initial_data = {}
-        if depense_existante:
-            initial_data = {
-                'depense_montant': depense_existante.montant,
-                'depense_description': depense_existante.description,
-            }
-        
-        form = VersementForm(instance=versement, initial=initial_data)
-    
-    context = {
-        'form': form,
-        'versement': versement,
-        'depense_existante': depense_existante,
-    }
-    
-    return render(request, 'core/factures/modifier_versement.html', context)
+        form = VersementForm(instance=versement)
+
+    return render(
+        request,
+        "core/factures/modifier_versement.html",
+        {
+            "form": form,
+            "versement": versement,
+        }
+    )
+
 
 
 @login_required
@@ -1721,7 +1702,118 @@ def liste_factures_entrepot(request):
         'title': 'Factures Entrepôt'
     }
     return render(request, 'core/factures/liste_factures_entrepot.html', context)
-# Créer une facture
+#
+#   DEPENSES
+#
+from django.utils.dateparse import parse_date
+
+from datetime import date
+from django.utils.dateparse import parse_date
+
+@login_required
+def liste_depenses(request):
+    agent = request.user.agent
+
+    depenses = Depense.objects.all().order_by('-date_depense')
+
+    categorie = request.GET.get('categorie')
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+
+    today = date.today()
+
+    # 📌 Mois en cours par défaut
+    if not date_debut and not date_fin:
+        depenses = depenses.filter(
+            date_depense__year=today.year,
+            date_depense__month=today.month
+        )
+        date_debut = today.replace(day=1).isoformat()
+        date_fin = today.isoformat()
+
+    # Filtres manuels
+    if categorie:
+        depenses = depenses.filter(categorie=categorie)
+
+    if date_debut:
+        depenses = depenses.filter(
+            date_depense__date__gte=parse_date(date_debut)
+        )
+
+    if date_fin:
+        depenses = depenses.filter(
+            date_depense__date__lte=parse_date(date_fin)
+        )
+
+    return render(request, 'core/depenses/liste.html', {
+        'depenses': depenses,
+        'categories': Depense._meta.get_field('categorie').choices,
+        'categorie_active': categorie,
+        'date_debut': date_debut,
+        'date_fin': date_fin,
+    })
+
+
+@login_required
+def detail_depense(request, depense_id):
+    depense = get_object_or_404(Depense, id=depense_id)
+    agent = request.user.agent
+
+    # Permissions simples
+    if depense.effectue_par != agent and not agent.est_direction:
+        return redirect('access_denied')
+
+    return render(request, 'core/depenses/detail.html', {
+        'depense': depense
+    })
+
+
+    
+@login_required
+def creer_depense(request):
+    agent = request.user.agent
+
+    if not agent.est_rot:
+        return redirect('access_denied')
+
+    if request.method == 'POST':
+        form = DepenseForm(request.POST)
+        if form.is_valid():
+            form.save(agent=agent)
+            messages.success(request, "✅ Dépense enregistrée")
+            return redirect('liste_depenses')
+    else:
+        form = DepenseForm()
+
+    return render(request, 'core/depenses/form.html', {
+        'form': form,
+        'titre': "Nouvelle dépense"
+    })
+
+
+@login_required
+def modifier_depense(request, depense_id):
+    depense = get_object_or_404(Depense, id=depense_id)
+    agent = request.user.agent
+
+    if agent != depense.effectue_par and not agent.est_direction:
+        return redirect('access_denied')
+
+    if request.method == 'POST':
+        form = DepenseForm(request.POST, instance=depense)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "✅ Dépense modifiée")
+            return redirect('liste_depenses')
+    else:
+        form = DepenseForm(instance=depense)
+
+    return render(request, 'core/depenses/form.html', {
+        'form': form,
+        'titre': "Modifier la dépense"
+    })
+
+
 
 
 #=========

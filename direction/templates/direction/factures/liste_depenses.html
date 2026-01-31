@@ -1,0 +1,100 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+{% block title %}Dépenses{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6">
+
+    <h1 class="text-2xl font-bold mb-4 flex items-center gap-2">
+        <i class="fas fa-receipt"></i>
+        Dépenses
+    </h1>
+
+    <!-- FILTRES -->
+    <div class="card bg-base-100 shadow mb-4">
+        <div class="card-body p-4">
+            <form method="get" class="flex flex-wrap gap-3">
+
+                <select name="categorie" class="select select-bordered select-sm">
+                    <option value="">Toutes catégories</option>
+                    {% for value, label in categories %}
+                        <option value="{{ value }}"
+                            {% if value == categorie_active %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <button class="btn btn-primary btn-sm">
+                    <i class="fas fa-filter"></i> Filtrer
+                </button>
+
+                <a href="{% url 'liste_depenses' %}" class="btn btn-outline btn-sm">
+                    Réinitialiser
+                </a>
+            </form>
+        </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body p-4 overflow-x-auto">
+            <table class="table table-zebra w-full text-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>ROT</th>
+                        <th>Catégorie</th>
+                        <th>Note</th>
+                        <th class="text-right">Montant</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in depenses %}
+                    <tr>
+                        <td>{{ d.date_depense|date:"d/m/Y" }}</td>
+
+                        <td>
+                            {{ d.effectue_par.full_name|default:"—" }}
+                        </td>
+
+                        <td>
+                            <span class="badge badge-outline">
+                                {{ d.get_categorie_display }}
+                            </span>
+                        </td>
+
+                        <td class="max-w-xs">
+                            {% if d.note %}
+                                {{ d.note|truncatechars:50 }}
+                            {% else %}
+                                <span class="text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-right font-semibold text-error">
+                            {{ d.montant|fcfa }} FCFA
+                        </td>
+
+                        <td>
+                            <a href="{% url 'detail_depense' d.id %}"
+                               class="btn btn-xs btn-outline btn-primary">
+                                Voir
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-6 text-gray-400">
+                            Aucune dépense trouvée
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

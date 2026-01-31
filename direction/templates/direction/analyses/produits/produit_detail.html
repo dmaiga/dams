@@ -1,7 +1,7 @@
 {% extends 'base_admin.html' %}
 {% load humanize %}
 {%load format_fcfa%}
-
+{% load direction_filters %}
 {% block title %}{{ product_data.product.nom|upper }} - Détails OOO{% endblock %}
 
 {% block content %}
@@ -35,7 +35,7 @@
                     <i class="fas fa-shopping-cart"></i>
                     Ventes Totales
                 </h2>
-                <p class="text-2xl font-bold">{{ product_data.sales_stats.total_quantity|floatformat:1 }} unités</p>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.total_quantity|format_number }} unités</p>
             </div>
         </div>
 
@@ -71,7 +71,7 @@
                     <i class="fas fa-percentage"></i>
                     Taux de Marge
                 </h2>
-                <p class="text-2xl font-bold">{{ product_data.sales_stats.taux_marge|default:0|floatformat:1 }}%</p>
+                <p class="text-2xl font-bold">{{ product_data.sales_stats.taux_marge|default:0|floatformat:2 }}%</p>
             </div>
         </div>
         
@@ -83,7 +83,7 @@
                     Pertes
                 </h2>
                 <p class="text-2xl font-bold">{{ product_data.sales_stats.pertes_valeur|fcfa }}</p>
-                <p class="text-sm text-gray-500">{{ product_data.sales_stats.pertes_quantite|floatformat:1 }} unités</p>
+                <p class="text-sm text-gray-500">{{ product_data.sales_stats.pertes_quantite|format_number }} unités</p>
             </div>
         </div>
     </div>
@@ -123,11 +123,11 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {{ lot.quantite_initiale|floatformat:1 }}
+                                {{ lot.quantite_initiale|format_number }}
                             </td>
                             <td class="text-center">
                                 <span class="font-bold {% if lot.quantite_restante < 5 %}text-error{% endif %}">
-                                    {{ lot.quantite_restante|floatformat:1 }}
+                                    {{ lot.quantite_restante|format_number }}
                                 </span>
                             </td>
                             <td class="text-right font-mono">
@@ -144,9 +144,9 @@
                             </td>
                             <td class="text-center">
                                 {% if lot.pertes.exists %}
-                                <div class="tooltip" data-tip="Pertes: {{ lot.quantite_perdue_totale|floatformat:1 }} unités - {{ lot.quantite_perdue_totale|multiply:lot.prix_achat_unitaire|fcfa }}">
+                                <div class="tooltip" data-tip="Pertes: {{ lot.quantite_perdue_totale|format_number }} unités - {{ lot.quantite_perdue_totale|multiply:lot.prix_achat_unitaire|fcfa }}">
                                     <span class="badge badge-error">
-                                        {{ lot.quantite_perdue_totale|floatformat:1 }}
+                                        {{ lot.quantite_perdue_totale|format_number }}
                                     </span>
                                 </div>
                                 {% else %}
@@ -200,7 +200,7 @@
                         {% for mois in product_data.monthly_sales %}
                         <tr>
                             <td class="font-semibold">{{ mois.month_name }}</td>
-                            <td class="text-center">{{ mois.total_quantity|floatformat:1 }} unités</td>
+                            <td class="text-center">{{ mois.total_quantity|format_number }} unités</td>
                             <td class="text-right font-mono">{{ mois.total_revenue|fcfa }}</td>
                             <td class="text-right font-mono {% if mois.total_marge > 0 %}text-success{% else %}text-error{% endif %}">
                                 {{ mois.total_marge|fcfa }}
@@ -212,7 +212,7 @@
                                     {% if taux_marge > 30 %}badge-success
                                     {% elif taux_marge > 15 %}badge-warning
                                     {% else %}badge-error{% endif %}">
-                                    {{ taux_marge|floatformat:1 }}%
+                                    {{ taux_marge|format_number }}%
                                 </span>
                                 {% else %}
                                 <span class="badge badge-secondary">0%</span>

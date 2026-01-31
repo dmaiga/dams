@@ -1136,7 +1136,7 @@ class RecouvrementForm(forms.ModelForm):
     def _vente_label(self, vente):
         produit = vente.detail_distribution.lot.produit.nom
         return (
-            f"Vente #{vente.id} | "
+            f"Vente | "
             f"{produit} | "
             f"{vente.quantite} unités | "
             f"{vente.total_vente:.0f} FCFA | "
@@ -1200,27 +1200,7 @@ from tinymce.widgets import TinyMCE
 
 
 class VersementForm(forms.ModelForm):
-    # Dépense optionnelle intégrée
-    depense_montant = forms.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        required=False,
-        initial=0,
-        label="Montant de la dépense",
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
-    )
 
-    depense_description = forms.CharField(
-        required=False,
-        label="Description de la dépense",
-        widget=TinyMCE(attrs={
-            'cols': 5,
-            'rows': 4,
-            'style': 'min-height: 60px; width:100%; max-width:100%;'
-        })
-    )
-    
-    # Champ pour plusieurs reçus - APPROCHE SIMPLE
     recus = forms.FileField(
         required=False,
         label="Reçus de versement",
@@ -1254,77 +1234,33 @@ class VersementForm(forms.ModelForm):
             'description': TinyMCE(attrs={
                 'rows': 2,
                 'class': 'form-control'
-            }), 
-            'date_versement_reelle': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            }),
+            'date_versement_reelle': forms.DateTimeInput(attrs={
+                'class': 'form-control',
+                'type': 'datetime-local'
+            }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Ajout de placeholder pour une meilleure UX mobile
         self.fields['montant_vente'].widget.attrs['placeholder'] = '0.00'
         self.fields['montant_hors_vente'].widget.attrs['placeholder'] = '0.00'
-        self.fields['depense_montant'].widget.attrs['placeholder'] = '0.00'
 
     def save(self, rot=None, commit=True):
         """
-        Sauvegarde qui gère création / modification
-        - Dépense mise à jour si elle existe
-        - Plusieurs reçus
+        Sauvegarde d’un versement bancaire
+        - Affecte le ROT (source de vérité)
+        - Gère les reçus multiples
         """
-        versement = super().save(commit=False)
-
-        # Affectation superviseur seulement en création
         if rot is None or not rot.est_rot:
             raise ValueError("Le versement doit être effectué par un ROT")
 
-        # 🔑 SOURCE DE VÉRITÉ
+        versement = super().save(commit=False)
         versement.effectue_par = rot
 
         if commit:
             versement.save()
 
-            # ============================
-            # 🔥 GESTION DES DÉPENSES
-            # ============================
-            dep_montant = self.cleaned_data.get('depense_montant') or 0
-            dep_desc = (self.cleaned_data.get('depense_description') or "").strip()
-
-            has_description = bool(dep_desc)
-            has_amount = dep_montant > 0
-
-            # Récupération éventuelle d'une dépense existante
-            depense_existante = versement.depenses.first()
-
-            # Si l'utilisateur a saisi une dépense
-            if has_description or has_amount:
-
-                # Valeurs par défaut si partiellement remplies
-                if has_amount and not dep_desc:
-                    dep_desc = "Dépense associée au versement"
-                if not has_amount:
-                    dep_montant = 0
-
-                if depense_existante:
-                    # 🔄 Mise à jour de la dépense existante
-                    depense_existante.montant = dep_montant
-                    depense_existante.description = dep_desc
-                    depense_existante.save()
-                else:
-                    # ✨ Création d'une nouvelle dépense
-                    Depense.objects.create(
-                        versement=versement,
-                        montant=dep_montant,
-                        description=dep_desc
-                    )
-
-            else:
-                # L'utilisateur supprime les champs -> supprimer la dépense existante
-                if depense_existante:
-                    depense_existante.delete()
-
-            # ============================
-            # 📂 GESTION DES RÉCUS MULTIPLES
-            # ============================
             recus_files = self.files.getlist('recus')
             recus_description = (self.cleaned_data.get('recus_description') or "").strip()
 
@@ -1336,6 +1272,8 @@ class VersementForm(forms.ModelForm):
                 )
 
         return versement
+
+
 
 class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
     versement = forms.ModelChoiceField(
@@ -1385,7 +1323,60 @@ class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
             recus_crees.append(recu)
 
         return recus_crees
- 
+
+
+
+class DepenseForm(forms.ModelForm):
+    class Meta:
+        model = Depense
+        fields = [
+            'date_depense',
+            'montant',
+            'categorie',
+            'note',
+        ]
+        widgets = {
+            'date_depense': forms.DateTimeInput(
+                attrs={
+                    'class': 'form-control',
+                    'type': 'datetime-local'
+                }
+            ),
+            'montant': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'step': '0.01',
+                    'placeholder': 'Montant en FCFA'
+                }
+            ),
+            'categorie': forms.Select(
+                attrs={
+                    'class': 'form-control'
+                }
+            ),
+            'note': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Détail facultatif (ex: Essence Koniba)'
+                }
+            ),
+        }
+
+    def save(self, agent=None, commit=True):
+        depense = super().save(commit=False)
+
+        # Affectation automatique de l’agent (ROT)
+        if agent:
+            depense.effectue_par = agent
+
+        # MVP : source par défaut
+        depense.source = depense.source or 'ROT'
+
+        if commit:
+            depense.save()
+
+        return depense
+
 
 from decimal import Decimal
 from django import forms

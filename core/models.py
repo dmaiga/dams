@@ -1928,8 +1928,8 @@ class RecuVersement(models.Model):
         verbose_name = "Reçu de versement"
         verbose_name_plural = "Reçus de versement"
 
-
 class Depense(models.Model):
+    # Qui a effectué la dépense (ROT)
     effectue_par = models.ForeignKey(
         Agent,
         on_delete=models.SET_NULL,
@@ -1939,12 +1939,17 @@ class Depense(models.Model):
         help_text="Agent ayant réellement effectué la dépense"
     )
 
+    # Lien optionnel avec un versement (NE PAS CASSER L’EXISTANT)
     versement = models.ForeignKey(
         VersementBancaire,
-        on_delete=models.CASCADE,
-        related_name='depenses'
+        on_delete=models.SET_NULL,   
+        null=True,
+        blank=True,
+        related_name='depenses',
+        help_text="Versement éventuellement lié"
     )
 
+    # Montant (inchangé)
     montant = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -1952,20 +1957,58 @@ class Depense(models.Model):
         validators=[MinValueValidator(Decimal('0.01'))]
     )
 
+    # 🟢 NOUVEAU : catégorie normalisée (MVP)
+    categorie = models.CharField(
+        max_length=40,
+        choices=[
+            ('ACHAT_MARCHANDISE', 'Achat marchandise'),
+            ('TRANSPORT_MARCHANDISE', 'Transport marchandise'),
+            ('CARBURANT', 'Carburant'),
+            ('MAINTENANCE_VEHICULE', 'Maintenance véhicule'),
+            ('FRAIS_OPERATIONNELS', 'Frais opérationnels'),
+            ('TRANSFERT', 'Transfert'),
+            ('DIVERS', 'Divers'),
+        ],
+        default='DIVERS',
+        verbose_name="Catégorie"
+    )
+
+    # 🟢 NOUVEAU : note simple (terrain-friendly)
+    note = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Note (optionnelle)",
+        help_text="Détail libre saisi par l’agent"
+    )
+
+    # 🔵 ANCIEN : description HTML (HISTORIQUE)
     description = HTMLField(
-        verbose_name="Détails de la dépense"
+        blank=True,
+        verbose_name="Description historique"
     )
 
     date_depense = models.DateTimeField(
         default=timezone.now,
         verbose_name="Date de la dépense"
     )
-    date_creation = models.DateTimeField(auto_now_add=True)
 
+    date_creation = models.DateTimeField(
+        auto_now_add=True
+    )
 
+    # 🟡 Technique : origine de la donnée
+    source = models.CharField(
+        max_length=20,
+        default='ROT',
+        choices=[
+            ('ROT', 'Saisie terrain'),
+            ('MIGRATION', 'Migration historique'),
+            ('ADMIN', 'Correction admin'),
+        ]
+    )
 
     def __str__(self):
-        return f"Dépense {self.id} - {self.montant} FCFA "
+        return f"Dépense #{self.id} - {self.montant} FCFA"
 
     class Meta:
         ordering = ['-date_depense']

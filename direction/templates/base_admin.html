@@ -77,144 +77,122 @@
                         <i class="fas fa-times"></i>
                     </label>
                 </div>
+<!-- Navigation -->
+<nav class="p-4 space-y-1">
+    <div class="mb-3">
+        <!-- ================= VUE D'ENSEMBLE ================= -->
+        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">VUE D'ENSEMBLE</p>
+        <ul class="space-y-1 mb-4">
+            <li>
+                <a href="{% url 'dashboard' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if request.resolver_match.url_name == 'dashboard' %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-tachometer-alt w-5"></i>
+                    <span>Tableau de Bord</span>
+                </a>
+            </li>
+        </ul>
 
-                <!-- Navigation -->
-                <nav class="p-4 space-y-1">
-                        
-                    <!-- Vue d'ensemble -->
-                    <div class="mb-3">
-                        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">VUE D'ENSEMBLE</p>
-                        <!-- ================= PILOTAGE ================= -->
-<ul class="space-y-1 mb-4">
-    <li>
-        <a href="{% url 'dashboard' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if request.resolver_match.url_name == 'dashboard' %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-tachometer-alt w-5"></i>
-            <span>Tableau de Bord</span>
-        </a>
-    </li>
-</ul>
+        <!-- ================= RÉFÉRENTIELS ================= -->
+        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">RÉFÉRENTIELS</p>
+        <ul class="space-y-1 mb-4">
+            <li>
+                <a href="{% url 'agent_dashboard' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if 'agent' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-user-tie w-5"></i>
+                    <span>Agents</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'product_list' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if 'product' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-cube w-5"></i>
+                    <span>Produits</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'liste_fournisseurs_direction' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if request.resolver_match.url_name == 'liste_fournisseurs_direction' %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-truck w-5"></i>
+                    <span>Fournisseurs</span>
+                </a>
+            </li>
+        </ul>
 
-<!-- ================= RÉFÉRENTIELS ================= -->
-<p class="text-xs font-semibold text-gray-500 px-3 mb-2">RÉFÉRENTIELS</p>
-<ul class="space-y-1 mb-4">
-    <li>
-        <a href="{% url 'agent_dashboard' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if 'agent' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-user-tie w-5"></i>
-            <span>Agents</span>
-        </a>
-    </li>
+        <!-- ================= PILOTAGE & ANALYSES ================= -->
+        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">PILOTAGE & ANALYSES</p>
+        <ul class="space-y-1 mb-4">
+            <li>
+                <a href="{% url 'toutes_les_ventes' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if 'vente' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-shopping-cart w-5"></i>
+                    <span>Ventes</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'analyse_operationnelle' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                          {% if 'analyse_operationnelle' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
+                    <i class="fas fa-magnifying-glass-chart w-5"></i>
+                    <span>Analyse Opérationnelle</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'salaire_lecture' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                          {% if 'salaire_lecture' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
+                    <i class="fas fa-file-invoice-dollar w-5"></i>
+                    <span>Rémunération</span>
+                </a>
+            </li>
+        </ul>
 
-    <li>
-        <a href="{% url 'product_list' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if 'product' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-cube w-5"></i>
-            <span>Produits</span>
-        </a>
-    </li>
+        <!-- ================= FINANCE ================= -->
+        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">FINANCE</p>
+        <ul class="space-y-1 mb-4">
+            <li>
+                <a href="{% url 'versements_direction' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if 'versements' in request.resolver_match.url_name or 'versement' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-money-check-alt w-5"></i>
+                    <span>Versements</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'liste_depenses' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if 'depenses' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-money-bill-wave w-5"></i>
+                    <span>Dépenses</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'factures_fournisseurs_direction' %}"
+                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if request.resolver_match.url_name == 'factures_fournisseurs_direction' or request.resolver_match.url_name == 'detail_facture_fournisseur_direction' %}bg-blue-50 text-primary{% endif %}">
+                    <i class="fas fa-file-invoice-dollar w-5"></i>
+                    <span>Factures Fournisseurs</span>
+                </a>
+            </li>
+        </ul>
+    </div>
 
-    <li>
-        <a href="{% url 'liste_fournisseurs_direction' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if request.resolver_match.url_name == 'liste_fournisseurs_direction' %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-truck w-5"></i>
-            <span>Fournisseurs</span>
-        </a>
-    </li>
-</ul>
+    <!-- ================= SESSION ================= -->
+    <ul class="pt-4 border-t">
+        <li>
+            <a href="{% url 'logout' %}"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 text-gray-700">
+                <i class="fas fa-sign-out-alt w-5"></i>
+                <span>Déconnexion</span>
+            </a>
+        </li>
+    </ul>
+</nav>
 
-<!-- ================= OPÉRATIONS ================= -->
-<p class="text-xs font-semibold text-gray-500 px-3 mb-2">OPÉRATIONS</p>
-<ul class="space-y-1 mb-4">
-    <li>
-        <a href="{% url 'toutes_les_ventes' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if 'vente' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-shopping-cart w-5"></i>
-            <span>Ventes</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="{% url 'versements_direction' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if 'versements' in request.resolver_match.url_name or 'versement' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-money-check-alt w-5"></i>
-            <span>Versements</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="{% url 'factures_fournisseurs_direction' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if request.resolver_match.url_name == 'factures_fournisseurs_direction' or request.resolver_match.url_name == 'detail_facture_fournisseur_direction' %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-file-invoice-dollar w-5"></i>
-            <span>Factures Fournisseurs</span>
-        </a>
-    </li>
-</ul>
-
-<!-- ================= ANALYSES ================= -->
-<p class="text-xs font-semibold text-gray-500 px-3 mb-2">ANALYSES</p>
-<ul class="space-y-1 mb-4">
-    <li>
-        <a href="{% url 'analyse_operationnelle' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
-                  {% if 'analyse_operationnelle' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
-            <i class="fas fa-magnifying-glass-chart w-5"></i>
-            <span>Analyse Opérationnelle</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="{% url 'analyse_financiere_direction' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                  {% if 'analyse_financiere' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
-            <i class="fas fa-chart-line w-5"></i>
-            <span>Analyse Financière</span>
-        </a>
-    </li>
-</ul>
-
-<!-- ================= CONTRÔLE ================= -->
-<p class="text-xs font-semibold text-gray-500 px-3 mb-2">CONTRÔLE</p>
-<ul class="space-y-1 mb-6">
-    <li>
-        <a href="{% url 'liste_clotures' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
-                  {% if 'liste_clotures' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
-            <i class="fas fa-lock w-5"></i>
-            <span>Clôtures</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="{% url 'salaire_lecture' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
-                  {% if 'salaire_lecture' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
-            <i class="fas fa-file-invoice-dollar w-5"></i>
-            <span>Rémunération</span>
-        </a>
-    </li>
-</ul>
-
-<!-- ================= SESSION ================= -->
-<ul class="pt-4 border-t">
-    <li>
-        <a href="{% url 'logout' %}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 text-gray-700">
-            <i class="fas fa-sign-out-alt w-5"></i>
-            <span>Déconnexion</span>
-        </a>
-    </li>
-</ul>
-
-                    </div>
-                </nav>
             </aside>
         </div>
     </div>

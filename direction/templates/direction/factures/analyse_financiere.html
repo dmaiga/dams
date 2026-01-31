@@ -1,261 +1,265 @@
-{% extends 'base_admin.html' %}
+{% extends "base_admin.html" %}
 {% load humanize %}
-{% load custom_filters format_fcfa %}
-{% block title %}Analyse Financière - Direction{% endblock %}
+{% load format_fcfa %}
 
 {% block content %}
-<div class="p-6">
-    <h1 class="text-2xl font-bold mb-6 flex items-center gap-2">
-        <i class="fas fa-chart-line"></i>
-        Analyse Financière
+<div class="p-6 space-y-6">
+
+  <!-- ================================================= -->
+  <!-- TITRE + PÉRIODE -->
+  <!-- ================================================= -->
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+    <h1 class="text-2xl font-bold">
+      Analyse financière – Direction
     </h1>
-    
-    <!-- Filtres -->
-<!-- Filtres -->
-<div class="card bg-base-100 shadow-sm mb-6">
+    <div class="text-sm text-gray-500">
+      {{ data.periode.label }}
+      ({{ data.periode.debut|date:"d/m/Y" }} →
+       {{ data.periode.fin|date:"d/m/Y" }})
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- FILTRE PÉRIODE -->
+  <!-- ================================================= -->
+  <form method="get" class="card bg-base-100 shadow">
+    <div class="card-body grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+
+      <!-- Année -->
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Année</span>
+        </label>
+        <select name="annee" class="select select-bordered">
+          {% for y in data.filtres.annees %}
+            <option value="{{ y }}"
+              {% if data.periode.annee == y %}selected{% endif %}>
+              {{ y }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Mois -->
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Mois</span>
+        </label>
+<select name="mois" class="select select-bordered">
+  <option value="">Toute l’année</option>
+  {% for m in data.filtres.mois %}
+    <option value="{{ m.value }}"
+      {% if data.periode.mois == m.value %}selected{% endif %}>
+      {{ m.label }}
+    </option>
+  {% endfor %}
+</select>
+
+      </div>
+
+      <!-- Appliquer -->
+      <button class="btn btn-primary">
+        Appliquer
+      </button>
+
+      <!-- Reset -->
+      <a href="{% url 'analyse_financiere_direction' %}"
+         class="btn btn-outline">
+        Réinitialiser
+      </a>
+
+    </div>
+  </form>
+
+  <!-- ================================================= -->
+  <!-- KPI GLOBAUX -->
+  <!-- ================================================= -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+  <div class="stat bg-base-100 shadow rounded-box">
+    <div class="stat-title">Chiffre d’affaires</div>
+    <div class="text-2xl font-semibold text-primary">
+      {{ data.kpis.chiffre_affaires|fcfa }} F
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow rounded-box">
+    <div class="stat-title">Versements banque</div>
+    <div class="text-2xl font-semibold text-success">
+      {{ data.kpis.versements_banque|fcfa }} F
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow rounded-box">
+    <div class="stat-title">Dépenses</div>
+    <div class="text-2xl font-semibold text-error">
+      {{ data.kpis.depenses|fcfa }} F
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow rounded-box">
+    <div class="stat-title">Salaires</div>
+    <div class="text-2xl font-semibold text-warning">
+      {{ data.kpis.salaires|fcfa }} F
+    </div>
+  </div>
+
+  <div class="stat bg-base-100 shadow rounded-box border border-primary">
+    <div class="stat-title">Marge</div>
+    <div class="text-3xl font-bold
+      {% if data.kpis.marge >= 0 %}
+        text-success
+      {% else %}
+        text-error
+      {% endif %}
+    ">
+      {{ data.kpis.marge|fcfa }} F
+    </div>
+
+  </div>
+
+</div>
+
+
+  <!-- ================================================= -->
+  <!-- SUPERVISEURS -->
+  <!-- ================================================= -->
+  <div class="card bg-base-100 shadow">
     <div class="card-body">
-        <form method="get" class="flex flex-wrap items-end gap-4">
+      <h2 class="card-title">Situation financière – Superviseurs</h2>
 
-            <!-- Mois (optionnel) -->
-            <div>
-                <label class="label">
-                    <span class="label-text font-semibold">Mois</span>
-                </label>
-                <select name="mois" class="select select-bordered w-44">
-                    <!-- OPTION ANNUELLE -->
-                    <option value="">
-                        Toute l’année
-                    </option>
-
-                    {% for value, label in mois_choices %}
-                    <option value="{{ value }}"
-                        {% if mois_selectionne == value %}selected{% endif %}>
-                        {{ label }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Année -->
-            <div>
-                <label class="label">
-                    <span class="label-text font-semibold">Année</span>
-                </label>
-                <select name="annee" class="select select-bordered w-32">
-                    {% for annee in annee_choices %}
-                    <option value="{{ annee }}"
-                        {% if annee_selectionnee == annee %}selected{% endif %}>
-                        {{ annee }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Bouton -->
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-filter mr-2"></i>
-                Appliquer
-            </button>
-
-            <!-- Période affichée -->
-            <div class="ml-auto text-sm text-gray-600">
-                {% if mois_selectionne %}
-                    Période :
-                    {{ debut_periode|date:"d/m/Y" }} -
-                    {{ fin_periode|date:"d/m/Y" }}
-                {% else %}
-                    Année : {{ annee_selectionnee }}
-                {% endif %}
-            </div>
-
-        </form>
+      <div class="overflow-x-auto">
+        <table class="table table-zebra">
+          <thead>
+            <tr>
+              <th>Superviseur</th>
+              <th>Ventes</th>
+              <th>Recouvrements</th>
+              <th>Solde</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sup in data.agents.superviseurs %}
+              <tr>
+                <td>{{ sup.superviseur }}</td>
+                <td>{{ sup.ventes_personnelles|fcfa }} F</td>
+                <td>{{ sup.recouvrements_agents|fcfa }} F</td>
+                <td class="font-semibold
+                  {% if sup.solde_mois >= 0 %}
+                    text-success
+                  {% else %}
+                    text-error
+                  {% endif %}
+                ">
+                  {{ sup.solde_mois|fcfa }} F
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-gray-400">
+                  Aucun superviseur
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-</div>
+  </div>
 
-    
-    <!-- Cartes de synthèse -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-
-    <!-- CA -->
-    <div class="card bg-success text-success-content shadow-sm">
-        <div class="card-body p-4">
-            <h3 class="card-title text-lg">Chiffre d'Affaires</h3>
-            <p class="text-2xl font-bold">{{ ca_total|fcfa }} FCFA</p>
-            <div class="flex justify-between text-xs mt-2">
-                <span>Gros : {{ ca_gros|fcfa }}</span>
-                <span>Détail : {{ ca_detail|fcfa }}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Versements -->
-    <div class="card bg-primary text-primary-content shadow-sm">
-        <div class="card-body p-4">
-            <h3 class="card-title text-lg">Versements Banque</h3>
-            <p class="text-2xl font-bold">{{ total_verse|fcfa }} FCFA</p>
-            <div class="text-xs mt-2">Argent sécurisé</div>
-        </div>
-    </div>
-
-    <!-- Dépenses -->
-    <div class="card bg-warning text-warning-content shadow-sm">
-        <div class="card-body p-4">
-            <h3 class="card-title text-lg">Dépenses Terrain</h3>
-            <p class="text-2xl font-bold">{{ total_depenses|fcfa }} FCFA</p>
-            <div class="text-xs mt-2">Dépenses superviseurs</div>
-        </div>
-    </div>
-
-    <!-- Dette fournisseur -->
-    <div class="card bg-error text-error-content shadow-sm">
-        <div class="card-body p-4">
-            <h3 class="card-title text-lg">Dette Fournisseur</h3>
-            <p class="text-2xl font-bold">{{ dette_consomme_fournisseurs|fcfa }} FCFA</p>
-            <div class="text-xs mt-2">Dette consommée</div>
-        </div>
-    </div>
-
-</div>
-
-    
-    <!-- Analyse par superviseur -->
-<div class="card bg-base-100 shadow-sm mb-6">
+  <!-- ================================================= -->
+  <!-- ROT -->
+  <!-- ================================================= -->
+  <div class="card bg-base-100 shadow">
     <div class="card-body">
-        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
-            <i class="fas fa-user-tie"></i>
-            Analyse par Superviseur
-        </h2>
+      <h2 class="card-title">Situation financière – ROT</h2>
 
-        <div class="overflow-x-auto">
-            <table class="table table-zebra">
-                <thead>
-                    <tr class="bg-base-200">
-                        <th>Superviseur</th>
-                        <th>Versements</th>
-                        <th>Dépenses</th>
-                        <th>Solde Actuel</th>
-                        <th>Argent en circulation</th>
-                        <th>Détail</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for sup in analyse_superviseurs %}
-                    <tr>
-                        <td class="font-semibold">{{ sup.superviseur.full_name }}</td>
-
-                        <td class="text-primary font-bold">
-                            {{ sup.total_verse|fcfa }} FCFA
-                        </td>
-
-                        <td class="text-warning font-bold">
-                            {{ sup.total_depenses|fcfa }} FCFA
-                        </td>
-
-                        <td class="font-bold
-                            {% if sup.solde_actuel > 0 %}text-success
-                            {% elif sup.solde_actuel < 0 %}text-error
-                            {% else %}text-gray-500{% endif %}">
-                            {{ sup.solde_actuel|fcfa }} FCFA
-                        </td>
-
-                        <td>
-                            {{ sup.argent_en_possession|fcfa }} FCFA
-                        </td>
-
-                        <td>
-                            <a href="{% url 'versements_direction' %}?superviseur={{ sup.superviseur.id }}"
-                               class="btn btn-sm btn-outline btn-info">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center text-gray-400 py-6">
-                            Aucune donnée superviseur
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+      <div class="overflow-x-auto">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>ROT</th>
+              <th>Reçu superviseurs</th>
+              <th>Versements banque</th>
+              <th>Dépenses</th>
+              <th>Solde</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in data.agents.rot %}
+              <tr>
+                <td>{{ r.rot }}</td>
+                <td>{{ r.recupere|fcfa }} F</td>
+                <td>{{ r.verse|fcfa }} F</td>
+                <td>{{ r.depenses|fcfa }} F</td>
+                <td class="font-semibold
+                  {% if r.solde_mois >= 0 %}
+                    text-success
+                  {% else %}
+                    text-error
+                  {% endif %}
+                ">
+                  {{ r.solde_mois|fcfa }} F
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-gray-400">
+                  Aucun ROT
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-</div>
+  </div>
 
-    
-    <!-- Détail des achats par fournisseur -->
-<div class="card bg-base-100 shadow-sm mb-6">
+  <!-- ================================================= -->
+  <!-- FOURNISSEURS -->
+  <!-- ================================================= -->
+  <div class="card bg-base-100 shadow">
     <div class="card-body">
-        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
-            <i class="fas fa-industry"></i>
-            Situation Fournisseurs
-        </h2>
+      <h2 class="card-title">Analyse fournisseurs</h2>
 
-        <div class="overflow-x-auto">
-            <table class="table table-zebra">
-                <thead>
-                    <tr class="bg-base-200">
-                        <th>Fournisseur</th>
-                        <th>Dette contractuelle</th>
-                        <th>Dette consommée</th>
-                        <th>Total payé</th>
-                        <th>Dette restante</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for fournisseur in fournisseurs %}
-                    <tr>
-                        <td class="font-semibold">{{ fournisseur.nom }}</td>
-
-                        <td>
-                            {{ fournisseur.dette_contractuelle|fcfa }} FCFA
-                        </td>
-
-                        <td class="text-warning font-bold">
-                            {{ fournisseur.dette_consomme|fcfa }} FCFA
-                        </td>
-
-                        <td class="text-success">
-                            {{ fournisseur.total_paye|fcfa }} FCFA
-                        </td>
-
-                        <td class="font-bold
-                            {% if fournisseur.dette_restante > 0 %}text-error
-                            {% else %}text-success{% endif %}">
-                            {{ fournisseur.dette_restante|fcfa }} FCFA
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-gray-400 py-6">
-                            Aucun fournisseur
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+      <div class="overflow-x-auto">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Fournisseur</th>
+              <th>Dette contractuelle</th>
+              <th>Dette consommée</th>
+              <th>Reste à payer</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in data.fournisseurs.analyse_data %}
+              <tr>
+                <td>{{ f.fournisseur.nom }}</td>
+                <td>{{ f.dette_contractuelle|fcfa }} F</td>
+                <td>{{ f.dette_consommee|fcfa }} F</td>
+                <td class="font-semibold
+                  {% if f.reste_contractuel > 0 %}
+                    text-error
+                  {% else %}
+                    text-success
+                  {% endif %}
+                ">
+                  {{ f.reste_contractuel|fcfa }} F
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-gray-400">
+                  Aucun fournisseur
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-</div>
-
-
-    
+  </div>
 
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Ajouter un effet de survol aux lignes des superviseurs
-    const rows = document.querySelectorAll('tbody tr');
-    rows.forEach(row => {
-        row.addEventListener('click', function() {
-            const detailBtn = this.querySelector('a[href*="versements_direction"]');
-            if (detailBtn) {
-                window.location.href = detailBtn.href;
-            }
-        });
-        row.style.cursor = 'pointer';
-    });
-});
-</script>
 {% endblock %}
