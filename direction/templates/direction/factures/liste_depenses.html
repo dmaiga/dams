@@ -11,30 +11,73 @@
     </h1>
 
     <!-- FILTRES -->
-    <div class="card bg-base-100 shadow mb-4">
-        <div class="card-body p-4">
-            <form method="get" class="flex flex-wrap gap-3">
+<div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+        <form method="get" class="flex flex-wrap gap-3 items-end">
 
-                <select name="categorie" class="select select-bordered select-sm">
-                    <option value="">Toutes catégories</option>
-                    {% for value, label in categories %}
-                        <option value="{{ value }}"
-                            {% if value == categorie_active %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
+            <select name="categorie" class="select select-bordered select-sm">
+                <option value="">Toutes catégories</option>
+                {% for value, label in categories %}
+                    <option value="{{ value }}"
+                        {% if value == categorie_active %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
 
-                <button class="btn btn-primary btn-sm">
-                    <i class="fas fa-filter"></i> Filtrer
-                </button>
+            <input type="date"
+                   name="date_debut"
+                   value="{{ date_debut }}"
+                   class="input input-bordered input-sm"
+                   placeholder="Du">
 
-                <a href="{% url 'liste_depenses' %}" class="btn btn-outline btn-sm">
-                    Réinitialiser
-                </a>
-            </form>
+            <input type="date"
+                   name="date_fin"
+                   value="{{ date_fin }}"
+                   class="input input-bordered input-sm"
+                   placeholder="Au">
+
+            <button class="btn btn-primary btn-sm">
+                <i class="fas fa-filter"></i> Filtrer
+            </button>
+
+            <!-- 🔄 RESET RÉEL -->
+            <a href="{% url 'liste_depense_direction' %}"
+               class="btn btn-outline btn-sm">
+                Réinitialiser
+            </a>
+        </form>
+    </div>
+</div>
+
+<div class="stats shadow mb-4 w-full">
+
+    <div class="stat">
+        <div class="stat-title">Total global des dépenses</div>
+        <div class="stat-value text-error">
+            {{ total_global|fcfa }} FCFA
+        </div>
+        <div class="stat-desc">
+            Toutes périodes confondues
         </div>
     </div>
+
+    <div class="stat">
+        <div class="stat-title">Total période filtrée</div>
+        <div class="stat-value text-primary">
+            {{ total_filtre|fcfa }} FCFA
+        </div>
+        <div class="stat-desc">
+            {% if categorie_active or date_debut or date_fin %}
+                Selon filtres actifs
+            {% else %}
+                Aucun filtre appliqué
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
 
     <!-- TABLE -->
     <div class="card bg-base-100 shadow">
@@ -78,7 +121,7 @@
                         </td>
 
                         <td>
-                            <a href="{% url 'detail_depense' d.id %}"
+                            <a href="{% url 'detail_depense_direction' d.id %}"
                                class="btn btn-xs btn-outline btn-primary">
                                 Voir
                             </a>

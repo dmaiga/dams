@@ -922,36 +922,71 @@ def detail_versement_direction(request, versement_id):
         context
     )
 
+from django.utils.dateparse import parse_date
+
+from django.utils.dateparse import parse_date
+
+from django.db.models import Sum
+from django.utils.dateparse import parse_date
+from decimal import Decimal
+
 @login_required
 def liste_depenses(request):
-    depenses = Depense.objects.select_related(
+    # 🔹 QuerySet de base (toutes les dépenses)
+    base_qs = Depense.objects.select_related(
         'effectue_par', 'effectue_par__user', 'versement'
-    ).order_by('-date_depense')
+    )
 
-    # 🔹 Filtre par catégorie
+    # 🔹 Total GLOBAL (sans aucun filtre)
+    total_global = (
+        base_qs.aggregate(total=Sum('montant'))['total']
+        or Decimal('0.00')
+    )
+
+    # 🔹 On clone pour appliquer les filtres
+    depenses = base_qs.order_by('-date_depense')
+
+    # 🔹 Filtre catégorie
     categorie = request.GET.get('categorie')
     if categorie:
         depenses = depenses.filter(categorie=categorie)
 
-    # 🔹 Filtre mois courant (par défaut)
-    mois = request.GET.get('mois', 'courant')
-    if mois == 'courant':
-        today = timezone.now().date()
-        debut = today.replace(day=1)
-        fin = (debut + timedelta(days=32)).replace(day=1)
-        depenses = depenses.filter(
-            date_depense__date__gte=debut,
-            date_depense__date__lt=fin
-        )
+    # 🔹 Filtre période (direction)
+    date_debut_raw = request.GET.get('date_debut')
+    date_fin_raw = request.GET.get('date_fin')
+
+    date_debut = parse_date(date_debut_raw) if date_debut_raw else None
+    date_fin = parse_date(date_fin_raw) if date_fin_raw else None
+
+    if date_debut:
+        depenses = depenses.filter(date_depense__date__gte=date_debut)
+
+    if date_fin:
+        depenses = depenses.filter(date_depense__date__lte=date_fin)
+
+    # 🔹 Total FILTRÉ
+    total_filtre = (
+        depenses.aggregate(total=Sum('montant'))['total']
+        or Decimal('0.00')
+    )
 
     context = {
         'depenses': depenses,
         'categories': Depense._meta.get_field('categorie').choices,
         'categorie_active': categorie,
-        'mois': mois,
+        'date_debut': date_debut_raw,
+        'date_fin': date_fin_raw,
+        'total_global': total_global,
+        'total_filtre': total_filtre,
     }
 
-    return render(request, 'direction/factures/liste_depenses.html', context)
+    return render(
+        request,
+        'direction/factures/liste_depenses.html',
+        context
+    )
+
+
 
 @login_required
 def detail_depense(request, depense_id):

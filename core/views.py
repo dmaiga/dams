@@ -1710,6 +1710,9 @@ from django.utils.dateparse import parse_date
 from datetime import date
 from django.utils.dateparse import parse_date
 
+from datetime import date
+from django.utils.dateparse import parse_date
+
 @login_required
 def liste_depenses(request):
     agent = request.user.agent
@@ -1719,11 +1722,12 @@ def liste_depenses(request):
     categorie = request.GET.get('categorie')
     date_debut = request.GET.get('date_debut')
     date_fin = request.GET.get('date_fin')
+    show_all = request.GET.get('all')  # 👈 NOUVEAU
 
     today = date.today()
 
-    # 📌 Mois en cours par défaut
-    if not date_debut and not date_fin:
+    # 📌 Mois en cours PAR DÉFAUT (uniquement si rien n’est demandé)
+    if not show_all and not date_debut and not date_fin:
         depenses = depenses.filter(
             date_depense__year=today.year,
             date_depense__month=today.month
@@ -1751,6 +1755,7 @@ def liste_depenses(request):
         'categorie_active': categorie,
         'date_debut': date_debut,
         'date_fin': date_fin,
+        'show_all': show_all,
     })
 
 

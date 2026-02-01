@@ -529,14 +529,17 @@
                             href="{% url 'liste_depenses' %}">
                              <i class="fas fa-file-invoice"></i>
                                 <span>Dépenses</span>
+
                         </a>
-                          <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
+
+<!-- 
+                        <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
                            href="{% url 'liste_ventes' %}">
                             <i class="fas fa-cash-register"></i>
                             <span>Mes Ventes</span>
                             
                         </a>
-
+-->
                       
 
                     </div>

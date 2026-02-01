@@ -14,6 +14,7 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal, ROUND_FLOOR
 
 from dateutil.relativedelta import relativedelta
+from django.utils import formats
 
 
 class Client(models.Model):
@@ -1126,11 +1127,21 @@ class AffectationLotSuperviseur(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True
     )
+    def date_affectation_humaine(self):
+        """
+        Date lisible pour affichage (sans heure)
+        """
+        return formats.date_format(
+            self.date_affectation,
+            "DATE_FORMAT"
+        )
     def __str__(self):
         return (
             f"{self.lot.produit.nom} — "
             f"reste {self.quantite_restante:.2f} "
             f"(init. {self.quantite_initiale:.2f})"
+            f"- {self.date_affectation_humaine()})"
+
         )
 
 

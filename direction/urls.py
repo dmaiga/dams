@@ -82,8 +82,8 @@ urlpatterns = [
     path('direction/versements/', views_direction.liste_versements_direction, name='versements_direction'),
     path('direction/versements/<int:versement_id>/', views_direction.detail_versement_direction, name='detail_versement_direction'),
     #Depenses
-    path('direction/depenses/', views_direction.liste_depenses, name='liste_depenses'),
-    path('direction/depenses/<int:depense_id>/', views_direction.detail_depense, name='detail_depense'),
+    path('direction/depenses/', views_direction.liste_depenses, name='liste_depense_direction'),
+    path('direction/depenses/<int:depense_id>/', views_direction.detail_depense, name='detail_depense_direction'),
     
     # Rapports
     path('analyse-financiere/', views_direction.analyse_financiere_direction, name='analyse_financiere_direction'),
