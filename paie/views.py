@@ -56,6 +56,18 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
         )
 
         # ----------------------------
+        # EFFECTIFS (KPI)
+        # ----------------------------
+        effectif_mamy = len(result["mamies"])
+        effectif_gros = len(result["gros"])
+        effectif_superviseur = len(result["superviseurs"])
+        effectif_total = (
+            effectif_mamy
+            + effectif_gros
+            + effectif_superviseur
+        )
+        
+        # ----------------------------
         # CONTEXTE (ALIGNÉ AU TEMPLATE)
         # ----------------------------
         context.update({
@@ -71,31 +83,38 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
                 (10, "Octobre"), (11, "Novembre"), (12, "Décembre"),
             ],
             "years": range(today.year - 3, today.year + 1),
-
-            # 🔴 LISTES (CLÉ DU BUG)
+        
+            # 🔴 LISTES
             "salaires_mamy": result["mamies"],
             "salaires_gros": result["gros"],
             "salaires_superviseur": result["superviseurs"],
-
+        
+            # 🟢 EFFECTIFS
+            "effectif_mamy": effectif_mamy,
+            "effectif_gros": effectif_gros,
+            "effectif_superviseur": effectif_superviseur,
+            "effectif_total": effectif_total,
+        
             # 🟢 TOTAUX
             "total_mamy_kilo": result["total_mamy_kilo"],
             "total_mamy_salaire_base": result["total_mamy_salaire_base"],
             "total_mamy_incentive": result["total_mamy_incentive"],
             "total_mamy_general": result["total_mamy_general"],
-
+        
             "total_gros_cartons": result["total_gros_cartons"],
             "total_gros_incentive": result["total_gros_incentive"],
             "total_gros_general": result["total_gros_general"],
-
+        
             "total_sup_kilo_mamies": result["total_sup_kilo_mamies"],
             "total_sup_salaire_base": result["total_sup_salaire_base"],
             "total_sup_dotation": result["total_sup_dotation"],
             "total_sup_bonus": result["total_sup_bonus"],
             "total_sup_general": result["total_sup_general"],
-
+        
+            # 🌍 GLOBAL
             "total_global": result["total_global"],
         })
-
+        
         return context
 
 

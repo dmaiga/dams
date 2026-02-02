@@ -27,40 +27,56 @@
   </div>
 </div>
 
-<!-- ================= KPI ================= -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-
+<!-- ================= KPI COMPACTS ================= -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
+  
+  <!-- KPI GLOBAL -->
   <div class="stat bg-base-100 shadow rounded-box">
-    <div class="stat-title">TOTAL GLOBAL</div>
-    <div class="stat-value text-primary">{{ total_global|fcfa }}</div>
+    <div class="stat-title text-sm">EFFECTIFS</div>
+    <div class="stat-value text-xl text-primary">{{ effectif_total }}</div>
+    <div class="stat-desc text-xs">Total global</div>
   </div>
 
   <div class="stat bg-base-100 shadow rounded-box">
-    <div class="stat-title">Mamies</div>
-    <div class="stat-value text-info">{{ total_mamy_general|fcfa }}</div>
-    <div class="stat-desc">{{ total_mamy_kilo|format_number }} kg</div>
+    <div class="stat-title text-sm">TOTAL GLOBAL</div>
+    <div class="stat-value text-xl text-primary">{{ total_global|fcfa }}</div>
+    <div class="stat-desc text-xs">Montant à verser</div>
   </div>
 
-  <div class="stat bg-base-100 shadow rounded-box">
-    <div class="stat-title">Agents gros</div>
-    <div class="stat-value text-warning">{{ total_gros_general|fcfa }}</div>
-    <div class="stat-desc">{{ total_gros_cartons|format_number }} cartons</div>
-  </div>
-
-  <div class="stat bg-base-100 shadow rounded-box">
-    <div class="stat-title">Superviseurs</div>
-    <div class="stat-value text-success">{{ total_sup_general|fcfa }}</div>
-    <div class="stat-desc">
-      {{ total_sup_kilo_mamies|format_number }} kg supervisés
+  <!-- MAMIES (BLEU) -->
+  <div class="stat bg-base-100 shadow rounded-box border-l-4 border-l-info">
+    <div class="stat-title text-sm flex items-center gap-1">
+      <div class="w-3 h-3 rounded-full bg-info"></div>
+      <span>Mamies</span>
     </div>
+    <div class="stat-value text-xl text-info">{{ total_mamy_general|fcfa }}</div>
+    <div class="stat-desc text-xs">{{ effectif_mamy }} agents · {{ total_mamy_kilo|format_number }} kg</div>
+  </div>
+
+  <!-- AGENTS GROS (ORANGE) -->
+  <div class="stat bg-base-100 shadow rounded-box border-l-4 border-l-warning">
+    <div class="stat-title text-sm flex items-center gap-1">
+      <div class="w-3 h-3 rounded-full bg-warning"></div>
+      <span>Agents gros</span>
+    </div>
+    <div class="stat-value text-xl text-warning">{{ total_gros_general|fcfa }}</div>
+    <div class="stat-desc text-xs">{{ effectif_gros }} agents · {{ total_gros_cartons|format_number }} cartons</div>
+  </div>
+
+  <!-- SUPERVISEURS (VERT) -->
+  <div class="stat bg-base-100 shadow rounded-box border-l-4 border-l-success">
+    <div class="stat-title text-sm flex items-center gap-1">
+      <div class="w-3 h-3 rounded-full bg-success"></div>
+      <span>Superviseurs</span>
+    </div>
+    <div class="stat-value text-xl text-success">{{ total_sup_general|fcfa }}</div>
+    <div class="stat-desc text-xs">{{ effectif_superviseur }} agents · {{ total_sup_kilo_mamies|format_number }} kg</div>
   </div>
 
 </div>
 
 <!-- ================= FILTRES ================= -->
-<!-- ================= FILTRE MOIS ================= -->
-<form method="get" class="flex gap-4 items-end bg-base-100 p-4 rounded-box shadow">
-
+<form method="get" class="flex gap-4 items-end bg-base-100 p-4 rounded-box shadow mb-6">
   <div>
     <label class="label text-xs">Mois</label>
     <select name="month" class="select select-sm select-bordered">
@@ -90,269 +106,282 @@
   </button>
 </form>
 
-
-<!-- ================= MAMIES ================= -->
-<div class="card bg-base-100 shadow">
-<div class="card-body">
-<div class="border border-gray-200 rounded-md p-3 mb-4 text-sm text-gray-700 bg-white">
-  <h3 class="font-semibold mb-2 text-gray-900">
-    Mode de calcul – Agents Mamies
-  </h3>
-
-  <ul class="list-disc list-inside space-y-1">
-    <li>
-      <strong>Salaire de base :</strong>
-      montant mensuel fixe
-      (ex. <span class="font-mono">20 000 FCFA</span>)
-    </li>
-    <li>
-      <strong>Proratisation :</strong>
-      si l’agent n’a pas travaillé tout le mois,
-      le salaire de base est calculé au prorata
-      des <strong>jours réellement travaillés</strong>
-    </li>
-    <li>
-      <strong>Incentive :</strong>
-      kilogrammes vendus ×
-      <span class="font-mono">incentive / kg</span>
-    </li>
-    <li>
-      <strong>Formule :</strong>
-      <span class="font-mono">
-        Salaire = Base (proratisée si besoin) + Incentive
-      </span>
-    </li>
-  </ul>
-
-  <p class="mt-2 text-xs text-gray-500">
-    ⚠️ Les agents récents sont inclus avec un salaire proportionnel à leur activité réelle.
-  </p>
-</div>
-
-<table class="table table-sm table-zebra">
-<thead>
-<tr>
-  <th>Agent</th>
-  <th>Superviseur</th>
-  <th class="text-right">Kg</th>
-  <th class="text-right">Base</th>
-  <th class="text-right">Incentive</th>
-  <th class="text-right">Total</th>
-</tr>
-</thead>
-
-<tbody>
-{% for s in salaires_mamy %}
-<tr>
-  <td>
-    {{ s.agent.full_name }}
-
-    {% if s.jours_travailles and s.jours_mois and s.jours_travailles < s.jours_mois %}
-      <div class="text-xs text-primary">
-        Proratisé ({{ s.jours_travailles }}/{{ s.jours_mois }} jours)
+<!-- ================= SECTION MAMIES (BLEU) ================= -->
+<div class="card bg-base-100 shadow border-t-4 border-t-info">
+  <div class="card-body p-4">
+    <!-- TITRE AVEC EFFECTIF ET BADGE DE COULEUR -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-4 h-4 rounded-full bg-info"></div>
+        <h2 class="text-lg font-semibold">Agents Mamies</h2>
+        <span class="badge badge-info badge-outline">{{ effectif_mamy }} agents</span>
       </div>
-    {% endif %}
-  </td>
+      <div class="text-lg font-bold text-info">
+        {{ total_mamy_general|fcfa }}
+      </div>
+    </div>
 
-  <td>{{ s.superviseur.full_name }}</td>
-
-  <td class="text-right">
-    {{ s.kilo_total|format_number }}
-  </td>
-
-  <td class="text-right">
-    {{ s.salaire_base|fcfa }}
-  </td>
-
-  <td class="text-right">
-    {{ s.incentive|fcfa }}
-  </td>
-
-  <td class="text-right font-bold text-primary">
-    {{ s.salaire_total|fcfa }}
-  </td>
-</tr>
-{% empty %}
-<tr>
-  <td colspan="6" class="text-center text-gray-400">
-    Aucune donnée
-  </td>
-</tr>
-{% endfor %}
-</tbody>
-
-<tfoot>
-<tr class="font-bold bg-base-200">
-  <td colspan="2" class="text-right">TOTAL</td>
-  <td class="text-right">{{ total_mamy_kilo|format_number }}</td>
-  <td class="text-right">{{ total_mamy_salaire_base|fcfa }}</td>
-  <td class="text-right">{{ total_mamy_incentive|fcfa }}</td>
-  <td class="text-right text-primary">{{ total_mamy_general|fcfa }}</td>
-</tr>
-</tfoot>
-</table>
-
-
-
-</div>
-</div>
-
-<!-- ================= AGENTS GROS ================= -->
-<div class="card bg-base-100 shadow">
-<div class="card-body">
-<h2 class="text-lg font-semibold mb-2">Agents gros</h2>
-<div class="border border-gray-200 rounded-md p-3 mb-4 text-sm text-gray-700 bg-white">
-  <div>
-    <h3 class="font-semibold mb-1">Mode de calcul – Agents gros</h3>
-    <ul class="list-disc list-inside space-y-1">
-      <li>
-        <strong>Base :</strong> aucun salaire fixe
-      </li>
-      <li>
-        <strong>Calcul selon cartons vendus :</strong>
-        <ul class="list-disc list-inside ml-4">
-          <li>
-            &lt; 150 cartons → 
-            <span class="font-mono">cartons × incentive par carton</span>
-          </li>
-          <li>
-            150 à 199 cartons → 
-            <span class="font-mono">50 000 FCFA</span>
-          </li>
-          <li>
-            ≥ 200 cartons → 
-            <span class="font-mono">90 000 FCFA</span>
-          </li>
-        </ul>
-      </li>
-      <li>
-        <strong>Salaire total :</strong>
-        montant calculé selon le palier atteint
-      </li>
-    </ul>
-  </div>
-</div>
-
-
-<table class="table table-sm table-zebra">
-<thead>
-<tr>
-  <th>Agent</th>
-  <th class="text-right">Cartons</th>
-  <th class="text-right">Incentive</th>
-  <th class="text-right">Total</th>
-</tr>
-</thead>
-<tbody>
-{% for s in salaires_gros %}
-<tr>
-  <td>{{ s.agent.full_name }}</td>
-  <td class="text-right">{{ s.cartons_total|format_number }}</td>
-  <td class="text-right">{{ s.incentive|fcfa }}</td>
-  <td class="text-right font-bold text-primary">{{ s.salaire_total|fcfa }}</td>
-</tr>
-{% empty %}
-<tr><td colspan="4" class="text-center text-gray-400">Aucune donnée</td></tr>
-{% endfor %}
-</tbody>
-<tfoot>
-<tr class="font-bold bg-base-200">
-  <td class="text-right">TOTAL</td>
-  <td class="text-right">{{ total_gros_cartons|format_number }}</td>
-  <td class="text-right">{{ total_gros_incentive|format_number }}</td>
- 
-  <td colspan="2" class="text-right text-primary">{{ total_gros_general|fcfa }}</td>
-</tr>
-</tfoot>
-</table>
-</div>
-</div>
-
-<!-- ================= SUPERVISEURS ================= -->
-<div class="card bg-base-100 shadow">
-<div class="card-body">
-<h2 class="text-lg font-semibold mb-2">Superviseurs</h2>
-<div class="border border-gray-200 rounded-md p-3 mb-4 text-sm text-gray-700 bg-white">
-  <div>
-    <h3 class="font-semibold mb-1">Mode de calcul – Superviseurs</h3>
-    <ul class="list-disc list-inside space-y-1">
-      <li>
-        <strong>Salaire de base :</strong>
-        salaire fixe mensuel (ex. <span class="font-mono">50 000 FCFA</span>)
-      </li>
-      <li>
-        <strong>Dotation de fonction :</strong>
-        montant fixe lié au poste
-      </li>
-      <li>
-        <strong>Bonus :</strong>
-        basé sur le <strong>volume total (kg) produit par les mamies supervisées</strong>
-      </li>
-      <li>
-        <strong>Paliers de bonus :</strong>
-        <ul class="list-disc list-inside ml-4">
-          <li>&lt; 37 500 kg → 0 %</li>
-          <li>37 500 à 44 999 kg → 3 %</li>
-          <li>45 000 à 59 999 kg → 6 %</li>
-          <li>≥ 60 000 kg → 8 %</li>
-        </ul>
-      </li>
-      <li>
-        <strong>Formule :</strong>
-        <span class="font-mono">
-          Salaire total = Base + Dotation + (Kg supervisés × Taux)
+    <!-- LEGENDE DE CALCUL -->
+    <details class="collapse collapse-arrow border border-gray-200 mb-4">
+      <summary class="collapse-title text-sm font-medium px-4 py-3">
+        <span class="flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Mode de calcul – Agents Mamies
         </span>
-      </li>
-    </ul>
+      </summary>
+      <div class="collapse-content px-4 pb-3 pt-0">
+        <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
+          <li><strong>Salaire de base :</strong> montant mensuel fixe</li>
+          <li><strong>Proratisation :</strong> si l'agent n'a pas travaillé tout le mois, le salaire est calculé au prorata des jours réellement travaillés</li>
+          <li><strong>Incentive :</strong> kilogrammes vendus × incentive par kg</li>
+          <li><strong>Formule :</strong> Salaire = Base (proratisée si besoin) + Incentive</li>
+        </ul>
+        <p class="mt-2 text-xs text-gray-500">
+          ⚠️ Les agents récents sont inclus avec un salaire proportionnel à leur activité réelle.
+        </p>
+      </div>
+    </details>
+
+    <!-- TABLEAU -->
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr class="bg-info/10">
+            <th>Agent</th>
+            <th>Superviseur</th>
+            <th class="text-right">Kg</th>
+            <th class="text-right">Base</th>
+            <th class="text-right">Incentive</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in salaires_mamy %}
+          <tr class="hover">
+            <td>
+              <div class="font-medium">{{ s.agent.full_name }}</div>
+              {% if s.jours_travailles and s.jours_mois and s.jours_travailles < s.jours_mois %}
+                <div class="text-xs text-info">
+                  Proratisé ({{ s.jours_travailles }}/{{ s.jours_mois }} jours)
+                </div>
+              {% endif %}
+            </td>
+            <td class="text-gray-600">{{ s.superviseur.full_name }}</td>
+            <td class="text-right font-mono">{{ s.kilo_total|format_number }}</td>
+            <td class="text-right font-mono">{{ s.salaire_base|fcfa }}</td>
+            <td class="text-right font-mono">{{ s.incentive|fcfa }}</td>
+            <td class="text-right font-bold text-info">{{ s.salaire_total|fcfa }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-gray-400 py-4">
+              Aucune donnée pour cette période
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bg-base-200 font-bold">
+            <td colspan="2" class="text-right">TOTAL</td>
+            <td class="text-right text-info">{{ total_mamy_kilo|format_number }}</td>
+            <td class="text-right">{{ total_mamy_salaire_base|fcfa }}</td>
+            <td class="text-right">{{ total_mamy_incentive|fcfa }}</td>
+            <td class="text-right text-info text-lg">{{ total_mamy_general|fcfa }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
 </div>
 
-<table class="table table-sm table-zebra">
-<thead>
-<tr>
-  <th>Superviseur</th>
-  <th class="text-right">Kg mamies</th>
-  <th class="text-right">Base</th>
-  <th class="text-right">Dotation</th>
-  <th class="text-right">Bonus</th>
-  <th class="text-right">Total</th>
-</tr>
-</thead>
-<tbody>
-{% for s in salaires_superviseur %}
-<tr>
-  <td>{{ s.agent.full_name }}</td>
-  <td class="text-right">{{ s.kilo_total_mamies|format_number }}</td>
-  <td class="text-right">{{ s.salaire_base|fcfa }}</td>
-  <td class="text-right">{{ s.dotation|fcfa }}</td>
-  <td class="text-right">{{ s.bonus|fcfa }}</td>
-  <td class="text-right font-bold text-primary">{{ s.salaire_total|fcfa }}</td>
-</tr>
-{% empty %}
-<tr><td colspan="6" class="text-center text-gray-400">Aucune donnée</td></tr>
-{% endfor %}
-</tbody>
-<tfoot>
-<tr class="font-bold bg-base-200">
-  <td class="text-right">TOTAL</td>
-  <td class="text-right">{{ total_sup_kilo_mamies|format_number }}</td>
-  <td class="text-right">{{ total_sup_salaire_base|fcfa }}</td>
-  <td class="text-right">{{ total_sup_dotation|fcfa }}</td>
-  <td class="text-right">{{ total_sup_bonus|fcfa }}</td>
-  <td class="text-right text-primary">{{ total_sup_general|fcfa }}</td>
-</tr>
-</tfoot>
-</table>
+<!-- ================= SECTION AGENTS GROS (ORANGE) ================= -->
+<div class="card bg-base-100 shadow border-t-4 border-t-warning">
+  <div class="card-body p-4">
+    <!-- TITRE AVEC EFFECTIF ET BADGE DE COULEUR -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-4 h-4 rounded-full bg-warning"></div>
+        <h2 class="text-lg font-semibold">Agents Gros</h2>
+        <span class="badge badge-warning badge-outline">{{ effectif_gros }} agents</span>
+      </div>
+      <div class="text-lg font-bold text-warning">
+        {{ total_gros_general|fcfa }}
+      </div>
+    </div>
+
+    <!-- LEGENDE DE CALCUL -->
+    <details class="collapse collapse-arrow border border-gray-200 mb-4">
+      <summary class="collapse-title text-sm font-medium px-4 py-3">
+        <span class="flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Mode de calcul – Agents Gros
+        </span>
+      </summary>
+      <div class="collapse-content px-4 pb-3 pt-0">
+        <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
+          <li><strong>Base :</strong> aucun salaire fixe</li>
+          <li><strong>Calcul selon paliers :</strong>
+            <ul class="list-disc list-inside ml-4 mt-1">
+              <li>&lt; 150 cartons → cartons × incentive par carton</li>
+              <li>150 à 199 cartons → 50 000 FCFA</li>
+              <li>≥ 200 cartons → 90 000 FCFA</li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- TABLEAU -->
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr class="bg-warning/10">
+            <th>Agent</th>
+            <th class="text-right">Cartons</th>
+            <th class="text-right">Palier</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in salaires_gros %}
+          <tr class="hover">
+            <td class="font-medium">{{ s.agent.full_name }}</td>
+            <td class="text-right font-mono">{{ s.cartons_total|format_number }}</td>
+            <td class="text-right font-mono">
+              {% if s.cartons_total < 150 %}
+                {{ s.incentive|fcfa }}
+              {% elif s.cartons_total < 200 %}
+                50 000 FCFA
+              {% else %}
+                90 000 FCFA
+              {% endif %}
+            </td>
+            <td class="text-right font-bold text-warning">{{ s.salaire_total|fcfa }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="text-center text-gray-400 py-4">
+              Aucune donnée pour cette période
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bg-base-200 font-bold">
+            <td class="text-right">TOTAL</td>
+            <td class="text-right text-warning">{{ total_gros_cartons|format_number }}</td>
+            <td class="text-right">{{ total_gros_incentive|fcfa }}</td>
+            <td class="text-right text-warning text-lg">{{ total_gros_general|fcfa }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
 </div>
+
+<!-- ================= SECTION SUPERVISEURS (VERT) ================= -->
+<div class="card bg-base-100 shadow border-t-4 border-t-success">
+  <div class="card-body p-4">
+    <!-- TITRE AVEC EFFECTIF ET BADGE DE COULEUR -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-4 h-4 rounded-full bg-success"></div>
+        <h2 class="text-lg font-semibold">Superviseurs</h2>
+        <span class="badge badge-success badge-outline">{{ effectif_superviseur }} agents</span>
+      </div>
+      <div class="text-lg font-bold text-success">
+        {{ total_sup_general|fcfa }}
+      </div>
+    </div>
+
+    <!-- LEGENDE DE CALCUL -->
+    <details class="collapse collapse-arrow border border-gray-200 mb-4">
+      <summary class="collapse-title text-sm font-medium px-4 py-3">
+        <span class="flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Mode de calcul – Superviseurs
+        </span>
+      </summary>
+      <div class="collapse-content px-4 pb-3 pt-0">
+        <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
+          <li><strong>Salaire de base :</strong> fixe mensuel</li>
+          <li><strong>Dotation de fonction :</strong> montant fixe lié au poste</li>
+          <li><strong>Bonus :</strong> basé sur le volume total (kg) des mamies supervisées</li>
+          <li><strong>Paliers de bonus :</strong>
+            <ul class="list-disc list-inside ml-4 mt-1">
+              <li>&lt; 37 500 kg → 0 %</li>
+              <li>37 500 à 44 999 kg → 3 %</li>
+              <li>45 000 à 59 999 kg → 6 %</li>
+              <li>≥ 60 000 kg → 8 %</li>
+            </ul>
+          </li>
+          <li><strong>Formule :</strong> Salaire = Base + Dotation + (Kg supervisés × Taux)</li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- TABLEAU -->
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr class="bg-success/10">
+            <th>Superviseur</th>
+            <th class="text-right">Kg mamies</th>
+            <th class="text-right">Base</th>
+            <th class="text-right">Dotation</th>
+            <th class="text-right">Bonus</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in salaires_superviseur %}
+          <tr class="hover">
+            <td class="font-medium">{{ s.agent.full_name }}</td>
+            <td class="text-right font-mono">{{ s.kilo_total_mamies|format_number }}</td>
+            <td class="text-right font-mono">{{ s.salaire_base|fcfa }}</td>
+            <td class="text-right font-mono">{{ s.dotation|fcfa }}</td>
+            <td class="text-right font-mono">{{ s.bonus|fcfa }}</td>
+            <td class="text-right font-bold text-success">{{ s.salaire_total|fcfa }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-gray-400 py-4">
+              Aucune donnée pour cette période
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bg-base-200 font-bold">
+            <td class="text-right">TOTAL</td>
+            <td class="text-right text-success">{{ total_sup_kilo_mamies|format_number }}</td>
+            <td class="text-right">{{ total_sup_salaire_base|fcfa }}</td>
+            <td class="text-right">{{ total_sup_dotation|fcfa }}</td>
+            <td class="text-right">{{ total_sup_bonus|fcfa }}</td>
+            <td class="text-right text-success text-lg">{{ total_sup_general|fcfa }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
 </div>
 
 </div>
 
-<script>
-const periodeSelect = document.getElementById("periode-select");
-const customDates = document.getElementById("custom-dates");
-periodeSelect?.addEventListener("change", e => {
-  customDates.classList.toggle("hidden", e.target.value !== "custom");
-});
-</script>
+<!-- POUR LES DETAILS/SUMMARY -->
+<style>
+details summary::-webkit-details-marker {
+  display: none;
+}
+details summary {
+  list-style: none;
+}
+</style>
+
 {% endblock %}
