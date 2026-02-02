@@ -180,87 +180,105 @@
 
    </div>
     <!-- Situation financière des superviseurs -->
-    <div class="card bg-base-100 shadow-xl mt-8">
-        <div class="card-body">
-            <h2 class="card-title mb-4">
-                <i class="fas fa-user-shield text-primary"></i>
-                Situation financière des superviseurs (mois en cours)
-            </h2>
+<!-- Situation financière des superviseurs -->
+<div class="card bg-base-100 shadow-xl mt-8">
+    <div class="card-body">
+        <h2 class="card-title mb-4">
+            <i class="fas fa-user-shield text-primary"></i>
+            Situation financière des superviseurs (trimestre en cours)
+        </h2>
 
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>Superviseur</th>
-                            <th>Ventes personnelles</th>
-                            <th>Recouvrements agents</th>
-                            <th>Solde détenu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in superviseurs_finance %}
-                        <tr>
-                            <td class="font-semibold">{{ row.superviseur.full_name }}</td>
-                            <td>{{ row.ventes_personnelles|fcfa }}</td>
-                            <td>{{ row.recouvrements_agents|fcfa }}</td>
-                            <td class="font-bold text-warning">
-                                {{ row.solde_mois|fcfa }}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center text-gray-500">
-                                Aucun superviseur actif
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>Superviseur</th>
+                        <th>Ventes personnelles</th>
+                        <th>Recouvrements agents</th>
+                        <th>Solde détenu</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in superviseurs_finance %}
+                    <tr>
+                        <td class="font-semibold">
+                            {{ row.superviseur.full_name }}
+                        </td>
+                        <td>
+                            {{ row.ventes_personnelles_trimestre|fcfa }}
+                        </td>
+                        <td>
+                            {{ row.recouvrements_agents_trimestre|fcfa }}
+                        </td>
+                        <td class="font-bold text-warning">
+                            {{ row.solde_trimestre|fcfa }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-gray-500">
+                            Aucun superviseur actif
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
+
     <!-- Situation financière ROT -->
-    <div class="card bg-base-100 shadow-xl mt-8">
-        <div class="card-body">
-            <h2 class="card-title mb-4">
-                <i class="fas fa-coins text-error"></i>
-                Responsable Opérationel Trésorerie – ROT (mois en cours)
-            </h2>
+<!-- Situation financière ROT -->
+<div class="card bg-base-100 shadow-xl mt-8">
+    <div class="card-body">
+        <h2 class="card-title mb-4">
+            <i class="fas fa-coins text-error"></i>
+            Responsable Opérationnel Trésorerie – ROT (trimestre en cours)
+        </h2>
 
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>ROT</th>
-                            <th>Reçu des superviseurs</th>
-                            <th>Versé en banque</th>
-                            <th>Dépenses</th>
-                            <th>Solde</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in rots_finance %}
-                        <tr>
-                            <td class="font-semibold">{{ row.rot.full_name }}</td>
-                            <td>{{ row.recupere|fcfa }}</td>
-                            <td>{{ row.verse|fcfa }}</td>
-                            <td>{{ row.depenses|fcfa }}</td>
-                            <td class="font-bold text-success">
-                                {{ row.solde_mois|fcfa }}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-gray-500">
-                                Aucun ROT actif
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>ROT</th>
+                        <th>Reçu des superviseurs</th>
+                        <th>Versé en banque</th>
+                        <th>Dépenses</th>
+                        <th>Solde</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rots_finance %}
+                    <tr>
+                        <td class="font-semibold">
+                            {{ row.rot.full_name }}
+                        </td>
+                        <td>
+                            {{ row.recupere_trimestre|fcfa }}
+                        </td>
+                        <td>
+                            {{ row.verse_trimestre|fcfa }}
+                        </td>
+                        <td>
+                            {{ row.depenses_trimestre|fcfa }}
+                        </td>
+                        <td class="font-bold text-success">
+                            {{ row.solde_trimestre|fcfa }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-gray-500">
+                            Aucun ROT actif
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
+
 
 
 {% endblock %}

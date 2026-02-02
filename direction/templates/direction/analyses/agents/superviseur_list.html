@@ -2,25 +2,26 @@
 {% load humanize %}
 {% load format_fcfa %}
 
-{% block title %}Superviseurs - Situation Financière{% endblock %}
+{% block title %}Superviseurs & ROT – Situation financière actuelle{% endblock %}
 
 {% block content %}
 
 <div class="space-y-8">
 
-    <!-- Header -->
-
-
+    <!-- ================= HEADER ================= -->
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold"> Superviseurs & ROT – Situation financière (mois en cours)</h1>
+        <h1 class="text-3xl font-bold">
+            Superviseurs & ROT – Situation financière actuelle
+        </h1>
+
         <div class="flex space-x-2">
-            <a href="{% url 'agent_dashboard' %}" class="btn btn-outline">
+            <a href="{% url 'agent_dashboard' %}" class="btn btn-outline btn-sm">
                 <i class="fas fa-arrow-left"></i>
                 Retour
             </a>
-            <a href="{% url 'agent_terrain_list' %}" class="btn btn-secondary">
+            <a href="{% url 'agent_terrain_list' %}" class="btn btn-secondary btn-sm">
                 <i class="fas fa-user-tie"></i>
-                Agents Terrain
+                Agents terrain
             </a>
         </div>
     </div>
@@ -30,7 +31,7 @@
         <div class="card-body">
             <h2 class="card-title mb-4">
                 <i class="fas fa-user-shield text-primary"></i>
-                Superviseurs – Situation mensuelle
+                Superviseurs – Situation financière actuelle
             </h2>
 
             <div class="overflow-x-auto">
@@ -38,57 +39,72 @@
                     <thead>
                         <tr>
                             <th>Superviseur</th>
-                            <th class="text-right">Ventes perso</th>
-                            <th class="text-right">Montant Recouvré</th>
-                            <th class="text-right">Montant avec agents</th>
+                            <th class="text-right">Ventes perso (post-clôture)</th>
+                            <th class="text-right">Montant recouvré</th>
+                            <th class="text-right">Montant chez agents</th>
                             <th class="text-right">Remis au ROT</th>
                             <th class="text-right">Solde détenu</th>
                             <th></th>
                         </tr>
                     </thead>
-<tbody>
-    {% for s in superviseurs %}
-    <tr>
-        <td class="font-semibold">
-            {{ s.superviseur.full_name }}
-        </td>
 
-        <td class="text-right">
-            {{ s.ventes_perso|fcfa }}
-        </td>
+                    <tbody>
+                    {% for s in superviseurs %}
+                    <tr>
+                        <td class="font-semibold">
+                            {{ s.superviseur.full_name }}
+                            <div class="text-xs text-gray-400">
+                                Période ouverte :
+                                {{ s.periode_debut }} → {{ s.periode_fin }}
+                            </div>
 
-        <td class="text-right text-success">
-            {{ s.recouvre_agents|fcfa }}
-        </td>
+                            {% if s.cloture_reference %}
+                            <div class="text-xs text-gray-500">
+                                Dernière clôture :
+                                {{ s.cloture_reference.date_fin_periode }}
+                            </div>
+                            {% else %}
+                            <div class="text-xs text-warning">
+                                Aucune clôture validée
+                            </div>
+                            {% endif %}
+                        </td>
 
-        <td class="text-right text-warning">
-            {{ s.montant_chez_agents|fcfa }}
-        </td>
+                        <td class="text-right">
+                            {{ s.ventes_perso|fcfa }}
+                        </td>
 
-        <td class="text-right text-info">
-            {{ s.remis_rot|fcfa }}
-        </td>
+                        <td class="text-right text-success">
+                            {{ s.recouvre_agents|fcfa }}
+                        </td>
 
-        <td class="text-right font-bold {% if s.solde_superviseur < 0 %}text-error{% endif %}">
-            {{ s.solde_superviseur|fcfa }}
-        </td>
+                        <td class="text-right text-warning">
+                            {{ s.montant_chez_agents|fcfa }}
+                        </td>
 
-        <td class="text-right">
-            <a href="{% url 'direction_superviseur_detail' s.superviseur.id %}"
-               class="btn btn-xs btn-outline">
-                Détail
-            </a>
-        </td>
-    </tr>
-    {% empty %}
-    <tr>
-        <td colspan="7" class="text-center text-gray-400 py-4">
-            Aucun superviseur actif ce mois
-        </td>
-    </tr>
-    {% endfor %}
-</tbody>
+                        <td class="text-right text-info">
+                            {{ s.remis_rot|fcfa }}
+                        </td>
 
+                        <td class="text-right font-bold {% if s.solde_superviseur < 0 %}text-error{% endif %}">
+                            {{ s.solde_superviseur|fcfa }}
+                        </td>
+
+                        <td class="text-right">
+                            <a href="{% url 'direction_superviseur_detail' s.superviseur.id %}"
+                               class="btn btn-xs btn-outline">
+                                Détail
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-gray-400 py-4">
+                            Aucun superviseur actif
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -99,7 +115,7 @@
         <div class="card-body">
             <h2 class="card-title mb-4">
                 <i class="fas fa-coins text-warning"></i>
-                ROT – Situation mensuelle
+                ROT – Situation financière actuelle
             </h2>
 
             <div class="overflow-x-auto">
@@ -111,34 +127,47 @@
                             <th class="text-right">Versé banque</th>
                             <th class="text-right">Dépenses</th>
                             <th class="text-right">Solde ROT</th>
-
                             <th></th>
                         </tr>
                     </thead>
+
                     <tbody>
-                        {% for r in rots %}
-                        <tr>
-                            <td class="font-semibold">{{ r.rot.full_name }}</td>
-                            <td class="text-right text-success">{{ r.recouvre|fcfa }}</td>
-                            <td class="text-right text-info">{{ r.verse_banque|fcfa }}</td>
-                            <td class="text-right text-error">{{ r.depenses|fcfa }}</td>
-                            <td class="text-right font-bold {% if r.solde < 0 %}text-error{% endif %}">
-                                {{ r.solde|fcfa }}
-                            </td>
-                            <td class="text-right">
-                                <a href="{% url 'direction_rot_detail' r.rot.id %}"
-                                   class="btn btn-xs btn-outline">
-                                    Détail
-                                </a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-gray-400 py-4">
-                                Aucun ROT actif ce mois
-                            </td>
-                        </tr>
-                        {% endfor %}
+                    {% for r in rots %}
+                    <tr>
+                        <td class="font-semibold">
+                            {{ r.rot.full_name }}
+                        </td>
+
+                        <td class="text-right text-success">
+                            {{ r.recouvre|fcfa }}
+                        </td>
+
+                        <td class="text-right text-info">
+                            {{ r.verse_banque|fcfa }}
+                        </td>
+
+                        <td class="text-right text-error">
+                            {{ r.depenses|fcfa }}
+                        </td>
+
+                        <td class="text-right font-bold {% if r.solde < 0 %}text-error{% endif %}">
+                            {{ r.solde|fcfa }}
+                        </td>
+
+                        <td class="text-right">
+                            <a href="{% url 'direction_rot_detail' r.rot.id %}"
+                               class="btn btn-xs btn-outline">
+                                Détail
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-400 py-4">
+                            Aucun ROT actif
+                        </td>
+                    </tr>
+                    {% endfor %}
                     </tbody>
                 </table>
             </div>

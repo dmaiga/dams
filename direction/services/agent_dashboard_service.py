@@ -50,7 +50,24 @@ class DashboardAgentAnalysisService:
         now = timezone.now()
         debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         return debut, now
-    
+
+    @staticmethod
+    def get_trimestre_courant_range():
+        now = timezone.now()
+        trimestre = (now.month - 1) // 3 + 1
+        debut_mois = (trimestre - 1) * 3 + 1
+
+        debut = now.replace(
+            month=debut_mois,
+            day=1,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0
+        )
+
+        return debut, now
+
     @staticmethod
     def get_agent_kpis():
         """KPI globaux agents (excluts direction)"""
@@ -238,11 +255,11 @@ class DashboardAgentAnalysisService:
 
     @staticmethod
     def get_superviseurs_finance():
-        debut, fin = DashboardAgentAnalysisService.get_mois_courant_range()
+        debut, fin = DashboardAgentAnalysisService.get_trimestre_courant_range()
 
         superviseurs = Agent.objects.filter(type_agent='entrepot', est_actif=True)
-
         data = []
+
         for sup in superviseurs:
 
             ventes_perso = Vente.objects.filter(
@@ -253,7 +270,7 @@ class DashboardAgentAnalysisService:
             ).aggregate(
                 total=Coalesce(
                     Sum(F("quantite") * F("prix_vente_unitaire")),
-                    Decimal("0")
+                    Decimal("0.00")
                 )
             )["total"]
 
@@ -262,24 +279,24 @@ class DashboardAgentAnalysisService:
                 date_recouvrement__gte=debut,
                 date_recouvrement__lte=fin
             ).aggregate(
-                total=Coalesce(Sum("montant_recouvre"), Decimal("0"))
+                total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
             )["total"]
-            
-            remis_rot = RecouvrementSuperviseur.objects.filter(
-                        superviseur=sup,
-                        date_recouvrement__date__range=(debut, fin)
-                    ).aggregate(
-                        total=Coalesce(Sum("montant"), Decimal("0.00"))
-                    )["total"]
 
+            remis_rot = RecouvrementSuperviseur.objects.filter(
+                superviseur=sup,
+                date_recouvrement__gte=debut,
+                date_recouvrement__lte=fin
+            ).aggregate(
+                total=Coalesce(Sum("montant"), Decimal("0.00"))
+            )["total"]
 
             solde = (recouvre_agents + ventes_perso) - remis_rot
 
             data.append({
                 "superviseur": sup,
-                "ventes_personnelles": ventes_perso,
-                "recouvrements_agents": recouvre_agents,
-                "solde_mois": solde,
+                "ventes_personnelles_trimestre": ventes_perso,
+                "recouvrements_agents_trimestre": recouvre_agents,
+                "solde_trimestre": solde,
             })
 
         return data
@@ -297,45 +314,43 @@ class DashboardAgentAnalysisService:
     
     @staticmethod
     def get_rot_finance():
-        debut, fin = DashboardAgentAnalysisService.get_mois_courant_range()
+        debut, fin = DashboardAgentAnalysisService.get_trimestre_courant_range()
         rots = Agent.objects.filter(type_agent='rot', est_actif=True)
-
+    
         data = []
         for rot in rots:
+        
             recupere = RecouvrementSuperviseur.objects.filter(
                 rot=rot,
-                date_creation__gte=debut,
-                date_creation__lte=fin
+                date_recouvrement__gte=debut,
+                date_recouvrement__lte=fin
             ).aggregate(
-                total=Coalesce(Sum("montant"), Decimal("0"))
+                total=Coalesce(Sum("montant"), Decimal("0.00"))
             )["total"]
-
+    
             verse = VersementBancaire.objects.filter(
                 effectue_par=rot,
                 date_versement_reelle__gte=debut,
                 date_versement_reelle__lte=fin
             ).aggregate(
-                total=Coalesce(Sum("montant_vente"), Decimal("0"))
+                total=Coalesce(Sum("montant_vente"), Decimal("0.00"))
             )["total"]
-
+    
             depenses = Depense.objects.filter(
                 effectue_par=rot,
                 date_depense__gte=debut,
                 date_depense__lte=fin
             ).aggregate(
-                total=Coalesce(Sum("montant"), Decimal("0"))
+                total=Coalesce(Sum("montant"), Decimal("0.00"))
             )["total"]
-
+    
             data.append({
                 "rot": rot,
-                "recupere": recupere,
-                "verse": verse,
-                "depenses": depenses,
-                "solde_mois": recupere - verse - depenses,
+                "recupere_trimestre": recupere,
+                "verse_trimestre": verse,
+                "depenses_trimestre": depenses,
+                "solde_trimestre": recupere - verse - depenses,
             })
-
+    
         return data
-
-
-
-
+    

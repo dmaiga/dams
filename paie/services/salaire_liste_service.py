@@ -2,10 +2,19 @@ from decimal import Decimal
 from core.models import Agent
 from paie.services.salaire_calculator import CalculatorSalaire
 
+from django.utils import timezone
+from datetime import timedelta
+
+
+
 
 class SalaireListeService:
     """
     Service Direction – Liste des salaires à verser (LECTURE SEULE)
+
+    ⚠️ Les salaires peuvent être proratisés selon l’ancienneté
+    et le nombre réel de jours travaillés dans la période.
+    
     """
 
     @staticmethod
@@ -65,10 +74,16 @@ class SalaireListeService:
                     "agent": agent,
                     "superviseur": agent.superviseur,
                     "kilo_total": calc["kilo_total"],
+
                     "salaire_base": salaire_base,
+                    "salaire_base_theorique": calc.get("salaire_base_theorique"),
+                    "jours_travailles": calc.get("jours_travailles"),
+                    "jours_mois": calc.get("jours_mois"),
+
                     "incentive": incentive,
                     "salaire_total": salaire_total,
                 }
+
 
                 mamies.append(ligne)
 

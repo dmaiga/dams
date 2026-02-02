@@ -117,10 +117,10 @@
 </div>
 
 
-    <!-- ================= SUPERVISEURS ================= -->
+<!-- ================= SUPERVISEURS ================= -->
 <div class="card mb-3">
     <div class="card-header fw-semibold">
-        👥 Superviseurs
+        👥 Superviseurs — Mois en cours
     </div>
 
     <div class="card-body p-2">
@@ -129,20 +129,48 @@
             <strong>{{ s.superviseur.full_name }}</strong>
 
             <div class="row small mt-1">
-                <div class="col-6 text-muted">Stock</div>
-                <div class="col-6 text-end">{{ s.stock_restant }}</div>
+                <!-- Stock -->
+                <div class="col-6 text-muted">Stock restant</div>
+                <div class="col-6 text-end">
+                    {{ s.stock_restant }}
+                </div>
 
-                <div class="col-6 text-muted">Collecté</div>
-                <div class="col-6 text-end">{{ s.recouvre_agents_vente|fcfa }}</div>
+                <!-- Collecté -->
+                <div class="col-6 text-muted">Collecté (agents)</div>
+                <div class="col-6 text-end">
+                    {{ s.recouvre_agents_mois|fcfa }}
+                </div>
 
-                <div class="col-6 text-muted">Remis ROT</div>
-                <div class="col-6 text-end">{{ s.total_remis_rot|fcfa }}</div>
+                <!-- Remis ROT -->
+                <div class="col-6 text-muted">Remis au ROT</div>
+                <div class="col-6 text-end">
+                    {{ s.total_remis_rot_mois|fcfa }}
+                </div>
 
-                <div class="col-6 fw-semibold">À remettre</div>
-                <div class="col-6 text-end fw-bold {% if s.reste_a_remettre > 0 %}text-danger{% endif %}">
-                    {{ s.reste_a_remettre|fcfa }}
+                <!-- À remettre -->
+                <div class="col-6 fw-semibold mt-1">À remettre</div>
+                <div class="col-6 text-end fw-bold mt-1">
+                    {% if s.reste_a_remettre_mois > 0 %}
+                        <span class="text-danger">
+                            {{ s.reste_a_remettre_mois|fcfa }}
+                        </span>
+                        <span class="badge bg-danger ms-1">
+                            À relancer
+                        </span>
+                    {% else %}
+                        <span class="text-success">
+                            0 FCFA
+                        </span>
+                        <span class="badge bg-success ms-1">
+                            OK
+                        </span>
+                    {% endif %}
                 </div>
             </div>
+        </div>
+        {% empty %}
+        <div class="text-muted small text-center py-3">
+            Aucun superviseur actif.
         </div>
         {% endfor %}
     </div>

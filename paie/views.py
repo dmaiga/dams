@@ -13,86 +13,88 @@ from paie.services.salaire_generation_service import SalaireGenerationService
 
 
 
+from calendar import monthrange
+from datetime import date
+from django.utils import timezone
+
+
+from calendar import monthrange
+from datetime import date
+from django.utils import timezone
+
 class SalaireLectureView(LoginRequiredMixin, TemplateView):
     template_name = "paie/salaire_liste.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # ----------------------------
-        # PÉRIODE
-        # ----------------------------
-        periode = self.request.GET.get("periode", "mensuel")
         today = timezone.now().date()
 
-        if periode == "custom":
-            date_debut = self.request.GET.get("date_debut")
-            date_fin = self.request.GET.get("date_fin")
+        # ----------------------------
+        # MOIS / ANNÉE
+        # ----------------------------
+        month = self.request.GET.get("month")
+        year = self.request.GET.get("year")
 
-            if date_debut and date_fin:
-                date_debut = datetime.strptime(date_debut, "%Y-%m-%d").date()
-                date_fin = datetime.strptime(date_fin, "%Y-%m-%d").date()
-            else:
-                date_debut = today.replace(day=1)
-                date_fin = today
+        if month and year:
+            month = int(month)
+            year = int(year)
         else:
-            date_debut = today.replace(day=1)
-            date_fin = today
+            month = today.month
+            year = today.year
+
+        last_day = monthrange(year, month)[1]
+        date_debut = date(year, month, 1)
+        date_fin = date(year, month, last_day)
 
         # ----------------------------
-        # FILTRE TYPE AGENT
-        # ----------------------------
-        current_type_agent = self.request.GET.get("type_agent", "")
-
-        # ----------------------------
-        # SERVICE
+        # SERVICE SALAIRES
         # ----------------------------
         result = SalaireListeService.get_salaires(
             date_debut=date_debut,
             date_fin=date_fin,
-            type_agent_filter=current_type_agent
-        )
-
-        salaires_qs = Salaire.objects.filter(
-            date_debut=date_debut,
-            date_fin=date_fin
-        )
-
-        periode_generee = salaires_qs.exists()
-        periode_validee = (
-            periode_generee and
-            not salaires_qs.filter(valide=False).exists()
         )
 
         # ----------------------------
-        # CONTEXT FINAL
+        # CONTEXTE (ALIGNÉ AU TEMPLATE)
         # ----------------------------
         context.update({
+            # période
+            "date_debut": date_debut,
+            "date_fin": date_fin,
+            "selected_month": month,
+            "selected_year": year,
+            "months": [
+                (1, "Janvier"), (2, "Février"), (3, "Mars"),
+                (4, "Avril"), (5, "Mai"), (6, "Juin"),
+                (7, "Juillet"), (8, "Août"), (9, "Septembre"),
+                (10, "Octobre"), (11, "Novembre"), (12, "Décembre"),
+            ],
+            "years": range(today.year - 3, today.year + 1),
+
+            # 🔴 LISTES (CLÉ DU BUG)
             "salaires_mamy": result["mamies"],
             "salaires_gros": result["gros"],
             "salaires_superviseur": result["superviseurs"],
-        
-            # 👩‍🌾 Mamies
+
+            # 🟢 TOTAUX
             "total_mamy_kilo": result["total_mamy_kilo"],
             "total_mamy_salaire_base": result["total_mamy_salaire_base"],
             "total_mamy_incentive": result["total_mamy_incentive"],
             "total_mamy_general": result["total_mamy_general"],
-        
-            # 📦 Agents gros
+
             "total_gros_cartons": result["total_gros_cartons"],
             "total_gros_incentive": result["total_gros_incentive"],
             "total_gros_general": result["total_gros_general"],
-        
-            # 🏢 Superviseurs
+
             "total_sup_kilo_mamies": result["total_sup_kilo_mamies"],
             "total_sup_salaire_base": result["total_sup_salaire_base"],
             "total_sup_dotation": result["total_sup_dotation"],
             "total_sup_bonus": result["total_sup_bonus"],
             "total_sup_general": result["total_sup_general"],
-        
+
             "total_global": result["total_global"],
         })
-        
 
         return context
 

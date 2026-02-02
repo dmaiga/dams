@@ -195,14 +195,21 @@ class AgentDashboardView(LoginRequiredMixin, TemplateView):
         return context
 
 
+
 class SuperviseurListView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/agents/superviseur_list.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        context["superviseurs"] = SuperviseurAnalysisService.get_superviseurs_finance_mensuel()
-        context["rots"] = SuperviseurAnalysisService.get_rots_finance_mensuel()
+        # 📊 Situation financière ACTUELLE (post-clôture)
+        context["superviseurs"] = (
+            SuperviseurAnalysisService.get_superviseurs_finance()
+        )
+
+        context["rots"] = (
+            SuperviseurAnalysisService.get_rots_finance()
+        )
 
         return context
 

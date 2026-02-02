@@ -34,14 +34,20 @@
     <!-- =========================
          FILTRE PÉRIODE
     ========================== -->
-<form method="get" class="flex flex-wrap items-end gap-3 bg-base-100 p-4 rounded-box shadow-sm">
+<!-- =========================
+     FILTRE PÉRIODE
+========================== -->
+<form method="get"
+      class="flex flex-wrap items-end gap-3 bg-base-100 p-4 rounded-box shadow-sm">
 
   <!-- Sélecteur période -->
   <div>
     <label class="label">
       <span class="label-text text-xs">Période</span>
     </label>
-    <select name="periode" class="select select-sm select-bordered">
+    <select name="periode"
+            class="select select-sm select-bordered"
+            onchange="this.form.submit()">
       <option value="mois" {% if periode == "mois" %}selected{% endif %}>
         Mois courant
       </option>
@@ -54,6 +60,7 @@
     </select>
   </div>
 
+  {% if periode == "custom" %}
   <!-- Date début -->
   <div>
     <label class="label">
@@ -64,6 +71,7 @@
       name="date_debut"
       value="{{ date_debut|date:'Y-m-d' }}"
       class="input input-sm input-bordered"
+      required
     />
   </div>
 
@@ -77,17 +85,20 @@
       name="date_fin"
       value="{{ date_fin|date:'Y-m-d' }}"
       class="input input-sm input-bordered"
+      required
     />
   </div>
 
-  <!-- Bouton -->
+  <!-- Bouton appliquer -->
   <div>
     <button type="submit" class="btn btn-sm btn-primary">
       Appliquer
     </button>
   </div>
+  {% endif %}
 
 </form>
+
 
   <!-- =========================
        KPIs

@@ -58,24 +58,38 @@
 </div>
 
 <!-- ================= FILTRES ================= -->
+<!-- ================= FILTRE MOIS ================= -->
 <form method="get" class="flex gap-4 items-end bg-base-100 p-4 rounded-box shadow">
+
   <div>
-    <label class="label text-xs">Période</label>
-    <select name="periode" id="periode-select" class="select select-sm select-bordered">
-      <option value="mensuel" {% if periode == "mensuel" %}selected{% endif %}>Mensuel</option>
-      <option value="custom" {% if periode == "custom" %}selected{% endif %}>Personnalisée</option>
+    <label class="label text-xs">Mois</label>
+    <select name="month" class="select select-sm select-bordered">
+      {% for m, label in months %}
+        <option value="{{ m }}"
+          {% if selected_month == m %}selected{% endif %}>
+          {{ label }}
+        </option>
+      {% endfor %}
     </select>
   </div>
 
-  <div id="custom-dates" class="flex gap-2 {% if periode != 'custom' %}hidden{% endif %}">
-    <input type="date" name="date_debut" value="{{ date_debut|date:'Y-m-d' }}"
-           class="input input-sm input-bordered">
-    <input type="date" name="date_fin" value="{{ date_fin|date:'Y-m-d' }}"
-           class="input input-sm input-bordered">
+  <div>
+    <label class="label text-xs">Année</label>
+    <select name="year" class="select select-sm select-bordered">
+      {% for y in years %}
+        <option value="{{ y }}"
+          {% if selected_year == y %}selected{% endif %}>
+          {{ y }}
+        </option>
+      {% endfor %}
+    </select>
   </div>
 
-  <button class="btn btn-sm btn-primary">Appliquer</button>
+  <button class="btn btn-sm btn-primary">
+    Appliquer
+  </button>
 </form>
+
 
 <!-- ================= MAMIES ================= -->
 <div class="card bg-base-100 shadow">
@@ -88,23 +102,32 @@
   <ul class="list-disc list-inside space-y-1">
     <li>
       <strong>Salaire de base :</strong>
-      salaire fixe mensuel (ex. <span class="font-mono">20 000 FCFA</span>)
+      montant mensuel fixe
+      (ex. <span class="font-mono">20 000 FCFA</span>)
+    </li>
+    <li>
+      <strong>Proratisation :</strong>
+      si l’agent n’a pas travaillé tout le mois,
+      le salaire de base est calculé au prorata
+      des <strong>jours réellement travaillés</strong>
     </li>
     <li>
       <strong>Incentive :</strong>
-      total des kilogrammes vendus ×
-      <span class="font-mono">incentive par kg</span>
-      (ex. <span class="font-mono">25 FCFA / kg</span>)
+      kilogrammes vendus ×
+      <span class="font-mono">incentive / kg</span>
     </li>
     <li>
       <strong>Formule :</strong>
       <span class="font-mono">
-        Salaire total = Salaire de base + (Kg vendus × Incentive/kg)
+        Salaire = Base (proratisée si besoin) + Incentive
       </span>
     </li>
   </ul>
-</div>
 
+  <p class="mt-2 text-xs text-gray-500">
+    ⚠️ Les agents récents sont inclus avec un salaire proportionnel à leur activité réelle.
+  </p>
+</div>
 
 <table class="table table-sm table-zebra">
 <thead>
@@ -117,20 +140,47 @@
   <th class="text-right">Total</th>
 </tr>
 </thead>
+
 <tbody>
 {% for s in salaires_mamy %}
 <tr>
-  <td>{{ s.agent.full_name }}</td>
+  <td>
+    {{ s.agent.full_name }}
+
+    {% if s.jours_travailles and s.jours_mois and s.jours_travailles < s.jours_mois %}
+      <div class="text-xs text-primary">
+        Proratisé ({{ s.jours_travailles }}/{{ s.jours_mois }} jours)
+      </div>
+    {% endif %}
+  </td>
+
   <td>{{ s.superviseur.full_name }}</td>
-  <td class="text-right">{{ s.kilo_total|format_number }}</td>
-  <td class="text-right">{{ s.salaire_base|fcfa }}</td>
-  <td class="text-right">{{ s.incentive|fcfa }}</td>
-  <td class="text-right font-bold text-primary">{{ s.salaire_total|fcfa }}</td>
+
+  <td class="text-right">
+    {{ s.kilo_total|format_number }}
+  </td>
+
+  <td class="text-right">
+    {{ s.salaire_base|fcfa }}
+  </td>
+
+  <td class="text-right">
+    {{ s.incentive|fcfa }}
+  </td>
+
+  <td class="text-right font-bold text-primary">
+    {{ s.salaire_total|fcfa }}
+  </td>
 </tr>
 {% empty %}
-<tr><td colspan="6" class="text-center text-gray-400">Aucune donnée</td></tr>
+<tr>
+  <td colspan="6" class="text-center text-gray-400">
+    Aucune donnée
+  </td>
+</tr>
 {% endfor %}
 </tbody>
+
 <tfoot>
 <tr class="font-bold bg-base-200">
   <td colspan="2" class="text-right">TOTAL</td>
@@ -141,6 +191,9 @@
 </tr>
 </tfoot>
 </table>
+
+
+
 </div>
 </div>
 

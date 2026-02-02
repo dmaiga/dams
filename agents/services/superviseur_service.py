@@ -30,6 +30,14 @@ def get_periode_courante():
     debut_mois = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return debut_mois, now
 
+def get_date_operationnelle(superviseur):
+    """
+    Date de référence opérationnelle :
+    - dernière clôture si elle existe
+    - sinon aucune limite (date.min)
+    """
+    return superviseur.date_derniere_cloture
+
 
 
 class SuperviseurDashboardService:
@@ -101,7 +109,8 @@ class SuperviseurDashboardService:
         """
     
         date_debut, date_fin = get_periode_courante()
-    
+        date_ref = get_date_operationnelle(superviseur)
+
         # 1️⃣ NOMBRE D’AGENTS
         agents = Agent.objects.filter(
             superviseur=superviseur,
@@ -127,8 +136,7 @@ class SuperviseurDashboardService:
         total_recouvre_agents = Recouvrement.objects.filter(
             agent__in=agents,
             superviseur=superviseur,
-            date_recouvrement__gte=date_debut,
-            date_recouvrement__lte=date_fin
+            date_recouvrement__gt=date_ref
         ).aggregate(
             total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
         )['total']
@@ -158,8 +166,7 @@ class SuperviseurDashboardService:
         # 4️⃣ MONTANT DÉJÀ REMIS AU ROT (MOIS)
         montant_remis_rot = RecouvrementSuperviseur.objects.filter(
             superviseur=superviseur,
-            date_recouvrement__gte=date_debut,
-            date_recouvrement__lte=date_fin
+            date_recouvrement__gt=date_ref
         ).aggregate(
             total=Coalesce(Sum('montant'), Decimal('0.00'))
         )['total']

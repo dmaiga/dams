@@ -25,6 +25,11 @@ def get_date_debut_rot():
     return settings.DATE_DEBUT_ROT
 
 
+from django.utils import timezone
+
+def get_debut_mois():
+    now = timezone.now()
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 
@@ -113,6 +118,7 @@ class RotDashboardService:
     @staticmethod
     def get_suivi_superviseurs():
         data = []
+        debut_mois = get_debut_mois()
 
         superviseurs = Agent.objects.filter(
             type_agent='entrepot',
@@ -120,20 +126,20 @@ class RotDashboardService:
         )
 
         for sup in superviseurs:
-            date_ref = sup.date_derniere_cloture
 
-            # 1️⃣ Argent récupéré auprès des agents
+            # 1️⃣ Argent récupéré auprès des agents (mois en cours)
             total_recouvre_agents = Recouvrement.objects.filter(
                 superviseur=sup,
-                date_recouvrement__gt=date_ref
+                date_recouvrement__gte=debut_mois
             ).aggregate(
                 total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
             )['total']
 
-            # 2️⃣ Ventes personnelles autorisées du superviseur
+            # 2️⃣ Ventes personnelles du superviseur (mois en cours)
             ventes_superviseur = Vente.objects.filter(
                 agent=sup,
-                date_vente__gt=date_ref
+                date_vente__gte=debut_mois,
+                est_supprime=False
             ).aggregate(
                 total=Coalesce(
                     Sum(F('quantite') * F('prix_vente_unitaire')),
@@ -141,29 +147,22 @@ class RotDashboardService:
                 )
             )['total']
 
-            # 3️⃣ Argent déjà remis au ROT
+            # 3️⃣ Argent remis au ROT (mois en cours)
             total_remis_rot = RecouvrementSuperviseur.objects.filter(
                 superviseur=sup,
-                date_creation__gt=date_ref
+                date_recouvrement__gte=debut_mois
             ).aggregate(
                 total=Coalesce(Sum('montant'), Decimal('0.00'))
             )['total']
 
-            # 4️⃣ Argent encore détenu par le superviseur
+            # 4️⃣ Argent encore détenu ce mois
             argent_chez_superviseur = (
                 total_recouvre_agents
                 + ventes_superviseur
                 - total_remis_rot
             )
-            argent_vente_superviseur = (
-                total_recouvre_agents
-                + ventes_superviseur
-                
-            )
 
-
-
-            # 5️⃣ Stock restant (information opérationnelle)
+            # 5️⃣ Stock restant (hors notion temporelle)
             stock_restant = AffectationLotSuperviseur.objects.filter(
                 superviseur=sup
             ).aggregate(
@@ -174,13 +173,13 @@ class RotDashboardService:
                 'superviseur': sup,
                 'stock_restant': stock_restant,
 
-                # flux cash
-                'recouvre_agents_vente': argent_vente_superviseur,
-                'ventes_superviseur': ventes_superviseur,
-                'total_remis_rot': total_remis_rot,
+                # flux cash mensuel
+                'recouvre_agents_mois': total_recouvre_agents,
+                'ventes_superviseur_mois': ventes_superviseur,
+                'total_remis_rot_mois': total_remis_rot,
 
-                # 🔥 KPI clé ROT
-                'reste_a_remettre': argent_chez_superviseur,
+                # KPI clé
+                'reste_a_remettre_mois': max(argent_chez_superviseur, Decimal('0.00')),
             })
 
         return data
@@ -194,13 +193,13 @@ class RotDashboardService:
         seuil = Decimal('50000')
 
         for ligne in RotDashboardService.get_suivi_superviseurs():
-            if ligne['reste_a_remettre'] > seuil:
+            if ligne['reste_a_remettre_mois'] > seuil:
                 alertes.append({
                     'type': 'finance',
                     'niveau': 'danger',
                     'message': (
                         f"{ligne['superviseur'].full_name} "
-                        f"doit encore {ligne['reste_a_remettre']} FCFA"
+                        f"doit encore {ligne['reste_a_remettre_mois']} FCFA"
                     )
                 })
 
