@@ -88,6 +88,73 @@
         </div>
     </div>
 
+<form method="get" class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+
+            <!-- Date début -->
+            <div class="col-md-3">
+                <label class="form-label">Du</label>
+                <input type="date"
+                       name="date_debut"
+                       value="{{ filtres.date_debut }}"
+                       class="form-control">
+            </div>
+
+            <!-- Date fin -->
+            <div class="col-md-3">
+                <label class="form-label">Au</label>
+                <input type="date"
+                       name="date_fin"
+                       value="{{ filtres.date_fin }}"
+                       class="form-control">
+            </div>
+
+            <!-- Lot -->
+            <div class="col-md-3">
+                <label class="form-label">Lot</label>
+                <select name="lot" class="form-select">
+                    <option value="">Tous les lots</option>
+                    {% for lot in lots %}
+                        <option value="{{ lot.id }}"
+                            {% if filtres.lot == lot.id|stringformat:"s" %}selected{% endif %}>
+                            {{ lot.produit.nom }}
+                            {% if lot.fournisseur %} | {{ lot.fournisseur.nom }}{% endif %}
+                            | {{ lot.date_reception|date:"d/m/Y" }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Fournisseur -->
+            <div class="col-md-3">
+                <label class="form-label">Fournisseur</label>
+                <select name="fournisseur" class="form-select">
+                    <option value="">Tous les fournisseurs</option>
+                    {% for f in fournisseurs %}
+                        <option value="{{ f.id }}"
+                            {% if filtres.fournisseur == f.id|stringformat:"s" %}selected{% endif %}>
+                            {{ f.nom }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Actions -->
+            <div class="col-12 d-flex gap-2 mt-2">
+                <button class="btn btn-primary">
+                    <i class="fas fa-filter me-1"></i> Filtrer
+                </button>
+                <a href="{% url 'rot_affectations_liste' %}" class="btn btn-outline-secondary">
+                    Réinitialiser
+                </a>
+            </div>
+
+        </div>
+    </div>
+</form>
+
+
     <!-- Liste des affectations -->
     <div class="card shadow-sm">
         <div class="card-header bg-light">
@@ -127,6 +194,9 @@
                             <!-- Produit -->
                             <td>
                                 <strong>{{ a.lot.produit.nom }}</strong>
+                                <small class="text-muted d-block">
+                                    Réception : {{ a.lot.date_reception|date:"d/m/Y" }}
+                                </small>
                               
                             </td>
                             

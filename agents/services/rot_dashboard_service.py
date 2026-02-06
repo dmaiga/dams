@@ -184,6 +184,76 @@ class RotDashboardService:
 
         return data
 
+    @staticmethod
+    def get_cash_superviseur_post_cloture(superviseur):
+        """
+        Cash réel du superviseur depuis la dernière clôture validée
+        """
+    
+        cloture = (
+            ClotureMensuelle.objects
+            .filter(superviseur=superviseur, est_cloture=True)
+            .order_by('-date_fin_periode')
+            .first()
+        )
+    
+        date_ref = cloture.date_fin_periode if cloture else None
+    
+        # 1️⃣ Recouvrements agents
+        recouvrements = Recouvrement.objects.filter(
+            superviseur=superviseur
+        )
+        if date_ref:
+            recouvrements = recouvrements.filter(
+                date_recouvrement__date__gt=date_ref
+            )
+    
+        total_recouvre = recouvrements.aggregate(
+            total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
+        )['total']
+    
+        # 2️⃣ Ventes superviseur
+        ventes = Vente.objects.filter(
+            agent=superviseur,
+            est_supprime=False
+        )
+        if date_ref:
+            ventes = ventes.filter(
+                date_vente__date__gt=date_ref
+            )
+    
+        total_ventes = ventes.aggregate(
+            total=Coalesce(
+                Sum(F('quantite') * F('prix_vente_unitaire')),
+                Decimal('0.00')
+            )
+        )['total']
+    
+        # 3️⃣ Remises ROT
+        remises = RecouvrementSuperviseur.objects.filter(
+            superviseur=superviseur
+        )
+        if date_ref:
+            remises = remises.filter(
+                date_recouvrement__date__gt=date_ref
+            )
+    
+        total_remis = remises.aggregate(
+            total=Coalesce(Sum('montant'), Decimal('0.00'))
+        )['total']
+    
+        cash_disponible = total_recouvre + total_ventes
+        cash_restant = max(cash_disponible - total_remis, Decimal('0.00'))
+    
+        return {
+            'date_reference': date_ref,
+            'total_recouvre': total_recouvre,
+            'total_ventes': total_ventes,
+            'total_remis': total_remis,
+            'cash_disponible': cash_disponible,
+            'cash_restant': cash_restant,
+        }
+    
     # =====================================================
     # 3️⃣ ALERTES ROT
     # =====================================================

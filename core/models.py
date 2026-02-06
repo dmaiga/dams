@@ -836,19 +836,13 @@ class LotEntrepot(models.Model):
     from django.core.exceptions import ValidationError
 
     def save(self, *args, **kwargs):
+        # 🔒 RÈGLE MÉTIER UNIQUE
+        if self.quantite_initiale is not None and self.prix_achat_unitaire is not None:
+            self.valeur_stock_initiale = (
+                self.quantite_initiale * self.prix_achat_unitaire
+            )
 
-        # --- Calcul valeur initiale UNE SEULE FOIS ---
-        if self.valeur_stock_initiale is None:
-
-            if self.est_conditionne:
-                # prix par unité × nombre d’unités
-                nb_unites = self.quantite_initiale / self.produit.poids_unitaire_kg
-                self.valeur_stock_initiale = nb_unites * self.prix_achat_unitaire
-            else:
-                # produit vrac → prix au kg
-                self.valeur_stock_initiale = self.quantite_initiale * self.prix_achat_unitaire
-
-        # --- Garde-fous ---
+        # Garde-fous
         if self.quantite_restante > self.quantite_initiale:
             raise ValidationError("Quantité restante > quantité initiale")
 
@@ -856,7 +850,7 @@ class LotEntrepot(models.Model):
             raise ValidationError("Quantité restante négative")
 
         super().save(*args, **kwargs)
-
+        
     @property
     def montant_total(self):
         if self.est_conditionne:
@@ -866,10 +860,9 @@ class LotEntrepot(models.Model):
 
     @property
     def valeur_actuelle_stock(self):
-        if self.est_conditionne:
-            nb_unites = self.quantite_restante / self.produit.poids_unitaire_kg
-            return nb_unites * self.prix_achat_unitaire
         return self.quantite_restante * self.prix_achat_unitaire
+
+
 
     @property
     def quantite_perdue_totale(self):

@@ -99,28 +99,42 @@ class SuperviseurDashboardService:
             est_actif=True
         ).select_related('user')
 
+
+
     # =====================================================
-    # FINANCES SUPERVISEUR (SOURCE = MODÈLE)
+    # FINANCES SUPERVISEUR – DASHBOARD OPÉRATIONNEL
     # =====================================================
     @staticmethod
     def get_finances_superviseur(superviseur):
         """
-        KPI SUPERVISEUR – MOIS COURANT (SOURCE FIABLE)
+        Dashboard superviseur – MOIS COURANT
+
+        Définitions métier :
+        - montant_a_recouvrer : argent encore chez les agents
+        - cash_detenu : argent physiquement détenu par le superviseur
+        (recouvrements + ventes perso – remises ROT)
         """
-    
+
+        # 🔹 Références temporelles
         date_debut, date_fin = get_periode_courante()
         date_ref = get_date_operationnelle(superviseur)
 
-        # 1️⃣ NOMBRE D’AGENTS
+        # =====================================================
+        # 1️⃣ AGENTS ACTIFS DU SUPERVISEUR
+        # =====================================================
         agents = Agent.objects.filter(
             superviseur=superviseur,
-            type_agent__in=['terrain', 'agent_gros'],
+            type_agent__in=["terrain", "agent_gros"],
             est_actif=True
         )
-    
+
         nombre_agents = agents.count()
-    
-        # 2️⃣ MONTANT À RECOUVRER (argent encore chez les agents – MOIS)
+
+        # =====================================================
+        # 2️⃣ MONTANT À RECOUVRER (ARGENT ENCORE CHEZ LES AGENTS)
+        # =====================================================
+
+        # Total des ventes réalisées par les agents sur la période
         total_ventes_agents = Vente.objects.filter(
             agent__in=agents,
             date_vente__gte=date_debut,
@@ -128,24 +142,34 @@ class SuperviseurDashboardService:
             est_supprime=False
         ).aggregate(
             total=Coalesce(
-                Sum(F('quantite') * F('prix_vente_unitaire')),
-                Decimal('0.00')
+                Sum(F("quantite") * F("prix_vente_unitaire")),
+                Decimal("0.00")
             )
-        )['total']
-    
+        )["total"]
+
+        # Total déjà recouvré auprès des agents
         total_recouvre_agents = Recouvrement.objects.filter(
             agent__in=agents,
             superviseur=superviseur,
-            date_recouvrement__gt=date_ref
+            date_recouvrement__gte=date_debut,
+            date_recouvrement__lte=date_fin
         ).aggregate(
-            total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
-        )['total']
-    
-        montant_a_recouvrer = total_ventes_agents - total_recouvre_agents
-            
-    
-    
+            total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
+        )["total"]
+
+        montant_a_recouvrer = max(
+            total_ventes_agents - total_recouvre_agents,
+            Decimal("0.00")
+        )
+
+        # =====================================================
         # 3️⃣ CASH DÉTENU PAR LE SUPERVISEUR (RÉEL)
+        # =====================================================
+
+        # a) Recouvrements agents encore en possession du superviseur
+        recouvrements_non_remis = total_recouvre_agents
+
+        # b) Ventes personnelles du superviseur
         ventes_superviseur = Vente.objects.filter(
             agent=superviseur,
             date_vente__gte=date_debut,
@@ -153,35 +177,36 @@ class SuperviseurDashboardService:
             est_supprime=False
         ).aggregate(
             total=Coalesce(
-                Sum(F('quantite') * F('prix_vente_unitaire')),
-                Decimal('0.00')
+                Sum(F("quantite") * F("prix_vente_unitaire")),
+                Decimal("0.00")
             )
-        )['total']
-    
-        cash_detenu = (
-            total_recouvre_agents
-            + ventes_superviseur
-        )
-    
-        # 4️⃣ MONTANT DÉJÀ REMIS AU ROT (MOIS)
+        )["total"]
+
+        # c) Montant déjà remis au ROT
         montant_remis_rot = RecouvrementSuperviseur.objects.filter(
             superviseur=superviseur,
-            date_recouvrement__gt=date_ref
+            date_recouvrement__gte=date_debut,
+            date_recouvrement__lte=date_fin
         ).aggregate(
-            total=Coalesce(Sum('montant'), Decimal('0.00'))
-        )['total']
-    
-        # 🔥 CASH NET À DISPOSITION
-        cash_detenu -= montant_remis_rot
-    
+            total=Coalesce(Sum("montant"), Decimal("0.00"))
+        )["total"]
+
+        # d) Cash réellement détenu
+        cash_detenu = max(
+            (recouvrements_non_remis + ventes_superviseur) - montant_remis_rot,
+            Decimal("0.00")
+        )
+
+        # =====================================================
+        # 🔚 RÉSULTAT DASHBOARD
+        # =====================================================
         return {
-            # KPI demandés
-            'nombre_agents': nombre_agents,
-            'montant_a_recouvrer': montant_a_recouvrer,
-            'cash_detenu': cash_detenu,
-            'montant_remis_rot': montant_remis_rot,
+            "nombre_agents": nombre_agents,
+            "montant_a_recouvrer": montant_a_recouvrer,
+            "cash_detenu": cash_detenu,
+            "montant_remis_rot": montant_remis_rot,
         }
-    
+
     # =====================================================
     # DÉTAIL FINANCIER PAR AGENT (POST-CLÔTURE)
     # =====================================================

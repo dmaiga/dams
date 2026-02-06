@@ -14,7 +14,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.utils.html import format_html
-
+from .models import FactureLotEntrepot
 
 @admin.register(Fournisseur)
 class FournisseurAdmin(admin.ModelAdmin):
@@ -651,3 +651,24 @@ class AffectationLotSuperviseurAdmin(admin.ModelAdmin):
     @admin.display(description="Produit")
     def produit_nom(self, obj):
         return obj.lot.produit.nom
+
+ 
+@admin.register(FactureLotEntrepot)
+class FactureLotEntrepotAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "lot",
+        "montant",
+        "date_upload",
+    )
+
+    list_editable = (
+        "montant",
+    )
+
+    readonly_fields = (
+        "date_upload",
+        "fichier",
+    )
+
+

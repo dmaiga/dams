@@ -78,7 +78,12 @@ from agents.services.agent_dashboard_service import AgentDashboardService
 from agents.services.superviseur_stock_service import SuperviseurStockService
 from agents.services.rot_dashboard_service import RotDashboardService
 from django.db.models import DecimalField, ExpressionWrapper
+from django.utils.dateparse import parse_date
 
+def safe_parse_date(value):
+    if isinstance(value, str) and value:
+        return parse_date(value)
+    return None
 
 @login_required
 def tableau_de_bord_superviseur(request):
@@ -570,6 +575,9 @@ def affecter_lot_superviseur(request):
     return render(request, 'agents/rot/affecter_lot.html', context)
 
 
+from django.utils.dateparse import parse_date
+from django.db.models import Sum
+from django.contrib.auth.decorators import login_required
 
 @login_required
 def rot_affectations_liste(request):
@@ -578,7 +586,6 @@ def rot_affectations_liste(request):
     if not agent.est_rot:
         return redirect('access_denied')
 
-    # Affectations faites par le ROT
     affectations = (
         AffectationLotSuperviseur.objects
         .filter(attribue_par=agent)
@@ -587,10 +594,40 @@ def rot_affectations_liste(request):
             'lot__fournisseur',
             'superviseur__user'
         )
-        .order_by('-date_affectation')
+       .order_by('-lot__date_reception', '-date_affectation')
+
     )
 
-    # Statistiques simples et cohérentes
+    # --------------------
+    # FILTRES (GET)
+    # --------------------
+    date_debut = safe_parse_date(request.GET.get('date_debut'))
+    date_fin = safe_parse_date(request.GET.get('date_fin'))
+
+    lot_id = request.GET.get('lot')
+    fournisseur_id = request.GET.get('fournisseur')
+
+    if date_debut:
+        affectations = affectations.filter(
+            date_affectation__date__gte=date_debut
+        )
+
+    if date_fin:
+        affectations = affectations.filter(
+            date_affectation__date__lte=date_fin
+        )
+
+    if lot_id:
+        affectations = affectations.filter(lot_id=lot_id)
+
+    if fournisseur_id:
+        affectations = affectations.filter(
+            lot__fournisseur_id=fournisseur_id
+        )
+
+    # --------------------
+    # STATS (post-filtre)
+    # --------------------
     total_quantite = affectations.aggregate(
         total=Sum('quantite_initiale')
     )['total'] or 0
@@ -605,6 +642,21 @@ def rot_affectations_liste(request):
         },
         'superviseurs_count': superviseurs_count,
         'produits_count': produits_count,
+
+        # pour les selects
+        'lots': LotEntrepot.objects
+            .select_related('produit', 'fournisseur')
+            .order_by('-date_reception'),
+
+        'fournisseurs': Fournisseur.objects.all(),
+
+        # conserver l’état du filtre
+        'filtres': {
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+            'lot': lot_id,
+            'fournisseur': fournisseur_id,
+        }
     }
 
     return render(
@@ -679,6 +731,9 @@ def detail_agent_rot(request, agent_id):
         context
     )
 
+
+
+
 @login_required
 def recouvrer_superviseur(request):
     rot = request.user.agent
@@ -688,7 +743,9 @@ def recouvrer_superviseur(request):
     superviseur = None
     resume = None
 
-    # --- ÉTAPE 1 : lecture superviseur (GET) ---
+    # ==========================
+    # ÉTAPE 1 : lecture superviseur (GET)
+    # ==========================
     superviseur_id = request.GET.get("superviseur")
     if superviseur_id:
         superviseur = Agent.objects.filter(
@@ -698,39 +755,36 @@ def recouvrer_superviseur(request):
         ).first()
 
         if superviseur:
-            total_remis = (
-                RecouvrementSuperviseur.objects
-                .filter(superviseur=superviseur)
-                .aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))
-                ["total"]
+            # 🔑 SOURCE DE VÉRITÉ
+            resume = RotDashboardService.get_cash_superviseur_post_cloture(
+                superviseur
             )
 
-            dernier = (
-                RecouvrementSuperviseur.objects
-                .filter(superviseur=superviseur)
-                .order_by("-date_recouvrement")
-                .first()
-            )
-
-            cash_disponible = superviseur.cash_disponible_superviseur
-            cash_restant = max(cash_disponible - total_remis, Decimal("0.00"))
-
-            resume = {
-                "cash_disponible": cash_disponible,
-                "total_remis": total_remis,
-                "cash_restant": cash_restant,
-                "dernier": dernier,
-            }
-
-    # --- ÉTAPE 2 : formulaire ---
+    # ==========================
+    # ÉTAPE 2 : formulaire (POST)
+    # ==========================
     if request.method == "POST":
         form = RecouvrementSuperviseurForm(request.POST)
+
         if form.is_valid():
             rec = form.save(commit=False)
             rec.rot = rot
-            rec.save()
-            messages.success(request, "Recouvrement enregistré.")
-            return redirect(f"{request.path}?superviseur={rec.superviseur_id}")
+
+            # 🔒 Sécurité comptable : pas plus que le cash restant
+            if resume and rec.montant > resume["cash_restant"]:
+                messages.error(
+                    request,
+                    "Montant supérieur au cash réellement disponible."
+                )
+            else:
+                rec.save()
+                messages.success(
+                    request,
+                    "Recouvrement enregistré avec succès."
+                )
+                return redirect(
+                    f"{request.path}?superviseur={rec.superviseur_id}"
+                )
     else:
         form = RecouvrementSuperviseurForm(
             initial={"superviseur": superviseur}
@@ -745,5 +799,3 @@ def recouvrer_superviseur(request):
             "resume": resume,
         }
     )
-
-

@@ -11,7 +11,9 @@ from core.models import Salaire
 from paie.services.salaire_liste_service import SalaireListeService
 from paie.services.salaire_generation_service import SalaireGenerationService
 
-
+import openpyxl
+from openpyxl.styles import Font
+from django.http import HttpResponse
 
 from calendar import monthrange
 from datetime import date
@@ -116,6 +118,147 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
         })
         
         return context
+
+
+
+
+
+
+def export_salaires_mamies_excel(request):
+    today = timezone.now().date()
+
+    month = request.GET.get("month")
+    year = request.GET.get("year")
+
+    if month and year:
+        month = int(month)
+        year = int(year)
+    else:
+        month = today.month
+        year = today.year
+
+    last_day = monthrange(year, month)[1]
+    date_debut = date(year, month, 1)
+    date_fin = date(year, month, last_day)
+
+    # 🔹 On filtre uniquement les mamies
+    result = SalaireListeService.get_salaires(
+        date_debut=date_debut,
+        date_fin=date_fin,
+        type_agent_filter="terrain"
+    )
+
+    mamies = result["mamies"]
+
+    # ==========================
+    # CREATION EXCEL
+    # ==========================
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Salaires Mamies"
+
+    headers = [
+        "Agent",
+        "Superviseur",
+        "Kg vendus",
+        "Salaire base",
+        "Incentive",
+        "Salaire total",
+        "Jours travaillés",
+        "Jours du mois",
+    ]
+
+    ws.append(headers)
+
+    # Style header
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for s in mamies:
+        ws.append([
+            s["agent"].full_name,
+            s["superviseur"].full_name if s["superviseur"] else "",
+            float(s["kilo_total"]),
+            float(s["salaire_base"]),
+            float(s["incentive"]),
+            float(s["salaire_total"]),
+            s.get("jours_travailles"),
+            s.get("jours_mois"),
+        ])
+
+    filename = f"salaires_mamies_{month}_{year}.xlsx"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    wb.save(response)
+    return response
+
+
+def export_salaires_gros_excel(request):
+    today = timezone.now().date()
+
+    month = request.GET.get("month")
+    year = request.GET.get("year")
+
+    if month and year:
+        month = int(month)
+        year = int(year)
+    else:
+        month = today.month
+        year = today.year
+
+    last_day = monthrange(year, month)[1]
+    date_debut = date(year, month, 1)
+    date_fin = date(year, month, last_day)
+
+    # 🔸 FILTRE AGENTS GROS
+    result = SalaireListeService.get_salaires(
+        date_debut=date_debut,
+        date_fin=date_fin,
+        type_agent_filter="agent_gros"
+    )
+
+    agents = result["gros"]
+
+    # ==========================
+    # CREATION EXCEL
+    # ==========================
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Salaires Agents Gros"
+
+    headers = [
+        "Agent",
+        "Cartons vendus",
+        "Incentive",
+        "Salaire total",
+    ]
+
+    ws.append(headers)
+
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for s in agents:
+        ws.append([
+            s["agent"].full_name,
+            float(s["cartons_total"]),
+            float(s["incentive"]),
+            float(s["salaire_total"]),
+        ])
+
+    filename = f"salaires_agents_gros_{month}_{year}.xlsx"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    wb.save(response)
+    return response
 
 
 class SalaireGenerationView(LoginRequiredMixin, View):
