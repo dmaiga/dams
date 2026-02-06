@@ -1389,7 +1389,7 @@ class PaiementFournisseurForm(forms.ModelForm):
     class Meta:
         model = PaiementFournisseur
         fields = [
-            'superviseur',
+            'effectue_par',
             'lot',
             'montant',
             'date_paiement',
@@ -1430,7 +1430,10 @@ class PaiementFournisseurForm(forms.ModelForm):
                     f"(sur {lot.valeur_stock_initiale} FCFA)"
                 )
             })
-
+        # ROT uniquement
+        self.fields['effectue_par'].queryset = Agent.objects.filter(
+            type_agent='rot'
+        )
     # =========================
     # LOGIQUE MÉTIER
     # =========================

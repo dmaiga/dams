@@ -9,7 +9,7 @@
     <!-- ===== HEADER ===== -->
     <div class="mb-3">
         <h5 class="mb-1">📋 Fournisseurs</h5>
-        <small class="text-muted">Gestion des fournisseurs et dettes</small>
+        <small class="text-muted">Suivi facturation fournisseurs (ROT)</small>
 
         <div class="mt-2">
             <a href="{% url 'creer_fournisseur' %}" class="btn btn-sm btn-primary">
@@ -20,7 +20,6 @@
 
     {% if fournisseurs %}
 
-        <!-- ===== LISTE MOBILE FIRST ===== -->
         <div class="d-grid gap-3">
             {% for f in fournisseurs %}
             <div class="card shadow-sm">
@@ -56,16 +55,22 @@
                         {% endif %}
                     </div>
 
-                    <!-- Dettes -->
+                    <!-- ===== FACTURATION ROT ===== -->
                     <div class="row text-center small mt-2">
-                        <div class="col-6">
-                            <div class="text-muted">Dette contractuelle</div>
-                            <strong>{{ f.dette_contractuelle|fcfa }}</strong>
+                        <div class="col-4">
+                            <div class="text-muted">Valeur lots</div>
+                            <strong>{{ f.valeur_lots|fcfa }}</strong>
                         </div>
-                        <div class="col-6">
-                            <div class="text-muted">Dette restante</div>
-                            <strong class="{% if f.dette_consommee > 0 %}text-danger{% else %}text-success{% endif %}">
-                                {{ f.dette_consommee|fcfa }}
+                        <div class="col-4">
+                            <div class="text-muted">Facturé</div>
+                            <strong class="text-success">
+                                {{ f.montant_facture|fcfa }}
+                            </strong>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted">Reste à facturer</div>
+                            <strong class="{% if f.reste_a_facturer > 0 %}text-warning{% else %}text-success{% endif %}">
+                                {{ f.reste_a_facturer|fcfa }}
                             </strong>
                         </div>
                     </div>
@@ -91,7 +96,6 @@
 
     {% else %}
 
-        <!-- ===== EMPTY STATE ===== -->
         <div class="text-center py-5">
             <i class="bi bi-box-seam fs-1 text-muted mb-3"></i>
             <p class="text-muted">Aucun fournisseur enregistré</p>

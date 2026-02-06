@@ -44,33 +44,32 @@
     </div>
 </div>
 
-
+<!-- ================= FOURNISSEURS (ROT – FACTURES) ================= -->
 <div class="card mb-3">
     <div class="card-header fw-semibold">
-        🏭 Fournisseurs
+        🏭 Fournisseurs (suivi factures)
     </div>
 
     <div class="card-body p-2">
-        {% for f in fournisseurs %}
+        {% for f in fournisseurs_rot %}
         <div class="border rounded p-2 mb-2">
-            <strong>{{ f.fournisseur.nom }}</strong>
+            <strong>{{ f.fournisseur_nom }}</strong>
 
             <div class="row small mt-1">
-                <div class="col-6 text-muted">Livré</div>
-                <div class="col-6 text-end">{{ f.qte_livree }}</div>
+                <div class="col-6 text-muted">Valeur lots reçus</div>
+                <div class="col-6 text-end">
+                    {{ f.valeur_lots|fcfa }}
+                </div>
 
-                <div class="col-6 text-muted">Vendu</div>
-                <div class="col-6 text-end">{{ f.qte_vendue }}</div>
+                <div class="col-6 text-muted">Montant facturé</div>
+                <div class="col-6 text-end text-success">
+                    {{ f.montant_facture|fcfa }}
+                </div>
 
-                <div class="col-6 text-muted">Dette</div>
-                <div class="col-6 text-end">{{ f.dette_contractuelle|fcfa }}</div>
-
-                <div class="col-6 text-muted">Payé</div>
-                <div class="col-6 text-end text-success">{{ f.paye|fcfa }}</div>
-
-                <div class="col-6 fw-semibold">Reste</div>
-                <div class="col-6 text-end fw-bold {% if f.reste > 0 %}text-danger{% endif %}">
-                    {{ f.reste|fcfa }}
+                <div class="col-6 fw-semibold">Reste à facturer</div>
+                <div class="col-6 text-end fw-bold
+                    {% if f.reste_a_facturer > 0 %}text-warning{% else %}text-success{% endif %}">
+                    {{ f.reste_a_facturer|fcfa }}
                 </div>
             </div>
         </div>
@@ -79,7 +78,6 @@
         {% endfor %}
     </div>
 </div>
-
 
     <!-- ================= STOCK ENTREPÔT ================= -->
 <div class="card mb-3">

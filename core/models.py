@@ -2024,6 +2024,10 @@ class PaiementFournisseur(models.Model):
     """
     Paiement simple au fournisseur
     Objectif : traçabilité claire, pas de sur-modélisation
+
+         ⚠️ NOTE MÉTIER :
+    - `superviseur` : champ HISTORIQUE (ancienne logique)
+    - `effectue_par` : champ ACTIF (nouvelle logique – ROT)
     """
 
     fournisseur = models.ForeignKey(
@@ -2041,15 +2045,27 @@ class PaiementFournisseur(models.Model):
         help_text="Optionnel : paiement rattaché à un lot précis"
     )
 
+    # 🔴 ANCIEN CHAMP (DÉPRÉCIÉ)
     superviseur = models.ForeignKey(
         'Agent',
         on_delete=models.SET_NULL,
         null=True,
-        related_name='paiements_fournisseurs',
+        blank=True,  
+        related_name='paiements_fournisseurs_superviseur',
         limit_choices_to={'type_agent': 'entrepot'},
-        verbose_name="Superviseur responsable"
+        verbose_name="Superviseur (déprécié – ancienne logique)"
     )
 
+    # ✅ NOUVEAU CHAMP ACTIF
+    effectue_par = models.ForeignKey(
+        'Agent',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='paiements_fournisseurs_rot',
+        limit_choices_to={'type_agent': 'rot'},
+        verbose_name="Paiement effectué par (ROT)"
+    )
     montant = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -2119,6 +2135,14 @@ class PaiementFournisseur(models.Model):
             return "supprime"
         return "actif"
     
+    @property
+    def acteur_paiement(self):
+        """
+        Retourne l’acteur réel du paiement :
+        - ROT si renseigné
+        - sinon superviseur (legacy)
+        """
+        return self.effectue_par or self.superviseur
 
 class ClotureMensuelle(models.Model):
     """

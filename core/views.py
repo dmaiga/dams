@@ -189,15 +189,20 @@ def supprimer_agent(request, agent_id):
 
 
 
+
 @login_required
 def liste_fournisseurs(request):
     data = []
 
-    fournisseurs = Fournisseur.objects.all()
+    fournisseurs = Fournisseur.objects.all().order_by('nom')
+
+    total_valeur_lots = Decimal('0.00')
+    total_facture = Decimal('0.00')
+    total_reste = Decimal('0.00')
 
     for f in fournisseurs:
         # =========================
-        # LOTS FOURNISSEUR
+        # LOTS DU FOURNISSEUR
         # =========================
         lots = LotEntrepot.objects.filter(fournisseur=f)
 
@@ -208,7 +213,7 @@ def liste_fournisseurs(request):
             lots
             .values('produit__nom')
             .annotate(
-                qte_livree=Coalesce(Sum('quantite_initiale'), Decimal('0'))
+                qte_livree=Coalesce(Sum('quantite_initiale'), Decimal('0.00'))
             )
             .order_by('produit__nom')
         )
@@ -219,54 +224,62 @@ def liste_fournisseurs(request):
         ]
 
         # -------------------------
-        # Dette contractuelle
+        # Valeur des lots reçus
         # -------------------------
-        dette_contractuelle = lots.aggregate(
+        valeur_lots = lots.aggregate(
             total=Coalesce(
                 Sum(
                     F('quantite_initiale') * F('prix_achat_unitaire'),
                     output_field=DecimalField(max_digits=15, decimal_places=2)
                 ),
-                Decimal('0')
+                Decimal('0.00')
             )
         )['total']
 
-        # =========================
-        # DETTE CONSOMMÉE
-        # =========================
-        ventes = Vente.objects.filter(
-            detail_distribution__lot__fournisseur=f
-        )
-
-        dette_consommee = ventes.aggregate(
+        # -------------------------
+        # Montant facturé (ROT)
+        # -------------------------
+        montant_facture = FactureLotEntrepot.objects.filter(
+            lot__fournisseur=f
+        ).aggregate(
             total=Coalesce(
-                Sum(
-                    F('quantite') *
-                    (F('prix_vente_unitaire') - F('detail_distribution__lot__prix_achat_unitaire')),
-                    output_field=DecimalField(max_digits=15, decimal_places=2)
-                ),
-                Decimal('0')
+                Sum('montant'),
+                Decimal('0.00')
             )
         )['total']
 
+        # -------------------------
+        # Reste à facturer (ROT)
+        # -------------------------
+        reste_a_facturer = max(
+            valeur_lots - montant_facture,
+            Decimal('0.00')
+        )
 
         data.append({
             'fournisseur': f,
-            'contact': f.contact if hasattr(f, 'contact') else "",
+            'contact': getattr(f, 'contact', ""),
             'produits': produits_liste,
-            'dette_contractuelle': dette_contractuelle,
-            'dette_consommee': dette_consommee,
+
+            # ROT – FACTURES
+            'valeur_lots': valeur_lots,
+            'montant_facture': montant_facture,
+            'reste_a_facturer': reste_a_facturer,
         })
-        total_contractuelle = sum(item['dette_contractuelle'] for item in data)
-        total_consommee = sum(item['dette_consommee'] for item in data)
+
+        # Totaux globaux
+        total_valeur_lots += valeur_lots
+        total_facture += montant_facture
+        total_reste += reste_a_facturer
 
     return render(
         request,
         'core/fournisseur/liste_fournisseurs.html',
         {
             'fournisseurs': data,
-            'total_contractuelle': total_contractuelle,
-            'total_consommee': total_consommee,
+            'total_valeur_lots': total_valeur_lots,
+            'total_facture': total_facture,
+            'total_reste': total_reste,
         }
     )
 
@@ -274,51 +287,69 @@ def liste_fournisseurs(request):
 def detail_fournisseur(request, fournisseur_id):
     fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
 
+    # =========================
+    # LOTS DU FOURNISSEUR
+    # =========================
     lots_qs = (
         LotEntrepot.objects
         .filter(fournisseur=fournisseur)
         .select_related('produit')
+        .prefetch_related('factures')
         .order_by('-date_reception')
     )
 
     lots = []
-    dette_contractuelle = Decimal('0')
-    dette_consomme = Decimal('0')
+    valeur_totale_lots = Decimal('0.00')
+    montant_total_facture = Decimal('0.00')
 
     for lot in lots_qs:
-        valeur_livree = lot.quantite_initiale * lot.prix_achat_unitaire
-        valeur_consomme = (
-            (lot.quantite_initiale - lot.quantite_restante)
-            * lot.prix_achat_unitaire
+        valeur_lot = lot.quantite_initiale * lot.prix_achat_unitaire
+
+        montant_facture_lot = (
+            lot.factures.aggregate(
+                total=Coalesce(Sum('montant'), Decimal('0.00'))
+            )['total']
         )
 
-        dette_contractuelle += valeur_livree
-        dette_consomme += valeur_consomme
+        reste_a_facturer_lot = max(
+            valeur_lot - montant_facture_lot,
+            Decimal('0.00')
+        )
+
+        valeur_totale_lots += valeur_lot
+        montant_total_facture += montant_facture_lot
 
         lots.append({
             'lot': lot,
+            'reference': lot.reference_lot,
             'date_reception': lot.date_reception,
             'produit': lot.produit.nom,
             'quantite_initiale': lot.quantite_initiale,
             'quantite_restante': lot.quantite_restante,
             'prix_achat': lot.prix_achat_unitaire,
-            'valeur_consomme': valeur_consomme,
-            'valeur_livree': valeur_livree,
+
+            # ROT – FACTURES
+            'valeur_lot': valeur_lot,
+            'montant_facture': montant_facture_lot,
+            'reste_a_facturer': reste_a_facturer_lot,
+            'factures': lot.factures.all(),
         })
 
-    paiements = fournisseur.paiements.filter(
-        est_supprime=False
-    ).aggregate(
-        total=Coalesce(Sum('montant'), Decimal('0'))
-    )['total']
-
+    # =========================
+    # KPI ROT FOURNISSEUR
+    # =========================
     kpi = {
-        'dette_contractuelle': dette_contractuelle,
-        'dette_consomme': dette_consomme,
-        'paiements': paiements,
-        'reste_a_payer': dette_contractuelle - paiements,
+        'valeur_lots': valeur_totale_lots,
+        'montant_facture': montant_total_facture,
+        'reste_a_facturer': max(
+            valeur_totale_lots - montant_total_facture,
+            Decimal('0.00')
+        ),
         'nb_lots': lots_qs.count(),
         'nb_produits': lots_qs.values('produit').distinct().count(),
+        'nb_factures': FactureLotEntrepot.objects.filter(
+            lot__fournisseur=fournisseur
+        ).count(),
     }
 
     context = {

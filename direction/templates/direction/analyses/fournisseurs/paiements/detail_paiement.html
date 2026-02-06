@@ -47,8 +47,6 @@
         <div class="text-sm text-gray-500 mb-2">MONTANT DU PAIEMENT</div>
         <div class="text-5xl font-bold text-gray-800 mb-4">{{ paiement.montant|fcfa }}</div>
         <div class="inline-flex items-center gap-2">
-            <span class="badge badge-lg">{{ paiement.get_mode_display }}</span>
-            <span class="text-gray-600">•</span>
             <span class="text-gray-600">{{ paiement.date_paiement|date:"d/m/Y" }}</span>
         </div>
     </div>
@@ -69,10 +67,7 @@
                     <div class="font-medium">{{ paiement.date_paiement|date:"d/m/Y" }}</div>
                 </div>
                 
-                <div>
-                    <div class="text-sm text-gray-500">Mode de paiement</div>
-                    <div class="font-medium">{{ paiement.get_mode_display }}</div>
-                </div>
+              
                 
                 {% if paiement.reference %}
                 <div>
@@ -88,16 +83,20 @@
             <h3 class="font-bold text-lg text-gray-800 mb-4">Responsables</h3>
             <div class="space-y-4">
                 <div>
-                    <div class="text-sm text-gray-500">Superviseur responsable</div>
+                    <div class="text-sm text-gray-500">Effectué par</div>
                     <div class="font-medium">
-                        {% if paiement.superviseur %}
-                        {{ paiement.superviseur.full_name }}
-                        <div class="text-sm text-gray-500">{{ paiement.superviseur.get_type_agent_display }}</div>
-                        {% else %}
-                        <span class="text-red-500">Non spécifié</span>
-                        {% endif %}
+    {% if paiement.effectue_par %}
+        {{ paiement.effectue_par }}
+      
+    {% elif paiement.superviseur %}
+        {{ paiement.superviseur }}
+        
+    {% else %}
+        —
+    {% endif %}
                     </div>
                 </div>
+                
                 
                 <div>
                     <div class="text-sm text-gray-500">Enregistré par</div>

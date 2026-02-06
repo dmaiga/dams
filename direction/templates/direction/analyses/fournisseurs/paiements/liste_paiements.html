@@ -188,12 +188,16 @@
                             
                             <!-- Superviseur -->
                             <td class="px-6 py-4">
-                                {% if paiement.superviseur %}
-                                <div class="text-sm text-gray-900">{{ paiement.superviseur.full_name }}</div>
-                                <div class="text-xs text-gray-500">{{ paiement.superviseur.get_type_agent_display }}</div>
-                                {% else %}
-                                <span class="text-gray-400 italic">Non spécifié</span>
-                                {% endif %}
+    Payé par :
+    {% if paiement.effectue_par %}
+        {{ paiement.effectue_par }}
+     
+    {% elif paiement.superviseur %}
+        {{ paiement.superviseur }}
+       
+    {% else %}
+        —
+    {% endif %}
                             </td>
                             
                             <!-- Montant -->

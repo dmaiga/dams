@@ -25,62 +25,57 @@
         </div>
     </div>
 
-    <!-- ===== KPI FOURNISSEUR ===== -->
+    <!-- ===== KPI FOURNISSEUR (ROT – FACTURES) ===== -->
     <div class="row g-2 mb-3">
-        <div class="col-6">
+        <div class="col-4">
             <div class="card border-start border-primary border-3">
                 <div class="card-body p-2">
-                    <small class="text-muted">Dette contractuelle</small>
-                    <strong>{{ kpi.dette_contractuelle|fcfa }}</strong>
+                    <small class="text-muted">Valeur lots reçus</small><br>
+                    <strong>{{ kpi.valeur_lots|fcfa }}</strong>
                 </div>
             </div>
         </div>
 
-        <div class="col-6">
-            <div class="card border-start border-warning border-3">
-                <div class="card-body p-2">
-                    <small class="text-muted">Dette consommée</small>
-                    <strong>{{ kpi.dette_consomme|fcfa }}</strong>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-6">
+        <div class="col-4">
             <div class="card border-start border-success border-3">
                 <div class="card-body p-2">
-                    <small class="text-muted">Payé</small>
-                    <strong>{{ kpi.paiements|fcfa }}</strong>
+                    <small class="text-muted">Montant facturé</small><br>
+                    <strong>{{ kpi.montant_facture|fcfa }}</strong>
                 </div>
             </div>
         </div>
 
-        <div class="col-6">
-            <div class="card border-start border-danger border-3">
+        <div class="col-4">
+            <div class="card border-start border-warning border-3">
                 <div class="card-body p-2">
-                    <small class="text-muted">Reste à payer</small>
-                    <strong>{{ kpi.reste_a_payer|fcfa }}</strong>
+                    <small class="text-muted">Reste à facturer</small><br>
+                    <strong class="{% if kpi.reste_a_facturer > 0 %}text-warning{% else %}text-success{% endif %}">
+                        {{ kpi.reste_a_facturer|fcfa }}
+                    </strong>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ===== LOTS FOURNISSEUR ===== -->
+    <!-- ===== LOTS & FACTURES FOURNISSEUR ===== -->
     <div class="card shadow-sm">
         <div class="card-header fw-semibold">
-            📦 Lots fournisseur
+            📦 Lots et factures
         </div>
 
         <div class="card-body p-2">
             {% for item in lots %}
             <div class="border rounded p-2 mb-2">
-                <div class="d-flex justify-content-between small">
+
+                <!-- Lot -->
+                <div class="d-flex justify-content-between small mb-1">
                     <strong>{{ item.produit }}</strong>
                     <span class="text-muted">
                         {{ item.date_reception|date:"d/m/Y" }}
                     </span>
                 </div>
 
-                <div class="row small mt-1">
+                <div class="row small mb-2">
                     <div class="col-6 text-muted">Qté livrée</div>
                     <div class="col-6 text-end">{{ item.quantite_initiale }}</div>
 
@@ -90,11 +85,41 @@
                     <div class="col-6 text-muted">Prix achat</div>
                     <div class="col-6 text-end">{{ item.prix_achat|fcfa }}</div>
 
-                    <div class="col-6 fw-semibold">Dette consommée</div>
+                    <div class="col-6 fw-semibold">Valeur du lot</div>
                     <div class="col-6 text-end fw-bold">
-                        {{ item.valeur_consomme|fcfa }}
+                        {{ item.valeur_lot|fcfa }}
                     </div>
                 </div>
+
+                <!-- Factures -->
+                <div class="bg-light rounded p-2">
+                    <small class="text-muted d-block mb-1">Factures</small>
+
+                    {% if item.factures %}
+                        {% for facture in item.factures %}
+                            <div class="d-flex justify-content-between small">
+                                <span>
+                                    📄 {{ facture.date_upload|date:"d/m/Y" }}
+                                    {% if facture.description %}
+                                        – {{ facture.description }}
+                                    {% endif %}
+                                </span>
+                                <strong>{{ facture.montant|fcfa }}</strong>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <small class="text-muted">Aucune facture pour ce lot</small>
+                    {% endif %}
+                </div>
+
+                <!-- Reste à facturer -->
+                <div class="d-flex justify-content-between mt-2 small fw-semibold">
+                    <span>Reste à facturer</span>
+                    <span class="{% if item.reste_a_facturer > 0 %}text-warning{% else %}text-success{% endif %}">
+                        {{ item.reste_a_facturer|fcfa }}
+                    </span>
+                </div>
+
             </div>
             {% empty %}
             <p class="text-center text-muted mb-0">Aucun lot</p>

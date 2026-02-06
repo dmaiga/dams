@@ -158,167 +158,6 @@ class FournisseurAnalyseService:
         return lots_impayes
 
 
-
-    @staticmethod
-    def get_analyse_periode(date_debut=None, date_fin=None):
-        """
-        Analyse par fournisseur sur une période donnée
-        LOGIQUE SAINE :
-        - Dette contractuelle = réception
-        - Dette consommée = ventes (analyse)
-        - Paiement = comparé UNIQUEMENT à la dette contractuelle
-        """
-
-        date_debut, date_fin = FournisseurAnalyseService._normalize_period(date_debut, date_fin)
-        now = timezone.now()
-
-        # =========================
-        # 1) LOTS → DETTE CONTRACTUELLE
-        # =========================
-        lots_agg = (
-            LotEntrepot.objects
-            .filter(date_reception__gte=date_debut, date_reception__lte=date_fin, fournisseur__isnull=False)
-            .values('fournisseur')
-            .annotate(
-                dette_contractuelle=Coalesce(
-                    Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
-                    DEC_ZERO
-                ),
-                quantite_livree=Coalesce(Sum('quantite_initiale'), DEC_ZERO),
-                stock_restant=Coalesce(Sum('quantite_restante'), DEC_ZERO),
-                valeur_stock_restant=Coalesce(
-                    Sum(F('quantite_restante') * F('prix_achat_unitaire')),
-                    DEC_ZERO
-                ),
-                nombre_lots=Count('id')
-            )
-        )
-        lots_by_fournisseur = {l['fournisseur']: l for l in lots_agg}
-
-        # =========================
-        # 2) VENTES → DETTE CONSOMMÉE
-        # =========================
-        ventes_agg = (
-            Vente.objects
-            .filter(
-                detail_distribution__lot__fournisseur__isnull=False,
-                detail_distribution__lot__date_reception__gte=date_debut,
-                detail_distribution__lot__date_reception__lte=date_fin,
-            )
-            .values('detail_distribution__lot__fournisseur')
-            .annotate(
-                quantite_vendue=Coalesce(Sum('quantite'), DEC_ZERO),
-                dette_consommee=Coalesce(
-                    Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
-                    DEC_ZERO
-                ),
-                chiffre_affaires=Coalesce(
-                    Sum(F('quantite') * F('prix_vente_unitaire')),
-                    DEC_ZERO
-                )
-            )
-        )
-        ventes_by_fournisseur = {v['detail_distribution__lot__fournisseur']: v for v in ventes_agg}
-
-        # =========================
-        # 3) PAIEMENTS → GLOBAL
-        # =========================
-        paiements_agg = (
-            PaiementFournisseur.objects
-            .filter(fournisseur__isnull=False, date_paiement__lte=now, est_supprime=False)
-            .values('fournisseur')
-            .annotate(total_paye=Coalesce(Sum('montant'), DEC_ZERO))
-        )
-        paiements_by_fournisseur = {p['fournisseur']: p['total_paye'] for p in paiements_agg}
-
-        # =========================
-        # 4) CONSTRUCTION ANALYSE
-        # =========================
-        fournisseur_ids = set(lots_by_fournisseur) | set(ventes_by_fournisseur) | set(paiements_by_fournisseur)
-        fournisseurs = Fournisseur.objects.filter(id__in=fournisseur_ids).order_by('nom')
-
-        analyse_data = []
-
-        for f in fournisseurs:
-            lid = f.id
-
-            lot = lots_by_fournisseur.get(lid, {})
-            vente = ventes_by_fournisseur.get(lid, {})
-            total_paye = paiements_by_fournisseur.get(lid, DEC_ZERO)
-
-            dette_contractuelle = lot.get('dette_contractuelle', DEC_ZERO)
-            dette_consommee = min(
-                vente.get('dette_consommee', DEC_ZERO),
-                dette_contractuelle
-            )
-
-            reste_contractuel = max(dette_contractuelle - total_paye, DEC_ZERO)
-
-            quantite_livree = lot.get('quantite_livree', DEC_ZERO)
-            quantite_vendue = vente.get('quantite_vendue', DEC_ZERO)
-
-            ecoulement_pct = (
-                (quantite_vendue / quantite_livree) * 100
-                if quantite_livree > 0 else 0
-            )
-
-            marge_brute = vente.get('chiffre_affaires', DEC_ZERO) - vente.get('dette_consommee', DEC_ZERO)
-
-            analyse_data.append({
-                'fournisseur': f,
-
-                # Quantités
-                'quantite_livree': quantite_livree,
-                'quantite_vendue': quantite_vendue,
-                'quantite_ecoulee': quantite_vendue, 
-                'stock_restant': lot.get('stock_restant', DEC_ZERO),
-                'valeur_stock_restant': lot.get('valeur_stock_restant', DEC_ZERO),
-
-                # Montants
-                    'montant_livre': dette_contractuelle,              # réception
-                    'montant_ecoule': vente.get('chiffre_affaires', DEC_ZERO),  # ✅ CA VENDU
-               
-                # Dettes
-                'dette_contractuelle': dette_contractuelle,
-                'dette_consommee': dette_consommee,
-                'total_paye': total_paye,
-                'reste_contractuel': reste_contractuel,
-
-                # Analyse
-                'ecoulement_pct': round(ecoulement_pct, 2),
-                'marge_brute': marge_brute,
-                'nombre_lots': lot.get('nombre_lots', 0),
-            })
-
-        # =========================
-        # 5) KPI GLOBAUX
-        # =========================
-        dette_contractuelle_globale = sum(i['dette_contractuelle'] for i in analyse_data)
-        dette_consommee_globale = sum(i['dette_consommee'] for i in analyse_data)
-        total_paye_global = sum(i['total_paye'] for i in analyse_data)
-        reste_contractuel_global = max(dette_contractuelle_globale - total_paye_global, DEC_ZERO)
-
-        marge_brute_totale = sum(i['marge_brute'] for i in analyse_data)
-
-        kpi_globaux = {
-            'dette_contractuelle_globale': dette_contractuelle_globale,
-            'dette_consommee_globale': dette_consommee_globale,
-            'total_paye': total_paye_global,
-            'reste_contractuel_global': reste_contractuel_global,
-            'pourcentage_paye_global': round(
-                (total_paye_global / dette_contractuelle_globale * 100)
-                if dette_contractuelle_globale > 0 else 100,
-                1
-            ),
-            'marge_brute_totale': marge_brute_totale,
-        }
-
-        return {
-            'analyse_data': analyse_data,
-            'kpi_globaux': kpi_globaux,
-            'periode': {'debut': date_debut, 'fin': date_fin, 'type': 'personnalise'}
-        }
-
     @staticmethod
     def get_detail_fournisseur(fournisseur_id, date_debut=None, date_fin=None):
         """
@@ -720,30 +559,30 @@ class FournisseurAnalyseService:
 
         return FournisseurAnalyseService.get_analyse_periode(date_debut, date_fin)
 
+    
     # =====================================================
-    # ANALYSE CORE
+    # ANALYSE CORE (CORRIGÉE)
     # =====================================================
     @staticmethod
     def get_analyse_periode(date_debut=None, date_fin=None):
         """
-        LOGIQUE :
-        - Dette contractuelle = réception
+        LOGIQUE CORRIGÉE :
+        - Dette contractuelle = réceptions (lots)
         - Dette consommée = ventes liées aux lots
-        - Paiement = global (pas temporel)
+        - Paiements = UNIQUEMENT paiements rattachés aux lots
+        => cohérence parfaite avec le détail fournisseur
         """
-
-        now = timezone.now()
-
+    
         # =========================
         # LOTS → DETTE CONTRACTUELLE
         # =========================
         lots_qs = LotEntrepot.objects.filter(fournisseur__isnull=False)
-
+    
         if date_debut:
             lots_qs = lots_qs.filter(date_reception__gte=date_debut)
         if date_fin:
             lots_qs = lots_qs.filter(date_reception__lte=date_fin)
-
+    
         lots_agg = (
             lots_qs
             .values('fournisseur')
@@ -762,14 +601,14 @@ class FournisseurAnalyseService:
             )
         )
         lots_by_fournisseur = {l['fournisseur']: l for l in lots_agg}
-
+    
         # =========================
         # VENTES → DETTE CONSOMMÉE
         # =========================
         ventes_qs = Vente.objects.filter(
             detail_distribution__lot__fournisseur__isnull=False
         )
-
+    
         if date_debut:
             ventes_qs = ventes_qs.filter(
                 detail_distribution__lot__date_reception__gte=date_debut
@@ -778,7 +617,7 @@ class FournisseurAnalyseService:
             ventes_qs = ventes_qs.filter(
                 detail_distribution__lot__date_reception__lte=date_fin
             )
-
+    
         ventes_agg = (
             ventes_qs
             .values('detail_distribution__lot__fournisseur')
@@ -797,24 +636,27 @@ class FournisseurAnalyseService:
         ventes_by_fournisseur = {
             v['detail_distribution__lot__fournisseur']: v for v in ventes_agg
         }
-
+    
         # =========================
-        # PAIEMENTS → GLOBAL
+        # PAIEMENTS → PAR LOT (CORRIGÉ)
         # =========================
-        paiements_agg = (
+        paiements_lots_agg = (
             PaiementFournisseur.objects
             .filter(
-                fournisseur__isnull=False,
-                date_paiement__lte=now,
+                lot__fournisseur__isnull=False,
                 est_supprime=False
             )
-            .values('fournisseur')
-            .annotate(total_paye=Coalesce(Sum('montant'), DEC_ZERO))
+            .values('lot__fournisseur')
+            .annotate(
+                total_paye=Coalesce(Sum('montant'), DEC_ZERO)
+            )
         )
+    
         paiements_by_fournisseur = {
-            p['fournisseur']: p['total_paye'] for p in paiements_agg
+            p['lot__fournisseur']: p['total_paye']
+            for p in paiements_lots_agg
         }
-
+    
         # =========================
         # CONSTRUCTION ANALYSE
         # =========================
@@ -823,73 +665,73 @@ class FournisseurAnalyseService:
             set(ventes_by_fournisseur) |
             set(paiements_by_fournisseur)
         )
-
+    
         fournisseurs = Fournisseur.objects.filter(
             id__in=fournisseur_ids
         ).order_by('nom')
-
+    
         analyse_data = []
-
+    
         for f in fournisseurs:
-            lid = f.id
-
-            lot = lots_by_fournisseur.get(lid, {})
-            vente = ventes_by_fournisseur.get(lid, {})
-            total_paye = paiements_by_fournisseur.get(lid, DEC_ZERO)
-
+            fid = f.id
+    
+            lot = lots_by_fournisseur.get(fid, {})
+            vente = ventes_by_fournisseur.get(fid, {})
+            total_paye = paiements_by_fournisseur.get(fid, DEC_ZERO)
+    
             dette_contractuelle = lot.get('dette_contractuelle', DEC_ZERO)
             dette_consommee = min(
                 vente.get('dette_consommee', DEC_ZERO),
                 dette_contractuelle
             )
-
+    
             reste_contractuel = max(dette_contractuelle - total_paye, DEC_ZERO)
-
+    
             quantite_livree = lot.get('quantite_livree', DEC_ZERO)
             quantite_vendue = vente.get('quantite_vendue', DEC_ZERO)
-
+    
             ecoulement_pct = (
                 (quantite_vendue / quantite_livree) * 100
                 if quantite_livree > 0 else 0
             )
-
+    
             marge_brute = (
                 vente.get('chiffre_affaires', DEC_ZERO)
                 - vente.get('dette_consommee', DEC_ZERO)
             )
-
+    
             analyse_data.append({
                 'fournisseur': f,
-
+    
                 # Quantités
                 'quantite_livree': quantite_livree,
                 'quantite_vendue': quantite_vendue,
                 'stock_restant': lot.get('stock_restant', DEC_ZERO),
                 'valeur_stock_restant': lot.get('valeur_stock_restant', DEC_ZERO),
-
+    
                 # Montants
                 'montant_livre': dette_contractuelle,
                 'montant_ecoule': vente.get('chiffre_affaires', DEC_ZERO),
-
-                # Dettes
+    
+                # Dettes (ALIGNÉES DÉTAIL)
                 'dette_contractuelle': dette_contractuelle,
                 'dette_consommee': dette_consommee,
                 'total_paye': total_paye,
                 'reste_contractuel': reste_contractuel,
-
+    
                 # Analyse
                 'ecoulement_pct': round(ecoulement_pct, 2),
                 'marge_brute': marge_brute,
                 'nombre_lots': lot.get('nombre_lots', 0),
             })
-
+    
         # =========================
         # KPI GLOBAUX
         # =========================
         dette_contractuelle_globale = sum(i['dette_contractuelle'] for i in analyse_data)
-        total_paye_global = sum(i['total_paye'] for i in analyse_data)
         dette_consommee_globale = sum(i['dette_consommee'] for i in analyse_data)
-
+        total_paye_global = sum(i['total_paye'] for i in analyse_data)
+    
         kpi_globaux = {
             'dette_contractuelle_globale': dette_contractuelle_globale,
             'dette_consommee_globale': dette_consommee_globale,
@@ -905,7 +747,7 @@ class FournisseurAnalyseService:
             ),
             'marge_brute_totale': sum(i['marge_brute'] for i in analyse_data),
         }
-
+    
         return {
             'analyse_data': analyse_data,
             'kpi_globaux': kpi_globaux,
@@ -915,3 +757,4 @@ class FournisseurAnalyseService:
                 'fin': date_fin,
             }
         }
+    

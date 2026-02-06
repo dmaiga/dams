@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
 from requests import request
+from agents.services.rot_fournisseur import RotFournisseurService
 
 from core.models import (
     Agent,
@@ -31,46 +32,51 @@ def get_debut_mois():
     now = timezone.now()
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-
+ 
 
 class RotDashboardService:
 
-    SEUIL_STOCK_FAIBLE = 10
+    SEUIL_STOCK_FAIBLE = Decimal("10.00")
 
     @staticmethod
     def get_stock_entrepot():
-        produits = (
+        """
+        Stock entrepôt – Dashboard ROT
+        1) valeur_ligne = quantite_restante × prix_achat_unitaire
+        2) somme(valeur_ligne) par produit
+        """
+    
+        lots_annotes = (
             LotEntrepot.objects
+            .annotate(
+                valeur_ligne=ExpressionWrapper(
+                    F('quantite_restante') * F('prix_achat_unitaire'),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                )
+            )
+        )
+    
+        produits = (
+            lots_annotes
             .values('produit__nom')
             .annotate(
-                quantite_restante=Coalesce(Sum('quantite_restante'), Decimal('0'))
+                quantite_restante=Coalesce(
+                    Sum('quantite_restante'),
+                    Decimal('0.00')
+                ),
+                valeur_stock=Coalesce(
+                    Sum('valeur_ligne'),
+                    Decimal('0.00')
+                )
             )
             .order_by('produit__nom')
         )
-
-        # Calculer la valeur du stock pour chaque produit
-        for produit in produits:
-            valeur_stock = (
-                LotEntrepot.objects
-                .filter(produit__nom=produit['produit__nom'])
-                .aggregate(
-                    valeur=Coalesce(
-                        Sum(
-                            F('quantite_restante') * F('prix_achat_unitaire'),
-                            output_field=DecimalField(max_digits=15, decimal_places=2)
-                        ),
-                        Decimal('0'),
-                        output_field=DecimalField(max_digits=15, decimal_places=2)
-                    )
-                )['valeur']
-            )
-            produit['valeur_stock'] = valeur_stock
-
+    
         return {
             'produits': produits,
             'seuil_faible': RotDashboardService.SEUIL_STOCK_FAIBLE
         }
-
+    
     # =====================================================
     # 1️⃣ KPIs GLOBAUX ROT
     # =====================================================
@@ -365,5 +371,6 @@ class RotDashboardService:
             'stock_entrepot': RotDashboardService.get_stock_entrepot(),
             'suivi_superviseurs': RotDashboardService.get_suivi_superviseurs(),
             'fournisseurs': RotDashboardService.get_tableau_fournisseurs(),
+            'fournisseurs_rot': RotFournisseurService.get_suivi_fournisseurs_rot(),
             'alertes': RotDashboardService.get_alertes(),
         }
