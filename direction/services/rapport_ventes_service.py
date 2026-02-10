@@ -1,4 +1,6 @@
 from django.db.models import Sum, Count, F, DecimalField
+from django.db.models.functions import Coalesce
+from decimal import Decimal
 from core.models import Vente
 
 
@@ -21,18 +23,32 @@ class RapportVentesService:
                 "detail_distribution__lot__produit__nom"
             )
             .annotate(
+                # 🔹 Quantité vendue (unités)
                 total_quantite=Sum("quantite"),
+
+                # 🔹 Nombre de ventes
                 nombre_ventes=Count("id"),
 
-                # 🔴 CHIFFRE D’AFFAIRES (OFFICIEL)
+                # 🔹 CA officiel
                 total_ca=Sum(
                     F("quantite") * F("prix_vente_unitaire"),
                     output_field=DecimalField(max_digits=15, decimal_places=2)
-                )
+                ),
+
+                # 🆕 POIDS TOTAL VENDU (KG)
+                total_kg=Sum(
+                    F("quantite") *
+                    Coalesce(
+                        F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                        Decimal("1")
+                    ),
+                    output_field=DecimalField(max_digits=15, decimal_places=2)
+                ),
             )
             .order_by(
                 "agent__user__last_name",
-                "date_vente__date"
+                "date_vente__date",
+                "detail_distribution__lot__produit__nom",
             )
         )
 

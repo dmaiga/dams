@@ -797,6 +797,74 @@ class DashboardService:
         
         return sorted(stocks, key=lambda x: x['valeur_actuelle'], reverse=True)
 
+
+    @staticmethod
+    def get_agents_en_test():
+        today = timezone.now().date()
+
+        agents = Agent.objects.filter(
+            est_actif=True,
+            date_mise_service__isnull=False,
+            date_mise_service__gte=today - timedelta(days=14)
+        )
+
+        result = []
+
+        for agent in agents:
+            debut = agent.date_mise_service.date()
+            fin = today
+
+            ventes = Vente.objects.filter(
+                agent=agent,
+                date_vente__date__range=(debut, fin),
+                est_supprime=False
+            ).annotate(
+                kg=F("quantite") *
+                   Coalesce(
+                       F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                       1
+                   )
+            )
+
+            total_kg = ventes.aggregate(
+                total=Coalesce(Sum("kg"), Decimal("0"))
+            )["total"]
+
+            nb_jours = max((fin - debut).days, 1)
+            kg_par_jour = total_kg / nb_jours
+
+            # 🎯 Évaluation
+            if kg_par_jour >= 50:
+                statut = "conforme"
+                couleur = "success"
+                decision = "Maintenir"
+            elif kg_par_jour >= 30:
+                statut = "tolere"
+                couleur = "warning"
+                decision = "Surveillance"
+            else:
+                statut = "insuffisant"
+                couleur = "danger"
+                decision = "Arrêt recommandé"
+
+            jours_restants = max(
+                14 - (today - debut).days, 0
+            )
+
+            result.append({
+                "agent": agent,
+                "superviseur": agent.superviseur,
+                "date_debut": debut,
+                "jours_restants": jours_restants,
+                "total_kg": total_kg,
+                "kg_par_jour": kg_par_jour,
+                "statut": statut,
+                "couleur": couleur,
+                "decision": decision,
+            })
+
+        return result
+
     @staticmethod
     def determiner_statut_stock(taux_rotation, jours_stock, quantite_restante):
         """Détermine le statut du stock basé sur 3 critères"""

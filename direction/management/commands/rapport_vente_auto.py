@@ -34,28 +34,28 @@ class Command(BaseCommand):
                 date_fin = datetime.strptime(date_fin_opt, "%Y-%m-%d").date()
             except ValueError:
                 raise CommandError(
-                    "❌ Format invalide. Utilisez YYYY-MM-DD"
+                    " Format invalide. Utilisez YYYY-MM-DD"
                 )
 
             if date_debut > date_fin:
                 raise CommandError(
-                    "❌ date_debut ne peut pas être après date_fin"
+                    " date_debut ne peut pas être après date_fin"
                 )
 
             self.stdout.write(
-                f"📅 Période manuelle : {date_debut} → {date_fin}"
+                f" Période manuelle : {date_debut} -> {date_fin}"
             )
 
         elif not date_debut_opt and not date_fin_opt:
             date_debut, date_fin = derniers_jours_ouvres(nb_jours=2)
             self.stdout.write(
-                f"📅 Période automatique : {date_debut} → {date_fin}"
+                f" Période automatique : {date_debut} -> {date_fin}"
             )
         
 
         else:
             raise CommandError(
-                "❌ Vous devez fournir date_debut ET date_fin, ou aucun des deux."
+                " Vous devez fournir date_debut ET date_fin, ou aucun des deux."
             )
 
         # =====================================
@@ -108,6 +108,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"📧 Rapport généré et envoyé : {fichier_path}"
+                f" Rapport généré et envoyé : {fichier_path}"
             )
         )

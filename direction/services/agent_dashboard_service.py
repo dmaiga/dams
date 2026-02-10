@@ -1,21 +1,21 @@
 #/core/services/
 from core.models import (Agent, Vente, Recouvrement, 
                          VersementBancaire, Depense, DetailDistribution,
-                         DistributionAgent,RecouvrementSuperviseur)
+                         DistributionAgent,RecouvrementSuperviseur,
+                         AffectationLotSuperviseur )
+
 
 from django.db.models import Max
 from django.utils import timezone
 from datetime import timedelta, datetime
 from django.db.models import Sum, Count, Max, F, DecimalField,Q
 from django.db.models import ExpressionWrapper, DecimalField
-
 from decimal import Decimal
-
 from core.models import Agent, Vente
-
 from django.db.models.functions import Coalesce
-
 from django.core.cache import cache
+
+
 
 class DashboardAgentAnalysisService:
 
@@ -40,6 +40,13 @@ class DashboardAgentAnalysisService:
 
             # finance ROT
             "rots_finance": DashboardAgentAnalysisService.get_rot_finance(),
+
+            # stock superviseurs par produit
+            "superviseurs_produits": DashboardAgentAnalysisService.get_superviseurs_produits(),
+            
+            # agents en test
+            "agents_en_test": DashboardAgentAnalysisService.get_agents_en_test(),
+
         }
 
         cache.set(cache_key, data, 60 * 3)  # cache 3 minutes
@@ -354,3 +361,105 @@ class DashboardAgentAnalysisService:
     
         return data
     
+    @staticmethod
+    def get_superviseurs_produits():
+        superviseurs = Agent.objects.filter(
+            type_agent='entrepot',
+            est_actif=True
+        ).select_related('user')
+
+        affectations = (
+            AffectationLotSuperviseur.objects
+            .filter(superviseur__in=superviseurs, quantite_restante__gt=0)
+            .select_related('lot__produit', 'superviseur')
+            .order_by('-date_affectation')
+        )
+
+        data = {}
+        for aff in affectations:
+            sid = aff.superviseur.id
+            data.setdefault(sid, {
+                "superviseur": aff.superviseur,
+                "produits": []
+            })
+
+            data[sid]["produits"].append({
+                "produit": aff.lot.produit.nom,
+                "lot": aff.lot.reference_lot,
+                "quantite_restante": aff.quantite_restante,
+                "quantite_initiale": aff.quantite_initiale,
+                "date_affectation": aff.date_affectation,
+            })
+
+        return list(data.values())
+
+
+# core/services/agent_dashboard_service.py
+
+
+    @staticmethod
+    def get_agents_en_test():
+        today = timezone.now().date()
+
+        agents = Agent.objects.filter(
+            est_actif=True,
+            date_mise_service__isnull=False,
+            date_mise_service__gte=today - timedelta(days=14)
+        )
+
+        result = []
+
+        for agent in agents:
+            debut = agent.date_mise_service.date()
+            fin = today
+
+            ventes = Vente.objects.filter(
+                agent=agent,
+                date_vente__date__range=(debut, fin),
+                est_supprime=False
+            ).annotate(
+                kg=F("quantite") *
+                   Coalesce(
+                       F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                       1
+                   )
+            )
+
+            total_kg = ventes.aggregate(
+                total=Coalesce(Sum("kg"), Decimal("0"))
+            )["total"]
+
+            nb_jours = max((fin - debut).days, 1)
+            kg_par_jour = total_kg / nb_jours
+
+            # 🎯 Évaluation
+            if kg_par_jour >= 50:
+                statut = "conforme"
+                couleur = "success"
+                decision = "Maintenir"
+            elif kg_par_jour >= 30:
+                statut = "tolere"
+                couleur = "warning"
+                decision = "Surveillance"
+            else:
+                statut = "insuffisant"
+                couleur = "danger"
+                decision = "Arrêt recommandé"
+
+            jours_restants = max(
+                14 - (today - debut).days, 0
+            )
+
+            result.append({
+                "agent": agent,
+                "superviseur": agent.superviseur,
+                "date_debut": debut,
+                "jours_restants": jours_restants,
+                "total_kg": total_kg,
+                "kg_par_jour": kg_par_jour,
+                "statut": statut,
+                "couleur": couleur,
+                "decision": decision,
+            })
+
+        return result

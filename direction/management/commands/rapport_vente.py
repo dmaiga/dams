@@ -65,5 +65,5 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(
-            self.style.SUCCESS(f"📄 Rapport généré : {output}")
+            self.style.SUCCESS(f"Rapport généré : {output}")
         )
