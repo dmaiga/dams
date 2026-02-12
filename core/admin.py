@@ -53,8 +53,19 @@ class DetailDistributionAdmin(admin.ModelAdmin):
         'id',
         'produit_nom',
         'quantite',
-        'prix_gros',
-        'prix_detail',
+        'agent_terrain',
+        'superviseur',
+        'date_distribution',
+    )
+
+
+    search_fields = (
+        'lot__produit__nom',
+        'distribution__agent_terrain__user__username',
+        'distribution__superviseur__user__username',
+    )
+    list_filter = (
+        'distribution__date_distribution',
     )
 
     raw_id_fields = ('distribution', 'lot')
@@ -62,12 +73,25 @@ class DetailDistributionAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
             'lot__produit',
-            'distribution',
+            'distribution__agent_terrain',
+            'distribution__superviseur',
         )
 
     @admin.display(description="Produit")
     def produit_nom(self, obj):
         return obj.lot.produit.nom
+
+    @admin.display(description="Agent terrain")
+    def agent_terrain(self, obj):
+        return obj.distribution.agent_terrain
+
+    @admin.display(description="Superviseur")
+    def superviseur(self, obj):
+        return obj.distribution.superviseur
+
+    @admin.display(description="Date distribution")
+    def date_distribution(self, obj):
+        return obj.distribution.date_distribution
 
 
 

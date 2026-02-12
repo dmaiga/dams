@@ -471,7 +471,7 @@ class SupervisorDistributionForm(forms.Form):
                 quantite_restante__gt=0
             )
             .select_related('lot__produit')
-            .order_by('lot__produit__nom')
+            .order_by('-date_affectation')
         )
 
     # =================================================

@@ -1795,14 +1795,13 @@ def detail_depense(request, depense_id):
     depense = get_object_or_404(Depense, id=depense_id)
     agent = request.user.agent
 
-    # Permissions simples
-    if depense.effectue_par != agent and not agent.est_direction:
+    # ✅ Permission : uniquement ROT ou Direction
+    if not (agent.est_rot or agent.est_direction):
         return redirect('access_denied')
 
     return render(request, 'core/depenses/detail.html', {
         'depense': depense
     })
-
 
     
 @login_required
