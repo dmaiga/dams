@@ -35,6 +35,7 @@ class Command(BaseCommand):
         # 2️⃣ Données
         # ===============================
         rapport = RapportVentesService.rapport_agents(date_debut, date_fin)
+        agents_sans_vente = RapportVentesService.agents_sans_vente(date_debut, date_fin)
 
         # ===============================
         # 3️⃣ Chemin par défaut
@@ -57,11 +58,11 @@ class Command(BaseCommand):
         # ===============================
         if options["format"] == "word":
             generer_rapport_ventes_word(
-                rapport, date_debut, date_fin, output
+                rapport,agents_sans_vente, date_debut, date_fin, output
             )
         else:
             generer_rapport_ventes_pdf(
-                rapport, date_debut, date_fin, output
+                rapport,agents_sans_vente, date_debut, date_fin, output
             )
 
         self.stdout.write(

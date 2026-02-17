@@ -11,7 +11,7 @@ from core.models import Vente, Agent
 class VenteAnalyseService:
  
     @staticmethod
-    def filter_ventes(date_debut, date_fin, agent_id=None, type_vente=None, produit_id=None):
+    def filter_ventes(date_debut, date_fin, agent_id=None, type_vente=None, produit_id=None, lot_id=None  ):
         qs = (
             Vente.objects
             .select_related(
@@ -33,7 +33,9 @@ class VenteAnalyseService:
             qs = qs.filter(type_vente=type_vente)
         if produit_id:
             qs = qs.filter(detail_distribution__lot__produit_id=produit_id)
-
+        if lot_id:
+            qs = qs.filter(detail_distribution__lot_id=lot_id)
+        
         return qs
 
     # ------------------------------------------------------------------

@@ -40,6 +40,25 @@
                     {% endfor %}
                 </select>
             </div>
+<!-- LOT -->
+<div class="col-12 col-md-4">
+    <label class="form-label small fw-semibold">Lot distribué</label>
+
+    <select name="lot" class="form-select form-select-sm">
+        <option value="">Tous les lots</option>
+
+        {% for l in lots %}
+        <option value="{{ l.id }}"
+            {% if filters.lot == l.id|stringformat:"s" %}selected{% endif %}>
+
+            {{ l.produit.nom }}
+            |{{ l.fournisseur.nom|default:"—" }}
+            |{{ l.date_reception|date:"d/m/Y" }}
+
+        </option>
+        {% endfor %}
+    </select>
+</div>
 
             <!-- AGENT -->
             <div class="col-12 col-md-4">

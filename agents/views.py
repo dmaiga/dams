@@ -28,6 +28,8 @@ from datetime import timedelta
 from decimal import Decimal
 import json
 
+from urllib3 import request
+
 # Project models
 from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
 from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
@@ -489,6 +491,7 @@ def liste_distribution_sup(request):
     produit_id = request.GET.get('produit')
     date_debut = request.GET.get('date_debut')
     date_fin = request.GET.get('date_fin')
+    lot_id = request.GET.get('lot')
 
     if agent_id:
         distributions = distributions.filter(agent_terrain_id=agent_id)
@@ -503,6 +506,11 @@ def liste_distribution_sup(request):
 
     if date_fin:
         distributions = distributions.filter(date_distribution__date__lte=date_fin)
+   
+    if lot_id:
+        distributions = distributions.filter(
+            detaildistribution__lot_id=lot_id
+        ).distinct()
 
     agents = (
         Agent.objects
@@ -517,18 +525,33 @@ def liste_distribution_sup(request):
         .distinct()
         .order_by('nom')
     )
+    
+    lots = (
+        LotEntrepot.objects
+        .filter(
+            detaildistribution__distribution__superviseur=superviseur
+        )
+        .select_related('produit', 'fournisseur') 
+        .distinct()
+        .order_by('produit__nom', '-date_reception')
+
+    )
+
 
     context = {
         'distributions': distributions,
         'agents': agents,
         'produits': produits,
+        'lots': lots,   
         'filters': {
             'agent': agent_id,
             'produit': produit_id,
+            'lot': lot_id, 
             'date_debut': date_debut,
             'date_fin': date_fin,
         }
     }
+
 
     return render(
         request,

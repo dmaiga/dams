@@ -528,6 +528,8 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         agent_id = params.get("agent")
         type_vente = params.get("type")
         produit_id = params.get("produit")
+        lot_id = params.get("lot")
+
 
         # 🔴 ÉTAPE MANQUANTE → créer le queryset
         qs = VenteAnalyseService.filter_ventes(
@@ -536,6 +538,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             agent_id=agent_id,
             type_vente=type_vente,
             produit_id=produit_id,
+            lot_id=lot_id,
         )
         dernier_recouvrement = Recouvrement.objects.filter(
             vente_id=OuterRef("pk")
@@ -588,7 +591,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         stats = VenteAnalyseService.compute_stats(ventes_qs)
         top_agents = VenteAnalyseService.compute_top_agents(ventes_qs)
         agents_list = VenteAnalyseService.get_agents_list()
-
+        
         current_year = timezone.now().year
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),
@@ -611,7 +614,9 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "top_agents": top_agents,
             "agents_list": agents_list,
             "produits_list": Produit.objects.only("id", "nom").order_by("nom"),
-
+            "lots_list": LotEntrepot.objects.select_related("produit")
+                        .order_by("-date_reception"),
+        
             # Contexte temporel
             "years": list(range(current_year - 2, current_year + 3)),
             "months": months,

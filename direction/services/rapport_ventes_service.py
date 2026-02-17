@@ -1,7 +1,8 @@
 from django.db.models import Sum, Count, F, DecimalField
 from django.db.models.functions import Coalesce
 from decimal import Decimal
-from core.models import Vente
+from core.models import Vente,Agent
+
 
 
 class RapportVentesService:
@@ -53,3 +54,31 @@ class RapportVentesService:
         )
 
         return ventes
+
+    @staticmethod
+    def agents_sans_vente(date_debut, date_fin):
+
+        # Agents ayant vendu sur la période
+        agents_ayant_vendu = (
+            Vente.objects
+            .filter(
+                date_vente__date__range=(date_debut, date_fin),
+                est_supprime=False
+            )
+            .values_list("agent_id", flat=True)
+            .distinct()
+        )
+
+        # ✅ uniquement agents commerciaux
+        agents_sans_vente = (
+            Agent.objects
+            .filter(
+                est_actif=True,
+                type_agent__in=["terrain", "agent_gros"]
+            )
+            .exclude(id__in=agents_ayant_vendu)
+            .select_related("user")
+            .order_by("user__last_name")
+        )
+
+        return agents_sans_vente
