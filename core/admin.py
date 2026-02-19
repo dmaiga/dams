@@ -51,6 +51,7 @@ class DetailDistributionAdmin(admin.ModelAdmin):
 
     list_display = (
         'id',
+        'lot_reference',
         'produit_nom',
         'quantite',
         'agent_terrain',
@@ -80,6 +81,9 @@ class DetailDistributionAdmin(admin.ModelAdmin):
     @admin.display(description="Produit")
     def produit_nom(self, obj):
         return obj.lot.produit.nom
+    @admin.display(description="Lot reference")
+    def lot_reference(self, obj):
+        return obj.lot.reference_lot
 
     @admin.display(description="Agent terrain")
     def agent_terrain(self, obj):
@@ -629,6 +633,7 @@ class AffectationLotSuperviseurAdmin(admin.ModelAdmin):
 
     list_display = (
         'id',
+        'lot_reference',
         'produit_nom',
         'superviseur',
         'quantite_resume',
@@ -675,6 +680,9 @@ class AffectationLotSuperviseurAdmin(admin.ModelAdmin):
     @admin.display(description="Produit")
     def produit_nom(self, obj):
         return obj.lot.produit.nom
+    @admin.display(description="Lot")
+    def lot_reference(self, obj):
+        return obj.lot.reference_lot
 
  
 @admin.register(FactureLotEntrepot)

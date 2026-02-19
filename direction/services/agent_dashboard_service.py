@@ -17,6 +17,8 @@ from django.core.cache import cache
 
 
 
+
+
 class DashboardAgentAnalysisService:
 
     @staticmethod
@@ -262,40 +264,65 @@ class DashboardAgentAnalysisService:
 
     @staticmethod
     def get_superviseurs_finance():
+
         debut, fin = DashboardAgentAnalysisService.get_trimestre_courant_range()
 
-        superviseurs = Agent.objects.filter(type_agent='entrepot', est_actif=True)
+        superviseurs = (
+            Agent.objects
+            .select_related("user")
+            .filter(type_agent='entrepot', est_actif=True)
+        )
+
+        ventes_map = {
+            x["agent_id"]: x["total"]
+            for x in (
+                Vente.objects
+                .filter(
+                    date_vente__range=(debut, fin),
+                    est_supprime=False
+                )
+                .values("agent_id")
+                .annotate(
+                    total=Coalesce(
+                        Sum(
+                            ExpressionWrapper(
+                                F("quantite") * F("prix_vente_unitaire"),
+                                output_field=DecimalField()
+                            )
+                        ),
+                        Decimal("0.00")
+                    )
+                )
+            )
+        }
+
+        recouvre_map = {
+            x["superviseur_id"]: x["total"]
+            for x in (
+                Recouvrement.objects
+                .filter(date_recouvrement__range=(debut, fin))
+                .values("superviseur_id")
+                .annotate(total=Coalesce(Sum("montant_recouvre"), Decimal("0.00")))
+            )
+        }
+
+        remis_map = {
+            x["superviseur_id"]: x["total"]
+            for x in (
+                RecouvrementSuperviseur.objects
+                .filter(date_recouvrement__range=(debut, fin))
+                .values("superviseur_id")
+                .annotate(total=Coalesce(Sum("montant"), Decimal("0.00")))
+            )
+        }
+
         data = []
 
         for sup in superviseurs:
 
-            ventes_perso = Vente.objects.filter(
-                agent=sup,
-                date_vente__gte=debut,
-                date_vente__lte=fin,
-                est_supprime=False
-            ).aggregate(
-                total=Coalesce(
-                    Sum(F("quantite") * F("prix_vente_unitaire")),
-                    Decimal("0.00")
-                )
-            )["total"]
-
-            recouvre_agents = Recouvrement.objects.filter(
-                superviseur=sup,
-                date_recouvrement__gte=debut,
-                date_recouvrement__lte=fin
-            ).aggregate(
-                total=Coalesce(Sum("montant_recouvre"), Decimal("0.00"))
-            )["total"]
-
-            remis_rot = RecouvrementSuperviseur.objects.filter(
-                superviseur=sup,
-                date_recouvrement__gte=debut,
-                date_recouvrement__lte=fin
-            ).aggregate(
-                total=Coalesce(Sum("montant"), Decimal("0.00"))
-            )["total"]
+            ventes_perso = ventes_map.get(sup.id, Decimal("0"))
+            recouvre_agents = recouvre_map.get(sup.id, Decimal("0"))
+            remis_rot = remis_map.get(sup.id, Decimal("0"))
 
             solde = (recouvre_agents + ventes_perso) - remis_rot
 
@@ -321,36 +348,52 @@ class DashboardAgentAnalysisService:
     
     @staticmethod
     def get_rot_finance():
+
         debut, fin = DashboardAgentAnalysisService.get_trimestre_courant_range()
-        rots = Agent.objects.filter(type_agent='rot', est_actif=True)
-    
+
+        rots = Agent.objects.select_related("user").filter(
+            type_agent='rot',
+            est_actif=True
+        )
+
+        recup_map = {
+            x["rot_id"]: x["total"]
+            for x in (
+                RecouvrementSuperviseur.objects
+                .filter(date_recouvrement__range=(debut, fin))
+                .values("rot_id")
+                .annotate(total=Coalesce(Sum("montant"), Decimal("0.00")))
+            )
+        }
+
+        verse_map = {
+            x["effectue_par_id"]: x["total"]
+            for x in (
+                VersementBancaire.objects
+                .filter(date_versement_reelle__range=(debut, fin))
+                .values("effectue_par_id")
+                .annotate(total=Coalesce(Sum("montant_vente"), Decimal("0.00")))
+            )
+        }
+
+        depense_map = {
+            x["effectue_par_id"]: x["total"]
+            for x in (
+                Depense.objects
+                .filter(date_depense__range=(debut, fin))
+                .values("effectue_par_id")
+                .annotate(total=Coalesce(Sum("montant"), Decimal("0.00")))
+            )
+        }
+
         data = []
+
         for rot in rots:
-        
-            recupere = RecouvrementSuperviseur.objects.filter(
-                rot=rot,
-                date_recouvrement__gte=debut,
-                date_recouvrement__lte=fin
-            ).aggregate(
-                total=Coalesce(Sum("montant"), Decimal("0.00"))
-            )["total"]
-    
-            verse = VersementBancaire.objects.filter(
-                effectue_par=rot,
-                date_versement_reelle__gte=debut,
-                date_versement_reelle__lte=fin
-            ).aggregate(
-                total=Coalesce(Sum("montant_vente"), Decimal("0.00"))
-            )["total"]
-    
-            depenses = Depense.objects.filter(
-                effectue_par=rot,
-                date_depense__gte=debut,
-                date_depense__lte=fin
-            ).aggregate(
-                total=Coalesce(Sum("montant"), Decimal("0.00"))
-            )["total"]
-    
+
+            recupere = recup_map.get(rot.id, Decimal("0"))
+            verse = verse_map.get(rot.id, Decimal("0"))
+            depenses = depense_map.get(rot.id, Decimal("0"))
+
             data.append({
                 "rot": rot,
                 "recupere_trimestre": recupere,
@@ -358,9 +401,9 @@ class DashboardAgentAnalysisService:
                 "depenses_trimestre": depenses,
                 "solde_trimestre": recupere - verse - depenses,
             })
-    
+
         return data
-    
+
     @staticmethod
     def get_superviseurs_produits():
         superviseurs = Agent.objects.filter(
@@ -396,70 +439,97 @@ class DashboardAgentAnalysisService:
 
 # core/services/agent_dashboard_service.py
 
-
     @staticmethod
     def get_agents_en_test():
+    
         today = timezone.now().date()
-
-        agents = Agent.objects.filter(
-            est_actif=True,
-            date_mise_service__isnull=False,
-            date_mise_service__gte=today - timedelta(days=14)
-        )
-
-        result = []
-
-        for agent in agents:
-            debut = agent.date_mise_service.date()
-            fin = today
-
-            ventes = Vente.objects.filter(
-                agent=agent,
-                date_vente__date__range=(debut, fin),
-                est_supprime=False
-            ).annotate(
-                kg=F("quantite") *
-                   Coalesce(
-                       F("detail_distribution__lot__produit__poids_unitaire_kg"),
-                       1
-                   )
+        debut_global = today - timedelta(days=14)
+    
+        # ✅ agents chargés avec user + superviseur
+        agents = list(
+            Agent.objects
+            .select_related("user", "superviseur__user")
+            .filter(
+                est_actif=True,
+                type_agent__in=["terrain", "agent_gros"],
+                date_debut_fonction__isnull=False,
+                date_debut_fonction__gte=debut_global
             )
-
-            total_kg = ventes.aggregate(
-                total=Coalesce(Sum("kg"), Decimal("0"))
-            )["total"]
-
-            nb_jours = max((fin - debut).days, 1)
-            kg_par_jour = total_kg / nb_jours
-
-            # 🎯 Évaluation
+        )
+    
+        if not agents:
+            return []
+    
+        agent_ids = [a.id for a in agents]
+    
+        # ✅ expression KG unique
+        kg_expression = ExpressionWrapper(
+            F("quantite") *
+            Coalesce(
+                F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                Decimal("1.0")
+            ),
+            output_field=DecimalField(max_digits=14, decimal_places=2)
+        )
+    
+        # ✅ UNE SEULE REQUÊTE ventes
+        ventes_agg = {
+            x["agent_id"]: x["total"]
+            for x in (
+                Vente.objects
+                .filter(
+                    agent_id__in=agent_ids,
+                    est_supprime=False,
+                    date_vente__date__gte=debut_global
+                )
+                .annotate(kg=kg_expression)
+                .values("agent_id")
+                .annotate(
+                    total=Coalesce(
+                        Sum("kg"),
+                        Decimal("0.00"),
+                        output_field=DecimalField(max_digits=14, decimal_places=2)
+                    )
+                )
+            )
+        }
+    
+        result = []
+    
+        for agent in agents:
+        
+            debut = agent.date_debut_fonction
+            total_kg = ventes_agg.get(agent.id, Decimal("0.00"))
+    
+            nb_jours = max((today - debut).days, 1)
+            kg_par_jour = total_kg / Decimal(nb_jours)
+    
+            # 🎯 Evaluation performance
             if kg_par_jour >= 50:
                 statut = "conforme"
                 couleur = "success"
-                decision = "Maintenir"
             elif kg_par_jour >= 30:
                 statut = "tolere"
                 couleur = "warning"
-                decision = "Surveillance"
             else:
                 statut = "insuffisant"
                 couleur = "danger"
-                decision = "Arrêt recommandé"
-
+    
             jours_restants = max(
-                14 - (today - debut).days, 0
+                14 - (today - debut).days,
+                0
             )
-
+    
             result.append({
                 "agent": agent,
                 "superviseur": agent.superviseur,
                 "date_debut": debut,
                 "jours_restants": jours_restants,
                 "total_kg": total_kg,
-                "kg_par_jour": kg_par_jour,
+                "kg_par_jour": round(kg_par_jour, 2),
                 "statut": statut,
                 "couleur": couleur,
-                "decision": decision,
             })
-
+    
         return result
+    

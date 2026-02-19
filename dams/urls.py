@@ -35,6 +35,9 @@ urlpatterns = [
     path('agents/', include('agents.urls')),
     path('paie/', include('paie.urls')),
 
+    path("app/", include("mobile.urls")),
+
+
 
 
 ]

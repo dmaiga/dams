@@ -28,7 +28,7 @@ from core.models import (
     AffectationLotSuperviseur,RecouvrementSuperviseur
 )
 
-
+from django.db import transaction
 
 
 
@@ -167,9 +167,17 @@ class RotSupervisorCreationForm(forms.ModelForm):
 
 # forms.py
 class SupervisorTerrainAgentCreationForm(forms.ModelForm):
+
     nom = forms.CharField(max_length=30, required=True)
     prenom = forms.CharField(max_length=30, required=True)
     telephone = forms.CharField(max_length=50, required=True)
+
+    date_debut_fonction = forms.DateField(
+        required=True,
+        label="Date de prise de fonction",
+        widget=forms.DateInput(attrs={'type': 'date'})
+    )
+
     type_agent = forms.ChoiceField(
         choices=[
             ('terrain', 'Agent (Vente au Détail)'),
@@ -178,29 +186,58 @@ class SupervisorTerrainAgentCreationForm(forms.ModelForm):
         initial='terrain',
         label="Type d'agent"
     )
+
     class Meta:
         model = Agent
         fields = [
             'telephone',
             'marche_affectation',
             'quartier',
+            'date_debut_fonction',
         ]
 
     def __init__(self, *args, **kwargs):
         self.superviseur = kwargs.pop('superviseur')
         super().__init__(*args, **kwargs)
 
+    # -------------------------
+    # VALIDATIONS
+    # -------------------------
+
     def clean_telephone(self):
-        telephone = self.cleaned_data['telephone'].replace(' ', '')
-        if Agent.objects.filter(telephone=telephone).exists():
+        telephone = self.cleaned_data['telephone']
+        telephone = telephone.replace(' ', '').strip()
+
+        if Agent.objects.filter(
+            telephone=telephone,
+            est_actif=True
+        ).exists():
             raise ValidationError("Numéro déjà utilisé.")
+
         return telephone
 
+    def clean_date_debut_fonction(self):
+        date_debut = self.cleaned_data['date_debut_fonction']
+
+        if date_debut > timezone.now().date():
+            raise ValidationError("La date ne peut pas être dans le futur.")
+
+        return date_debut
+
+    # -------------------------
+    # SAVE ATOMIQUE
+    # -------------------------
+
+    @transaction.atomic
     def save(self, commit=True):
+
         nom = self.cleaned_data['nom']
         prenom = self.cleaned_data['prenom']
         telephone = self.cleaned_data['telephone']
-        type_agent = self.cleaned_data['type_agent'] 
+        type_agent = self.cleaned_data['type_agent']
+        date_debut = self.cleaned_data['date_debut_fonction']
+
+        # username unique
         username = f"{prenom.lower()}.{nom.lower()}"
         i = 1
         while User.objects.filter(username=username).exists():
@@ -216,17 +253,61 @@ class SupervisorTerrainAgentCreationForm(forms.ModelForm):
         )
 
         agent = super().save(commit=False)
+
         agent.user = user
         agent.telephone = telephone
-        agent.type_agent = type_agent 
+        agent.type_agent = type_agent
         agent.superviseur = self.superviseur
         agent.est_actif = True
+        agent.date_debut_fonction = date_debut
+
+        if not agent.salaire_base_personnel:
+            agent.salaire_base_personnel = Decimal("20000")
 
         if commit:
             agent.save()
 
         return agent
 
+
+class SupervisorTerrainAgentUpdateForm(forms.ModelForm):
+
+    date_debut_fonction = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={'type': 'date'})
+    )
+
+    class Meta:
+        model = Agent
+        fields = [
+            'telephone',
+            'marche_affectation',
+            'quartier',
+            'date_debut_fonction',
+            'est_actif',
+        ]
+
+    def clean_telephone(self):
+        telephone = self.cleaned_data['telephone']
+        telephone = telephone.replace(' ', '').strip()
+
+        qs = Agent.objects.filter(
+            telephone=telephone,
+            est_actif=True
+        ).exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise ValidationError("Numéro déjà utilisé.")
+
+        return telephone
+
+    def clean_date_debut_fonction(self):
+        date_debut = self.cleaned_data['date_debut_fonction']
+
+        if date_debut > timezone.now().date():
+            raise ValidationError("La date ne peut pas être future.")
+
+        return date_debut
 
 from django import forms
 from django.core.exceptions import ValidationError

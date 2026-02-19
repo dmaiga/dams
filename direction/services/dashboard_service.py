@@ -17,15 +17,9 @@ class DashboardService:
 
     @staticmethod
     def get_kpis_fournisseurs(periode_type='annee', annee=None, mois=None):
-        """
-        KPIs fournisseurs – LOGIQUE SAINE
-        - Dette contractuelle = réceptions (lots)
-        - Dette consommée = ventes (bornée)
-        - Paiement = comparé au contractuel UNIQUEMENT
-        """
     
         from core.models import Fournisseur, Vente, PaiementFournisseur, LotEntrepot
-        from django.db.models import Sum, F
+        from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Count
         from django.db.models.functions import Coalesce
         from decimal import Decimal
         from django.utils import timezone
@@ -40,57 +34,95 @@ class DashboardService:
         total_paye_global = Decimal('0.00')
         total_reste_contractuel = Decimal('0.00')
     
-        fournisseurs = Fournisseur.objects.filter(
-            lots__isnull=False
-        ).distinct().order_by('nom')
+        # ===============================
+        # 1️⃣ AGRÉGATS LOTS (1 requête)
+        # ===============================
+        lots_agg = {
+            x["fournisseur_id"]: x
+            for x in (
+                LotEntrepot.objects
+                .filter(date_reception__lte=date_fin)
+                .values("fournisseur_id")
+                .annotate(
+                    dette_contractuelle=Coalesce(
+                        Sum(
+                            ExpressionWrapper(
+                                F("quantite_initiale") * F("prix_achat_unitaire"),
+                                output_field=DecimalField()
+                            )
+                        ),
+                        Decimal("0.00")
+                    ),
+                    total_lots=Count("id"),
+
+                    lots_periode=Count(
+                        "id",
+                        filter=Q(date_reception__range=(date_debut, date_fin))
+                    )
+
+                )
+            )
+        }
+    
+        # ===============================
+        # 2️⃣ AGRÉGATS VENTES (1 requête)
+        # ===============================
+        ventes_agg = {
+            x["detail_distribution__lot__fournisseur_id"]: x["total"]
+            for x in (
+                Vente.objects
+                .filter(date_vente__lte=now)
+                .values("detail_distribution__lot__fournisseur_id")
+                .annotate(
+                    total=Coalesce(
+                        Sum(
+                            ExpressionWrapper(
+                                F("quantite") *
+                                F("detail_distribution__lot__prix_achat_unitaire"),
+                                output_field=DecimalField()
+                            )
+                        ),
+                        Decimal("0.00")
+                    )
+                )
+            )
+        }
+    
+        # ===============================
+        # 3️⃣ AGRÉGATS PAIEMENTS (1 requête)
+        # ===============================
+        paiements_agg = {
+            x["fournisseur_id"]: x["total"]
+            for x in (
+                PaiementFournisseur.objects
+                .filter(est_supprime=False, date_paiement__lte=now)
+                .values("fournisseur_id")
+                .annotate(
+                    total=Coalesce(Sum("montant"), Decimal("0.00"))
+                )
+            )
+        }
+    
+        # ===============================
+        # FOURNISSEURS (0 requête interne)
+        # ===============================
+        fournisseurs = Fournisseur.objects.order_by("nom")
     
         for fournisseur in fournisseurs:
         
-            # =========================
-            # 1️⃣ DETTE CONTRACTUELLE (LOTS)
-            # =========================
-            dette_contractuelle = LotEntrepot.objects.filter(
-                fournisseur=fournisseur,
-                date_reception__lte=date_fin
-            ).aggregate(
-                total=Coalesce(
-                    Sum(F('quantite_initiale') * F('prix_achat_unitaire')),
-                    Decimal('0.00')
-                )
-            )['total']
+            lots_data = lots_agg.get(fournisseur.id, {})
+            dette_contractuelle = lots_data.get("dette_contractuelle", Decimal("0.00"))
+            total_lots = lots_data.get("total_lots", 0)
+            nombre_lots_periode = lots_data.get("lots_periode", 0)
     
-            # =========================
-            # 2️⃣ DETTE CONSOMMÉE (VENTES)
-            # =========================
-            dette_consommee_brute = Vente.objects.filter(
-                detail_distribution__lot__fournisseur=fournisseur,
-                date_vente__lte=now
-            ).aggregate(
-                total=Coalesce(
-                    Sum(F('quantite') * F('detail_distribution__lot__prix_achat_unitaire')),
-                    Decimal('0.00')
-                )
-            )['total']
-    
+            dette_consommee_brute = ventes_agg.get(fournisseur.id, Decimal("0.00"))
             dette_consommee = min(dette_consommee_brute, dette_contractuelle)
     
-            # =========================
-            # 3️⃣ PAIEMENTS
-            # =========================
-            total_paye = PaiementFournisseur.objects.filter(
-                fournisseur=fournisseur,
-                est_supprime=False,
-                date_paiement__lte=now
-            ).aggregate(
-                total=Coalesce(Sum('montant'), Decimal('0.00'))
-            )['total']
+            total_paye = paiements_agg.get(fournisseur.id, Decimal("0.00"))
     
-            # =========================
-            # 4️⃣ RESTE CONTRACTUEL
-            # =========================
             reste_contractuel = max(
                 dette_contractuelle - total_paye,
-                Decimal('0.00')
+                Decimal("0.00")
             )
     
             pourcentage_paye = (
@@ -98,34 +130,18 @@ class DashboardService:
                 if dette_contractuelle > 0 else 100
             )
     
-            # =========================
-            # 5️⃣ LOTS DE LA PÉRIODE
-            # =========================
-            nombre_lots_periode = fournisseur.lots.filter(
-                date_reception__range=[date_debut, date_fin]
-            ).count()
-    
             fournisseurs_data.append({
                 'fournisseur': fournisseur,
                 'nom': fournisseur.nom,
-    
-                # DETTES
                 'dette_contractuelle': dette_contractuelle,
                 'dette_consommee': dette_consommee,
-    
-                # FINANCIER
                 'total_paye': total_paye,
                 'reste_contractuel': reste_contractuel,
                 'pourcentage_paye': round(pourcentage_paye, 2),
-    
-                # META
                 'nombre_lots_periode': nombre_lots_periode,
-                'total_lots': fournisseur.lots.count(),
+                'total_lots': total_lots,
             })
     
-            # =========================
-            # AGRÉGATS GLOBAUX
-            # =========================
             total_dette_contractuelle += dette_contractuelle
             total_dette_consommee += dette_consommee
             total_paye_global += total_paye
@@ -143,14 +159,11 @@ class DashboardService:
     
         return {
             'fournisseurs_data': fournisseurs_data,
-    
-            # KPI GLOBAUX
             'dette_contractuelle': total_dette_contractuelle,
             'dette_consommee': total_dette_consommee,
             'total_paye': total_paye_global,
             'reste_contractuel': total_reste_contractuel,
             'pourcentage_global_paye': round(pourcentage_global_paye, 2),
-    
             'nombre_fournisseurs': len(fournisseurs_data),
         }
     
@@ -275,7 +288,7 @@ class DashboardService:
         # -------------------------
         # SOLDE SUPERVISEURS (INSTANTANÉ)
         # -------------------------
-        superviseurs = Agent.objects.filter(type_agent='entrepot')
+        superviseurs = Agent.objects.select_related("user").filter(type_agent='entrepot')
         solde_superviseurs = sum(
             float(superviseur.solde_reel_superviseur)
             for superviseur in superviseurs
@@ -375,7 +388,7 @@ class DashboardService:
         date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
         
         performances = []
-        superviseurs = Agent.objects.filter(type_agent='entrepot')
+        superviseurs = Agent.objects.select_related("user").filter(type_agent='entrepot')
         
         for superviseur in superviseurs:
             # Ventes de la période
@@ -580,7 +593,7 @@ class DashboardService:
         
         # Dépenses par superviseur pour la période
         depenses_par_superviseur = []
-        for agent in Agent.objects.filter(type_agent='entrepot'):
+        for agent in Agent.objects.select_related("user").filter(type_agent='entrepot'):
             depenses_agent = Depense.objects.filter(
                 versement__superviseur=agent, 
                 date_depense__range=[date_debut, date_fin]
@@ -737,7 +750,7 @@ class DashboardService:
     @staticmethod
     def get_portefeuilles_tous_superviseurs(periode_type='mois', annee=None, mois=None):
         """Retourne les portefeuilles de TOUS les superviseurs (pour la direction) avec valeurs sur la période."""
-        superviseurs = Agent.objects.filter(type_agent='entrepot')
+        superviseurs = Agent.objects.select_related("user").filter(type_agent='entrepot')
         portefeuilles = []
 
         for superviseur in superviseurs:
@@ -798,72 +811,6 @@ class DashboardService:
         return sorted(stocks, key=lambda x: x['valeur_actuelle'], reverse=True)
 
 
-    @staticmethod
-    def get_agents_en_test():
-        today = timezone.now().date()
-
-        agents = Agent.objects.filter(
-            est_actif=True,
-            date_mise_service__isnull=False,
-            date_mise_service__gte=today - timedelta(days=14)
-        )
-
-        result = []
-
-        for agent in agents:
-            debut = agent.date_mise_service.date()
-            fin = today
-
-            ventes = Vente.objects.filter(
-                agent=agent,
-                date_vente__date__range=(debut, fin),
-                est_supprime=False
-            ).annotate(
-                kg=F("quantite") *
-                   Coalesce(
-                       F("detail_distribution__lot__produit__poids_unitaire_kg"),
-                       1
-                   )
-            )
-
-            total_kg = ventes.aggregate(
-                total=Coalesce(Sum("kg"), Decimal("0"))
-            )["total"]
-
-            nb_jours = max((fin - debut).days, 1)
-            kg_par_jour = total_kg / nb_jours
-
-            # 🎯 Évaluation
-            if kg_par_jour >= 50:
-                statut = "conforme"
-                couleur = "success"
-                decision = "Maintenir"
-            elif kg_par_jour >= 30:
-                statut = "tolere"
-                couleur = "warning"
-                decision = "Surveillance"
-            else:
-                statut = "insuffisant"
-                couleur = "danger"
-                decision = "Arrêt recommandé"
-
-            jours_restants = max(
-                14 - (today - debut).days, 0
-            )
-
-            result.append({
-                "agent": agent,
-                "superviseur": agent.superviseur,
-                "date_debut": debut,
-                "jours_restants": jours_restants,
-                "total_kg": total_kg,
-                "kg_par_jour": kg_par_jour,
-                "statut": statut,
-                "couleur": couleur,
-                "decision": decision,
-            })
-
-        return result
 
     @staticmethod
     def determiner_statut_stock(taux_rotation, jours_stock, quantite_restante):

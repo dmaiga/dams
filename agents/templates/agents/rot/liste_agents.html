@@ -5,80 +5,101 @@
 {% block content %}
 <div class="container py-3">
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-         <h4 class="mb-4">
-            <i class="fas fa-users me-2"></i>
-            Superviseurs & Agents terrain
-        </h4>
-        </div>
-        <a href="{% url 'creer_agent' %}" class="btn btn-primary btn-sm">
-            <i class="fas fa-plus me-1"></i> Nouvel agent
+<style>
+.agent-card{
+    border-radius:12px;
+}
+
+.label{
+    font-size:.8rem;
+    color:#6c757d;
+}
+
+.value{
+    font-size:.95rem;
+    font-weight:500;
+}
+
+.phone{
+    white-space:nowrap;
+}
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">
+        <i class="fas fa-users me-2"></i>
+        Superviseurs & Agents terrain
+    </h5>
+</div>
+
+{% for superviseur in superviseurs %}
+<div class="card agent-card mb-3 shadow-sm">
+
+    <!-- HEADER SUPERVISEUR -->
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <strong>
+            <i class="fas fa-user-tie me-1"></i>
+            {{ superviseur.full_name }}
+        </strong>
+
+        <a href="{% url 'detail_agent_rot' superviseur.id %}"
+           class="btn btn-sm btn-outline-primary">
+            Voir
         </a>
     </div>
-     
 
-    {% for superviseur in superviseurs %}
-        <div class="card mb-3 shadow-sm">
-            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                <strong>
-                    <i class="fas fa-user-tie me-1"></i>
-                    {{ superviseur.full_name }}
-                </strong>
+    <!-- AGENTS -->
+    <div class="card-body p-2">
 
-                <a href="{% url 'detail_agent_rot' superviseur.id %}"
-                   class="btn btn-sm btn-outline-primary">
+        {% for agent in superviseur.agents_geres.all %}
+        <div class="border rounded p-2 mb-2">
+
+            <div class="d-flex justify-content-between align-items-center">
+                <strong>{{ agent.full_name }}</strong>
+
+                {% if agent.type_agent == 'terrain' %}
+                    <span class="badge bg-secondary">Détail</span>
+                {% elif agent.type_agent == 'agent_gros' %}
+                    <span class="badge bg-info">Gros</span>
+                {% endif %}
+            </div>
+
+            <div class="d-flex justify-content-between mt-2">
+                <span class="label">Téléphone</span>
+                <span class="value phone" translate="no">
+                    {{ agent.telephone|default:"—" }}
+                </span>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <span class="label">Marché</span>
+                <span class="value">
+                    {{ agent.marche_affectation|default:"—" }}
+                </span>
+            </div>
+
+            <div class="text-end mt-2">
+                <a href="{% url 'detail_agent_rot' agent.id %}"
+                   class="btn btn-sm btn-outline-secondary w-100">
                     Voir détail
                 </a>
             </div>
 
-            <div class="card-body p-0">
-                {% if superviseur.agents_geres.all %}
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Agent terrain</th>
-                                 <th>Type</th>
-                                <th>Téléphone</th>
-                                <th>Marché</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for agent in superviseur.agents_geres.all %}
-                                <tr>
-                                    <td>{{ agent.full_name }}</td>
-                                       <td>
-                                        {% if agent.type_agent == 'terrain' %}
-                                        <span class="badge bg-secondary">Détail</span>
-                                        {% elif agent.type_agent == 'agent_gros' %}
-                                        <span class="badge bg-info">Gros</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ agent.telephone|default:"—" }}</td>
-                                    <td>{{ agent.marche_affectation|default:"—" }}</td>
-                                    <td class="text-end">
-                                        <a href="{% url 'detail_agent_rot' agent.id %}"
-                                           class="btn btn-sm btn-outline-secondary">
-                                            Détail
-                                        </a>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <div class="text-muted small p-3">
-                        Aucun agent terrain rattaché
-                    </div>
-                {% endif %}
-            </div>
         </div>
-    {% empty %}
-        <div class="alert alert-info">
-            Aucun superviseur actif.
+        {% empty %}
+        <div class="text-muted small">
+            Aucun agent terrain rattaché
         </div>
-    {% endfor %}
+        {% endfor %}
+
+    </div>
+</div>
+
+{% empty %}
+<div class="alert alert-info">
+    Aucun superviseur actif.
+</div>
+{% endfor %}
 
 </div>
 {% endblock %}

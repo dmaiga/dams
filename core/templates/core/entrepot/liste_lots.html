@@ -1,315 +1,205 @@
 {% extends 'base.html' %}
-{% load static %}
-{% load humanize %} 
-{% load mathfilters %}  
+{% load humanize %}
+{% load mathfilters %}
 {% load format_fcfa %}
-{% block title %}Liste des Lots - Entrepôt{% endblock %}
+
+{% block title %}Lots Entrepôt{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header pb-0">
-                    <div class="d-flex align-items-center">
-                        <h4>Gestion des Lots</h4>
-                        <a href="{% url 'reception_lot' %}" class="btn btn-primary btn-sm ms-auto">
-                            <i class="fas fa-plus me-2"></i>Nouveau Lot
-                        </a>
-                       
-                    </div>
-                    <p class="text-sm mb-0">Tous les lots reçus de l'entrepôt</p>
-                </div>
-            <div class="card-body">
-                <!-- Filtres -->
-                <form method="get" class="row mb-4">
-                    <div class="col-md-4">
-                        <input
-                            type="text"
-                            class="form-control"
-                            name="produit"
-                            placeholder="Filtrer par produit..."
-                            value="{{ request.GET.produit }}"
-                        >
-                    </div>
-                
-                    <div class="col-md-3">
-                        <input
-                            type="text"
-                            class="form-control"
-                            name="fournisseur"
-                            placeholder="Filtrer par fournisseur..."
-                            value="{{ request.GET.fournisseur }}"
-                        >
-                    </div>
-                
-                    <div class="col-md-3">
-                        <select class="form-select" name="statut">
-                            <option value="">Tous les statuts</option>
-                            <option value="disponible" {% if request.GET.statut == 'disponible' %}selected{% endif %}>
-                                Disponible
-                            </option>
-                            <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>
-                                Épuisé
-                            </option>
-                        </select>
-                    </div>
-                
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-outline-primary w-100">
-                            Filtrer
-                        </button>
-                    </div>
-                </form>
-
-
-                <!-- KPI Améliorés -->
-                <div class="row mb-4 g-3 justify-content-between">
-
-                    <!-- Total Lots -->
-                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-                        <div class="card border-left-primary shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Lots</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_lots|intcomma }}</div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="fas fa-boxes fa-2x text-gray-300"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                
-                    <!-- Valeur Stock Initiale -->
-                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-                        <div class="card border-left-success shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Prix d'Achat Total</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_valeur_initiale|floatformat:0|intcomma }} F</div>
-                                        <div class="text-xs text-muted">Investissement initial</div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="fas fa-money-bill-wave fa-2x text-gray-300"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                
-                    <!-- Valeur Actuelle -->
-                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-                        <div class="card border-left-info shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Valeur Actuelle</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_valeur_actuelle|floatformat:0|intcomma }} F</div>
-                                        <div class="text-xs {% if total_valeur_actuelle < total_valeur_initiale %}text-danger{% else %}text-success{% endif %}">
-                                            {% if total_valeur_initiale > 0 %}
-                                                {{ total_valeur_actuelle|div:total_valeur_initiale|mul:100|floatformat:1 }}% restant
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="fas fa-chart-line fa-2x text-gray-300"></i>
-                                    </div>
-                                </div>
-                                </div>
-                            </div>
-                        </div>
-                    
-                  
-                    <!-- Lots Épuisés -->
-                    <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 flex-fill">
-                        <div class="card border-left-danger shadow h-100 py-2">
-                            <div class="card-body">
-                                <div class="row no-gutters align-items-center">
-                                    <div class="col mr-2">
-                                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Lots Épuisés</div>
-                                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ lots_epuises|intcomma }}</div>
-                                        <div class="text-xs text-muted">
-                                            {% if total_lots > 0 %}
-                                                {{ lots_epuises|div:total_lots|mul:100|floatformat:1 }}% du total
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="col-auto">
-                                        <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                
-                </div>
-
-
-                <!-- Tableau des lots amélioré -->
-<div class="table-responsive">
-  <table class="table table-hover align-middle" id="lots-table">
-    <thead class="table-light">
-      <tr>
-        <th>Lot</th>
-        <th>Produit</th>
-        <th>Fournisseur</th>
-        <th>Stock</th>
-        <th>Prix </th>
-        <th>Valeur initiale</th>
-        <th>Valeur actuelle</th>
-        <th>Réception</th>
-        <th class="text-end">Actions</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {% for lot in lots %}
-      <tr class="{% if lot.quantite_restante == 0 %}table-secondary{% endif %}">
-
-        <!-- LOT -->
-        <td>
-          {% if lot.reference_lot %}
-            <span class="badge bg-primary">{{ lot.reference_lot }}</span>
-          {% else %}
-            <span class="text-muted">Lot #{{ lot.id }}</span>
-          {% endif %}
-        </td>
-
-        <!-- PRODUIT -->
-        <td>
-          <strong>{{ lot.produit.nom }}</strong>
-      
-        </td>
-
-        <!-- FOURNISSEUR -->
-        <td>
-          {% if lot.fournisseur %}
-            {{ lot.fournisseur.nom }}
-          {% else %}
-            <span class="text-muted">—</span>
-          {% endif %}
-        </td>
-
-        <!-- STOCK -->
-<!-- STOCK -->
-<td style="min-width: 180px;">
-  <strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
-    {{ lot.quantite_restante|floatformat:2 }}
-  </strong>
-
-  <div class="progress mt-1" style="height: 5px;">
-    {% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress %}
-    <div class="progress-bar {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}"
-         style="width: {{ progress }}%">
-    </div>
-  </div>
-
-  <div class="small text-muted text-center">
-    Initial : {{ lot.quantite_initiale|floatformat:2 }}
-  </div>
-</td>
-
-        <!-- PRIX -->
-        <td>
-          <strong>{{ lot.prix_achat_unitaire|fcfa }}</strong>
-        </td>
-
-        <!-- VALEUR INITIALE -->
-        <td>
-          <strong class="text-success">{{ lot.valeur_stock_initiale|fcfa }}</strong>
-        </td>
-
-        <!-- VALEUR ACTUELLE -->
-        <td>
-          <strong class="text-info">{{ lot.valeur_actuelle_stock|fcfa }}</strong>
-        </td>
-
-        <!-- DATE -->
-        <td>
-          <div class="small">{{ lot.date_reception|date:"d/m/Y" }}</div>
-          <div class="small text-muted">{{ lot.date_reception|date:"H:i" }}</div>
-        </td>
-
-        <!-- ACTIONS -->
-        <td class="text-end">
-          <div class="btn-group btn-group-sm">
-            <a href="{% url 'detail_lot' lot.id %}"
-               class="btn btn-outline-info"
-               title="Voir le lot">
-              <i class="fas fa-eye"></i>
-            </a>
-
-            {% if lot.quantite_restante > 0 %}
-            <a href="{% url 'affecter_lot_superviseur' %}"
-               class="btn btn-outline-primary"
-               title="Distribuer">
-              <i class="fas fa-share"></i>
-            </a>
-            {% endif %}
-          </div>
-        </td>
-
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="9" class="text-center py-5">
-          <i class="fas fa-box-open fa-2x text-muted mb-2"></i>
-          <p class="text-muted mb-3">Aucun lot enregistré</p>
-          <a href="{% url 'reception_lot' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i>Ajouter un lot
-          </a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-               
-            </div>
-        </div>
-        
-    </div>
-    
-</div>
-</div>
-{% endblock %}
-
-{% block extra_js %}
-
 
 <style>
-.progress {
-    background-color: #e9ecef;
-    border-radius: 4px;
+.label{
+    font-size:.8rem;
+    color:#6c757d;
 }
-.progress-bar {
-    border-radius: 4px;
-    transition: width 0.6s ease;
-}
-.card {
-    border: none;
-    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-}
-.border-left-primary { border-left: 0.25rem solid #4e73df !important; }
-.border-left-success { border-left: 0.25rem solid #1cc88a !important; }
-.border-left-info { border-left: 0.25rem solid #36b9cc !important; }
-.border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
-.border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
-.border-left-secondary { border-left: 0.25rem solid #858796 !important; }
 
-.table th {
-    border-top: none;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.5px;
+.montant{
+    white-space:nowrap;
+    font-weight:600;
+}
+
+.lot-card{
+    border-radius:14px;
+}
+
+.kpi-card{
+    border-radius:12px;
+}
+
+.progress{
+    height:6px;
 }
 </style>
+
+<div class="container-fluid py-3">
+
+<!-- ================= HEADER ================= -->
+<div class="d-flex align-items-center mb-3">
+    <h5 class="mb-0">📦 Gestion des Lots</h5>
+
+    <a href="{% url 'reception_lot' %}"
+       class="btn btn-primary ms-auto">
+        + Nouveau
+    </a>
+</div>
+
+<p class="text-muted small">
+    Tous les lots reçus de l'entrepôt
+</p>
+
+<!-- ================= FILTRES MOBILE ================= -->
+<form method="get" class="mb-3">
+
+    <input class="form-control mb-2"
+           name="produit"
+           placeholder="Produit..."
+           value="{{ request.GET.produit }}">
+
+    <input class="form-control mb-2"
+           name="fournisseur"
+           placeholder="Fournisseur..."
+           value="{{ request.GET.fournisseur }}">
+
+    <select class="form-select mb-2" name="statut">
+        <option value="">Tous statuts</option>
+        <option value="disponible" {% if request.GET.statut == 'disponible' %}selected{% endif %}>Disponible</option>
+        <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>Épuisé</option>
+    </select>
+
+    <button class="btn btn-outline-primary w-100">
+        Filtrer
+    </button>
+
+</form>
+
+<!-- ================= KPI ================= -->
+<div class="row g-2 mb-3">
+
+<div class="col-6">
+<div class="card kpi-card border-start border-primary border-3">
+<div class="card-body p-2">
+<div class="label">Total lots</div>
+<strong>{{ total_lots|intcomma }}</strong>
+</div>
+</div>
+</div>
+
+<div class="col-6">
+<div class="card kpi-card border-start border-success border-3">
+<div class="card-body p-2">
+<div class="label">Investissement</div>
+<div class="montant">{{ total_valeur_initiale|fcfa }}</div>
+</div>
+</div>
+</div>
+
+<div class="col-6">
+<div class="card kpi-card border-start border-info border-3">
+<div class="card-body p-2">
+<div class="label">Valeur actuelle</div>
+<div class="montant">{{ total_valeur_actuelle|fcfa }}</div>
+</div>
+</div>
+</div>
+
+<div class="col-6">
+<div class="card kpi-card border-start border-danger border-3">
+<div class="card-body p-2">
+<div class="label">Lots épuisés</div>
+<strong>{{ lots_epuises }}</strong>
+</div>
+</div>
+</div>
+
+</div>
+
+<!-- ================= LISTE LOTS ================= -->
+
+{% for lot in lots %}
+<div class="card lot-card shadow-sm mb-3 {% if lot.quantite_restante == 0 %}bg-light{% endif %}">
+<div class="card-body">
+
+<!-- HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+
+    <span class="badge bg-primary">
+        {{ lot.reference_lot }}
+    </span>
+
+    <small class="text-muted">
+        {{ lot.date_reception|date:"d/m/Y" }}
+    </small>
+
+</div>
+
+<!-- PRODUIT -->
+<h6 class="mb-2">{{ lot.produit.nom }}</h6>
+
+<!-- FOURNISSEUR -->
+<div class="d-flex justify-content-between">
+<span class="label">Fournisseur</span>
+<span>{{ lot.fournisseur.nom|default:"—" }}</span>
+</div>
+
+<!-- STOCK -->
+<div class="mt-2">
+<div class="d-flex justify-content-between">
+<span class="label">Stock</span>
+<strong class="{% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+{{ lot.quantite_restante|floatformat:2 }}
+</strong>
+</div>
+
+{% widthratio lot.quantite_restante lot.quantite_initiale 100 as progress %}
+<div class="progress mt-1">
+<div class="progress-bar {% if lot.quantite_restante > 0 %}bg-success{% else %}bg-danger{% endif %}"
+     style="width: {{ progress }}%">
+</div>
+</div>
+
+<small class="text-muted">
+Initial : {{ lot.quantite_initiale|floatformat:2 }}
+</small>
+</div>
+
+<!-- VALEURS -->
+<div class="d-flex justify-content-between mt-2">
+<span class="label">Prix achat</span>
+<span class="montant">{{ lot.prix_achat_unitaire|fcfa }}</span>
+</div>
+
+<div class="d-flex justify-content-between">
+<span class="label">Valeur initiale</span>
+<span class="montant text-success">{{ lot.valeur_stock_initiale|fcfa }}</span>
+</div>
+
+<div class="d-flex justify-content-between">
+<span class="label">Valeur actuelle</span>
+<span class="montant text-info">{{ lot.valeur_actuelle_stock|fcfa }}</span>
+</div>
+
+<!-- ACTIONS -->
+<div class="d-flex justify-content-center mt-3">
+
+<a href="{% url 'detail_lot' lot.id %}"
+   class="btn btn-outline-secondary w-50">
+   Voir
+</a>
+
+
+
+</div>
+
+</div>
+</div>
+
+{% empty %}
+<div class="text-center py-5">
+<i class="fas fa-box-open fa-2x text-muted"></i>
+<p class="text-muted mt-2">Aucun lot enregistré</p>
+</div>
+{% endfor %}
+
+</div>
+
 {% endblock %}

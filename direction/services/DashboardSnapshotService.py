@@ -31,6 +31,12 @@ class DashboardSnapshotService:
         snapshot.update(
             DashboardService.get_kpis_globaux(periode_type, annee, mois)
         )
+        snapshot["kpis_fournisseurs"] = DashboardService.get_kpis_fournisseurs(
+            periode_type,
+            annee,
+            mois
+        )
+
         snapshot["stock_essentiel"] = DashboardService.get_stock_essentiel_avec_fournisseurs()
         snapshot["performances_agents"] = DashboardService.get_performances_agents(periode_type, annee, mois)
         snapshot.update(
@@ -45,5 +51,5 @@ class DashboardSnapshotService:
                 periode_type, annee, mois
             )
 
-        cache.set(cache_key, snapshot, 60 * 5)  # 10 minutes
+        cache.set(cache_key, snapshot, 60 * 10)  # 10 minutes
         return snapshot

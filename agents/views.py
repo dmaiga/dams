@@ -58,7 +58,8 @@ from agents.forms import (
                             RotSupervisorCreationForm,
                             RotAffectationLotSuperviseurForm,
                             SupervisorDistributionForm,
-                            RecouvrementSuperviseurForm
+                            RecouvrementSuperviseurForm,
+                            SupervisorTerrainAgentUpdateForm
                             
                             )
 
@@ -344,7 +345,7 @@ def detail_agent_sup(request, agent_id):
             "client",
             "detail_distribution__lot__produit"
         )
-        .order_by("-date_vente")[:5]
+        .order_by("-date_vente")[:10]
     )
 
     # =========================
@@ -432,17 +433,21 @@ def creer_agent(request):
 
 @login_required
 def modifier_agent(request, agent_id):
+
     agent_cible = get_object_or_404(Agent, id=agent_id)
     agent_connecte = request.user.agent
 
-    # Sécurité minimale
+    # sécurité périmètre
     if agent_connecte.est_superviseur and agent_cible.superviseur != agent_connecte:
         return HttpResponseForbidden()
 
-    form = SupervisorTerrainAgentCreationForm(
+    # sécurité type
+    if not agent_cible.est_agent_vente:
+        return HttpResponseForbidden()
+
+    form = SupervisorTerrainAgentUpdateForm(
         request.POST or None,
-        instance=agent_cible,
-        superviseur=agent_connecte if agent_connecte.est_superviseur else None
+        instance=agent_cible
     )
 
     if request.method == 'POST' and form.is_valid():
@@ -454,6 +459,7 @@ def modifier_agent(request, agent_id):
         'form': form,
         'agent': agent_cible
     })
+
 
 @login_required
 def liste_distribution_sup(request):

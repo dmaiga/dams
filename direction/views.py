@@ -72,107 +72,36 @@ from direction.services.analyse_operationnelle_service import AnalyseOperationne
 
 # core/views/dashboard.py
 
+from direction.services.DashboardSnapshotService import DashboardSnapshotService
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/dashboards/dashboard.html'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # 🔵 Récupération des paramètres de filtre - ANNÉE par défaut
-        periode_type = self.request.GET.get('periode', 'annee')  # Changé 'mois' -> 'annee'
-        annee = self.request.GET.get('annee')
-        mois = self.request.GET.get('mois')
-        agents_inactifs = DashboardService.get_agents_inactifs(depuis_jours=3)
 
-        # Conversion des paramètres
-        if annee:
-            annee = int(annee)
-        else:
-            # Si pas d'année spécifiée, prendre l'année courante
-            annee = timezone.now().year
-        
+        periode_type = self.request.GET.get('periode', 'annee')
+        annee = int(self.request.GET.get('annee', timezone.now().year))
+        mois = self.request.GET.get('mois')
+
         if mois:
             mois = int(mois)
-        
-        kpis_fournisseurs = DashboardService.get_kpis_fournisseurs(
-            periode_type=periode_type,
-            annee=annee,
-            mois=mois
+
+        snapshot = DashboardSnapshotService.get_snapshot(
+            periode_type,
+            annee,
+            mois,
+            self.request.user
         )
-        
-        # 🔵 Bloc 1 : KPIs Globaux
-        kpis_globaux = DashboardService.get_kpis_globaux(periode_type, annee, mois)
-        
-        # 🟣 Bloc 2 : Stock ESSENTIEL avec fournisseurs
-        stock_essentiel = DashboardService.get_stock_essentiel_avec_fournisseurs()
-        
-        # 🟠 Bloc 3 : Performances Agents
-        performances_agents = DashboardService.get_performances_agents(periode_type, annee, mois)
-        
-        # 🔴 Bloc 4 : Analyses Ventes AVANCÉES
-        analyses_ventes = DashboardService.get_analyses_ventes_avancees(periode_type, annee, mois)
-        
-        # 🟢 Bloc 5 : Analyses Dépenses
-        analyses_depenses = DashboardService.get_analyses_depenses(periode_type, annee, mois)
-        
-        # 🟦 Bloc 6 : Portefeuilles de TOUS les superviseurs (pour la direction)
-        portefeuilles_superviseurs = []
-        user_has_agent = hasattr(self.request.user, 'agent')
-        user_is_direction = False
-        
-        if user_has_agent:
-            user_is_direction = self.request.user.agent.est_direction
-            if user_is_direction:
-                portefeuilles_superviseurs = DashboardService.get_portefeuilles_tous_superviseurs(
-                    periode_type, annee, mois
-                )
-        
-        # 🟪 Bloc 7 : Portefeuille ROT (Direction)
-        portefeuilles_rot = None
 
-        if user_has_agent and user_is_direction:
-            portefeuilles_rot = DashboardService.get_portefeuilles_rot(
-                periode_type, annee, mois
-            )
+        context.update(snapshot)
 
-        # Années disponibles pour le filtre
-        annees_disponibles = DashboardService.get_annees_disponibles()
-        
         context.update({
-            # KPI Globaux
-            **kpis_globaux,
-            "agents_inactifs": agents_inactifs,
-            # Stock ESSENTIEL avec fournisseurs
-            'stock_essentiel': stock_essentiel,
-            
-            # Performances
-            'performances_agents': performances_agents,
-            
-            'kpis_fournisseurs': kpis_fournisseurs,
-            # Ventes
-            **analyses_ventes,
-            
-            # Dépenses
-            **analyses_depenses,
-            
-            # Portefeuilles superviseurs (pour la direction)
-            'portefeuilles_superviseurs': portefeuilles_superviseurs,
-            'portefeuilles_rot': portefeuilles_rot,
-            'user_has_agent': user_has_agent,
-            'user_is_direction': user_is_direction,
-            
-            # Filtres
-            'annees_disponibles': annees_disponibles,
-            'periode_selectionnee': periode_type,
-            'annee_selectionnee': annee,
-            'mois_selectionne': mois,
-            'mois_liste': [
-                (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
-                (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
-                (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre')
-            ]
+            "annee_selectionnee": annee,
+            "mois_selectionne": mois,
+            "periode_selectionnee": periode_type,
         })
-        
+
         return context
 
 
@@ -180,20 +109,15 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 class AgentDashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/agents/agent_dashboard.html'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # 🔥 Snapshot unique (cache)
-        context.update(
-            DashboardAgentAnalysisService.get_agents_dashboard_snapshot()
-        )
+        snapshot = DashboardAgentAnalysisService.get_agents_dashboard_snapshot()
 
-        # Ce qui n’est PAS dans le snapshot
-        context["agents_stock"] = DashboardAgentAnalysisService.get_agents_with_stock_cached()
+        context.update(snapshot)
 
         return context
-
 
 
 class SuperviseurListView(LoginRequiredMixin, TemplateView):

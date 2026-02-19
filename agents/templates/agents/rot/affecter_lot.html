@@ -5,66 +5,93 @@
 {% block content %}
 <div class="container py-3">
 
-    <h5 class="mb-3">
-        Affectation de lot (ROT)
-    </h5>
+<style>
+.section-title{
+    font-size:.8rem;
+    color:#6c757d;
+    font-weight:600;
+    text-transform:uppercase;
+    margin-bottom:6px;
+}
 
-    <form method="post" class="card card-body shadow-sm">
-        {% csrf_token %}
+.form-card{
+    border-radius:14px;
+}
 
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger">
-                {{ form.non_field_errors }}
-            </div>
-        {% endif %}
+input, select{
+    height:48px !important;
+    font-size:1rem !important;
+}
 
-        <!-- LOT -->
-        <div class="mb-3">
-            <label class="form-label">Lot</label>
-            {{ form.lot }}
-            {{ form.lot.errors }}
-        </div>
+.btn-submit{
+    height:52px;
+    font-size:1.1rem;
+    font-weight:600;
+}
+</style>
 
-        <!-- SUPERVISEUR -->
-        <div class="mb-3">
-            <label class="form-label">Superviseur</label>
-            {{ form.superviseur }}
-            {{ form.superviseur.errors }}
-        </div>
+<h5 class="mb-3">🔁 Affectation de lot</h5>
 
-        <!-- DATE -->
-        <div class="mb-3">
-            <label class="form-label">Date de distribution</label>
-            {{ form.date_affectation }}
-            {{ form.date_affectation.errors }}
-        </div>
+<form method="post" class="card form-card shadow-sm p-3">
+{% csrf_token %}
 
-        <!-- QUANTITÉ -->
-        <div class="mb-3">
-            <label class="form-label">Quantité (unités)</label>
-            {{ form.quantite_saisie }}
-            {{ form.quantite_saisie.errors }}
-        </div>
+{% if form.non_field_errors %}
+<div class="alert alert-danger">
+    {{ form.non_field_errors }}
+</div>
+{% endif %}
 
-        <!-- PRIX -->
-        <div class="mb-3">
-            <label class="form-label">Prix de gros</label>
-            {{ form.prix_gros }}
-            {{ form.prix_gros.errors }}
-        </div>
+<!-- ================= LOT ================= -->
+<div class="mb-3">
+    <div class="section-title">Lot à distribuer</div>
+    {{ form.lot }}
+    <div class="text-danger small">{{ form.lot.errors }}</div>
+</div>
 
-        <div class="mb-4">
-            <label class="form-label">Prix de détail</label>
-            {{ form.prix_detail }}
-            {{ form.prix_detail.errors }}
-        </div>
+<!-- ================= SUPERVISEUR ================= -->
+<div class="mb-3">
+    <div class="section-title">Superviseur</div>
+    {{ form.superviseur }}
+    <div class="text-danger small">{{ form.superviseur.errors }}</div>
+</div>
 
-        {{ form.quantite_initiale }}
+<!-- ================= DATE ================= -->
+<div class="mb-3">
+    <div class="section-title">Date distribution</div>
+    {{ form.date_affectation }}
+    <div class="text-danger small">{{ form.date_affectation.errors }}</div>
+</div>
 
-        <button type="submit" class="btn btn-primary w-100">
-            Valider l’affectation
-        </button>
-    </form>
+<hr>
+
+<!-- ================= QUANTITÉ ================= -->
+<div class="mb-3">
+    <div class="section-title">Quantité à affecter</div>
+    {{ form.quantite_saisie }}
+    <div class="text-danger small">{{ form.quantite_saisie.errors }}</div>
+</div>
+
+<!-- ================= PRIX ================= -->
+<div class="mb-3">
+    <div class="section-title">Prix gros (fixé ROT)</div>
+    {{ form.prix_gros }}
+    <div class="text-danger small">{{ form.prix_gros.errors }}</div>
+</div>
+
+<div class="mb-4">
+    <div class="section-title">Prix détail (agents)</div>
+    {{ form.prix_detail }}
+    <div class="text-danger small">{{ form.prix_detail.errors }}</div>
+</div>
+
+{{ form.quantite_initiale }}
+
+<!-- ================= ACTION ================= -->
+<button type="submit" class="btn btn-primary w-100 btn-submit">
+    ✅ Valider l’affectation
+</button>
+
+</form>
 
 </div>
 {% endblock %}

@@ -1,6 +1,8 @@
 {% extends 'base_admin.html' %}
 {% load humanize %}
 {% load format_fcfa %}
+{% load dashboard_filters %}
+{% load direction_filters %}
 
 {% block title %}Tableau de Bord - Agents{% endblock %}
 
@@ -94,7 +96,7 @@
                             <th>Total KG</th>
                             <th>KG / jour</th>
                             <th>Statut</th>
-                            <th>Décision</th>
+                           
                         </tr>
                     </thead>
                     <tbody>
@@ -117,10 +119,10 @@
                                 {{ a.jours_restants }} j
                             </td>
                             <td>
-                                {{ a.total_kg }}
+                                {{ a.total_kg|format_number }}
                             </td>
                             <td class="font-bold">
-                                {{ a.kg_par_jour|floatformat:1 }}
+                                {{ a.kg_par_jour|format_number }}
                             </td>
                             <td>
                                 <span class="badge
@@ -131,9 +133,7 @@
                                     {{ a.statut|capfirst }}
                                 </span>
                             </td>
-                            <td class="font-bold">
-                                {{ a.decision }}
-                            </td>
+                          
                         </tr>
                         {% empty %}
                         <tr>
@@ -284,7 +284,7 @@
                         <tr>
                             <td class="font-semibold">{{ a.agent.full_name }}</td>
                             <td class="text-center">{{ a.nombre_ventes }}</td>
-                            <td class="text-center">{{ a.quantite }}</td>
+                            <td class="text-center">{{ a.quantite|format_number }}</td>
                             <td class="font-bold">{{ a.ca|fcfa }}</td>
                             <td>{{ a.derniere_vente|date:"d/m/Y H:i" }}</td>
                         </tr>

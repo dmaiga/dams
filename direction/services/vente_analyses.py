@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.db.models import Sum, F, Q, Case, When, IntegerField, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from core.models import Vente, Agent
-
+from datetime import datetime, time
 
 class VenteAnalyseService:
  
@@ -135,12 +135,37 @@ class VenteAnalyseService:
                 else timezone.make_aware(datetime(annee, mois + 1, 1))
             ) - timedelta(seconds=1)
             return debut, fin
-
-        # perso / fallback
+        
+        # -------------------------------------------------
+        # PERIODE PERSONNALISÉE
+        # -------------------------------------------------
+        if periode == "perso":
+            date_debut = params.get("date_debut")
+            date_fin = params.get("date_fin")
+        
+            if date_debut and date_fin:
+                debut = timezone.make_aware(
+                    datetime.combine(
+                        datetime.fromisoformat(date_debut).date(),
+                        time.min
+                    )
+                )
+        
+                fin = timezone.make_aware(
+                    datetime.combine(
+                        datetime.fromisoformat(date_fin).date(),
+                        time.max
+                    )
+                )
+        
+                return debut, fin
+        
+        # fallback sécurité
         return (
             timezone.make_aware(datetime(now.year, 1, 1)),
             now,
         )
+      
 
     """Service d'analyse des ventes pour filtres, stats et top agents."""
     
