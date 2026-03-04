@@ -1,10 +1,8 @@
 from decimal import Decimal
-
 from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
 from requests import request
 from agents.services.rot_fournisseur import RotFournisseurService
-
 from core.models import (
     Agent,
     Vente,
@@ -17,8 +15,7 @@ from core.models import (
     AffectationLotSuperviseur,
     Fournisseur,
       PaiementFournisseur,
-)
-
+    )
 from django.db.models import ExpressionWrapper
 from django.conf import settings
 
@@ -76,12 +73,13 @@ class RotDashboardService:
             'produits': produits,
             'seuil_faible': RotDashboardService.SEUIL_STOCK_FAIBLE
         }
-    
+
     # =====================================================
     # 1️⃣ KPIs GLOBAUX ROT
     # =====================================================
     @staticmethod
     def get_kpis(rot):
+    
         if not rot or not rot.est_rot:
             return {
                 'total_recupere_rot': Decimal('0'),
@@ -89,37 +87,72 @@ class RotDashboardService:
                 'total_depenses': Decimal('0'),
                 'solde_rot': Decimal('0'),
             }
-        date_min = get_date_debut_rot()
-
-        recouvre_qs = RecouvrementSuperviseur.objects.filter(rot=rot)
-
-        versement_qs = VersementBancaire.objects.filter(effectue_par=rot)
-        depense_qs = Depense.objects.filter(effectue_par=rot)
-
-        if date_min:
-            recouvre_qs = recouvre_qs.filter(date_recouvrement__date__gte=date_min)
-            versement_qs = versement_qs.filter(date_versement_reelle__date__gte=date_min)
-            depense_qs = depense_qs.filter(date_depense__date__gte=date_min)
-
+    
+        debut_mois = get_debut_mois()
+    
+        recouvre_qs = RecouvrementSuperviseur.objects.filter(
+            rot=rot,
+            date_recouvrement__gte=debut_mois
+        )
+    
+        versement_qs = VersementBancaire.objects.filter(
+            effectue_par=rot,
+            date_versement_reelle__gte=debut_mois
+        )
+    
+        depense_qs = Depense.objects.filter(
+            effectue_par=rot,
+            date_depense__gte=debut_mois
+        )
+    
         total_recupere = recouvre_qs.aggregate(
             total=Coalesce(Sum('montant'), Decimal('0'))
         )['total']
-
+    
         total_verse = versement_qs.aggregate(
             total=Coalesce(Sum('montant_vente'), Decimal('0'))
         )['total']
-
+    
         total_depenses = depense_qs.aggregate(
             total=Coalesce(Sum('montant'), Decimal('0'))
         )['total']
-
+    
         return {
             'total_recupere_rot': total_recupere,
             'total_verse_banque': total_verse,
             'total_depenses': total_depenses,
-            'solde_rot': total_recupere - total_verse - total_depenses,
+            'solde_rot' : rot.solde_rot
         }
+    
+    @staticmethod
+    def get_stock_critique():
+        """
+        Dashboard ROT :
+        Affiche uniquement les stocks faibles (< seuil)
+        """
 
+        seuil = RotDashboardService.SEUIL_STOCK_FAIBLE
+
+        produits = (
+            LotEntrepot.objects
+            .values("produit__nom")
+            .annotate(
+                quantite_restante=Coalesce(
+                    Sum("quantite_restante"),
+                    Decimal("0.00")
+                )
+            )
+            .filter(quantite_restante__lt=seuil)
+            .order_by("quantite_restante")
+        )
+
+        produits_faibles = list(produits)
+
+        return {
+            "stocks_faibles": produits_faibles,
+            "has_alert": len(produits_faibles) > 0,
+            "seuil": seuil,
+        }
 
     @staticmethod
     def get_suivi_superviseurs():
@@ -369,6 +402,8 @@ class RotDashboardService:
         return {
             'kpis': RotDashboardService.get_kpis(rot),
             'stock_entrepot': RotDashboardService.get_stock_entrepot(),
+            'stock_critique': RotDashboardService.get_stock_critique(),
+
             'suivi_superviseurs': RotDashboardService.get_suivi_superviseurs(),
             'fournisseurs': RotDashboardService.get_tableau_fournisseurs(),
             'fournisseurs_rot': RotFournisseurService.get_suivi_fournisseurs_rot(),

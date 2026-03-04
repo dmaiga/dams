@@ -80,92 +80,6 @@
     </div>
 
 </div>
-
-<!-- ================= FOURNISSEURS ================= -->
-<div class="card card-mobile mb-3">
-    <div class="card-header fw-semibold">
-        🏭 Fournisseurs (factures)
-    </div>
-
-    <div class="card-body p-2">
-        {% for f in fournisseurs_rot %}
-        <div class="border rounded p-2 mb-2">
-
-            <strong>{{ f.fournisseur_nom }}</strong>
-
-            <div class="d-flex justify-content-between mt-2">
-                <span class="label">Valeur lots</span>
-                <span class="value montant" translate="no">
-                    {{ f.valeur_lots|fcfa }}
-                </span>
-            </div>
-
-            <div class="d-flex justify-content-between">
-                <span class="label">Facturé</span>
-                <span class="value text-success montant" translate="no">
-                    {{ f.montant_facture|fcfa }}
-                </span>
-            </div>
-
-            <div class="d-flex justify-content-between fw-bold mt-1">
-                <span>Reste</span>
-                <span class="montant
-                    {% if f.reste_a_facturer > 0 %}
-                        text-warning
-                    {% else %}
-                        text-success
-                    {% endif %}"
-                    translate="no">
-                    {{ f.reste_a_facturer|fcfa }}
-                </span>
-            </div>
-
-        </div>
-        {% empty %}
-        <p class="text-muted text-center mb-0">Aucun fournisseur</p>
-        {% endfor %}
-    </div>
-</div>
-
-<!-- ================= STOCK ENTREPÔT ================= -->
-<div class="card card-mobile mb-3">
-    <div class="card-header fw-semibold">
-        📦 Stock Entrepôt
-    </div>
-
-    <div class="card-body p-2">
-        {% for p in stock_entrepot.produits %}
-        <div class="border rounded p-2 mb-2">
-
-            <strong>{{ p.produit__nom }}</strong>
-
-            <div class="d-flex justify-content-between mt-2">
-                <span class="label">Qté restante</span>
-                <span class="value">{{ p.quantite_restante }}</span>
-            </div>
-
-            <div class="d-flex justify-content-between">
-                <span class="label">Valeur</span>
-                <span class="montant" translate="no">
-                    {{ p.valeur_stock|fcfa }}
-                </span>
-            </div>
-
-            <div class="mt-1">
-                {% if p.quantite_restante <= stock_entrepot.seuil_faible %}
-                    <span class="badge bg-danger">Stock faible</span>
-                {% else %}
-                    <span class="badge bg-success">OK</span>
-                {% endif %}
-            </div>
-
-        </div>
-        {% empty %}
-        <p class="text-muted text-center mb-0">Aucun stock</p>
-        {% endfor %}
-    </div>
-</div>
-
 <!-- ================= SUPERVISEURS ================= -->
 <div class="card card-mobile mb-3">
     <div class="card-header fw-semibold">
@@ -217,6 +131,38 @@
         {% endfor %}
     </div>
 </div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">
+        ⚠️ Stock critique entrepôt
+    </div>
+
+    <div class="card-body">
+
+        {% if stock_critique.has_alert %}
+
+            {% for p in stock_critique.stocks_faibles %}
+                <div class="d-flex justify-content-between border-bottom py-2">
+                    <strong>{{ p.produit__nom }}</strong>
+                    <span class="badge bg-danger">
+                        {{ p.quantite_restante|floatformat:0 }}
+                    </span>
+                </div>
+            {% endfor %}
+
+        {% else %}
+
+            <div class="text-center text-muted py-3">
+                ✅ Aucun stock critique
+            </div>
+
+        {% endif %}
+
+    </div>
+</div>
+
+
+
 
 </div>
 {% endblock %}

@@ -1762,6 +1762,7 @@ def liste_depenses(request):
         depenses = depenses.filter(
             date_depense__year=today.year,
             date_depense__month=today.month
+            
         )
         date_debut = today.replace(day=1).isoformat()
         date_fin = today.isoformat()
@@ -1772,12 +1773,12 @@ def liste_depenses(request):
 
     if date_debut:
         depenses = depenses.filter(
-            date_depense__date__gte=parse_date(date_debut)
+            date_depense__gte=parse_date(date_debut)
         )
 
     if date_fin:
         depenses = depenses.filter(
-            date_depense__date__lte=parse_date(date_fin)
+            date_depense__lte=parse_date(date_fin)
         )
 
     return render(request, 'core/depenses/liste.html', {

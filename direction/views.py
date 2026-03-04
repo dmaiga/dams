@@ -119,7 +119,6 @@ class AgentDashboardView(LoginRequiredMixin, TemplateView):
 
         return context
 
-
 class SuperviseurListView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/agents/superviseur_list.html'
 
@@ -136,7 +135,6 @@ class SuperviseurListView(LoginRequiredMixin, TemplateView):
         )
 
         return context
-
 
 def SuperviseurDetail(request, pk):
     superviseur = get_object_or_404(Agent, pk=pk, type_agent='entrepot')
@@ -173,11 +171,7 @@ def SuperviseurDetail(request, pk):
             "matrice": matrice,
             **periode,
         }
-    )
-
-    
-
-
+    ) 
 
 class AgentTerrainListView(LoginRequiredMixin, TemplateView):
     template_name = "direction/analyses/agents/agent_terrain_list.html"
@@ -236,7 +230,6 @@ class AgentTerrainListView(LoginRequiredMixin, TemplateView):
 
         return context
 
-
 class AgentDetailView(LoginRequiredMixin, DetailView):
     model = Agent
     template_name = "direction/analyses/agents/agent_detail.html"
@@ -274,7 +267,6 @@ class AgentDetailView(LoginRequiredMixin, DetailView):
         })
 
         return context
-
 
 def RotDetailView(request, pk):
     rot = get_object_or_404(Agent, pk=pk, type_agent='rot')
@@ -731,7 +723,7 @@ def liste_versements_direction(request):
         debut = aujourd_hui.replace(day=1)
         fin = (debut + timedelta(days=32)).replace(day=1) - timedelta(days=1)
         versements = versements.filter(
-            date_versement_reelle__date__range=(debut, fin)
+            date_versement_reelle__range=(debut, fin)
         )
         filtres_actifs['periode'] = 'Mois en cours'
 
@@ -739,7 +731,7 @@ def liste_versements_direction(request):
         debut = aujourd_hui.replace(month=1, day=1)
         fin = aujourd_hui.replace(month=12, day=31)
         versements = versements.filter(
-            date_versement_reelle__date__range=(debut, fin)
+            date_versement_reelle__range=(debut, fin)
         )
         filtres_actifs['periode'] = 'Année en cours'
 
@@ -748,8 +740,8 @@ def liste_versements_direction(request):
         date_fin = request.GET.get('date_fin')
         if date_debut and date_fin:
             versements = versements.filter(
-                date_versement_reelle__date__gte=date_debut,
-                date_versement_reelle__date__lte=date_fin
+                date_versement_reelle__gte=date_debut,
+                date_versement_reelle__lte=date_fin
             )
             filtres_actifs['periode'] = 'Période personnalisée'
             filtres_actifs['date_debut'] = date_debut
@@ -895,10 +887,10 @@ def liste_depenses(request):
     date_fin = parse_date(date_fin_raw) if date_fin_raw else None
 
     if date_debut:
-        depenses = depenses.filter(date_depense__date__gte=date_debut)
+        depenses = depenses.filter(date_depense__gte=date_debut)
 
     if date_fin:
-        depenses = depenses.filter(date_depense__date__lte=date_fin)
+        depenses = depenses.filter(date_depense__lte=date_fin)
 
     # 🔹 Total FILTRÉ
     total_filtre = (

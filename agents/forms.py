@@ -354,13 +354,15 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
             'step': '0.01'
         })
     )
+
     date_affectation = forms.DateTimeField(
-        label="Date et heure de distribution",
-        initial=timezone.now,
-        widget=forms.DateTimeInput(attrs={
-            'type': 'datetime-local',
+        label="Date de distribution",
+        widget=forms.DateInput(attrs={  
+            'type': 'date',
             'class': 'form-control'
-        })
+        }),
+        input_formats=['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'],
+        required=False
     )
     # =================================================
     # META

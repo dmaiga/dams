@@ -114,12 +114,19 @@ class SuperviseurAnalysisService:
                 Decimal("0.00")
             )
 
-            solde_superviseur = (
-                solde_ouverture
-                + ventes_perso
+            
+            solde_mois = (
+                ventes_perso
                 + recouvre_agents
                 - remis_rot
             )
+
+            # on retire le solde d'ouverture
+            solde_superviseur = max(
+                solde_mois - solde_ouverture,
+                Decimal("0.00")
+            )
+
 
             data.append({
                 "superviseur": sup,
@@ -173,8 +180,15 @@ class SuperviseurAnalysisService:
             ).aggregate(
                 total=Coalesce(Sum("montant"), Decimal("0.00"))
             )["total"]
+            ajustement = rot.ajustement_solde or Decimal('0')
 
-            solde_rot = recu_superviseurs - verse_banque - depenses
+            solde_rot = (
+                recu_superviseurs
+                - verse_banque
+                - depenses
+                + ajustement
+            )
+            
 
             data.append({
                 "rot": rot,

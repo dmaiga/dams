@@ -1325,59 +1325,51 @@ class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
         return recus_crees
 
 
-
 class DepenseForm(forms.ModelForm):
     class Meta:
         model = Depense
-        fields = [
-            'date_depense',
-            'montant',
-            'categorie',
-            'note',
-        ]
+        fields = ['date_depense', 'montant', 'categorie', 'note']
         widgets = {
-            'date_depense': forms.DateTimeInput(
-                attrs={
-                    'class': 'form-control',
-                    'type': 'datetime-local'
-                }
-            ),
-            'montant': forms.NumberInput(
-                attrs={
-                    'class': 'form-control',
-                    'step': '0.01',
-                    'placeholder': 'Montant en FCFA'
-                }
-            ),
-            'categorie': forms.Select(
-                attrs={
-                    'class': 'form-control'
-                }
-            ),
-            'note': forms.TextInput(
-                attrs={
-                    'class': 'form-control',
-                    'placeholder': 'Détail facultatif (ex: Essence Koniba)'
-                }
-            ),
+            'date_depense': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'montant': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'placeholder': 'Montant en FCFA'
+            }),
+            'categorie': forms.Select(attrs={'class': 'form-control'}),
+            'note': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Détail facultatif'
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Date du jour par défaut
+        if not self.is_bound:
+            self.initial['date_depense'] = timezone.now().date()
+        self.fields['date_depense'].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Garantir une date
+        if not cleaned_data.get('date_depense'):
+            cleaned_data['date_depense'] = timezone.now().date()
+        return cleaned_data
 
     def save(self, agent=None, commit=True):
         depense = super().save(commit=False)
-
-        # Affectation automatique de l’agent (ROT)
         if agent:
             depense.effectue_par = agent
-
-        # MVP : source par défaut
         depense.source = depense.source or 'ROT'
-
         if commit:
             depense.save()
-
         return depense
-
-
+    
+    
 from decimal import Decimal
 from django import forms
 from django.db.models import Sum

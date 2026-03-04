@@ -638,12 +638,12 @@ def rot_affectations_liste(request):
 
     if date_debut:
         affectations = affectations.filter(
-            date_affectation__date__gte=date_debut
+            date_affectation__gte=date_debut
         )
 
     if date_fin:
         affectations = affectations.filter(
-            date_affectation__date__lte=date_fin
+            date_affectation__lte=date_fin
         )
 
     if lot_id:

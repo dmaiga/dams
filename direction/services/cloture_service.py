@@ -35,7 +35,7 @@ def calculer_solde_periode(superviseur, date_debut, date_fin, solde_ouverture):
 
     depenses = Depense.objects.filter(
         versement__superviseur=superviseur,
-        date_depense__date__range=(date_debut, date_fin)
+        date_depense__range=(date_debut, date_fin)
     ).aggregate(
         total=Sum('montant')
     )['total'] or Decimal('0.00')

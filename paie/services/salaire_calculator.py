@@ -179,11 +179,11 @@ class CalculatorSalaire:
             data = CalculatorSalaire.calcul_salaire_mamy(agent, date_debut, date_fin)
             kilo_total_mamies += data["kilo_total"]
 
-        if kilo_total_mamies < Decimal("37500"):
+        if kilo_total_mamies < Decimal("18000"):
             taux = Decimal("0")
-        elif kilo_total_mamies < Decimal("45000"):
-            taux = Decimal("0.03")
-        elif kilo_total_mamies < Decimal("60000"):
+        elif kilo_total_mamies < Decimal("27000"):
+            taux = Decimal("0.04")
+        elif kilo_total_mamies < Decimal("37000"):
             taux = Decimal("0.06")
         else:
             taux = Decimal("0.08")

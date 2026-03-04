@@ -488,7 +488,7 @@ class AgentAnalysisService:
 
         depenses = Depense.objects.filter(
             effectue_par=rot,
-            date_depense__date__range=(debut, fin)
+            date_depense__range=(debut, fin)
         ).aggregate(
             total=Coalesce(Sum("montant"), Decimal("0"))
         )["total"]

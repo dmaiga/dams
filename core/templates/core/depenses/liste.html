@@ -2,18 +2,23 @@
 {% load format_fcfa %}
 
 {% block content %}
-<div class="container py-3">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5>Dépenses</h5>
-        <a href="{% url 'creer_depense' %}" class="btn btn-success btn-sm">
-            + Dépense
-        </a>
-    </div>
+<div class="container-fluid px-2 px-md-3 py-3">
 
-<form method="get" class="row g-2 mb-3 align-items-end">
+<!-- HEADER -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+    <h5 class="mb-0">Dépenses</h5>
 
-    <div class="col-md-3">
+    <a href="{% url 'creer_depense' %}"
+       class="btn btn-success btn-sm w-100 w-md-auto">
+        + Dépense
+    </a>
+</div>
+
+<!-- FILTRES -->
+<form method="get" class="row g-2 mb-3">
+
+    <div class="col-12 col-md-3">
         <label class="form-label small">Catégorie</label>
         <select name="categorie" class="form-select form-select-sm">
             <option value="">Toutes</option>
@@ -25,84 +30,160 @@
         </select>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-6 col-md-3">
         <label class="form-label small">Du</label>
-        <input type="date" name="date_debut"
+        <input type="date"
+               name="date_debut"
                value="{{ date_debut }}"
                class="form-control form-control-sm">
     </div>
 
-    <div class="col-md-3">
+    <div class="col-6 col-md-3">
         <label class="form-label small">Au</label>
-        <input type="date" name="date_fin"
+        <input type="date"
+               name="date_fin"
                value="{{ date_fin }}"
                class="form-control form-control-sm">
     </div>
 
-    <div class="col-md-3 d-flex gap-2">
+    <div class="col-12 col-md-3 d-grid d-md-flex gap-2">
         <button class="btn btn-primary btn-sm w-100">
             Filtrer
         </button>
 
-        <!-- 🔄 RESET / TOUT AFFICHER -->
         <a href="{% url 'liste_depenses' %}?all=1"
            class="btn btn-outline-secondary btn-sm w-100">
             Tout afficher
         </a>
     </div>
+
 </form>
 
 
-<table class="table table-sm table-hover align-middle">
-    <thead class="table-light">
-        <tr>
-            <th>Date</th>
-            <th>Montant</th>
-            <th>Catégorie</th>
-            <th>Description</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
+<!-- ========================= -->
+<!-- TABLE DESKTOP -->
+<!-- ========================= -->
+<div class="d-none d-md-block">
+
+    <table class="table table-sm table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Date</th>
+                <th>Montant</th>
+                <th>Catégorie</th>
+                <th>Description</th>
+                <th></th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for d in depenses %}
+            <tr>
+
+                <td class="text-muted small">
+                    {{ d.date_depense|date:"d/m/Y" }}
+                </td>
+
+                <td class="fw-bold text-danger">
+                    {{ d.montant|fcfa }} FCFA
+                </td>
+
+                <td>
+                    <span class="badge bg-secondary">
+                        {{ d.get_categorie_display }}
+                    </span>
+                </td>
+
+                <td style="max-width:380px;">
+                    {% if d.note %}
+                        <strong>{{ d.note|truncatewords:6 }}</strong>
+                    {% elif d.description %}
+                        <span class="text-muted small">
+                            {{ d.description|striptags|truncatewords:10 }}
+                        </span>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+
+                <td class="text-end">
+                    <a href="{% url 'detail_depense' d.id %}"
+                       class="btn btn-sm btn-outline-secondary">
+                        👁️
+                    </a>
+                </td>
+
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    Aucune dépense trouvée
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+
+
+<!-- ========================= -->
+<!-- CARDS MOBILE -->
+<!-- ========================= -->
+<div class="d-md-none">
+
     {% for d in depenses %}
-        <tr>
-            <td class="text-muted small">
-                {{ d.date_depense|date:"d/m/Y" }}
-            </td>
+    <div class="card shadow-sm mb-2 border-0">
 
-            <td class="fw-bold text-danger">
-                {{ d.montant|fcfa }} FCFA
-            </td>
+        <div class="card-body p-3">
 
-            <td>
+            <!-- Ligne principale -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small">
+                    {{ d.date_depense|date:"d/m/Y" }}
+                </span>
+
+                <span class="fw-bold text-danger fs-6">
+                    {{ d.montant|fcfa }} FCFA
+                </span>
+            </div>
+
+            <!-- Catégorie -->
+            <div class="mb-2">
                 <span class="badge bg-secondary">
                     {{ d.get_categorie_display }}
                 </span>
-            </td>
+            </div>
 
-<td style="max-width: 380px;">
-    {% if d.note %}
-        <strong>{{ d.note|truncatewords:6 }}</strong>
-    {% elif d.description %}
-        <span class="text-muted small">
-            {{ d.description|striptags|truncatewords:10 }}
-        </span>
-    {% else %}
-        —
-    {% endif %}
-</td>
+            <!-- Description -->
+            <div class="small text-muted mb-3">
+                {% if d.note %}
+                    <strong class="text-dark">
+                        {{ d.note|truncatewords:8 }}
+                    </strong>
+                {% elif d.description %}
+                    {{ d.description|striptags|truncatewords:14 }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
 
+            <!-- Action -->
+            <a href="{% url 'detail_depense' d.id %}"
+               class="btn btn-outline-secondary btn-sm w-100">
+                Voir détail
+            </a>
 
-            <td class="text-end">
-                <a href="{% url 'detail_depense' d.id %}"
-                   class="btn btn-sm btn-outline-secondary">
-                    👁️
-                </a>
-            </td>
-        </tr>
+        </div>
+    </div>
+
+    {% empty %}
+        <div class="text-center text-muted py-4">
+            Aucune dépense trouvée
+        </div>
     {% endfor %}
-    </tbody>
-</table>
+
+</div>
 
 
 </div>

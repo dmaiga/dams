@@ -778,6 +778,25 @@ class Agent(models.Model):
         # ❌ ON NE SOUSTRAIT PAS LES REMISES AU ROT ICI
         return cash_agents + ventes_perso
 
+    @property
+    def solde_rot(self):
+    
+        if not self.est_rot:
+            return Decimal("0")
+    
+        recouvre = RecouvrementSuperviseur.objects.filter(rot=self).aggregate(
+            total=Coalesce(Sum("montant"), Decimal("0"))
+        )["total"]
+    
+        versements = VersementBancaire.objects.filter(effectue_par=self).aggregate(
+            total=Coalesce(Sum("montant_vente"), Decimal("0"))
+        )["total"]
+    
+        depenses = Depense.objects.filter(effectue_par=self).aggregate(
+            total=Coalesce(Sum("montant"), Decimal("0"))
+        )["total"]
+    
+        return recouvre - versements - depenses + (self.ajustement_solde or Decimal("0"))
     
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit,
@@ -819,16 +838,19 @@ class LotEntrepot(models.Model):
     date_enregistrement = models.DateTimeField(auto_now_add=True)
     reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
 
-
+ 
 
     def __str__(self):
         produit = self.produit.nom if self.produit else "Produit inconnu"
         fournisseur = self.fournisseur.nom if self.fournisseur else "—"
-       
+
+        date = timezone.localtime(self.date_reception)
+        date_formatee = date.strftime("%d/%m/%Y")
+
         return (
             f"{produit} | {fournisseur} | "
-            f"reste {self.quantite_restante:.2f} "
-            f"(init. {self.quantite_initiale:.2f})"
+            f"Reçu le {date_formatee} | "
+            f"Stock: {self.quantite_restante:.2f}"
         )
 
 
@@ -1112,7 +1134,7 @@ class AffectationLotSuperviseur(models.Model):
         related_name='affectations_realisees'
     )
 
-    date_affectation = models.DateTimeField(
+    date_affectation = models.DateField(
         verbose_name="Date de distribution"
     )
 
@@ -1133,7 +1155,7 @@ class AffectationLotSuperviseur(models.Model):
             f"{self.lot.produit.nom} — "
             f"reste {self.quantite_restante:.2f} "
             f"(init. {self.quantite_initiale:.2f})"
-            f"- {self.date_affectation_humaine()})"
+            f"- {self.date_affectation})"
 
         )
 
@@ -1991,8 +2013,8 @@ class Depense(models.Model):
         verbose_name="Description historique"
     )
 
-    date_depense = models.DateTimeField(
-        default=timezone.now,
+    date_depense = models.DateField(
+        default=timezone.localdate,
         verbose_name="Date de la dépense"
     )
 

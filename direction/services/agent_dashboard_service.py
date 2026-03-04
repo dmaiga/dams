@@ -393,13 +393,20 @@ class DashboardAgentAnalysisService:
             recupere = recup_map.get(rot.id, Decimal("0"))
             verse = verse_map.get(rot.id, Decimal("0"))
             depenses = depense_map.get(rot.id, Decimal("0"))
+            ajustement = rot.ajustement_solde or Decimal('0')
 
+            solde_trimestre = (
+                recupere
+                - verse
+                - depenses
+                + ajustement
+            )
             data.append({
                 "rot": rot,
                 "recupere_trimestre": recupere,
                 "verse_trimestre": verse,
                 "depenses_trimestre": depenses,
-                "solde_trimestre": recupere - verse - depenses,
+                "solde_trimestre": solde_trimestre,
             })
 
         return data
