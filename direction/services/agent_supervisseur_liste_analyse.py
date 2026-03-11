@@ -196,6 +196,7 @@ class SuperviseurAnalysisService:
                 "verse_banque": verse_banque,
                 "depenses": depenses,
                 "solde": solde_rot,
+                "ajustement": ajustement,
             })
 
         return data

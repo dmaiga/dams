@@ -126,6 +126,7 @@
                             <th class="text-right">Reçu superviseurs</th>
                             <th class="text-right">Versé banque</th>
                             <th class="text-right">Dépenses</th>
+                            <th class="text-right">Re-ajustement</th>
                             <th class="text-right">Solde ROT</th>
                             <th></th>
                         </tr>
@@ -148,6 +149,9 @@
 
                         <td class="text-right text-error">
                             {{ r.depenses|fcfa }}
+                        </td>
+                        <td class="text-right text-error">
+                            {{ r.ajustement|fcfa }}
                         </td>
 
                         <td class="text-right font-bold {% if r.solde < 0 %}text-error{% endif %}">

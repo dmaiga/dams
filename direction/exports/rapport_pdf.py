@@ -94,25 +94,39 @@ def generer_rapport_ventes_pdf(
     # ===============================
     # REGROUPEMENT PAR AGENT
     # ===============================
+    from core.models import Agent
+
     agents = defaultdict(list)
+    agents_objs = {}
 
     for row in rapport:
-        agent = f"{row['agent__user__first_name']} {row['agent__user__last_name']}"
-        agents[agent].append(row)
+        agent_id = row["agent__id"]
 
+        if agent_id not in agents_objs:
+            agents_objs[agent_id] = Agent.objects.get(id=agent_id)
+
+        agents[agent_id].append(row)
     # ===============================
     # PAR AGENT
     # ===============================
-    for agent, ventes in agents.items():
+    for agent_id, ventes in agents.items():
 
+        agent_obj = agents_objs[agent_id]
+        agent_nom = f"{agent_obj.user.first_name} {agent_obj.user.last_name}"
         # 🔥 total période agent
         total_agent_kg = sum(float(v["total_kg"]) for v in ventes)
 
-        elements.append(
-            Paragraph(
-                f"<b>Agent : {agent} — Total période : {total_agent_kg:.2f} kg</b>",
-                styles["Heading2"]
+        if agent_obj.est_en_test:
+            titre = (
+                f"Agent : {agent_nom} "
+                f"(EN TEST - {agent_obj.jours_restants_test} jours restants) "
+                f"— Total période : {total_agent_kg:.2f} kg"
             )
+        else:
+            titre = f"Agent : {agent_nom} — Total période : {total_agent_kg:.2f} kg"
+        
+        elements.append(
+            Paragraph(f"<b>{titre}</b>", styles["Heading2"])
         )
 
         elements.append(Spacer(1, 6))
@@ -220,18 +234,34 @@ def generer_rapport_ventes_pdf(
         )
     )
 
-    if agents_sans_vente:
-        for agent in agents_sans_vente:
-            nom = f"{agent.user.first_name} {agent.user.last_name}"
-            elements.append(Paragraph(f"- {nom}", styles["Normal"]))
-    else:
+ 
+    agents_test = []
+    agents_confirmes = []
+
+    for agent in agents_sans_vente:
+        if agent.est_en_test:
+            agents_test.append(agent)
+        else:
+            agents_confirmes.append(agent)
+
+    if agents_test:
         elements.append(
-            Paragraph(
-                "Tous les agents actifs ont réalisé au moins une vente.",
-                styles["Normal"]
-            )
+            Paragraph("<b>Agents en période d'essai sans vente</b>", styles["Heading3"])
+        )
+    
+        for agent in agents_test:
+            nom = f"{agent.user.first_name} {agent.user.last_name}"
+            texte = f"- {nom} ({agent.jours_restants_test} jours restants)"
+            elements.append(Paragraph(texte, styles["Normal"]))
+    
+    if agents_confirmes:
+        elements.append(
+            Paragraph("<b>Agents confirmés sans vente</b>", styles["Heading3"])
         )
 
+        for agent in agents_confirmes:
+            nom = f"{agent.user.first_name} {agent.user.last_name}"
+            elements.append(Paragraph(f"- {nom}", styles["Normal"]))
     # ===============================
     # BUILD PDF
     # ===============================

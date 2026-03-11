@@ -337,7 +337,7 @@ class Agent(models.Model):
         if not self.est_superviseur:
             return
     
-        solde_actuel = self.solde_reel_superviseur  # ✅ BON SOLDE
+        solde_actuel = self.solde_reel_superviseur   
     
         if solde_actuel == 0:
             return
@@ -359,6 +359,31 @@ class Agent(models.Model):
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
     
+ 
+
+    @property
+    def est_en_test(self):
+        return self.jours_restants_test and self.jours_restants_test > 0
+    
+    @property
+    def jours_restants_test(self):
+
+        if not self.date_debut_fonction:
+            return None
+
+        fin_test = self.date_debut_fonction + timedelta(days=14)
+        aujourd_hui = timezone.now().date()
+
+        if aujourd_hui > fin_test:
+            return 0
+
+        return (fin_test - aujourd_hui).days
+
+    @property
+    def fin_periode_test(self):
+        if not self.date_debut_fonction:
+            return None
+        return self.date_debut_fonction + timedelta(days=14)
 
     @property
     def contrat_expire(self):
@@ -798,6 +823,8 @@ class Agent(models.Model):
     
         return recouvre - versements - depenses + (self.ajustement_solde or Decimal("0"))
     
+
+
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit,
                                  on_delete=models.CASCADE,

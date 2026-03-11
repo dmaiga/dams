@@ -367,6 +367,8 @@
                         <th>Reçu des superviseurs</th>
                         <th>Versé en banque</th>
                         <th>Dépenses</th>
+                        <th>Re-ajustement</th>
+                        
                         <th>Solde</th>
                     </tr>
                 </thead>
@@ -385,6 +387,11 @@
                         <td>
                             {{ row.depenses_trimestre|fcfa }}
                         </td>
+
+                         <td class="font-bold text-error">
+                            {{row.ajustement|fcfa }}
+                        </td>
+                        
                         <td class="font-bold text-success">
                             {{ row.solde_trimestre|fcfa }}
                         </td>

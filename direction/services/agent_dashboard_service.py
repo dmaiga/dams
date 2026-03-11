@@ -407,6 +407,8 @@ class DashboardAgentAnalysisService:
                 "verse_trimestre": verse,
                 "depenses_trimestre": depenses,
                 "solde_trimestre": solde_trimestre,
+                "ajustement": ajustement,
+                
             })
 
         return data
