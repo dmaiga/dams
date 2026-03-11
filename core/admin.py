@@ -40,11 +40,19 @@ class LotEntrepotAdmin(admin.ModelAdmin):
     list_display = ['produit', 'fournisseur', 'quantite_initiale', 'quantite_restante', 'prix_achat_unitaire', 'date_reception']
     list_filter = ['produit', 'fournisseur', 'date_reception']
     search_fields = ['produit__nom', 'fournisseur__nom']
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur produit et fournisseur"""
+        return super().get_queryset(request).select_related('produit', 'fournisseur')
 
 @admin.register(DistributionAgent)
 class DistributionAgentAdmin(admin.ModelAdmin):
     list_display = ['superviseur', 'agent_terrain', 'date_distribution','date_creation']
     list_filter = ['date_distribution', 'superviseur', 'agent_terrain','date_creation']
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur superviseur et agent_terrain"""
+        return super().get_queryset(request).select_related('superviseur__user', 'agent_terrain__user')
 
 @admin.register(DetailDistribution)
 class DetailDistributionAdmin(admin.ModelAdmin):
@@ -166,6 +174,10 @@ class MouvementStockAdmin(admin.ModelAdmin):
     list_display = ['produit', 'type_mouvement', 'quantite', 'date_mouvement']
     list_filter = ['type_mouvement', 'date_mouvement']
     search_fields = ['produit__nom']
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur produit"""
+        return super().get_queryset(request).select_related('produit')
 
 
 @admin.register(Recouvrement)
@@ -247,6 +259,10 @@ class AgentAdmin(admin.ModelAdmin):
         'user__username',
         'telephone',
     ]
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur user et superviseur"""
+        return super().get_queryset(request).select_related('user', 'superviseur__user')
 
     actions = ['activer_agents', 'desactiver_agents']
 
@@ -356,6 +372,10 @@ class DepenseAdmin(admin.ModelAdmin):
     search_fields = ['description', 'versement__superviseur__user__username']
     ordering = ['-date_depense']
     readonly_fields = ['date_creation']
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur versement et superviseur"""
+        return super().get_queryset(request).select_related('versement__superviseur__user')
 
 # -------------------------
 # Admin pour VersementBancaire
@@ -372,6 +392,10 @@ class RecuVersementInline(admin.TabularInline):
 class VersementBancaireAdmin(admin.ModelAdmin):
     inlines = [RecuVersementInline]
     list_display = ('id', 'effectue_par', 'montant_vente', 'montant_hors_vente', 'date_versement_reelle')
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur effectue_par et superviseur"""
+        return super().get_queryset(request).select_related('effectue_par__user', 'superviseur__user')
 
 
 @admin.register(RecuVersement)
@@ -379,6 +403,10 @@ class RecuVersementAdmin(admin.ModelAdmin):
     list_display = ('id', 'versement', 'description', 'date_upload')
     list_filter = ('date_upload', )
     search_fields = ('description', 'versement__id')
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur versement et superviseur"""
+        return super().get_queryset(request).select_related('versement__superviseur__user')
 
 
 
@@ -417,6 +445,10 @@ class DetteAdmin(admin.ModelAdmin):
     readonly_fields = ('date_creation', 'date_reglement')
 
     inlines = [PaiementDetteInline]
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur vente et client"""
+        return super().get_queryset(request).select_related('vente__client')
 
 
 # ==============================
@@ -434,6 +466,10 @@ class PaiementDetteAdmin(admin.ModelAdmin):
     )
     list_filter = ('mode_paiement', 'date_paiement')
     search_fields = ('reference', 'dette__vente__client__nom')
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur dette et client"""
+        return super().get_queryset(request).select_related('dette__vente__client')
 
 @admin.register(PaiementFournisseur)
 class PaiementFournisseurAdmin(admin.ModelAdmin):
@@ -468,6 +504,10 @@ class PaiementFournisseurAdmin(admin.ModelAdmin):
         'lot',
         'superviseur',
     )
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur lot, fournisseur et produit"""
+        return super().get_queryset(request).select_related('lot__produit', 'lot__fournisseur', 'fournisseur')
 
     # =========================
     # COLONNES CALCULÉES
@@ -553,6 +593,10 @@ class BonusAgentAdmin(admin.ModelAdmin):
     search_fields = ('agent__user__username', 'agent__user__first_name', 'agent__user__last_name')
     
     readonly_fields = ('date_mise_a_jour',)
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur agent"""
+        return super().get_queryset(request).select_related('agent__user')
 
 
 
@@ -598,6 +642,10 @@ class RecouvrementSuperviseurAdmin(admin.ModelAdmin):
     readonly_fields = (
         'date_creation',
     )
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur superviseur et rot"""
+        return super().get_queryset(request).select_related('superviseur__user', 'rot__user')
 
     fieldsets = (
         ("Informations principales", {
@@ -702,5 +750,9 @@ class FactureLotEntrepotAdmin(admin.ModelAdmin):
         "date_upload",
         "fichier",
     )
+    
+    def get_queryset(self, request):
+        """Optimise les requêtes pour éviter N+1 sur lot et produit"""
+        return super().get_queryset(request).select_related('lot__produit', 'lot__fournisseur')
 
 
