@@ -67,7 +67,7 @@ Le projet est organisé en plusieurs dossiers principaux :
 ## Technologies Utilisées
 - **Langage** : Python
 - **Framework** : Django
-- **Base de Données** : SQLite
+- **Base de Données** :  / prod POSTGRESQL
 - **Frontend** : HTML, CSS, JavaScript
 
 ---

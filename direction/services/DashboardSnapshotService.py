@@ -37,19 +37,13 @@ class DashboardSnapshotService:
             mois
         )
 
-        snapshot["stock_essentiel"] = DashboardService.get_stock_essentiel_avec_fournisseurs()
+
         snapshot["performances_agents"] = DashboardService.get_performances_agents(periode_type, annee, mois)
         snapshot.update(
             DashboardService.get_analyses_ventes_avancees(periode_type, annee, mois)
         )
-        snapshot.update(
-            DashboardService.get_analyses_depenses(periode_type, annee, mois)
-        )
 
-        if hasattr(user, "agent") and user.agent.est_direction:
-            snapshot["portefeuilles_superviseurs"] = DashboardService.get_portefeuilles_tous_superviseurs(
-                periode_type, annee, mois
-            )
+
 
         cache.set(cache_key, snapshot, 60 * 10)  # 10 minutes
         return snapshot

@@ -79,44 +79,133 @@
     </div>
 </div>
 
-    <!-- Filtres -->
+    <!-- Filtres Période -->
     <div class="card bg-base-100 shadow-xl mb-6">
         <div class="card-body">
-            <h2 class="card-title">Filtres</h2>
-            <form method="get" class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="form-control w-full md:w-auto">
+            <h2 class="card-title mb-4">Filtres de Période</h2>
+            <form method="get" class="space-y-4">
+                <!-- Type de période -->
+                <div class="form-control w-full">
                     <label class="label">
-                        <span class="label-text">Fournisseur</span>
+                        <span class="label-text font-semibold">Période</span>
                     </label>
-                    <select name="fournisseur" class="select select-bordered w-full">
-                        <option value="">Tous les fournisseurs</option>
-                        {% for supplier in suppliers %}
-                        <option value="{{ supplier.id }}" 
-                            {% if current_filters.fournisseur == supplier.id|stringformat:"i" %}selected{% endif %}>
-                            {{ supplier.nom }} ({{ supplier.total_stock|format_number }} unités)
-                        </option>
-                        {% endfor %}
+                    <select name="periode" class="select select-bordered w-full" onchange="updatePeriodeFields()">
+                        <option value="mois_courant" {% if periode_selectionnee == 'mois_courant' %}selected{% endif %}>Mois courant ({{ mois_courant }}/{{ annee_courant }})</option>
+                        <option value="mois_custom" {% if periode_selectionnee == 'mois_custom' %}selected{% endif %}>Mois personnalisé</option>
+                        <option value="annee_courant" {% if periode_selectionnee == 'annee_courant' %}selected{% endif %}>Année en cours</option>
+                        <option value="custom" {% if periode_selectionnee == 'custom' %}selected{% endif %}>Plage personnalisée</option>
+                        <option value="30jours" {% if periode_selectionnee == '30jours' %}selected{% endif %}>30 derniers jours</option>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-filter"></i>
-                    Filtrer
-                </button>
-                {% if current_filters.fournisseur %}
-                <a href="{% url 'product_list' %}" class="btn btn-outline">
-                    <i class="fas fa-times"></i>
-                    Effacer
-                </a>
-                {% endif %}
+
+                <!-- Mois personnalisé -->
+                <div id="mois-custom" class="{% if periode_selectionnee != 'mois_custom' %}hidden{% endif %} flex gap-2">
+                    <div class="form-control flex-1">
+                        <label class="label">
+                            <span class="label-text">Mois</span>
+                        </label>
+                        <select name="mois" class="select select-bordered">
+                            {% for num, nom in mois_liste %}
+                            <option value="{{ num }}" {% if mois_courant == num %}selected{% endif %}>{{ nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-control flex-1">
+                        <label class="label">
+                            <span class="label-text">Année</span>
+                        </label>
+                        <select name="annee" class="select select-bordered">
+                            {% for annee in annees_disponibles %}
+                            <option value="{{ annee }}" {% if annee_courant == annee %}selected{% endif %}>{{ annee }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Plage personnalisée -->
+                <div id="custom-range" class="{% if periode_selectionnee != 'custom' %}hidden{% endif %} flex gap-2">
+                    <div class="form-control flex-1">
+                        <label class="label">
+                            <span class="label-text">Date début</span>
+                        </label>
+                        <input type="date" name="date_debut" class="input input-bordered">
+                    </div>
+                    <div class="form-control flex-1">
+                        <label class="label">
+                            <span class="label-text">Date fin</span>
+                        </label>
+                        <input type="date" name="date_fin" class="input input-bordered">
+                    </div>
+                </div>
+
+                <!-- Boutons -->
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary flex-1">
+                        <i class="fas fa-filter"></i>
+                        Appliquer
+                    </button>
+                    <a href="{% url 'product_list' %}" class="btn btn-outline flex-1">
+                        <i class="fas fa-redo"></i>
+                        Réinitialiser
+                    </a>
+                </div>
             </form>
 
-            {% if selected_supplier %}
-            <div class="mt-4">
-                <div class="badge badge-info badge-lg">
-                    Fournisseur: {{ selected_supplier.nom }}
+            <!-- Indicateur période active -->
+            <div class="mt-4 pt-4 border-t border-base-200">
+                <div class="badge badge-primary badge-lg">
+                    <i class="fas fa-calendar"></i>
+                    Du {{ date_debut|date:"d/m/Y" }} au {{ date_fin|date:"d/m/Y" }}
                 </div>
             </div>
-            {% endif %}
+        </div>
+    </div>
+
+    <!-- STATS PÉRIODE -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <!-- Montant investi -->
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-accent">
+            <div class="card-body p-4">
+                <h3 class="card-title text-sm"><i class="fas fa-money-bill-wave"></i> Investi</h3>
+                <p class="text-2xl font-bold text-accent">{{ stats_periode.total_investi|fcfa }}</p>
+                <p class="text-xs text-base-content/60 mt-1">{{ stats_periode.quantite_recue|format_number }} unités reçues</p>
+            </div>
+        </div>
+
+        <!-- CA réalisé -->
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-success">
+            <div class="card-body p-4">
+                <h3 class="card-title text-sm"><i class="fas fa-chart-line"></i> CA</h3>
+                <p class="text-2xl font-bold text-success">{{ stats_periode.total_ca|fcfa }}</p>
+                <p class="text-xs text-base-content/60 mt-1">{{ stats_periode.quantite_vendue|format_number }} unités vendues</p>
+            </div>
+        </div>
+
+        <!-- Marge réalisée -->
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-info">
+            <div class="card-body p-4">
+                <h3 class="card-title text-sm"><i class="fas fa-hand-holding-usd"></i> Marge</h3>
+                <p class="text-2xl font-bold text-info">{{ stats_periode.total_marge|fcfa }}</p>
+                <p class="text-xs text-base-content/60 mt-1">Marge totale</p>
+            </div>
+        </div>
+
+        <!-- Taux de marge -->
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-warning">
+            <div class="card-body p-4">
+                <h3 class="card-title text-sm"><i class="fas fa-percentage"></i> Taux</h3>
+                <p class="text-2xl font-bold text-warning">{{ stats_periode.taux_marge_periode|floatformat:1 }}%</p>
+                <p class="text-xs text-base-content/60 mt-1">Sur le CA</p>
+            </div>
+        </div>
+
+        <!-- Produits analysés -->
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-primary">
+            <div class="card-body p-4">
+                <h3 class="card-title text-sm"><i class="fas fa-box"></i> Produits</h3>
+                <p class="text-2xl font-bold text-primary">{{ page_obj.paginator.count }}</p>
+                <p class="text-xs text-base-content/60 mt-1">Avec activité</p>
+            </div>
         </div>
     </div>
 
@@ -135,13 +224,13 @@
                 <thead>
                     <tr>
                         <th>Produit</th>
-                        <th class="text-center">Stock</th>
-                        <th class="text-right">Valeur Stock</th>
-                        <th class="text-center">Ventes Total</th>
-                        <th class="text-right">Marge Total</th>
+                        <th class="text-center">Lots Reçus</th>
+                        <th class="text-right">Montant Investi</th>
+                        <th class="text-center">Quantité Vendue</th>
+                        <th class="text-right">CA Réalisé</th>
+                        <th class="text-right">Marge</th>
                         <th class="text-center">Taux Marge</th>
-                        <th class="text-center">Pertes</th>
-                        <th class="text-center">Statut</th>
+                        <th class="text-center">ROI</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -149,30 +238,25 @@
                     {% for product_data in products_data %}
                     <tr>
                         <td>
-                            <div class="font-bold">{{ product_data.product.nom }}</div>
-                            {% if product_data.fournisseur_specifique %}
-                            <div class="text-sm text-gray-500">
-                                Fournisseur: {{ product_data.fournisseur_specifique.nom }}
-                            </div>
-                            {% endif %}
+                            <div class="font-bold">{{ product_data.produit_nom }}</div>
                         </td>
                         <td class="text-center">
-                            <div class="font-bold">{{ product_data.total_stock|format_number }}</div>
+                            <span class="badge badge-outline">{{ product_data.nombre_lots }}</span>
                         </td>
                         <td class="text-right font-mono font-bold">
-                            {{ product_data.total_valeur_stock_disponible|fcfa }} FCFA
+                            {{ product_data.montant_investi|fcfa }} FCFA
                         </td>
                         <td class="text-center">
-                            <div>{{ product_data.total_sales_quantity|format_number }} unités</div>
-                            <div class="text-xs text-success">
-                                {{ product_data.total_sales_revenue|fcfa }} FCFA
-                            </div>
+                            <span class="font-bold">{{ product_data.quantite_vendue|format_number }}</span> unités
                         </td>
                         <td class="text-right font-mono font-bold text-success">
+                            {{ product_data.total_ca|fcfa }} FCFA
+                        </td>
+                        <td class="text-right font-mono font-bold text-info">
                             {{ product_data.marge_totale|fcfa }} FCFA
                         </td>
                         <td class="text-center">
-                            <div class="tooltip" data-tip="Taux de marge: {{ product_data.taux_marge|format_number }}%">
+                            <div class="tooltip" data-tip="Taux: {{ product_data.taux_marge|floatformat:1 }}%">
                                 <div class="radial-progress 
                                     {% if product_data.taux_marge > 30 %}text-success
                                     {% elif product_data.taux_marge > 15 %}text-warning
@@ -183,27 +267,17 @@
                             </div>
                         </td>
                         <td class="text-center">
-                            {% if product_data.total_losses_quantite > 0 %}
-                            <div class="tooltip" data-tip="{{ product_data.total_losses_quantite|fcfa }} unités - {{ product_data.total_losses_valeur|fcfa }} FCFA">
-                                <span class="badge badge-error">
-                                    {{ product_data.total_losses_valeur|fcfa }} FCFA
+                            <div class="tooltip" data-tip="Retour sur investissement">
+                                <span class="badge 
+                                    {% if product_data.roi > 50 %}badge-success
+                                    {% elif product_data.roi > 20 %}badge-warning
+                                    {% else %}badge-error{% endif %}">
+                                    {{ product_data.roi|floatformat:0 }}%
                                 </span>
                             </div>
-                            {% else %}
-                            <span class="text-gray-400">-</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-center">
-                            <span class="badge 
-                                {% if product_data.stock_status == 'CRITIQUE' %}badge-error
-                                {% elif product_data.stock_status == 'EXCÉDENTAIRE' %}badge-warning
-                                {% elif product_data.stock_status == 'RUPTURE' %}badge-secondary
-                                {% else %}badge-success{% endif %}">
-                                {{ product_data.stock_status }}
-                            </span>
                         </td>
                         <td>
-                            <a href="{% url 'product_detail' product_data.product.id %}{% if current_filters.fournisseur %}?fournisseur={{ current_filters.fournisseur }}{% endif %}" 
+                            <a href="{% url 'product_detail' product_data.produit_id %}?periode={{ periode_selectionnee }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}" 
                                class="btn btn-sm btn-primary">
                                 <i class="fas fa-eye"></i>
                                 Détails
@@ -213,110 +287,60 @@
                     {% empty %}
                     <tr>
                         <td colspan="9" class="text-center text-gray-500 py-4">
-                            Aucun produit trouvé avec les filtres actuels
+                            Aucun produit avec activité pendant cette période
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        
 
-
-    <!-- Ventes par agent (si fournisseur sélectionné) -->
-    {% if ventes_par_agent and selected_supplier %}
-    <div class="card bg-base-100 shadow-xl mb-6">
-        <div class="card-body">
-            <h2 class="card-title mb-4">Ventes par Agent - {{ selected_supplier.nom }}</h2>
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>Agent</th>
-                            <th class="text-center">Quantité Vendue</th>
-                            <th class="text-right">Chiffre d'Affaires</th>
-                            <th class="text-right">Marge Générée</th>
-                            <th class="text-center">Taux de Marge</th>
-                            <th class="text-center">Produits Vendus</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for agent_data in ventes_par_agent %}
-                        <tr>
-                            <td>
-                                <div class="font-bold">{{ agent_data.agent.full_name }}</div>
-                                <div class="text-sm text-gray-500">{{ agent_data.agent.get_type_agent_display }}</div>
-                            </td>
-                            <td class="text-center font-bold">
-                                {{ agent_data.total_quantite|format_number }}
-                            </td>
-                            <td class="text-right font-mono font-bold">
-                                {{ agent_data.total_ca|fcfa }} FCFA
-                            </td>
-                            <td class="text-right font-mono font-bold text-success">
-                                {{ agent_data.total_marge|fcfa }} FCFA
-                            </td>
-                            <td class="text-center">
-                                <div class="radial-progress 
-                                    {% if agent_data.taux_marge > 30 %}text-success
-                                    {% elif agent_data.taux_marge > 15 %}text-warning
-                                    {% else %}text-error{% endif %}" 
-                                    style="--value:{{ agent_data.taux_marge|floatformat:0 }}; --size:3rem;">
-                                    {{ agent_data.taux_marge|floatformat:0 }}%
-                                </div>
-                            </td>
-                            <td class="text-center">
-                                <div class="flex flex-wrap gap-1 justify-center">
-                                    {% for produit in agent_data.produits_vendus %}
-                                    <span class="badge badge-outline badge-sm">{{ produit }}</span>
-                                    {% endfor %}
-                                    {% if agent_data.nombre_produits > 3 %}
-                                    <span class="badge badge-ghost badge-sm">+{{ agent_data.nombre_produits|add:"-3" }}</span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="flex justify-center mt-6">
+            <div class="join">
+                {% if page_obj.has_previous %}
+                <a class="join-item btn" 
+                   href="?page=1&periode={{ periode_selectionnee }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}">
+                    «
+                </a>
+                <a class="join-item btn" 
+                   href="?page={{ page_obj.previous_page_number }}&periode={{ periode_selectionnee }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}">
+                    ‹
+                </a>
+                {% endif %}
+                
+                <button class="join-item btn btn-active">
+                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                </button>
+                
+                {% if page_obj.has_next %}
+                <a class="join-item btn" 
+                   href="?page={{ page_obj.next_page_number }}&periode={{ periode_selectionnee }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}">
+                    ›
+                </a>
+                <a class="join-item btn" 
+                   href="?page={{ page_obj.paginator.num_pages }}&periode={{ periode_selectionnee }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}">
+                    »
+                </a>
+                {% endif %}
             </div>
         </div>
-    </div>
-    {% endif %}
-
-            <!-- Pagination -->
-            {% if is_paginated %}
-            <div class="flex justify-center mt-6">
-                <div class="join">
-                    {% if page_obj.has_previous %}
-                    <a class="join-item btn" 
-                       href="?page=1{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
-                        «
-                    </a>
-                    <a class="join-item btn" 
-                       href="?page={{ page_obj.previous_page_number }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
-                        ‹
-                    </a>
-                    {% endif %}
-                    
-                    <button class="join-item btn btn-active">
-                        Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
-                    </button>
-                    
-                    {% if page_obj.has_next %}
-                    <a class="join-item btn" 
-                       href="?page={{ page_obj.next_page_number }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
-                        ›
-                    </a>
-                    <a class="join-item btn" 
-                       href="?page={{ page_obj.paginator.num_pages }}{% if current_filters.fournisseur %}&fournisseur={{ current_filters.fournisseur }}{% endif %}">
-                        »
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
+        {% endif %}
     </div>
 </div>
+
+<script>
+function updatePeriodeFields() {
+    const periode = document.querySelector('select[name="periode"]').value;
+    const moisCustom = document.getElementById('mois-custom');
+    const customRange = document.getElementById('custom-range');
+    
+    if (moisCustom) moisCustom.classList.toggle('hidden', periode !== 'mois_custom');
+    if (customRange) customRange.classList.toggle('hidden', periode !== 'custom');
+}
+
+// Initialisation au chargement
+document.addEventListener('DOMContentLoaded', updatePeriodeFields);
+</script>
 {% endblock %}

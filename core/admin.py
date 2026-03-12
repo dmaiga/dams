@@ -283,7 +283,6 @@ class AgentAdmin(admin.ModelAdmin):
             '<span style="color: red; font-weight: bold;">✖ Inactif</span>'
         )
     statut_actif.short_description = "Statut"
-    statut_actif.admin_order_field = 'est_actif'
 
     # =========================
     # ACTIONS ADMIN

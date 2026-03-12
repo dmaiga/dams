@@ -1,6 +1,6 @@
 # core/services/dashboard_service.py
 from django.utils import timezone
-from django.db.models import Sum, Count, Q, F, FloatField, Max, Case, When, Value
+from django.db.models import Sum, Count, Q, F, FloatField, Max, Case, When, Value, ExpressionWrapper, DecimalField
 from django.db.models.functions import Coalesce, TruncMonth, TruncYear
 from datetime import timedelta, datetime
 from decimal import Decimal
@@ -168,50 +168,6 @@ class DashboardService:
         }
     
 
-    @staticmethod
-    def get_agents_inactifs(depuis_jours=3):
-        """
-        Agents terrain / entrepôt actifs
-        qui n'ont fait AUCUNE vente
-        ou dont la dernière vente date de plus de X jours.
-        """
-
-        seuil = timezone.now() - timedelta(days=depuis_jours)
-
-        agents = (
-            Agent.objects
-            .filter(
-                type_agent__in=["terrain", "entrepot"],
-                est_actif=True,               # ✅ exclure désactivés
-                user__is_active=True
-            )
-            .annotate(
-                derniere_vente=Max("vente__date_vente")
-            )
-            .filter(
-                models.Q(derniere_vente__lt=seuil) |  # vente trop ancienne
-                models.Q(derniere_vente__isnull=True)  # jamais vendu
-            )
-            .order_by("derniere_vente")
-        )
-
-        resultat = []
-
-        for agent in agents:
-            if agent.derniere_vente:
-                jours = (timezone.now() - agent.derniere_vente).days
-            else:
-                jours = None
-
-            resultat.append({
-                "agent": agent,
-                "nom": agent.full_name,
-                "jours_depuis": jours,
-                "derniere_vente": agent.derniere_vente,
-            })
-
-        return resultat
-
     
     @staticmethod
     def get_periodes(periode_type='mois', annee=None, mois=None):
@@ -248,71 +204,111 @@ class DashboardService:
         date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
     
         # -------------------------
-        # VENTES DE LA PÉRIODE
+        # VENTES DE LA PÉRIODE (1 query)
         # -------------------------
-        ventes_periode = Vente.objects.filter(
+        ventes_agg = Vente.objects.filter(
             date_vente__range=[date_debut, date_fin],
             est_supprime=False
+        ).aggregate(
+            total_ca=Coalesce(
+                Sum(ExpressionWrapper(
+                    F("quantite") * F("prix_vente_unitaire"),
+                    output_field=DecimalField()
+                )),
+                Decimal("0.00")
+            ),
+            total_kg=Coalesce(
+                Sum(ExpressionWrapper(
+                    F("quantite") * Case(
+                        When(
+                            detail_distribution__lot__produit__poids_unitaire_kg__isnull=False,
+                            then=F("detail_distribution__lot__produit__poids_unitaire_kg")
+                        ),
+                        default=Decimal("1.00"),
+                        output_field=DecimalField()
+                    ),
+                    output_field=DecimalField()
+                )),
+                Decimal("0.00")
+            ),
+            count_ventes=Count("id")
         )
     
-        # CA = quantité réelle × prix unitaire
-        total_ventes_periode = sum(
-            float(vente.quantite) * float(vente.prix_vente_unitaire)
-            for vente in ventes_periode
+        total_ventes_periode = float(ventes_agg["total_ca"] or 0)
+        total_quantite_vendue_kg = float(ventes_agg["total_kg"] or 0)
+        nombre_ventes = ventes_agg["count_ventes"] or 0
+    
+        # -------------------------
+        # STOCK ACTUEL (1 query)
+        # -------------------------
+        stock_agg = LotEntrepot.objects.aggregate(
+            total_stock=Coalesce(
+                Sum(ExpressionWrapper(
+                    F("quantite_restante") * F("prix_achat_unitaire"),
+                    output_field=DecimalField()
+                )),
+                Decimal("0.00")
+            )
         )
-    
-        # Volume physique (kg) – analytique uniquement
-        total_quantite_vendue_kg = sum(
-            float(vente.quantite_en_kg)
-            for vente in ventes_periode
-        )
+        stock_total = float(stock_agg["total_stock"] or 0)
     
         # -------------------------
-        # STOCK ACTUEL
+        # PERTES DE LA PÉRIODE (1 query)
         # -------------------------
-        lots = LotEntrepot.objects.all()
-        stock_total = sum(float(lot.valeur_actuelle_stock) for lot in lots)
-    
-        # -------------------------
-        # PERTES DE LA PÉRIODE
-        # -------------------------
-        pertes_periode = Perte.objects.filter(
+        pertes_agg = Perte.objects.filter(
             date_perte__range=[date_debut, date_fin]
-        ).select_related('lot')
-    
-        valeur_pertes = sum(
-            float(perte.quantite_perdue) * float(perte.lot.prix_achat_unitaire)
-            for perte in pertes_periode
+        ).aggregate(
+            total_valeur=Coalesce(
+                Sum(ExpressionWrapper(
+                    F("quantite_perdue") * F("lot__prix_achat_unitaire"),
+                    output_field=DecimalField()
+                )),
+                Decimal("0.00")
+            )
         )
+        valeur_pertes = float(pertes_agg["total_valeur"] or 0)
     
         # -------------------------
-        # SOLDE SUPERVISEURS (INSTANTANÉ)
+        # SOLDE SUPERVISEURS (INSTANTANÉ) (1 query)
         # -------------------------
-        superviseurs = Agent.objects.select_related("user").filter(type_agent='entrepot')
-        solde_superviseurs = sum(
-            float(superviseur.solde_reel_superviseur)
-            for superviseur in superviseurs
+        superviseurs = Agent.objects.filter(
+            type_agent='entrepot',
+            est_actif=True
         )
+        solde_superviseurs = float(sum(
+            float(sup.solde_reel_superviseur or 0) for sup in superviseurs
+        ))
     
         # -------------------------
-        # DÉPENSES DE LA PÉRIODE
+        # DÉPENSES DE LA PÉRIODE (1 query)
         # -------------------------
-        depenses_periode = Depense.objects.filter(
+        depenses_agg = Depense.objects.filter(
             date_depense__range=[date_debut, date_fin]
+        ).aggregate(
+            total_depenses=Coalesce(Sum("montant"), Decimal("0.00"))
         )
-        total_depenses = sum(float(depense.montant) for depense in depenses_periode)
+        total_depenses = float(depenses_agg["total_depenses"] or 0)
     
         # -------------------------
-        # MARGE & CASH FLOW
+        # MARGE BRUTE (1 query - computed in DB)
         # -------------------------
-        marge_brute_periode = DashboardService.calculer_marge_brute_periode(
-            date_debut, date_fin
+        marge_agg = Vente.objects.filter(
+            date_vente__range=[date_debut, date_fin]
+        ).aggregate(
+            marge=Coalesce(
+                Sum(ExpressionWrapper(
+                    F("quantite") * (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire")),
+                    output_field=DecimalField()
+                )),
+                Decimal("0.00")
+            )
         )
+        marge_brute_periode = float(marge_agg["marge"] or 0)
     
         cash_flow = total_ventes_periode - total_depenses
     
         # -------------------------
-        # RETURN
+        # RETURN (7 queries total vs 825+)
         # -------------------------
         return {
             "total_ventes_periode": total_ventes_periode,
@@ -323,7 +319,7 @@ class DashboardService:
             "total_depenses": total_depenses,
             "marge_brute_periode": marge_brute_periode,
             "cash_flow": cash_flow,
-            "nombre_ventes_periode": ventes_periode.count(),
+            "nombre_ventes_periode": nombre_ventes,
             "date_debut": date_debut,
             "date_fin": date_fin,
             "periode_type": periode_type
@@ -331,91 +327,110 @@ class DashboardService:
     
 
     @staticmethod
-    def calculer_marge_brute_periode(date_debut, date_fin):
-        """Calcule la marge brute réelle pour une période donnée"""
-        ventes_periode = Vente.objects.filter(
-            date_vente__range=[date_debut, date_fin]
-        ).select_related('detail_distribution__lot')
-        
-        marge_totale = 0
-        for vente in ventes_periode:
-            if vente.detail_distribution and vente.detail_distribution.lot:
-                prix_achat = float(vente.detail_distribution.lot.prix_achat_unitaire)
-                prix_vente = float(vente.prix_vente_unitaire)
-                quantite = float(vente.quantite)
-                
-                marge_totale += quantite * (prix_vente - prix_achat)
-        
-        return marge_totale
-
-    @staticmethod
     def get_stock_essentiel():
         """🟣 Bloc 2 : Stock essentiel - Données utiles (toujours actuel)"""
+        from django.db.models.functions import TruncDate
+        
+        # 1 query: Get all lots with aggregated vente data
+        lots_with_ventes = LotEntrepot.objects.filter(
+            quantite_restante__gt=0
+        ).select_related('produit').annotate(
+            valeur_stock=ExpressionWrapper(
+                F("quantite_restante") * F("prix_achat_unitaire"),
+                output_field=DecimalField()
+            ),
+            quantite_vendue_30j=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        F("detail_distribution__vente__quantite") * Case(
+                            When(
+                                detail_distribution__vente__detail_distribution__lot__produit__poids_unitaire_kg__isnull=False,
+                                then=F("detail_distribution__vente__detail_distribution__lot__produit__poids_unitaire_kg")
+                            ),
+                            default=Decimal("1.00"),
+                            output_field=DecimalField()
+                        ),
+                        output_field=DecimalField()
+                    ),
+                    filter=Q(
+                        detail_distribution__vente__date_vente__gte=timezone.now() - timedelta(days=30)
+                    )
+                ),
+                Decimal("0.00")
+            )
+        ).values(
+            'id', 'produit__nom', 'quantite_restante', 
+            'valeur_stock', 'quantite_vendue_30j'
+        ).order_by('-valeur_stock')
+        
         stocks = []
-        
-        lots = LotEntrepot.objects.select_related('produit').filter(quantite_restante__gt=0)
-        
-        for lot in lots:
-            quantite_restante = float(lot.quantite_restante)
-            valeur_actuelle = float(lot.valeur_actuelle_stock)
-            
-            # Calcul du taux de rotation (ventes du produit / stock actuel)
-            ventes_produit = Vente.objects.filter(
-                detail_distribution__lot__produit=lot.produit,
-                date_vente__gte=timezone.now() - timedelta(days=30)
-            )
-            quantite_vendue_mois = sum(
-                float(v.quantite_en_kg) for v in ventes_produit
-            )
-
+        for lot in lots_with_ventes:
+            quantite_restante = float(lot['quantite_restante'] or 0)
+            valeur_actuelle = float(lot['valeur_stock'] or 0)
+            quantite_vendue_mois = float(lot['quantite_vendue_30j'] or 0)
             
             taux_rotation = (quantite_vendue_mois / quantite_restante * 100) if quantite_restante > 0 else 0
             
             stocks.append({
-                'produit': lot.produit.nom,
+                'produit': lot['produit__nom'],
                 'quantite_restante': quantite_restante,
                 'valeur_actuelle': valeur_actuelle,
                 'taux_rotation': taux_rotation,
                 'ventes_30j': quantite_vendue_mois
             })
         
-        # Trier par valeur actuelle décroissante
-        return sorted(stocks, key=lambda x: x['valeur_actuelle'], reverse=True)
+        return stocks
 
     @staticmethod
     def get_performances_agents(periode_type='mois', annee=None, mois=None):
         """🟠 Bloc 3 : Performances des Agents avec filtre de période"""
         date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
         
-        performances = []
-        superviseurs = Agent.objects.select_related("user").filter(type_agent='entrepot')
+        # 1 query: Get all superviseurs with their période aggregates
+        superviseurs = (
+            Agent.objects
+            .filter(type_agent='entrepot', est_actif=True)
+            .select_related("user")
+            .annotate(
+                total_ventes_periode=Coalesce(
+                    Sum(
+                        ExpressionWrapper(
+                            F("vente__quantite") * F("vente__prix_vente_unitaire"),
+                            output_field=DecimalField()
+                        ),
+                        filter=Q(vente__date_vente__range=[date_debut, date_fin])
+                    ),
+                    Decimal("0.00")
+                ),
+                total_recouvre_periode=Coalesce(
+                    Sum(
+                        "recouvrements__montant_recouvre",
+                        filter=Q(recouvrements__date_recouvrement__range=[date_debut, date_fin])
+                    ),
+                    Decimal("0.00")
+                ),
+                count_ventes_periode=Count(
+                    "vente__id",
+                    filter=Q(vente__date_vente__range=[date_debut, date_fin])
+                )
+            )
+            .order_by('-total_ventes_periode')
+        )
         
-        for superviseur in superviseurs:
-            # Ventes de la période
-            ventes_periode = Vente.objects.filter(
-                agent=superviseur,
-                date_vente__range=[date_debut, date_fin]
-            )
-            total_ventes_periode = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_periode)
-            
-            # Recouvrements de la période
-            recouvrements_periode = Recouvrement.objects.filter(
-                superviseur=superviseur,
-                date_recouvrement__range=[date_debut, date_fin]
-            )
-            total_recouvre_periode = sum(float(r.montant_recouvre) for r in recouvrements_periode)
+        performances = []
+        for sup in superviseurs:
+            total_ventes = float(sup.total_ventes_periode or 0)
+            count = sup.count_ventes_periode or 0
             
             performances.append({
-                'superviseur': superviseur.full_name,
-                'total_ventes': total_ventes_periode,
-                'total_recouvre': total_recouvre_periode,
-                'solde_actuel': float(superviseur.solde_reel_superviseur),  # Toujours actuel
-                'moyenne_vente': total_ventes_periode / max(ventes_periode.count(), 1),
-                
+                'superviseur': sup.user.get_full_name() if sup.user else "Unknown",
+                'total_ventes': total_ventes,
+                'total_recouvre': float(sup.total_recouvre_periode or 0),
+                'solde_actuel': float(sup.solde_reel_superviseur or 0),
+                'moyenne_vente': total_ventes / max(count, 1),
             })
         
-        # Trier par CA décroissant
-        return sorted(performances, key=lambda x: x['total_ventes'], reverse=True)
+        return performances
     
     @staticmethod
     def get_analyses_ventes_avancees(periode_type='mois', annee=None, mois=None):
@@ -423,236 +438,207 @@ class DashboardService:
     
         date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
     
-        ventes_periode = (
+        # 1 query: Aggregate ventes par produit with proper kg calculation
+        ventes_par_produit = (
             Vente.objects
             .filter(date_vente__range=[date_debut, date_fin])
-            .select_related('detail_distribution__lot__produit')
+            .values('detail_distribution__lot__produit__nom')
+            .annotate(
+                quantite_total=Coalesce(Sum("quantite"), Decimal("0.00")),
+                kg_total=Coalesce(
+                    Sum(ExpressionWrapper(
+                        F("quantite") * Case(
+                            When(
+                                detail_distribution__lot__produit__poids_unitaire_kg__isnull=False,
+                                then=F("detail_distribution__lot__produit__poids_unitaire_kg")
+                            ),
+                            default=Decimal("1.00"),
+                            output_field=DecimalField()
+                        ),
+                        output_field=DecimalField()
+                    )),
+                    Decimal("0.00")
+                ),
+                ca_total=Coalesce(
+                    Sum(ExpressionWrapper(
+                        F("quantite") * F("prix_vente_unitaire"),
+                        output_field=DecimalField()
+                    )),
+                    Decimal("0.00")
+                ),
+                marge_total=Coalesce(
+                    Sum(ExpressionWrapper(
+                        F("quantite") * (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire")),
+                        output_field=DecimalField()
+                    )),
+                    Decimal("0.00")
+                )
+            )
+            .order_by('-ca_total')[:10]
         )
+        
+        top_produits = [
+            {
+                "nom": item['detail_distribution__lot__produit__nom'],
+                "quantite": round(float(item['quantite_total']), 2),
+                "kg_vendus": round(float(item['kg_total']), 2),
+                "ca": float(item['ca_total']),
+                "marge": float(item['marge_total']),
+            }
+            for item in ventes_par_produit
+        ]
     
-        produits_data = {}
-    
-        # =========================
-        # AGRÉGATION PAR PRODUIT
-        # =========================
-        for vente in ventes_periode:
-            if not (
-                vente.detail_distribution and
-                vente.detail_distribution.lot and
-                vente.detail_distribution.lot.produit
-            ):
-                continue
-            
-            produit = vente.detail_distribution.lot.produit
-            produit_nom = produit.nom
-    
-            if produit_nom not in produits_data:
-                produits_data[produit_nom] = {
-                    "quantite": 0,      # unités OU kg
-                    "kg_vendus": 0,     # toujours en kg
-                    "ca": 0,
-                    "marge": 0,
-                }
-    
-            # ---- KG VENDUS (ANALYTIQUE SEULEMENT)
-            kg_vendus = float(vente.quantite_en_kg)
-            produits_data[produit_nom]["kg_vendus"] += kg_vendus
-    
-            # ---- QUANTITÉ LISIBLE (RÉELLE)
-            if produit.poids_unitaire_kg:
-                # Produit conditionné → unités vendues
-                produits_data[produit_nom]["quantite"] += float(vente.quantite)
-            else:
-                # Produit vrac → kg vendus
-                produits_data[produit_nom]["quantite"] += float(vente.quantite)
-    
-            # ---- CA & MARGE (RÈGLE MÉTIER CORRECTE)
-            quantite_reelle = float(vente.quantite)
-            prix_vente = float(vente.prix_vente_unitaire)
-            prix_achat = float(vente.detail_distribution.lot.prix_achat_unitaire)
-    
-            produits_data[produit_nom]["ca"] += quantite_reelle * prix_vente
-            produits_data[produit_nom]["marge"] += quantite_reelle * (prix_vente - prix_achat)
-    
-        # =========================
-        # TOP 10 PRODUITS PAR CA
-        # =========================
-        top_produits = sorted(
-            [
-                {
-                    "nom": nom,
-                    "quantite": round(data["quantite"], 2),
-                    "kg_vendus": round(data["kg_vendus"], 2),
-                    "ca": data["ca"],
-                    "marge": data["marge"],
-                }
-                for nom, data in produits_data.items()
-            ],
-            key=lambda x: x["ca"],
-            reverse=True
-        )[:10]
-    
-        # =========================
-        # RÉPARTITIONS
-        # =========================
-        ventes_gros = ventes_periode.filter(type_vente='gros')
-        ventes_detail = ventes_periode.filter(type_vente='detail')
-    
-        ca_gros = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_gros)
-        ca_detail = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_detail)
-    
-        ventes_comptant = ventes_periode.filter(mode_paiement='comptant')
-        ventes_credit = ventes_periode.filter(mode_paiement='credit')
-    
-        ca_comptant = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_comptant)
-        ca_credit = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_credit)
-    
-        # =========================
-        # TENDANCE DES VENTES
-        # =========================
-        tendance = []
-    
+        # Répartition par type de vente (1 query)
+        type_vente_agg = (
+            Vente.objects
+            .filter(date_vente__range=[date_debut, date_fin])
+            .values('type_vente')
+            .annotate(
+                ca=Coalesce(
+                    Sum(ExpressionWrapper(
+                        F("quantite") * F("prix_vente_unitaire"),
+                        output_field=DecimalField()
+                    )),
+                    Decimal("0.00")
+                ),
+                count=Count("id")
+            )
+        )
+        
+        ca_gros = 0
+        ca_detail = 0
+        count_gros = 0
+        count_detail = 0
+        
+        for item in type_vente_agg:
+            if item['type_vente'] == 'gros':
+                ca_gros = float(item['ca'])
+                count_gros = item['count']
+            elif item['type_vente'] == 'detail':
+                ca_detail = float(item['ca'])
+                count_detail = item['count']
+        
+        # Répartition par mode paiement (1 query)
+        mode_paiement_agg = (
+            Vente.objects
+            .filter(date_vente__range=[date_debut, date_fin])
+            .values('mode_paiement')
+            .annotate(
+                ca=Coalesce(
+                    Sum(ExpressionWrapper(
+                        F("quantite") * F("prix_vente_unitaire"),
+                        output_field=DecimalField()
+                    )),
+                    Decimal("0.00")
+                ),
+                count=Count("id")
+            )
+        )
+        
+        ca_comptant = 0
+        ca_credit = 0
+        count_comptant = 0
+        count_credit = 0
+        
+        for item in mode_paiement_agg:
+            if item['mode_paiement'] == 'comptant':
+                ca_comptant = float(item['ca'])
+                count_comptant = item['count']
+            elif item['mode_paiement'] == 'credit':
+                ca_credit = float(item['ca'])
+                count_credit = item['count']
+        
+        ca_total_periode = ca_gros + ca_detail
+        
+        # Tendance des ventes - 1 query using aggregate
         if periode_type == 'annee':
-            for i in range(1, 13):
-                mois_debut = datetime(
-                    annee, i, 1, 0, 0, 0,
-                    tzinfo=timezone.get_current_timezone()
+            annee = annee or date_debut.year
+            tendance_agg = (
+                Vente.objects
+                .filter(date_vente__year=annee)
+                .extra(select={'month': 'EXTRACT(month FROM date_vente)'})
+                .values('month')
+                .annotate(
+                    ca=Coalesce(
+                        Sum(ExpressionWrapper(
+                            F("quantite") * F("prix_vente_unitaire"),
+                            output_field=DecimalField()
+                        )),
+                        Decimal("0.00")
+                    ),
+                    count=Count("id")
                 )
-                dernier_jour = calendar.monthrange(annee, i)[1]
-                mois_fin = datetime(
-                    annee, i, dernier_jour, 23, 59, 59,
-                    tzinfo=timezone.get_current_timezone()
-                )
-    
-                ventes_mois = Vente.objects.filter(
-                    date_vente__range=[mois_debut, mois_fin]
-                )
-                ca_mois = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_mois)
-    
+                .order_by('month')
+            )
+            
+            tendance = []
+            for item in tendance_agg:
+                month_num = int(item['month']) if item['month'] else 0
                 tendance.append({
-                    "periode": calendar.month_name[i],
-                    "ca": ca_mois,
-                    "ventes": ventes_mois.count()
+                    "periode": calendar.month_name[month_num] if month_num > 0 else "Unknown",
+                    "ca": float(item['ca']),
+                    "ventes": item['count']
                 })
         else:
-            for i in range(30):
-                date_jour = date_fin - timedelta(days=29 - i)
-                ventes_jour = Vente.objects.filter(
-                    date_vente__date=date_jour.date()
+            # Last 30 days
+            tendance_agg = (
+                Vente.objects
+                .filter(date_vente__range=[date_debut, date_fin])
+                .extra(select={'date_only': 'DATE(date_vente)'})
+                .values('date_only')
+                .annotate(
+                    ca=Coalesce(
+                        Sum(ExpressionWrapper(
+                            F("quantite") * F("prix_vente_unitaire"),
+                            output_field=DecimalField()
+                        )),
+                        Decimal("0.00")
+                    ),
+                    count=Count("id")
                 )
-                ca_jour = sum(float(v.quantite * v.prix_vente_unitaire) for v in ventes_jour)
-    
-                tendance.append({
-                    "periode": date_jour.strftime('%d/%m'),
-                    "ca": ca_jour,
-                    "ventes": ventes_jour.count()
-                })
+                .order_by('date_only')
+            )
+            
+            tendance = [
+                {
+                    "periode": item['date_only'].strftime('%d/%m') if item['date_only'] else "Unknown",
+                    "ca": float(item['ca']),
+                    "ventes": item['count']
+                }
+                for item in tendance_agg
+            ]
     
         return {
             "top_produits": top_produits,
             "repartition_type": {
                 "gros": {
                     "ca": ca_gros,
-                    "ventes": ventes_gros.count(),
-                    "pourcentage": (ca_gros / (ca_gros + ca_detail) * 100)
-                    if (ca_gros + ca_detail) > 0 else 0
+                    "ventes": count_gros,
+                    "pourcentage": (ca_gros / ca_total_periode * 100) if ca_total_periode > 0 else 0
                 },
                 "detail": {
                     "ca": ca_detail,
-                    "ventes": ventes_detail.count(),
-                    "pourcentage": (ca_detail / (ca_gros + ca_detail) * 100)
-                    if (ca_gros + ca_detail) > 0 else 0
+                    "ventes": count_detail,
+                    "pourcentage": (ca_detail / ca_total_periode * 100) if ca_total_periode > 0 else 0
                 }
             },
             "repartition_paiement": {
                 "comptant": {
                     "ca": ca_comptant,
-                    "ventes": ventes_comptant.count(),
-                    "pourcentage": (ca_comptant / (ca_comptant + ca_credit) * 100)
-                    if (ca_comptant + ca_credit) > 0 else 0
+                    "ventes": count_comptant,
+                    "pourcentage": (ca_comptant / (ca_comptant + ca_credit) * 100) if (ca_comptant + ca_credit) > 0 else 0
                 },
                 "credit": {
                     "ca": ca_credit,
-                    "ventes": ventes_credit.count(),
-                    "pourcentage": (ca_credit / (ca_comptant + ca_credit) * 100)
-                    if (ca_comptant + ca_credit) > 0 else 0
+                    "ventes": count_credit,
+                    "pourcentage": (ca_credit / (ca_comptant + ca_credit) * 100) if (ca_comptant + ca_credit) > 0 else 0
                 }
             },
             "tendance_ventes": tendance,
-            "total_ca_periode": ca_gros + ca_detail
+            "total_ca_periode": ca_total_periode
         }
     
 
-    @staticmethod
-    def get_analyses_depenses(periode_type='mois', annee=None, mois=None):
-        """🟢 Bloc 5 : Analyses des Dépenses avec filtre de période"""
-        date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
-        
-        # Dépenses totales de la période
-        depenses_periode = Depense.objects.filter(date_depense__range=[date_debut, date_fin])
-        total_depenses_periode = sum(float(d.montant) for d in depenses_periode)
-        
-        # Dépenses par superviseur pour la période
-        depenses_par_superviseur = []
-        for agent in Agent.objects.select_related("user").filter(type_agent='entrepot'):
-            depenses_agent = Depense.objects.filter(
-                versement__superviseur=agent, 
-                date_depense__range=[date_debut, date_fin]
-            )
-            total_depenses_agent = sum(float(d.montant) for d in depenses_agent)
-            
-            depenses_par_superviseur.append({
-                'superviseur': agent.full_name,
-                'total_depenses': total_depenses_agent,
-                'nombre_depenses': depenses_agent.count()
-            })
-        
-        # Évolution des dépenses selon la période
-        if periode_type == 'annee':
-            # Évolution sur les 12 derniers mois
-            evolution = []
-            for i in range(12):
-                mois_ref = date_fin - timedelta(days=30*i)
-                annee_ref = mois_ref.year
-                mois_num = mois_ref.month
-                
-                debut_mois_ref = datetime(annee_ref, mois_num, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
-                dernier_jour = calendar.monthrange(annee_ref, mois_num)[1]
-                fin_mois_ref = datetime(annee_ref, mois_num, dernier_jour, 23, 59, 59, tzinfo=timezone.get_current_timezone())
-                
-                depenses_mois_ref = Depense.objects.filter(date_depense__range=[debut_mois_ref, fin_mois_ref])
-                total_depenses_mois_ref = sum(float(d.montant) for d in depenses_mois_ref)
-                
-                evolution.append({
-                    'periode': debut_mois_ref.strftime('%b %Y'),
-                    'montant': total_depenses_mois_ref
-                })
-        else:
-            # Évolution sur les 6 derniers mois
-            evolution = []
-            for i in range(6):
-                mois_ref = date_fin - timedelta(days=30*i)
-                annee_ref = mois_ref.year
-                mois_num = mois_ref.month
-                
-                debut_mois_ref = datetime(annee_ref, mois_num, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
-                dernier_jour = calendar.monthrange(annee_ref, mois_num)[1]
-                fin_mois_ref = datetime(annee_ref, mois_num, dernier_jour, 23, 59, 59, tzinfo=timezone.get_current_timezone())
-                
-                depenses_mois_ref = Depense.objects.filter(date_depense__range=[debut_mois_ref, fin_mois_ref])
-                total_depenses_mois_ref = sum(float(d.montant) for d in depenses_mois_ref)
-                
-                evolution.append({
-                    'periode': debut_mois_ref.strftime('%b %Y'),
-                    'montant': total_depenses_mois_ref
-                })
-        
-        evolution.reverse()
-        
-        return {
-            'total_depenses_periode': total_depenses_periode,
-            'depenses_par_superviseur': depenses_par_superviseur,
-            'evolution_depenses': evolution
-        }
 
     @staticmethod
     def get_annees_disponibles():
@@ -668,193 +654,3 @@ class DashboardService:
         
         return sorted(annees, reverse=True)
     
-    @staticmethod
-    def get_portefeuille_superviseur(superviseur_id, periode_type='mois', annee=None, mois=None):
-        superviseur = Agent.objects.get(id=superviseur_id, type_agent='entrepot')
-        date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
-
-        # 1️⃣ Recouvrements effectués auprès des agents
-        total_recouvre = Recouvrement.objects.filter(
-            superviseur=superviseur,
-            date_recouvrement__range=[date_debut, date_fin]
-        ).aggregate(
-            total=Coalesce(Sum('montant_recouvre'), Decimal('0.00'))
-        )['total']
-
-        # 2️⃣ Montant remis au ROT (SOURCE UNIQUE ET OFFICIELLE)
-        montant_remis_rot = RecouvrementSuperviseur.objects.filter(
-            superviseur=superviseur,
-            date_recouvrement__range=[date_debut, date_fin]
-        ).aggregate(
-            total=Coalesce(Sum('montant'), Decimal('0.00'))
-        )['total']
-
-        # 3️⃣ Solde détenu (instantané, hors filtre)
-        solde_detenu = superviseur.solde_reel_superviseur
-
-        return {
-            'superviseur': superviseur.full_name,
-            'superviseur_id': superviseur.id,
-            'total_recouvre_periode': total_recouvre,
-            'montant_remis_rot': montant_remis_rot,
-            'solde_detenu': solde_detenu,
-        }
-
-
-    @staticmethod
-    def get_portefeuilles_rot(periode_type='mois', annee=None, mois=None):
-        date_debut, date_fin = DashboardService.get_periodes(periode_type, annee, mois)
-
-        rots = Agent.objects.filter(type_agent='rot', est_actif=True)
-        resultats = []
-
-        for rot in rots:
-            recu = RecouvrementSuperviseur.objects.filter(
-                rot=rot,
-                date_recouvrement__range=[date_debut, date_fin]
-            ).aggregate(
-                total=Coalesce(Sum('montant'), Decimal('0.00'))
-            )['total']
-
-            verse_banque = VersementBancaire.objects.filter(
-                effectue_par=rot,
-                date_versement_reelle__range=[date_debut, date_fin]
-            ).aggregate(
-                total=Coalesce(
-                    Sum('montant_vente'),
-                    Decimal('0.00')
-                )
-            )['total']
-
-            depenses = Depense.objects.filter(
-                effectue_par=rot,
-                date_depense__range=[date_debut, date_fin]
-            ).aggregate(
-                total=Coalesce(Sum('montant'), Decimal('0.00'))
-            )['total']
-
-            solde = recu - verse_banque - depenses
-
-            resultats.append({
-                'rot': rot.full_name,
-                'rot_id': rot.id,
-                'recu_superviseurs': recu,
-                'verse_banque': verse_banque,
-                'depenses': depenses,
-                'solde': solde,
-            })
-
-        return resultats
-
-
-    @staticmethod
-    def get_portefeuilles_tous_superviseurs(periode_type='mois', annee=None, mois=None):
-        """Retourne les portefeuilles de TOUS les superviseurs (pour la direction) avec valeurs sur la période."""
-        superviseurs = Agent.objects.select_related("user").filter(type_agent='entrepot')
-        portefeuilles = []
-
-        for superviseur in superviseurs:
-            portefeuille = DashboardService.get_portefeuille_superviseur(
-                superviseur.id, periode_type, annee, mois
-            )
-            if portefeuille:
-                portefeuilles.append(portefeuille)
-
-        # Trier par solde actuel décroissant (valeur instantanée)
-        return sorted(portefeuilles, key=lambda x: x.get('solde_actuel', 0), reverse=True)
-
-
-    @staticmethod
-    def get_stock_essentiel_avec_fournisseurs():
-        """Stock essentiel avec informations fournisseurs et statut amélioré"""
-        stocks = []
-        
-        lots = LotEntrepot.objects.select_related('produit', 'fournisseur').filter(quantite_restante__gt=0)
-        
-        for lot in lots:
-            quantite_restante = float(lot.quantite_restante)
-            valeur_actuelle = float(lot.valeur_actuelle_stock)
-            
-            # Calcul du taux de rotation
-            ventes_produit = Vente.objects.filter(
-                detail_distribution__lot__produit=lot.produit,
-                date_vente__gte=timezone.now() - timedelta(days=30)
-            )
-            quantite_vendue_mois = sum(float(v.quantite) for v in ventes_produit)
-            
-            taux_rotation = (quantite_vendue_mois / quantite_restante * 100) if quantite_restante > 0 else 0
-            
-            # Calcul des jours de stock
-            jours_stock = (quantite_restante / (quantite_vendue_mois / 30)) if quantite_vendue_mois > 0 else 999
-            
-            # Détermination du statut amélioré
-            statut, badge_class, description = DashboardService.determiner_statut_stock(
-                taux_rotation, jours_stock, quantite_restante
-            )
-            
-            stocks.append({
-                'produit': lot.produit.nom,
-                'fournisseur': lot.fournisseur.nom if lot.fournisseur else "Non spécifié",
-                'quantite_restante': quantite_restante,
-                'valeur_actuelle': valeur_actuelle,
-                'taux_rotation': taux_rotation,
-                'ventes_30j': quantite_vendue_mois,
-                'jours_stock': jours_stock,
-                'prix_achat_unitaire': float(lot.prix_achat_unitaire),
-                'date_reception': lot.date_reception,
-                'reference_lot': lot.reference_lot or "N/A",
-                'statut': statut,
-                'badge_class': badge_class,
-                'statut_description': description
-            })
-        
-        return sorted(stocks, key=lambda x: x['valeur_actuelle'], reverse=True)
-
-
-
-    @staticmethod
-    def determiner_statut_stock(taux_rotation, jours_stock, quantite_restante):
-        """Détermine le statut du stock basé sur 3 critères"""
-        
-        # CRITÈRE 1 : Rotation (dynamique du produit)
-        if taux_rotation > 150:  # Rotation très élevée
-            critere_rotation = 3
-        elif taux_rotation > 80:  # Bonne rotation
-            critere_rotation = 2
-        elif taux_rotation > 30:  # Rotation moyenne
-            critere_rotation = 1
-        else:  # Faible rotation
-            critere_rotation = 0
-
-        # CRITÈRE 2 : Jours de stock (risque de rupture)
-        if jours_stock < 7:  # Risque de rupture imminent
-            critere_jours = 0
-        elif jours_stock < 15:  # Stock faible
-            critere_jours = 1
-        elif jours_stock < 30:  # Stock correct
-            critere_jours = 2
-        else:  # Stock élevé (risque de surstock)
-            critere_jours = 3
-
-        # CRITÈRE 3 : Quantité restante (volume physique)
-        if quantite_restante < 10:  # Quantité très faible
-            critere_quantite = 0
-        elif quantite_restante < 50:  # Quantité faible
-            critere_quantite = 1
-        elif quantite_restante < 200:  # Quantité moyenne
-            critere_quantite = 2
-        else:  # Quantité élevée
-            critere_quantite = 3
-
-        # Score total (0-9)
-        score_total = critere_rotation + critere_jours + critere_quantite
-
-        # Détermination du statut final
-        if score_total >= 7:
-            return "optimal", "badge-success", "Stock optimal - Rotation élevée, niveau approprié"
-        elif score_total >= 5:
-            return "correct", "badge-info", "Stock correct - Équilibre acceptable"
-        elif score_total >= 3:
-            return "attention", "badge-warning", "Attention nécessaire - Surveiller le stock"
-        else:
-            return "critique", "badge-error", "Action requise - Risque élevé"

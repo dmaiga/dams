@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+import calendar
 import json
 
 from datetime import date, timedelta
@@ -96,10 +97,24 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         context.update(snapshot)
 
+        # Mois disponibles avec leurs noms
+        mois_liste = [
+            (1, 'Janvier'), (2, 'Février'), (3, 'Mars'),
+            (4, 'Avril'), (5, 'Mai'), (6, 'Juin'),
+            (7, 'Juillet'), (8, 'Août'), (9, 'Septembre'),
+            (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre'),
+        ]
+
+        # Années disponibles (année en cours et 2 années précédentes)
+        today = timezone.now()
+        annees_disponibles = list(range(today.year - 2, today.year + 1))
+
         context.update({
             "annee_selectionnee": annee,
             "mois_selectionne": mois,
             "periode_selectionnee": periode_type,
+            "mois_liste": mois_liste,
+            "annees_disponibles": annees_disponibles,
         })
 
         return context
@@ -318,62 +333,121 @@ def analyse_operationnelle(request):
 
 class ProductListView(LoginRequiredMixin, ListView):
     """
-    View to display a paginated list of products with filtering options by supplier.
-    Provides additional context data such as KPIs and sales statistics.
+    View to display products analysis by PERIOD.
+    Pivot: PRODUIT (not supplier)
+    Allows answering: "How much invested in February on garlic?"
     """
 
     template_name = 'direction/analyses/produits/produit_liste.html'
     context_object_name = 'products_data'
     paginate_by = 20
 
-    def get_queryset(self):
-        """
-        Retrieve the list of products filtered by the selected supplier.
+    def get_date_range(self):
+        """Extract and validate period parameters"""
+        periode = self.request.GET.get('periode', 'mois_courant')
+        today = timezone.now()
 
-        Returns:
-            QuerySet: A list of products filtered by supplier if provided.
-        """
-        supplier_id = self.request.GET.get('fournisseur')
-        return ProductAnalysisService.get_products_by_supplier(supplier_id)
+        if periode == 'mois_courant':
+            date_debut = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            dernier_jour = calendar.monthrange(today.year, today.month)[1]
+            date_fin = today.replace(day=dernier_jour, hour=23, minute=59, second=59, microsecond=999999)
+        
+        elif periode == 'mois_custom':
+            mois = int(self.request.GET.get('mois', today.month))
+            annee = int(self.request.GET.get('annee', today.year))
+            date_debut = datetime(annee, mois, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
+            dernier_jour = calendar.monthrange(annee, mois)[1]
+            date_fin = datetime(annee, mois, dernier_jour, 23, 59, 59, tzinfo=timezone.get_current_timezone())
+        
+        elif periode == 'annee_courant':
+            date_debut = today.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            date_fin = today.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+        
+        elif periode == 'custom':
+            date_debut_str = self.request.GET.get('date_debut')
+            date_fin_str = self.request.GET.get('date_fin')
+            try:
+                from django.utils.dateparse import parse_datetime
+                date_debut = parse_datetime(f"{date_debut_str}T00:00:00") or today.replace(day=1)
+                date_fin = parse_datetime(f"{date_fin_str}T23:59:59") or today
+            except:
+                date_debut = today.replace(day=1)
+                date_fin = today
+        
+        else:  # default: 30 derniers jours
+            date_fin = today
+            date_debut = today - timedelta(days=30)
+
+        return date_debut, date_fin, periode
+
+    def get_queryset(self):
+        """Get products for the selected period"""
+        date_debut, date_fin, periode = self.get_date_range()
+        produit_id = self.request.GET.get('produit')
+        
+        # Call new service method with period filtering
+        return ProductAnalysisService.get_products_by_period(
+            date_debut=date_debut,
+            date_fin=date_fin,
+            produit_id=produit_id
+        )
 
     def get_context_data(self, **kwargs):
-        """
-        Add additional context data to the template, including KPIs, suppliers, and sales statistics.
-
-        Args:
-            **kwargs: Additional keyword arguments passed to the context.
-
-        Returns:
-            dict: The context data for the template.
-        """
+        """Add period filters and KPIs to template"""
         context = super().get_context_data(**kwargs)
+
+        date_debut, date_fin, periode = self.get_date_range()
 
         # KPI globaux
         context['kpis'] = ProductAnalysisService.get_product_kpis()
 
-        # Liste des fournisseurs pour le filtre
-        context['suppliers'] = ProductAnalysisService.get_suppliers_with_stats()
+        # Filtres de période
+        context['periode_selectionnee'] = periode
+        context['date_debut'] = date_debut
+        context['date_fin'] = date_fin
 
-        # Fournisseur sélectionné
-        selected_supplier_id = self.request.GET.get('fournisseur')
-        if selected_supplier_id:
+        # Listes pour les filtres
+        mois_liste = [
+            (1, 'Janvier'), (2, 'Février'), (3, 'Mars'),
+            (4, 'Avril'), (5, 'Mai'), (6, 'Juin'),
+            (7, 'Juillet'), (8, 'Août'), (9, 'Septembre'),
+            (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre'),
+        ]
+        today = timezone.now()
+        annees_disponibles = list(range(today.year - 2, today.year + 1))
+
+        context.update({
+            'mois_liste': mois_liste,
+            'annees_disponibles': annees_disponibles,
+            'mois_courant': today.month,
+            'annee_courant': today.year,
+        })
+
+        # Produits sélectionné
+        produit_id = self.request.GET.get('produit')
+        if produit_id:
             try:
-                context['selected_supplier'] = Fournisseur.objects.get(id=selected_supplier_id)
-            except Fournisseur.DoesNotExist:
-                context['selected_supplier'] = None
+                context['produit_detail'] = Produit.objects.get(id=produit_id)
+            except Produit.DoesNotExist:
+                context['produit_detail'] = None
 
-        # Paramètres de filtrage
-        context['current_filters'] = {
-            'fournisseur': selected_supplier_id
+        # STATS TOTALES POUR LA PÉRIODE
+        products = self.get_queryset()
+        stats_periode = {
+            'total_investi': sum(p['montant_investi'] for p in products),
+            'total_ca': sum(p['total_ca'] for p in products),
+            'total_marge': sum(p['marge_totale'] for p in products),
+            'quantite_recue': sum(p['quantite_recue'] for p in products),
+            'quantite_vendue': sum(p['quantite_vendue'] for p in products),
         }
+        stats_periode['taux_marge_periode'] = float(
+            (stats_periode['total_marge'] / stats_periode['total_ca'] * 100)
+            if stats_periode['total_ca'] > 0 else 0
+        )
+        context['stats_periode'] = stats_periode
 
-        # Ventes par agent pour le fournisseur sélectionné
-        if selected_supplier_id:
-            context['ventes_par_agent'] = ProductAnalysisService.get_ventes_par_agent(selected_supplier_id)
-
-        # Pagination manuelle
-        products_data = self.get_queryset()
-        paginator = Paginator(products_data, self.paginate_by)
+        # Pagination
+        paginator = Paginator(products, self.paginate_by)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
@@ -384,25 +458,83 @@ class ProductListView(LoginRequiredMixin, ListView):
         return context
     
 class ProductDetailView(LoginRequiredMixin, DetailView):
+    model = Produit
     template_name = 'direction/analyses/produits/produit_detail.html'
     context_object_name = 'product_data'
-    
-    def get_object(self):
-        product_id = self.kwargs.get('pk')
-        supplier_id = self.request.GET.get('fournisseur')
-        return ProductAnalysisService.get_product_detail(product_id, supplier_id)
+    pk_url_kwarg = 'pk'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['kpis'] = ProductAnalysisService.get_product_kpis()
         
-        # Passer le fournisseur sélectionné si existant
-        supplier_id = self.request.GET.get('fournisseur')
-        if supplier_id:
+        product = self.object
+        
+        # KPIs globaux
+        context['kpis'] = ProductAnalysisService.get_product_kpis()
+        context['product'] = product
+        
+        # Filtres de période
+        periode = self.request.GET.get('periode', 'mois_courant')
+        today = timezone.now()
+
+        if periode == 'mois_courant':
+            date_debut = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            dernier_jour = calendar.monthrange(today.year, today.month)[1]
+            date_fin = today.replace(day=dernier_jour, hour=23, minute=59, second=59, microsecond=999999)
+        
+        elif periode == 'mois_custom':
+            mois = int(self.request.GET.get('mois', today.month))
+            annee = int(self.request.GET.get('annee', today.year))
+            date_debut = datetime(annee, mois, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
+            dernier_jour = calendar.monthrange(annee, mois)[1]
+            date_fin = datetime(annee, mois, dernier_jour, 23, 59, 59, tzinfo=timezone.get_current_timezone())
+        
+        elif periode == 'annee_courant':
+            date_debut = today.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            date_fin = today.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
+        
+        elif periode == 'custom':
+            date_debut_str = self.request.GET.get('date_debut')
+            date_fin_str = self.request.GET.get('date_fin')
             try:
-                context['selected_supplier'] = Fournisseur.objects.get(id=supplier_id)
-            except Fournisseur.DoesNotExist:
-                context['selected_supplier'] = None
+                from django.utils.dateparse import parse_datetime
+                date_debut = parse_datetime(f"{date_debut_str}T00:00:00") or today.replace(day=1)
+                date_fin = parse_datetime(f"{date_fin_str}T23:59:59") or today
+            except:
+                date_debut = today.replace(day=1)
+                date_fin = today
+        
+        else:  # default: 30 derniers jours
+            date_fin = today
+            date_debut = today - timedelta(days=30)
+
+        # Récupérer les données du produit pour cette période
+        products_data = ProductAnalysisService.get_products_by_period(
+            date_debut=date_debut,
+            date_fin=date_fin,
+            produit_id=product.id
+        )
+        
+        if products_data:
+            context['product_period_data'] = products_data[0]
+        
+        # Listes pour les filtres
+        mois_liste = [
+            (1, 'Janvier'), (2, 'Février'), (3, 'Mars'),
+            (4, 'Avril'), (5, 'Mai'), (6, 'Juin'),
+            (7, 'Juillet'), (8, 'Août'), (9, 'Septembre'),
+            (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre'),
+        ]
+        annees_disponibles = list(range(today.year - 2, today.year + 1))
+
+        context.update({
+            'periode_selectionnee': periode,
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+            'mois_liste': mois_liste,
+            'annees_disponibles': annees_disponibles,
+            'mois_courant': today.month,
+            'annee_courant': today.year,
+        })
         
         return context
     

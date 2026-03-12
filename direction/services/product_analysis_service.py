@@ -3,11 +3,12 @@ from django.db.models import (
 )
 
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from decimal import Decimal
 from core.models import Produit, LotEntrepot, Vente, Fournisseur, Perte
 from django.core.cache import cache
 from django.db.models.functions import TruncMonth
+import calendar
 
 class ProductAnalysisService:
 
@@ -76,6 +77,124 @@ class ProductAnalysisService:
 
         cache.set(cache_key, data, 60 * 15)
         return data
+
+    # ----------------------------------------------------------------------
+    # 1.5) Produits filtrés par PÉRIODE (nouveau pivot)
+    # ----------------------------------------------------------------------
+    @staticmethod
+    def get_products_by_period(date_debut, date_fin, produit_id=None):
+        """
+        ANALYSE PAR PRODUIT + PÉRIODE
+        Pivot: PRODUIT
+        Répond à: "Combien ai-je investi en février sur les ails ?"
+        
+        Retourne:
+        - Montant investi (lots reçus pendant la période)
+        - CA réalisé (ventes pendant la période)
+        - Marge
+        - Quantités
+        """
+        
+        cache_key = f"products_period:{date_debut}:{date_fin}:{produit_id or 'all'}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        # ============================
+        # 🔹 LOTS REÇUS PENDANT LA PÉRIODE
+        # ============================
+        lots_periode = LotEntrepot.objects.filter(
+            date_reception__range=[date_debut, date_fin]
+        ).values("produit_id").annotate(
+            montant_investi=Sum(
+                F("quantite_initiale") * F("prix_achat_unitaire"),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            ),
+            quantite_recue=Sum("quantite_initiale"),
+            nombre_lots=Count("id")
+        )
+
+        if produit_id:
+            lots_periode = lots_periode.filter(produit_id=produit_id)
+
+        lots_map = {row["produit_id"]: row for row in lots_periode}
+
+        # ============================
+        # 🔹 VENTES PENDANT LA PÉRIODE
+        # ============================
+        ventes_periode = Vente.objects.filter(
+            date_vente__range=[date_debut, date_fin],
+            est_supprime=False
+        ).values("detail_distribution__lot__produit_id").annotate(
+            total_ca=Sum(
+                F("quantite") * F("prix_vente_unitaire"),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            ),
+            quantite_vendue=Sum("quantite"),
+            marge_totale=Sum(
+                (F("prix_vente_unitaire") - F("detail_distribution__lot__prix_achat_unitaire"))
+                * F("quantite"),
+                output_field=DecimalField(max_digits=15, decimal_places=2)
+            ),
+            nombre_ventes=Count("id")
+        )
+
+        if produit_id:
+            ventes_periode = ventes_periode.filter(
+                detail_distribution__lot__produit_id=produit_id
+            )
+
+        ventes_map = {row["detail_distribution__lot__produit_id"]: row for row in ventes_periode}
+
+        # ============================
+        # 🔹 PRODUITS AVEC STATS
+        # ============================
+        produits_qs = Produit.objects.all()
+        if produit_id:
+            produits_qs = produits_qs.filter(id=produit_id)
+
+        # Seulement les produits ayant des lots ou ventes comptes pendant la période
+        produit_ids = set(lots_map.keys()) | set(ventes_map.keys())
+        if produit_ids:
+            produits_qs = produits_qs.filter(id__in=produit_ids)
+
+        final_list = []
+        for p in produits_qs.order_by("nom"):
+            lot_data = lots_map.get(p.id, {})
+            vente_data = ventes_map.get(p.id, {})
+
+            montant_investi = lot_data.get("montant_investi", Decimal("0"))
+            total_ca = vente_data.get("total_ca", Decimal("0"))
+            marge = vente_data.get("marge_totale", Decimal("0"))
+
+            taux_marge = float((marge / total_ca) * 100) if total_ca > 0 else 0.0
+
+            final_list.append({
+                "product": p,
+                "produit_id": p.id,
+                "produit_nom": p.nom,
+                
+                # 📥 Investissement (lots reçus pendant période)
+                "montant_investi": montant_investi,
+                "quantite_recue": lot_data.get("quantite_recue", 0),
+                "nombre_lots": lot_data.get("nombre_lots", 0),
+                
+                # 📤 Ventes (pendant période)
+                "total_ca": total_ca,
+                "quantite_vendue": vente_data.get("quantite_vendue", 0),
+                "marge_totale": marge,
+                "taux_marge": taux_marge,
+                "nombre_ventes": vente_data.get("nombre_ventes", 0),
+                
+                # Autres
+                "roi": float((marge / montant_investi) * 100) if montant_investi > 0 else 0.0,
+            })
+
+        # Trier par montant investi (décroissant)
+        final_list.sort(key=lambda x: x["montant_investi"], reverse=True)
+
+        cache.set(cache_key, final_list, 60 * 5)
+        return final_list
 
     # ----------------------------------------------------------------------
     # 2) Liste des produits (optimisée ORM)
