@@ -49,20 +49,12 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
         date_debut = date(year, month, 1)
         date_fin = date(year, month, last_day)
 
-        # ✅ Vérifier si salaires existent en BD
-        salaires_en_db = Salaire.objects.filter(
-            date_debut=date_debut,
-            date_fin=date_fin
-        ).exists()
-
         # ----------------------------
         # SERVICE SALAIRES
-        # Utilise BD si existe, sinon recalcule
         # ----------------------------
         result = SalaireListeService.get_salaires(
             date_debut=date_debut,
             date_fin=date_fin,
-            use_db=salaires_en_db  # ✅ LECTURE DEPUIS BD SI GÉNÉRÉ
         )
 
         # ----------------------------
@@ -123,16 +115,9 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
         
             # 🌍 GLOBAL
             "total_global": result["total_global"],
-            
-            # ✅ Flag: données figées ou calculées?
-            "is_from_db": result.get("is_from_db", False),
         })
         
         return context
-
-
-
-
 
 
 def export_salaires_mamies_excel(request):
@@ -152,18 +137,11 @@ def export_salaires_mamies_excel(request):
     date_debut = date(year, month, 1)
     date_fin = date(year, month, last_day)
 
-    # ✅ Vérifier si salaires existent en BD
-    salaires_en_db = Salaire.objects.filter(
-        date_debut=date_debut,
-        date_fin=date_fin
-    ).exists()
-
     # 🔹 On filtre uniquement les mamies
     result = SalaireListeService.get_salaires(
         date_debut=date_debut,
         date_fin=date_fin,
-        type_agent_filter="terrain",
-        use_db=salaires_en_db  # ✅ DEPUIS BD SI DISPO
+        type_agent_filter="terrain"
     )
 
     mamies = result["mamies"]
@@ -232,18 +210,11 @@ def export_salaires_gros_excel(request):
     date_debut = date(year, month, 1)
     date_fin = date(year, month, last_day)
 
-    # ✅ Vérifier si salaires existent en BD
-    salaires_en_db = Salaire.objects.filter(
-        date_debut=date_debut,
-        date_fin=date_fin
-    ).exists()
-
     # 🔸 FILTRE AGENTS GROS
     result = SalaireListeService.get_salaires(
         date_debut=date_debut,
         date_fin=date_fin,
-        type_agent_filter="agent_gros",
-        use_db=salaires_en_db  # ✅ DEPUIS BD SI DISPO
+        type_agent_filter="agent_gros"
     )
 
     agents = result["gros"]

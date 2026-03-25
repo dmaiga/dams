@@ -61,9 +61,13 @@
            value="{{ request.GET.fournisseur }}">
 
     <select class="form-select mb-2" name="statut">
-        <option value="">Tous statuts</option>
-        <option value="disponible" {% if request.GET.statut == 'disponible' %}selected{% endif %}>Disponible</option>
-        <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>Épuisé</option>
+    <option value="">Tous</option>
+    <option value="disponible" {% if request.GET.statut == 'disponible' or not request.GET.statut %}selected{% endif %}>
+        Disponible
+    </option>
+    <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>
+        Épuisé
+    </option>
     </select>
 
     <button class="btn btn-outline-primary w-100">
@@ -84,23 +88,7 @@
 </div>
 </div>
 
-<div class="col-6">
-<div class="card kpi-card border-start border-success border-3">
-<div class="card-body p-2">
-<div class="label">Investissement</div>
-<div class="montant">{{ total_valeur_initiale|fcfa }}</div>
-</div>
-</div>
-</div>
 
-<div class="col-6">
-<div class="card kpi-card border-start border-info border-3">
-<div class="card-body p-2">
-<div class="label">Valeur actuelle</div>
-<div class="montant">{{ total_valeur_actuelle|fcfa }}</div>
-</div>
-</div>
-</div>
 
 <div class="col-6">
 <div class="card kpi-card border-start border-danger border-3">
@@ -199,6 +187,51 @@ Initial : {{ lot.quantite_initiale|floatformat:2 }}
 <p class="text-muted mt-2">Aucun lot enregistré</p>
 </div>
 {% endfor %}
+
+{% if page_obj.has_other_pages %}
+
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+
+
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+        <a class="page-link"
+           href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+            ←
+        </a>
+    </li>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+        {% elif num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+            <li class="page-item">
+                <a class="page-link"
+                   href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">
+                    {{ num }}
+                </a>
+            </li>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+        <a class="page-link"
+           href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+            →
+        </a>
+    </li>
+    {% endif %}
+
+</ul>
+
+
+</nav>
+{% endif %}
 
 </div>
 

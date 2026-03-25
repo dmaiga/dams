@@ -7,114 +7,38 @@
 {% block content %}
 <div class="container mt-3">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h5 class="mb-0">
-                <i class="fas fa-clipboard-list me-2"></i>
-                Mes affectations
-            </h5>
-            <small class="text-muted">Lots affectés aux superviseurs</small>
-        </div>
-        <a href="{% url 'affecter_lot_superviseur' %}" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i> Nouvelle affectation
-        </a>
+<!-- HEADER MOBILE -->
+
+<div class="mb-3">
+
+
+<div class="d-flex align-items-center justify-content-between">
+    <div>
+        <h6 class="fw-bold mb-0">Affectations</h6>
+        <small class="text-muted">Lots → superviseurs</small>
     </div>
 
-    <!-- Statistiques rapides -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card border-primary">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-primary bg-opacity-10 p-2 rounded me-3">
-                            <i class="fas fa-boxes text-primary"></i>
-                        </div>
-                        <div>
-                            <div class="text-muted small">Total affectations</div>
-                            <div class="h5 mb-0">{{ affectations.count }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-info">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-info bg-opacity-10 p-2 rounded me-3">
-                            <i class="fas fa-balance-scale text-info"></i>
-                        </div>
-                        <div>
-                            <div class="text-muted small">Total quantité</div>
-                            <div class="h5 mb-0">
-                                {% with total_qte=affectations_total.kg|floatformat:0 %}
-                                    {{ total_qte|intcomma }} kg
-                                {% endwith %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-success">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-success bg-opacity-10 p-2 rounded me-3">
-                            <i class="fas fa-users text-success"></i>
-                        </div>
-                        <div>
-                            <div class="text-muted small">Superviseurs</div>
-                            <div class="h5 mb-0">{{ superviseurs_count }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-warning">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-warning bg-opacity-10 p-2 rounded me-3">
-                            <i class="fas fa-archive text-warning"></i>
-                        </div>
-                        <div>
-                            <div class="text-muted small">Produits différents</div>
-                            <div class="h5 mb-0">{{ produits_count }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <a href="{% url 'affecter_lot_superviseur' %}" 
+       class="btn btn-sm btn-primary">
+        + Ajouter
+    </a>
+</div>
 
-<form method="get" class="card mb-4">
+
+</div>
+
+
+<div class="card mb-3 shadow-sm border-0">
     <div class="card-body">
-        <div class="row g-3 align-items-end">
 
-            <!-- Date début -->
-            <div class="col-md-3">
-                <label class="form-label">Du</label>
-                <input type="date"
-                       name="date_debut"
-                       value="{{ filtres.date_debut }}"
-                       class="form-control">
-            </div>
 
-            <!-- Date fin -->
-            <div class="col-md-3">
-                <label class="form-label">Au</label>
-                <input type="date"
-                       name="date_fin"
-                       value="{{ filtres.date_fin }}"
-                       class="form-control">
-            </div>
+    <form method="get" class="row g-2">
 
-            <!-- Lot -->
-            <div class="col-md-3">
-                <label class="form-label">Lot</label>
-                <select name="lot" class="form-select">
-                    <option value="">Tous les lots</option>
+        <!-- LOT PRIORITAIRE -->
+        <div class="col-12">
+            <label class="small text-muted">Lot</label>
+            <select name="lot" class="form-select form-select-sm">
+                <option value="">Tous les lots</option>
                     {% for lot in lots %}
                         <option value="{{ lot.id }}"
                             {% if filtres.lot == lot.id|stringformat:"s" %}selected{% endif %}>
@@ -123,36 +47,55 @@
                             | {{ lot.date_reception|date:"d/m/Y" }}
                         </option>
                     {% endfor %}
-                </select>
-            </div>
-
-            <!-- Fournisseur -->
-            <div class="col-md-3">
-                <label class="form-label">Fournisseur</label>
-                <select name="fournisseur" class="form-select">
-                    <option value="">Tous les fournisseurs</option>
-                    {% for f in fournisseurs %}
-                        <option value="{{ f.id }}"
-                            {% if filtres.fournisseur == f.id|stringformat:"s" %}selected{% endif %}>
-                            {{ f.nom }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Actions -->
-            <div class="col-12 d-flex gap-2 mt-2">
-                <button class="btn btn-primary">
-                    <i class="fas fa-filter me-1"></i> Filtrer
-                </button>
-                <a href="{% url 'rot_affectations_liste' %}" class="btn btn-outline-secondary">
-                    Réinitialiser
-                </a>
-            </div>
-
+            </select>
         </div>
-    </div>
-</form>
+
+        <!-- FOURNISSEUR -->
+        <div class="col-6">
+            <select name="fournisseur" class="form-select form-select-sm">
+                <option value="">Fournisseur</option>
+                {% for f in fournisseurs %}
+                    <option value="{{ f.id }}"
+                    {% if filtres.fournisseur == f.id|stringformat:"s" %}selected{% endif %}>
+                        {{ f.nom }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- DATE -->
+        <div class="col-6">
+            <input type="date"
+                   name="date_debut"
+                   value="{{ filtres.date_debut }}"
+                   class="form-control form-control-sm">
+        </div>
+
+        <div class="col-6">
+            <input type="date"
+                   name="date_fin"
+                   value="{{ filtres.date_fin }}"
+                   class="form-control form-control-sm">
+        </div>
+
+        <!-- ACTION -->
+        <div class="col-6 d-grid">
+            <button class="btn btn-primary btn-sm">Filtrer</button>
+        </div>
+
+        <div class="col-6 d-grid">
+            <a href="{% url 'rot_affectations_liste' %}" class="btn btn-outline-secondary btn-sm">
+                Reset
+            </a>
+        </div>
+
+    </form>
+
+</div>
+
+
+</div>
+
 
 <!-- ================= LISTE AFFECTATIONS MOBILE ================= -->
 
@@ -264,6 +207,50 @@
 
 </div>
 
+{% if page_obj.has_other_pages %}
+
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+
+
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+        <a class="page-link"
+           href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+            ←
+        </a>
+    </li>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+        {% elif num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+            <li class="page-item">
+                <a class="page-link"
+                   href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">
+                    {{ num }}
+                </a>
+            </li>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+        <a class="page-link"
+           href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+            →
+        </a>
+    </li>
+    {% endif %}
+
+</ul>
+
+
+</nav>
+{% endif %}
 
 <style>
 .card {

@@ -672,3 +672,79 @@ class RecouvrementSuperviseurForm(forms.ModelForm):
 
         return date
 
+
+class VenteSuperviseurSimplifieeForm(forms.Form):
+
+    agent = forms.ModelChoiceField(
+        queryset=Agent.objects.none(),
+        label="Agent"
+    )
+
+    affectation = forms.ModelChoiceField(
+        queryset=AffectationLotSuperviseur.objects.none(),
+        label="Produit (stock disponible)"
+    )
+
+    quantite = forms.DecimalField(
+        
+        label="Quantité"
+    )
+
+    def __init__(self, *args, **kwargs):
+        superviseur = kwargs.pop('superviseur')
+        super().__init__(*args, **kwargs)
+
+        # =========================
+        # AGENTS DU SUPERVISEUR
+        # =========================
+        self.fields['agent'].queryset = Agent.objects.filter(
+            superviseur=superviseur,
+            type_agent__in=['terrain', 'agent_gros'],
+            est_actif=True
+        ).select_related('user')
+
+        # =========================
+        # STOCK DISPONIBLE
+        # =========================
+        qs = (
+            AffectationLotSuperviseur.objects
+            .filter(
+                superviseur=superviseur,
+                quantite_restante__gt=0
+            )
+            .select_related('lot__produit')
+            .order_by('-date_affectation')
+        )
+
+        self.fields['affectation'].queryset = qs
+
+        # =========================
+        # AFFICHAGE LISIBLE
+        # =========================
+        self.fields['affectation'].label_from_instance = lambda obj: (
+            f"{obj.lot.produit.nom} | "
+            f"Init: {obj.quantite_initiale} | "
+            f"Restant: {obj.quantite_restante} | "
+            f"Affecté le: {obj.date_affectation.strftime('%d/%m/%Y')}"
+            
+        )
+
+        # =========================
+        # UI Bootstrap
+        # =========================
+        self.fields['agent'].widget.attrs.update({'class': 'form-select'})
+        self.fields['affectation'].widget.attrs.update({'class': 'form-select'})
+        self.fields['quantite'].widget.attrs.update({'class': 'form-control'})
+
+    def clean(self):
+        cleaned_data = super().clean()
+        affectation = cleaned_data.get('affectation')
+        quantite = cleaned_data.get('quantite')
+    
+        if affectation and quantite:
+            if quantite > affectation.quantite_restante:
+                raise forms.ValidationError(
+                    "Quantité supérieure au stock disponible"
+                )
+    
+        return cleaned_data

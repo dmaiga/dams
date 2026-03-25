@@ -1,106 +1,94 @@
 {% extends "base.html" %}
-{% load humanize %}
 {% load format_fcfa %}
 
-{% block title %}Mes distributions{% endblock %}
-
 {% block content %}
-<div class="container-fluid py-4">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h5 mb-1">
-                <i class="fas fa-truck-loading me-2 text-primary"></i>
-                Mes distributions
-            </h1>
-            
-        </div>
+<div class="container py-3">
 
-        <a href="{% url 'distribuer_lot_agent' %}" class="btn btn-primary btn-sm">
-            <i class="fas fa-plus me-1"></i> Nouvelle distribution
-        </a>
-    </div>
-    <!-- FILTRES -->
+
+<!-- HEADER -->
+<div class="mb-3">
+    <h5 class="fw-bold mb-1">📦 Mes distributions</h5>
+    <div class="text-muted small">Historique des distributions</div>
+</div>
+
 <!-- FILTRES -->
 <div class="card mb-3">
     <div class="card-body">
+<!-- FILTRES CORRIGÉS -->
 
-        <form method="get" class="row g-2">
+<div class="card mb-3">
+    <div class="card-body">
 
-            <!-- PRODUIT -->
-            <div class="col-12 col-md-4">
-                <label class="form-label small fw-semibold">Produit</label>
-                <select name="produit" class="form-select form-select-sm">
-                    <option value="">Tous les produits</option>
-                    {% for p in produits %}
-                        <option value="{{ p.id }}"
-                            {% if filters.produit == p.id|stringformat:"s" %}selected{% endif %}>
-                            {{ p.nom }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-<!-- LOT -->
-<div class="col-12 col-md-4">
-    <label class="form-label small fw-semibold">Lot distribué</label>
 
-    <select name="lot" class="form-select form-select-sm">
-        <option value="">Tous les lots</option>
+    <form method="get" class="row g-2">
 
-        {% for l in lots %}
-        <option value="{{ l.id }}"
-            {% if filters.lot == l.id|stringformat:"s" %}selected{% endif %}>
+        <!-- LOT (PRIORITAIRE) -->
+        <div class="col-12">
+            <label class="small text-muted">Lot</label>
+            <select name="lot" class="form-select form-select-sm">
+                <option value="">Tous les lots</option>
 
-            {{ l.produit.nom }}
-            |{{ l.fournisseur.nom|default:"—" }}
-            |{{ l.date_reception|date:"d/m/Y" }}
+                {% for l in lots %}
+                    <option value="{{ l.id }}"
+                    {% if filters.lot == l.id|stringformat:"s" %}selected{% endif %}>
 
-        </option>
-        {% endfor %}
-    </select>
-</div>
+                    {{ l.produit.nom }}
+                    | {{ l.fournisseur.nom|default:"—" }}
+                    | {{ l.date_reception|date:"d/m" }}
 
-            <!-- AGENT -->
-            <div class="col-12 col-md-4">
-                <label class="form-label small fw-semibold">Agent</label>
-                <select name="agent" class="form-select form-select-sm">
-                    <option value="">Tous les agents</option>
-                    {% for a in agents %}
-                        <option value="{{ a.id }}"
-                            {% if filters.agent == a.id|stringformat:"s" %}selected{% endif %}>
-                            {{ a.full_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <!-- DATE DEBUT -->
-            <div class="col-6 col-md-2">
-                <label class="form-label small fw-semibold">Du</label>
-                <input type="date"
-                       name="date_debut"
-                       value="{{ filters.date_debut }}"
-                       class="form-control form-control-sm">
-            </div>
+        <!-- AGENT -->
+        <div class="col-6">
+            <select name="agent" class="form-select form-select-sm">
+                <option value="">Agent</option>
+                {% for a in agents %}
+                    <option value="{{ a.id }}"
+                    {% if filters.agent == a.id|stringformat:"s" %}selected{% endif %}>
+                        {{ a.full_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <!-- DATE FIN -->
-            <div class="col-6 col-md-2">
-                <label class="form-label small fw-semibold">Au</label>
-                <input type="date"
-                       name="date_fin"
-                       value="{{ filters.date_fin }}"
-                       class="form-control form-control-sm">
-            </div>
+        <!-- PRODUIT (OPTIONNEL) -->
+        <div class="col-6">
+            <select name="produit" class="form-select form-select-sm">
+                <option value="">Produit</option>
+                {% for p in produits %}
+                    <option value="{{ p.id }}"
+                    {% if filters.produit == p.id|stringformat:"s" %}selected{% endif %}>
+                        {{ p.nom }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <!-- ACTION -->
-            <div class="col-12 d-grid mt-2">
-                <button type="submit" class="btn btn-sm btn-primary">
-                    Filtrer
-                </button>
-            </div>
+        <!-- DATES -->
+        <div class="col-6">
+            <input type="date" name="date_debut"
+                   value="{{ filters.date_debut }}"
+                   class="form-control form-control-sm">
+        </div>
 
-        </form>
+        <div class="col-6">
+            <input type="date" name="date_fin"
+                   value="{{ filters.date_fin }}"
+                   class="form-control form-control-sm">
+        </div>
 
+        <!-- ACTION -->
+        <div class="col-12 d-grid">
+            <button type="submit" class="btn btn-primary btn-sm">
+                Filtrer
+            </button>
+        </div>
+
+    </form>
         {% if filters.agent or filters.produit or filters.date_debut or filters.date_fin %}
         <div class="mt-2 text-end">
             <a href="{% url 'liste_distribution_sup' %}"
@@ -109,83 +97,107 @@
             </a>
         </div>
         {% endif %}
+</div>
+
+
+</div>
 
     </div>
 </div>
 
+<!-- LISTE -->
+{% for d in distributions %}
+<div class="card mb-3 shadow-sm border-0">
 
-    {% if distributions %}
-        {% for d in distributions %}
-        <div class="card mb-3 shadow-sm">
+    <!-- HEADER -->
+    <div class="card-body pb-2">
+        <div class="d-flex justify-content-between">
+            <div>
+                <div class="fw-semibold">👤 {{ d.agent_terrain.full_name }}</div>
+                <div class="text-muted small">{{ d.date_distribution|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div class="text-end">
+                <div class="fw-bold">{{ d.quantite_totale }}</div>
+                <small class="text-muted">unités</small>
+            </div>
+        </div>
+    </div>
 
-            <!-- EN-TÊTE -->
-            <div class="card-header bg-light d-flex justify-content-between">
-                <div>
-                    <strong>Agent :</strong>
-                    {{ d.agent_terrain.full_name }}
-                </div>
-                <div class="text-muted">
-                    {{ d.date_distribution|date:"d/m/Y H:i" }}
-                </div>
+    <!-- DETAILS -->
+    <div class="px-3 pb-3">
+
+        {% for detail in d.detaildistribution_set.all %}
+        <div class="border-top pt-2 mt-2">
+
+            <div class="fw-semibold">
+                {{ detail.lot.produit.nom }}
             </div>
 
-            <!-- DÉTAILS -->
-            <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Produit</th>
-                            <th>Lot</th>
-                            <th>Quantité</th>
-                            <th>Prix gros</th>
-                            <th>Prix détail</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for detail in d.detaildistribution_set.all %}
-                        <tr>
-                            <td>{{ detail.lot.produit.nom }}</td>
-                            <td>{{ detail.lot.reference_lot }}</td>
-                            <td>{{ detail.quantite }}</td>
-                            <td>
-                                {% if detail.prix_gros %}
-                                    {{ detail.prix_gros|fcfa }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if detail.prix_detail %}
-                                    {{ detail.prix_detail|fcfa }}
-                                {% else %}
-                                    —
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="small text-muted">
+                Lot: {{ detail.lot.reference_lot }}
             </div>
 
-            <!-- FOOTER -->
-            <div class="card-footer d-flex justify-content-between small">
-                <span>
-                    Quantité totale :
-                    <strong>{{ d.quantite_totale }}</strong>
-                </span>
-                <span>
-                    Produits :
-                    <strong>{{ d.nombre_produits_differents }}</strong>
-                </span>
+            <div class="d-flex justify-content-between small mt-1">
+                <span>Qty: {{ detail.quantite }}</span>
+                <span>{{ detail.prix_detail|fcfa }}</span>
             </div>
 
         </div>
+        {% empty %}
+        <div class="text-muted small">Aucun détail</div>
         {% endfor %}
-    {% else %}
-        <div class="alert alert-info">
-            Aucune distribution enregistrée.
-        </div>
-    {% endif %}
+
+    </div>
+
+</div>
+{% empty %}
+<div class="alert alert-info text-center">
+    Aucune distribution enregistrée
+</div>
+{% endfor %}
+
+<!-- PAGINATION -->
+{% if page_obj.has_other_pages %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.previous_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+                ←
+            </a>
+        </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% elif num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="?page={{ num }}{% if query_string %}&{{ query_string }}{% endif %}">
+                        {{ num }}
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.next_page_number }}{% if query_string %}&{{ query_string }}{% endif %}">
+                →
+            </a>
+        </li>
+        {% endif %}
+
+    </ul>
+</nav>
+{% endif %}
+
 
 </div>
 {% endblock %}

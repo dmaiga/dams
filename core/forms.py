@@ -411,7 +411,7 @@ class PerteForm(forms.ModelForm):
 
 
 # forms.py
-
+#deprecie utilisation du forms SupervisorDistributionForm dans l'app AGENT
 class DistributionForm(forms.ModelForm):
     TYPE_DISTRIBUTION = (
         ('TERRAIN', 'Distribution à un agent'),
@@ -1275,7 +1275,7 @@ class VersementForm(forms.ModelForm):
 
 
 
-class RecuVersementForm(forms.Form):  # ✅ Utiliser Form au lieu de ModelForm
+class RecuVersementForm(forms.Form): 
     versement = forms.ModelChoiceField(
         queryset=VersementBancaire.objects.all(),
         required=False,

@@ -12,6 +12,8 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator
+
 # DB / ORM
 from django.db import models, transaction
 from django.db.models import (
@@ -59,7 +61,8 @@ from agents.forms import (
                             RotAffectationLotSuperviseurForm,
                             SupervisorDistributionForm,
                             RecouvrementSuperviseurForm,
-                            SupervisorTerrainAgentUpdateForm
+                            SupervisorTerrainAgentUpdateForm,
+                            VenteSuperviseurSimplifieeForm
                             
                             )
 
@@ -141,6 +144,13 @@ def dashboard_agent(request):
 
 
 #
+from django.core.paginator import Paginator
+from django.utils import timezone
+from datetime import timedelta
+from django.core.paginator import Paginator
+from urllib.parse import urlencode
+from django.utils.dateparse import parse_date
+
 @login_required
 def superviseur_lots_affectes(request):
     agent = request.user.agent
@@ -148,18 +158,67 @@ def superviseur_lots_affectes(request):
     if not agent.est_superviseur:
         return redirect('access_denied')
 
-    lots_affectes = (
-        AffectationLotSuperviseur.objects
-        .filter(superviseur=agent, quantite_restante__gt=0)
-        .select_related(
-            'lot__produit',
-            'attribue_par__user'
+    # =========================
+    # FILTRES TEMPORELS
+    # =========================
+    periode = request.GET.get('periode')  # today, 7j, 30j
+
+
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+
+    # 🔥 CLEAN
+    date_debut = parse_date(date_debut) if date_debut else None
+    date_fin = parse_date(date_fin) if date_fin else None
+    lots_qs = AffectationLotSuperviseur.objects.filter(
+        superviseur=agent
+    )
+
+    # 🔹 filtres rapides
+    today = timezone.now()
+
+    if periode == 'today':
+        lots_qs = lots_qs.filter(date_affectation=today)
+
+    elif periode == '7j':
+        lots_qs = lots_qs.filter(
+            date_affectation__gte=today - timedelta(days=7)
         )
+
+    elif periode == '30j':
+        lots_qs = lots_qs.filter(
+            date_affectation__gte=today - timedelta(days=30)
+        )
+
+    # 🔹 filtre personnalisé
+    if date_debut:
+        lots_qs = lots_qs.filter(date_affectation__gte=date_debut)
+
+    if date_fin:
+        lots_qs = lots_qs.filter(date_affectation__lte=date_fin)
+
+    # =========================
+    # QUERY OPTIMISÉE
+    # =========================
+    lots_qs = (
+        lots_qs
+        .select_related('lot__produit', 'attribue_par__user')
         .order_by('-date_affectation')
     )
 
+    # =========================
+    # PAGINATION
+    # =========================
+    paginator = Paginator(lots_qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # =========================
+    # TRANSFORMATION
+    # =========================
     lots_data = []
-    for affectation in lots_affectes:
+
+    for affectation in page_obj:
         taux_restant = 0
         taux_utilise = 0
 
@@ -180,9 +239,11 @@ def superviseur_lots_affectes(request):
             ),
         })
 
-    # Totaux globaux (EN UNITÉS)
-    total_initial = sum(a.quantite_initiale for a in lots_affectes)
-    total_restant = sum(a.quantite_restante for a in lots_affectes)
+    # =========================
+    # KPI (filtrés)
+    # =========================
+    total_initial = sum(a.quantite_initiale for a in lots_qs)
+    total_restant = sum(a.quantite_restante for a in lots_qs)
 
     taux_utilisation_global = 0
     if total_initial > 0:
@@ -192,10 +253,16 @@ def superviseur_lots_affectes(request):
 
     context = {
         'lots_data': lots_data,
+        'page_obj': page_obj,
         'total_initial': total_initial,
         'total_restant': total_restant,
         'taux_utilisation_global': round(taux_utilisation_global, 1),
-        'nombre_lots': len(lots_data),
+        'nombre_lots': lots_qs.count(),
+
+        # 🔥 garder les filtres en mémoire
+        'periode': periode,
+        'date_debut': date_debut,
+        'date_fin': date_fin,
     }
 
     return render(
@@ -203,7 +270,6 @@ def superviseur_lots_affectes(request):
         'agents/superviseur/lots_affectes.html',
         context
     )
-
 
 @login_required
 def distribuer_lot_agent(request):
@@ -232,6 +298,102 @@ def distribuer_lot_agent(request):
     })
 
 
+@login_required
+def vente_superviseur_simplifiee(request):
+    superviseur = request.user.agent
+    form = VenteSuperviseurSimplifieeForm(
+        request.POST or None,
+        superviseur=superviseur   
+    )
+
+    if form.is_valid():
+        with transaction.atomic():
+
+            agent = form.cleaned_data['agent']
+            affectation = form.cleaned_data['affectation']
+            quantite = form.cleaned_data['quantite']
+
+            # 🔒 sécurité agent
+            if agent.superviseur != superviseur:
+                raise ValidationError("Agent non autorisé")
+
+            # 🔒 sécurité affectation
+            if affectation.superviseur != superviseur:
+                raise ValidationError("Affectation invalide")
+
+            # 🔒 stock (double check backend)
+            if quantite > affectation.quantite_restante:
+                raise ValidationError("Stock insuffisant")
+
+            produit = affectation.lot.produit
+
+            # =========================
+            # 1. PRIX
+            # =========================
+            if agent.type_agent == 'agent_gros':
+                prix = affectation.prix_gros
+                type_vente = 'gros'
+            else:
+                prix = affectation.prix_detail
+                type_vente = 'detail'
+
+            # =========================
+            # 2. DISTRIBUTION AUTO
+            # =========================
+            distribution = DistributionAgent.objects.create(
+                superviseur=superviseur,
+                agent_terrain=agent,
+                type_distribution='TERRAIN',
+                quantite_totale=quantite
+
+            )
+
+            detail = DetailDistribution.objects.create(
+                distribution=distribution,
+                lot=affectation.lot,
+                quantite=quantite,
+                prix_gros=affectation.prix_gros,
+                prix_detail=affectation.prix_detail
+            )
+
+            # =========================
+            # 3. VENTE
+            # =========================
+            vente = Vente.objects.create(
+                agent=agent,
+                detail_distribution=detail,
+                quantite=quantite,
+                prix_vente_unitaire=prix,
+                type_vente=type_vente,
+                date_vente=timezone.now()
+            )
+
+            # =========================
+            # 4. RECOUVREMENT AUTO
+            # =========================
+            montant = quantite * prix
+
+            Recouvrement.objects.create(
+                agent=agent,
+                superviseur=superviseur,
+                montant_recouvre=montant,
+                date_recouvrement=timezone.now()
+            )
+
+            # =========================
+            # 5. MAJ STOCK
+            # =========================
+            affectation.quantite_restante -= quantite
+            affectation.save()
+
+        messages.success(request, "✅ Vente enregistrée ")
+        return redirect('tableau_de_bord_superviseur')
+
+    return render(
+        request,
+        'agents/superviseur/vente_all_superviseur.html',
+        {'form': form}
+    )
 
 
 @login_required
@@ -495,9 +657,10 @@ def liste_distribution_sup(request):
     # -------------------------
     agent_id = request.GET.get('agent')
     produit_id = request.GET.get('produit')
-    date_debut = request.GET.get('date_debut')
-    date_fin = request.GET.get('date_fin')
     lot_id = request.GET.get('lot')
+
+    date_debut = parse_date(request.GET.get('date_debut')) if request.GET.get('date_debut') else None
+    date_fin = parse_date(request.GET.get('date_fin')) if request.GET.get('date_fin') else None
 
     if agent_id:
         distributions = distributions.filter(agent_terrain_id=agent_id)
@@ -507,17 +670,17 @@ def liste_distribution_sup(request):
             detaildistribution__lot__produit_id=produit_id
         ).distinct()
 
-    if date_debut:
-        distributions = distributions.filter(date_distribution__date__gte=date_debut)
-
-    if date_fin:
-        distributions = distributions.filter(date_distribution__date__lte=date_fin)
-   
     if lot_id:
         distributions = distributions.filter(
             detaildistribution__lot_id=lot_id
         ).distinct()
 
+    if date_debut:
+        distributions = distributions.filter(date_distribution__date__gte=date_debut)
+
+    if date_fin:
+        distributions = distributions.filter(date_distribution__date__lte=date_fin)
+    
     agents = (
         Agent.objects
         .filter(superviseur=superviseur, est_actif=True)
@@ -542,22 +705,36 @@ def liste_distribution_sup(request):
         .order_by('produit__nom', '-date_reception')
 
     )
+    
+    paginator = Paginator(distributions, 10)  # 10 par page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
 
+    query_string = urlencode({
+        k: v for k, v in query_params.items()
+        if v not in [None, '', 'None']
+    })
 
     context = {
-        'distributions': distributions,
+        'distributions': page_obj,   
+        'page_obj': page_obj,
+        'query_string': query_string,
+
         'agents': agents,
         'produits': produits,
-        'lots': lots,   
+        'lots': lots,
+
         'filters': {
             'agent': agent_id,
             'produit': produit_id,
-            'lot': lot_id, 
+            'lot': lot_id,
             'date_debut': date_debut,
             'date_fin': date_fin,
         }
     }
-
 
     return render(
         request,
@@ -627,6 +804,7 @@ def rot_affectations_liste(request):
 
     )
 
+
     # --------------------
     # FILTRES (GET)
     # --------------------
@@ -653,6 +831,23 @@ def rot_affectations_liste(request):
         affectations = affectations.filter(
             lot__fournisseur_id=fournisseur_id
         )
+    # =========================
+    # PAGINATION
+    # =========================
+    paginator = Paginator(affectations, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # =========================
+    # QUERY STRING PROPRE
+    # =========================
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+
+    query_string = urlencode({
+        k: v for k, v in query_params.items()
+        if v not in [None, '', 'None']
+    })
 
     # --------------------
     # STATS (post-filtre)
@@ -665,21 +860,22 @@ def rot_affectations_liste(request):
     produits_count = affectations.values('lot__produit').distinct().count()
 
     context = {
-        'affectations': affectations,
+        'affectations': page_obj,
+        'page_obj': page_obj,
+        'query_string': query_string,
+
         'affectations_total': {
             'quantite': total_quantite,
         },
         'superviseurs_count': superviseurs_count,
         'produits_count': produits_count,
 
-        # pour les selects
         'lots': LotEntrepot.objects
             .select_related('produit', 'fournisseur')
             .order_by('-date_reception'),
 
         'fournisseurs': Fournisseur.objects.all(),
 
-        # conserver l’état du filtre
         'filtres': {
             'date_debut': date_debut,
             'date_fin': date_fin,
@@ -687,7 +883,6 @@ def rot_affectations_liste(request):
             'fournisseur': fournisseur_id,
         }
     }
-
     return render(
         request,
         'agents/rot/affectations_liste.html',

@@ -16,6 +16,8 @@ urlpatterns = [
   path('affectation/lot', views.superviseur_lots_affectes, name='superviseur_lots_affectes'),
   path('affectation/agent', views.distribuer_lot_agent, name='distribuer_lot_agent'),
 
+    path('vente/agent', views.vente_superviseur_simplifiee, name='vente_superviseur_simplifiee'),
+
   path('sup/distribution/liste', views.liste_distribution_sup, name='liste_distribution_sup'),
 
   path('affectation/liste_rot', views.rot_affectations_liste, name='rot_affectations_liste'),

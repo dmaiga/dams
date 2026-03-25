@@ -21,18 +21,22 @@
                     {% endif %}
                 </small>
             </div>
+            <!--
             {% if peut_recouvrir %}
             <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success btn-sm">
                 <i class="fas fa-money-bill-wave me-1"></i>Recouvrir
             </a>
             {% endif %}
-        </div>
+        -->
+             <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-edit me-2"></i>Modifier 
+                </a>
+            </div>
     </div>
-
-    <!-- Cartes statistiques en grille mobile -->
-    <div class="p-3">
+    <!-- Cartes statistiques en grille mobile 
+     <div class="p-3">
         <div class="row g-3">
-            <!-- Ventes totales -->
+    
             <div class="col-6">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-3">
@@ -49,7 +53,6 @@
                 </div>
             </div>
 
-            <!-- Argent recouvré -->
             <div class="col-6">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-3">
@@ -66,7 +69,6 @@
                 </div>
             </div>
 
-            <!-- À recouvrer -->
             <div class="col-6">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-3">
@@ -83,7 +85,7 @@
                 </div>
             </div>
 
-            <!-- Taux de recouvrement -->
+          
             <div class="col-6">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-3">
@@ -101,7 +103,7 @@
             </div>
         </div>
 
-        <!-- Répartition des ventes -->
+      Répartition des ventes
         <div class="card border-0 shadow-sm mt-3">
             <div class="card-body p-3">
                 <h6 class="mb-3">
@@ -113,8 +115,8 @@
                             <div class="text-muted small mb-1">Ventes Gros</div>
                             <div class="h5 text-warning">{{ ventes_gros|floatformat:0|intcomma }} F</div>
                            <small class="text-muted">
-    {{ pourcentage_gros }}%
-</small>
+                               {{ pourcentage_gros }}%
+                           </small>
                         </div>
                     </div>
                     <div class="col-6">
@@ -122,13 +124,14 @@
                             <div class="text-muted small mb-1">Ventes Détail</div>
                             <div class="h5 text-info">{{ ventes_detail|floatformat:0|intcomma }} F</div>
                             <small class="text-muted">
-    {{ pourcentage_gros }}%
-</small>                </div>
+                                {{ pourcentage_gros }}%
+                            </small>                
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-
+-->
         <!-- Informations agent -->
         <div class="card border-0 shadow-sm mt-3">
             <div class="card-header bg-white border-0 py-3">
@@ -175,23 +178,21 @@
         <!-- Actions rapides -->
         <div class="mt-3">
             <div class="d-grid gap-2">
-                
+                 <!-- 
                 <a href="{% url 'creer_recouvrement' agent.id %}" class="btn btn-success">
                     <i class="fas fa-hand-holding-usd me-2"></i>Effectuer un recouvrement
                 </a>
                
-                <!-- 
+                
                 <a href="{% url 'historique_recouvrement' agent.id %}" class="btn btn-outline-secondary">
                     <i class="fas fa-history me-2"></i>Voir historique
                 </a>
                 --> 
-                <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-outline-primary">
-                    <i class="fas fa-edit me-2"></i>Modifier l'agent
-                </a>
+               
             </div>
         </div>
 
-        <!-- Dernières ventes -->
+        <!-- Dernières ventes 
         <div class="card border-0 shadow-sm mt-4">
             <div class="card-header bg-white border-0 py-3">
                 <div class="d-flex justify-content-between align-items-center">
@@ -249,6 +250,7 @@
                 </a>
             </div>
         </div>
+        -->
     </div>
 </div>
 

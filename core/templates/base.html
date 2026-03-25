@@ -457,29 +457,33 @@
                             <i class="fas fa-users"></i>
                             <span>Gestion Agents</span>
                         </a>
-                       <a class="nav-link" href="{% url 'superviseur_lots_affectes' %}">
+                       <a class="nav-link" href="{% url 'vente_superviseur_simplifiee' %}">
+                            <i class="fas fa-cash-register"></i>
+                           Ventes
+                        </a>
+                        <a class="nav-link" href="{% url 'superviseur_lots_affectes' %}">
                             <i class="fas fa-pallet"></i>
                             Lots affectés
                         </a>
-
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
-                           href="{% url 'liste_agents_recouvrement' %}">
-                            <i class="fas fa-hand-holding-usd"></i>
-                            <span>Recouvrement Agents</span>
-                        </a>
-                       
+                        
+                      <!--  <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
+                                href="{% url 'liste_agents_recouvrement' %}">
+                                 <i class="fas fa-hand-holding-usd"></i>
+                                 <span>Recouvrement Agents</span>
+                             </a>
+                       !-->
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_distribution_sup' %}active{% endif %}" 
                            href="{% url 'liste_distribution_sup' %}">
                             <i class="fas fa-truck-loading"></i>
                             <span>Distributions</span>
                         </a>
-  <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
+                       <!-- <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
                            href="{% url 'liste_ventes' %}">
                             <i class="fas fa-cash-register"></i>
                             <span>Mes Ventes</span>
                             
                         </a>
-
+                        -->
                
                     </div>
                     {% elif request.user.agent.est_rot %}

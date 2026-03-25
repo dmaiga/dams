@@ -65,7 +65,7 @@ class CalculatorSalaire:
         )
     
         # 🔹 PRORATISATION SI < 1 MOIS
-        if jours_travailles < total_jours_mois:
+        if agent.date_debut_fonction and jours_travailles < total_jours_mois:
             salaire_base = (
                 salaire_base_theorique
                 * Decimal(jours_travailles)

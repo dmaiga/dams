@@ -30,6 +30,9 @@ from django.utils import timezone
 from django.views.generic import View, TemplateView, ListView, DetailView
 from django.db.models.functions import Concat
 from django.db.models import Value, CharField
+
+from django.core.paginator import Paginator
+
 from core.models import (
     Agent, Client, Produit, Vente,
     LotEntrepot, DetailDistribution, DistributionAgent,
@@ -458,95 +461,36 @@ class ProductListView(LoginRequiredMixin, ListView):
         return context
     
 class ProductDetailView(LoginRequiredMixin, DetailView):
-    model = Produit
     template_name = 'direction/analyses/produits/produit_detail.html'
     context_object_name = 'product_data'
-    pk_url_kwarg = 'pk'
+    
+    def get_object(self):
+        product_id = self.kwargs.get('pk')
+        supplier_id = self.request.GET.get('fournisseur')
+        return ProductAnalysisService.get_product_detail(product_id, supplier_id)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        product = self.object
-        
-        # KPIs globaux
         context['kpis'] = ProductAnalysisService.get_product_kpis()
-        context['product'] = product
         
-        # Filtres de période
-        periode = self.request.GET.get('periode', 'mois_courant')
-        today = timezone.now()
-
-        if periode == 'mois_courant':
-            date_debut = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            dernier_jour = calendar.monthrange(today.year, today.month)[1]
-            date_fin = today.replace(day=dernier_jour, hour=23, minute=59, second=59, microsecond=999999)
-        
-        elif periode == 'mois_custom':
-            mois = int(self.request.GET.get('mois', today.month))
-            annee = int(self.request.GET.get('annee', today.year))
-            date_debut = datetime(annee, mois, 1, 0, 0, 0, tzinfo=timezone.get_current_timezone())
-            dernier_jour = calendar.monthrange(annee, mois)[1]
-            date_fin = datetime(annee, mois, dernier_jour, 23, 59, 59, tzinfo=timezone.get_current_timezone())
-        
-        elif periode == 'annee_courant':
-            date_debut = today.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            date_fin = today.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
-        
-        elif periode == 'custom':
-            date_debut_str = self.request.GET.get('date_debut')
-            date_fin_str = self.request.GET.get('date_fin')
+        # Passer le fournisseur sélectionné si existant
+        supplier_id = self.request.GET.get('fournisseur')
+        if supplier_id:
             try:
-                from django.utils.dateparse import parse_datetime
-                date_debut = parse_datetime(f"{date_debut_str}T00:00:00") or today.replace(day=1)
-                date_fin = parse_datetime(f"{date_fin_str}T23:59:59") or today
-            except:
-                date_debut = today.replace(day=1)
-                date_fin = today
-        
-        else:  # default: 30 derniers jours
-            date_fin = today
-            date_debut = today - timedelta(days=30)
-
-        # Récupérer les données du produit pour cette période
-        products_data = ProductAnalysisService.get_products_by_period(
-            date_debut=date_debut,
-            date_fin=date_fin,
-            produit_id=product.id
-        )
-        
-        if products_data:
-            context['product_period_data'] = products_data[0]
-        
-        # Listes pour les filtres
-        mois_liste = [
-            (1, 'Janvier'), (2, 'Février'), (3, 'Mars'),
-            (4, 'Avril'), (5, 'Mai'), (6, 'Juin'),
-            (7, 'Juillet'), (8, 'Août'), (9, 'Septembre'),
-            (10, 'Octobre'), (11, 'Novembre'), (12, 'Décembre'),
-        ]
-        annees_disponibles = list(range(today.year - 2, today.year + 1))
-
-        context.update({
-            'periode_selectionnee': periode,
-            'date_debut': date_debut,
-            'date_fin': date_fin,
-            'mois_liste': mois_liste,
-            'annees_disponibles': annees_disponibles,
-            'mois_courant': today.month,
-            'annee_courant': today.year,
-        })
+                context['selected_supplier'] = Fournisseur.objects.get(id=supplier_id)
+            except Fournisseur.DoesNotExist:
+                context['selected_supplier'] = None
         
         return context
     
 
 #ventes
 
-
 class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
     template_name = "direction/analyses/ventes/liste_ventes_admin.html"
     context_object_name = "ventes"
-    
+    paginate_by = 25  
 
     # ------------------------------------------------------------------
     # CACHE USER + AGENT (ANTI 1000 REQUÊTES)
@@ -566,7 +510,6 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     # ------------------------------------------------------------------
     from django.db.models import F, DecimalField, ExpressionWrapper
 
-
     def get_queryset(self):
         params = self.request.GET
         periode = params.get("periode", "annee")
@@ -578,8 +521,6 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         produit_id = params.get("produit")
         lot_id = params.get("lot")
 
-
-        # 🔴 ÉTAPE MANQUANTE → créer le queryset
         qs = VenteAnalyseService.filter_ventes(
             date_debut=date_debut,
             date_fin=date_fin,
@@ -588,11 +529,11 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             produit_id=produit_id,
             lot_id=lot_id,
         )
+
         dernier_recouvrement = Recouvrement.objects.filter(
             vente_id=OuterRef("pk")
         ).order_by("-date_recouvrement")
 
-        # ✅ PUIS annoter
         qs = qs.annotate(
             total_vente_sql=ExpressionWrapper(
                 F("quantite") * F("prix_vente_unitaire"),
@@ -617,10 +558,8 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 F("stagiaire__user__last_name"),
                 output_field=CharField()
             )
-
         )
 
-        # Cache pour réutilisation
         self.filtered_queryset = qs
         self.date_debut = date_debut
         self.date_fin = date_fin
@@ -639,7 +578,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         stats = VenteAnalyseService.compute_stats(ventes_qs)
         top_agents = VenteAnalyseService.compute_top_agents(ventes_qs)
         agents_list = VenteAnalyseService.get_agents_list()
-        
+
         current_year = timezone.now().year
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),
@@ -648,7 +587,6 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         ]
 
         context.update({
-            # KPI
             "total_ca": stats["total_ca"],
             "total_marge": stats["total_marge"],
             "taux_marge": round(stats["taux_marge"], 1),
@@ -658,14 +596,12 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "clients_count": stats["clients_count"],
             "agents_count": stats["agents_count"],
 
-            # Listes
             "top_agents": top_agents,
             "agents_list": agents_list,
             "produits_list": Produit.objects.only("id", "nom").order_by("nom"),
             "lots_list": LotEntrepot.objects.select_related("produit")
                         .order_by("-date_reception"),
-        
-            # Contexte temporel
+
             "years": list(range(current_year - 2, current_year + 3)),
             "months": months,
             "current_year": current_year,
@@ -676,7 +612,6 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         })
 
         return context
-
 
 class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente

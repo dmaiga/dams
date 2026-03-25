@@ -63,7 +63,7 @@ from agents.services.agent_stock_service import AgentStockService
 
 
 from django.core.paginator import Paginator
-
+from urllib.parse import urlencode
 
 
 
@@ -454,7 +454,7 @@ def liste_lots(request):
 
     produit_filter = request.GET.get('produit')
     fournisseur_filter = request.GET.get('fournisseur')
-    statut_filter = request.GET.get('statut')
+    statut_filter = request.GET.get('statut', 'disponible')
 
     if produit_filter:
         lots = lots.filter(produit__nom__icontains=produit_filter)
@@ -466,7 +466,17 @@ def liste_lots(request):
         lots = lots.filter(quantite_restante__gt=0)
     elif statut_filter == 'epuise':
         lots = lots.filter(quantite_restante=0)
+    
+    paginator = Paginator(lots, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
 
+    query_string = urlencode({
+        k: v for k, v in query_params.items()
+        if v not in [None, '', 'None']
+    })
     stats = lots.aggregate(
         total_lots=models.Count('id'),
         total_stock=Coalesce(
@@ -496,10 +506,12 @@ def liste_lots(request):
     )
 
     return render(request, 'core/entrepot/liste_lots.html', {
-        'lots': lots,
+        'lots': page_obj,
+        'page_obj': page_obj,
+        'query_string': query_string,
+        'statut_filter': statut_filter,
         **stats,
     })
-
 
 
 @login_required
@@ -1578,9 +1590,29 @@ def liste_versement(request):
         Depense.objects
         .aggregate(total=Sum('montant'))['total'] or 0
     )
+    # =========================
+    # PAGINATION
+    # =========================
+    paginator = Paginator(versements, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # =========================
+    # QUERY STRING PROPRE
+    # =========================
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+
+    query_string = urlencode({
+        k: v for k, v in query_params.items()
+        if v not in [None, '', 'None']
+    })
 
     context = {
-        'versements': versements,
+        'versements': page_obj,
+        'page_obj': page_obj,
+        'query_string': query_string,
+
         'total_vente': total_vente,
         'total_hors_vente': total_hors_vente,
         'total_depenses': total_depenses,

@@ -320,7 +320,7 @@ function togglePeriodFields(value) {
                 <thead class="bg-gray-50 text-xs">
                     <tr>
                         <th class="font-medium text-gray-700 px-3 py-2">Date V</th>
-                        <th class="font-medium text-gray-700 px-3 py-2">Date R</th>
+                         
                         <th class="font-medium text-gray-700 px-3 py-2">Agent</th>
                         <th class="font-medium text-gray-700 px-3 py-2">Produit</th>
                         <th class="font-medium text-gray-700 px-3 py-2 text-right">Qté</th>
@@ -339,14 +339,7 @@ function togglePeriodFields(value) {
                             <div class="text-xs text-gray-500">{{ vente.date_vente|date:"H:i" }}</div>
                         </td>
                         
-                        <td>
-                          {% if vente.date_recouvrement %}
-                            {{ vente.date_recouvrement|date:"d/m/Y" }}
-                                                        <div class="text-xs text-gray-500">{{ vente.date_vente|date:"H:i" }}</div>
-                          {% else %}
-                            <span class="text-muted">—</span>
-                          {% endif %}
-                        </td>
+                        
 
                         <!-- Agent -->
                         <td class="px-3 py-2">
@@ -420,45 +413,38 @@ function togglePeriodFields(value) {
             </table>
         </div>
 
-        <!-- Pied de tableau -->
-        {% if ventes %}
-        <div class="p-3 border-t border-gray-100 bg-gray-50">
-            <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
-                <div class="text-gray-600">
-                    Page {{ ventes.number }} sur {{ ventes.paginator.num_pages }}
-                </div>
-                
-                <!-- Pagination bas de page -->
-                {% if ventes.paginator.num_pages > 1 %}
-                <div class="flex items-center gap-2">
-                    <!-- Bouton précédent -->
-                    {% if ventes.has_previous %}
-                    <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ ventes.previous_page_number }}" 
-                       class="btn btn-xs btn-outline">
-                        <i class="fas fa-chevron-left mr-1"></i>Précédent
-                    </a>
-                    {% else %}
-                    <button class="btn btn-xs btn-outline disabled" disabled>
-                        <i class="fas fa-chevron-left mr-1"></i>Précédent
-                    </button>
-                    {% endif %}
-                    
-                    <!-- Bouton suivant -->
-                    {% if ventes.has_next %}
-                    <a href="?{% if request.GET %}{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}{% endif %}page={{ ventes.next_page_number }}" 
-                       class="btn btn-xs btn-outline">
-                        Suivant<i class="fas fa-chevron-right ml-1"></i>
-                    </a>
-                    {% else %}
-                    <button class="btn btn-xs btn-outline disabled" disabled>
-                        Suivant<i class="fas fa-chevron-right ml-1"></i>
-                    </button>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
+
+<div class="p-3 border-t border-gray-100 bg-gray-50">
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
+
+        <div class="text-gray-600">
+            Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+        </div>
+
+        {% if is_paginated %}
+        <div class="flex items-center gap-2">
+
+            <!-- précédent -->
+{% if page_obj.has_previous %}
+<a href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+   class="btn btn-xs btn-outline">
+   <i class="fas fa-chevron-left mr-1"></i>Précédent
+</a>
+{% endif %}
+
+            <!-- suivant -->
+{% if page_obj.has_next %}
+<a href="?{% for key,value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+   class="btn btn-xs btn-outline">
+   Suivant <i class="fas fa-chevron-right ml-1"></i>
+</a>
+{% endif %}
+
         </div>
         {% endif %}
+
+    </div>
+</div>
     </div>
 </div>
 
@@ -499,4 +485,3 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 {% endblock %}
-[file content end]

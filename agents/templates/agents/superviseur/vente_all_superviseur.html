@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+
+
+        <!-- CARD -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">🧾 Enregistrer une vente</h5>
+            </div>
+
+            <div class="card-body">
+
+                <!-- MESSAGES -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- FORM -->
+                <form method="post">
+                    {% csrf_token %}
+
+                    <!-- AGENT -->
+                    <div class="mb-3">
+                        <label class="form-label">Agent</label>
+                        {{ form.agent }}
+                        {% if form.agent.errors %}
+                            <div class="text-danger small">
+                                {{ form.agent.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- PRODUIT -->
+                    <div class="mb-3">
+                        <label class="form-label">Produit</label>
+                        {{ form.affectation }}
+                        {% if form.affectation.errors %}
+                            <div class="text-danger small">
+                                {{ form.affectation.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- QUANTITÉ -->
+                    <div class="mb-3">
+                        <label class="form-label">Quantité</label>
+                        {{ form.quantite }}
+                        {% if form.quantite.errors %}
+                            <div class="text-danger small">
+                                {{ form.quantite.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            ✅ Valider la vente
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+</div>
+
+{% endblock %}

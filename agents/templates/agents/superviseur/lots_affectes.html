@@ -1,134 +1,194 @@
 {% extends "base.html" %}
 {% load format_fcfa %}
+
 {% block title %}Lots affectés{% endblock %}
 
 {% block content %}
+
 <div class="container py-3">
 
-    <!-- En-tête -->
-    <div class="mb-4">
-        <a href="{% url 'tableau_de_bord_superviseur' %}"
-           class="btn btn-sm btn-outline-secondary mb-2">
-            ← Retour
-        </a>
-        <h5>📦 Mes lots affectés</h5>
 
-        <!-- Résumé -->
-        <div class="row g-2">
-            <div class="col-4">
-                <div class="bg-light p-2 rounded text-center">
-                    <small class="text-muted">Lots</small>
-                    <div class="fw-bold">{{ nombre_lots }}</div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="bg-light p-2 rounded text-center">
-                    <small class="text-muted">Stock restant</small>
-                    <div class="fw-bold">
-                        {{ total_restant|floatformat:0 }} unités
-                    </div>
-                </div>
-            </div>
-            <div class="col-4">
-                <div class="bg-light p-2 rounded text-center">
-                    <small class="text-muted">Utilisé</small>
-                    <div class="fw-bold">
-                        {{ taux_utilisation_global|floatformat:0 }}%
-                    </div>
-                </div>
+<!-- HEADER -->
+<div class="mb-3">
+    <a href="{% url 'tableau_de_bord_superviseur' %}" class="btn btn-sm btn-outline-secondary mb-2">
+        ← Retour
+    </a>
+    <h5 class="fw-bold mb-1">📦 Mes lots affectés</h5>
+
+    <!-- KPI -->
+    <div class="row g-2 mt-2 text-center">
+        <div class="col-4">
+            <div class="bg-light p-2 rounded">
+                <small class="text-muted">Lots</small>
+                <div class="fw-bold">{{ nombre_lots }}</div>
             </div>
         </div>
-    </div>
-
-    <!-- Action -->
-    <div class="d-grid mb-4">
-        <a href="{% url 'distribuer_lot_agent' %}" class="btn btn-primary">
-            Distribuer à un agent
-        </a>
-    </div>
-
-    {% if lots_data %}
-    <div class="list-group">
-        {% for data in lots_data %}
-        {% with a=data.affectation %}
-        <div class="list-group-item">
-
-            <!-- Produit -->
-            <strong>{{ a.lot.produit.nom }}</strong>
-
-            <!-- Quantités -->
-            <div class="row mt-2">
-                <div class="col-6">
-                    <small class="text-muted">Reçu</small>
-                    <div>{{ a.quantite_initiale|floatformat:0 }} unités</div>
-                </div>
-                <div class="col-6">
-                    <small class="text-muted">Restant</small>
-                    <div class="fw-bold">
-                        {{ a.quantite_restante|floatformat:0 }} unités
-                    </div>
-                </div>
+        <div class="col-4">
+            <div class="bg-light p-2 rounded">
+                <small class="text-muted">Restant</small>
+                <div class="fw-bold">{{ total_restant|floatformat:0 }}</div>
             </div>
-            <!-- Prix conseillés (ROT) -->
-<div class="row mt-2">
-    <div class="col-6">
-        <small class="text-muted">Prix en gros </small>
-        <div class="fw-semibold">
-            {{ a.prix_gros|fcfa }}
         </div>
-    </div>
-    <div class="col-6">
-        <small class="text-muted">Prix en détail</small>
-        <div class="fw-bold text-success">
-            {{ a.prix_detail|fcfa }}
+        <div class="col-4">
+            <div class="bg-light p-2 rounded">
+                <small class="text-muted">Utilisé</small>
+                <div class="fw-bold">{{ taux_utilisation_global|floatformat:0 }}%</div>
+            </div>
         </div>
     </div>
 </div>
 
+<!-- FILTRE -->
+<div class="card mb-3 shadow-sm border-0">
+    <div class="card-body">
 
-            <!-- Progression -->
-            {% if a.quantite_initiale > 0 %}
-            <div class="progress mt-2" style="height: 5px;">
-                <div class="progress-bar bg-{{ data.statut_progress }}"
-                     style="width: {{ data.taux_restant }}%">
+        <form method="get" class="row g-2">
+
+            <!-- Période -->
+            <div class="col-12">
+                <div class="btn-group w-100">
+                    <a href="?periode=today" class="btn btn-sm {% if periode == 'today' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        Aujourd’hui
+                    </a>
+                    <a href="?periode=7j" class="btn btn-sm {% if periode == '7j' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        7 jours
+                    </a>
+                    <a href="?periode=30j" class="btn btn-sm {% if periode == '30j' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                        30 jours
+                    </a>
+                    <a href="?" class="btn btn-sm btn-outline-secondary">
+                        Reset
+                    </a>
                 </div>
             </div>
-            <div class="text-end small text-muted">
-                {{ data.taux_utilise|floatformat:0 }}% utilisé
-            </div>
-            {% endif %}
 
-            <!-- Métadonnées -->
-            <div class="small text-muted mt-2">
-                <div class="d-flex justify-content-between">
-                    <span>
-                        {{ a.attribue_par.full_name|truncatechars:15 }}
-                    </span>
-                    <span>
-                        {{ a.date_affectation|date:"d/m H:i" }}
-                    </span>
-                </div>
+            <!-- Dates -->
+            <div class="col-5">
+                <input type="date" name="date_debut" value="{{ date_debut }}" class="form-control form-control-sm">
             </div>
 
-            <!-- Action -->
-            <div class="text-end mt-2">
-                <a href="{% url 'distribuer_lot_agent' %}?lot={{ a.lot_id }}"
-                   class="btn btn-sm btn-outline-primary">
-                    Distribuer
-                </a>
+            <div class="col-5">
+                <input type="date" name="date_fin" value="{{ date_fin }}" class="form-control form-control-sm">
             </div>
 
+            <div class="col-2 d-grid">
+                <button class="btn btn-dark btn-sm">OK</button>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+<!-- LISTE -->
+{% for data in lots_data %}
+{% with a=data.affectation %}
+
+<div class="card mb-3 shadow-sm border-0">
+
+    <div class="card-body">
+
+        <!-- Produit -->
+        <div class="fw-semibold">
+            {{ a.lot.produit.nom }}
         </div>
-        {% endwith %}
-        {% endfor %}
+
+        <!-- Quantités -->
+        <div class="d-flex justify-content-between mt-2 small">
+            <span>Reçu: {{ a.quantite_initiale|floatformat:0 }}</span>
+            <span class="fw-bold">
+                Restant: {{ a.quantite_restante|floatformat:0 }}
+            </span>
+        </div>
+
+        <!-- Prix -->
+        <div class="d-flex justify-content-between mt-2 small">
+            <span>Gros: {{ a.prix_gros|fcfa }}</span>
+            <span class="text-success fw-semibold">
+                Détail: {{ a.prix_detail|fcfa }}
+            </span>
+        </div>
+
+        <!-- Progress -->
+        {% if a.quantite_initiale > 0 %}
+        <div class="progress mt-2" style="height: 6px;">
+            <div class="progress-bar bg-{{ data.statut_progress }}"
+                 style="width: {{ data.taux_restant }}%">
+            </div>
+        </div>
+        <div class="text-end small text-muted">
+            {{ data.taux_utilise|floatformat:0 }}% utilisé
+        </div>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="d-flex justify-content-between mt-2 small text-muted">
+            <span>{{ a.attribue_par.full_name|truncatechars:20 }}</span>
+            <span>{{ a.date_affectation|date:"d/m/Y" }}</span>
+        </div>
+
     </div>
 
-    {% else %}
-    <div class="text-center py-5 text-muted">
-        <h6>Aucun lot affecté</h6>
-        <p>Le ROT ne vous a pas encore affecté de lot.</p>
-    </div>
-    {% endif %}
+</div>
+
+{% endwith %}
+{% empty %}
+<div class="text-center py-4 text-muted">
+    Aucun lot trouvé
+</div>
+{% endfor %}
+
+<!-- PAGINATION -->
+{% if page_obj.has_other_pages %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.previous_page_number }}
+               {% if periode %}&periode={{ periode }}{% endif %}
+               {% if date_debut and not periode %}&date_debut={{ date_debut }}{% endif %}
+               {% if date_fin and not periode %}&date_fin={{ date_fin }}{% endif %}">
+                ←
+            </a>
+        </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+            {% elif num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+                <li class="page-item">
+                    <a class="page-link"
+                       href="?page={{ num }}
+                       {% if periode %}&periode={{ periode }}{% endif %}
+                       {% if date_debut and not periode %}&date_debut={{ date_debut }}{% endif %}
+                       {% if date_fin and not periode %}&date_fin={{ date_fin }}{% endif %}">
+                        {{ num }}
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+               href="?page={{ page_obj.next_page_number }}
+               {% if periode %}&periode={{ periode }}{% endif %}
+               {% if date_debut and not periode %}&date_debut={{ date_debut }}{% endif %}
+               {% if date_fin and not periode %}&date_fin={{ date_fin }}{% endif %}">
+                →
+            </a>
+        </li>
+        {% endif %}
+
+    </ul>
+</nav>
+{% endif %}
+
 
 </div>
 {% endblock %}
