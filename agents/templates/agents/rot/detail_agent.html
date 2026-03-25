@@ -53,29 +53,7 @@
                 </div>
 
                 <!-- Stats financières pour agents de vente -->
-                {% if agent.type_agent in 'terrain,agent_gros' %}
-                <div class="col-md-6">
-                    <h6 class="border-bottom pb-2">Résumé financier (30 jours)</h6>
-                    <div class="row mb-1">
-                        <div class="col-6 text-muted">Chiffre d'affaires</div>
-                        <div class="col-6 fw-bold">{{ stats_ventes.total_ca|default:0|floatformat:0 }} FCFA</div>
-                    </div>
-                    <div class="row mb-1">
-                        <div class="col-6 text-muted">Quantité vendue</div>
-                        <div class="col-6">{{ stats_ventes.total_quantite|default:0|floatformat:0 }} kg</div>
-                    </div>
-                    <div class="row mb-1">
-                        <div class="col-6 text-muted">Marge générée</div>
-                        <div class="col-6 text-success">{{ stats_ventes.marge_totale|default:0|floatformat:0 }} FCFA</div>
-                    </div>
-                    <div class="row mb-1">
-                        <div class="col-6 text-muted">Argent à recouvrer</div>
-                        <div class="col-6 {% if argent_en_possession > 0 %}text-warning fw-bold{% endif %}">
-                            {{ argent_en_possession|floatformat:0 }} FCFA
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
+
             </div>
 
             <!-- Section STOCK ACTUEL (agents de vente) -->
@@ -128,75 +106,9 @@
             {% endif %}
 
             <!-- Section DERNIÈRES VENTES -->
-            {% if agent.type_agent in 'terrain,agent_gros' and dernieres_ventes %}
-            <div class="mb-4">
-                <h6 class="border-bottom pb-2 mb-3">🛒 10 dernières ventes</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Produit</th>
-                                <th>Quantité</th>
-                                <th>Type</th>
-                                <th>Prix unitaire</th>
-                                <th>Total</th>
-                                <th>Client</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for vente in dernieres_ventes %}
-                            <tr>
-                                <td>{{ vente.date_vente|date:"d/m H:i" }}</td>
-                                <td>{{ vente.detail_distribution.lot.produit.nom }}{% if vente.specification %} <small class="text-muted">({{ vente.specification }})</small>{% endif %}</td>
-                                <td>{{ vente.quantite|floatformat:1 }} kg</td>
-                                <td>
-                                    <span class="badge {% if vente.type_vente == 'gros' %}bg-info{% else %}bg-secondary{% endif %}">
-                                        {{ vente.get_type_vente_display }}
-                                    </span>
-                                </td>
-                                <td>{{ vente.prix_vente_unitaire|floatformat:0 }} FCFA</td>
-                                <td>{{ vente.total_vente|floatformat:0 }} FCFA</td>
-                                <td>{{ vente.nom_client|default:"—" }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {% endif %}
+ 
 
-            <!-- Section AGENTS SUPERVISÉS (pour superviseurs) -->
-            {% if agent.type_agent == 'entrepot' and agents_supervises %}
-            <div class="mb-4">
-                <h6 class="border-bottom pb-2 mb-3">👥 Agents supervisés</h6>
-                <div class="row">
-                    {% for sub_agent in agents_supervises %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card border">
-                            <div class="card-body py-2">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ sub_agent.full_name }}</strong>
-                                        <span class="badge {% if sub_agent.type_agent == 'agent_gros' %}bg-info{% else %}bg-secondary{% endif %} ms-1">
-                                            {{ sub_agent.get_type_agent_display }}
-                                        </span>
-                                    </div>
-                                    <a href="{% url 'detail_agent_rot' sub_agent.id %}" class="btn btn-sm btn-outline-primary">
-                                        Détail
-                                    </a>
-                                </div>
-                                <div class="small text-muted mt-1">
-                                    {{ sub_agent.quartier|default:"Quartier non spécifié" }} 
-                                    • {{ sub_agent.marche_affectation|default:"Marché non spécifié" }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
+
         </div>
     </div>
 

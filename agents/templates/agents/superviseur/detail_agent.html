@@ -27,10 +27,11 @@
                 <i class="fas fa-money-bill-wave me-1"></i>Recouvrir
             </a>
             {% endif %}
-        -->
+       
              <a href="{% url 'modifier_agent' agent.id %}" class="btn btn-success btn-sm">
                     <i class="fas fa-edit me-2"></i>Modifier 
                 </a>
+            -->
             </div>
     </div>
     <!-- Cartes statistiques en grille mobile 
@@ -159,14 +160,7 @@
                         <small class="text-muted d-block">Marché</small>
                         {{ agent.marche_affectation|default:"—" }}
                     </div>
-                    <div class="list-group-item border-0 px-0 py-2">
-                        <small class="text-muted d-block">Nom d'utilisateur</small>
-                        {{ agent.user.username }}
-                    </div>
-                    <div class="list-group-item border-0 px-0 py-2">
-                        <small class="text-muted d-block">Total ventes (historique)</small>
-                        {{ ventes_total_count }} vente{{ ventes_total_count|pluralize }}
-                    </div>
+                 
                     <div class="list-group-item border-0 px-0 py-2">
                         <small class="text-muted d-block">Ventes (30 derniers jours)</small>
                         {{ ventes_30j_count }}

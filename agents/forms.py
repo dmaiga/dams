@@ -68,11 +68,38 @@ class TelephoneOrUsernameLoginForm(AuthenticationForm):
 
 
 class DirectionAgentCreationForm(forms.ModelForm):
+    #  Infos utilisateur
     nom = forms.CharField(max_length=30)
     prenom = forms.CharField(max_length=30)
     telephone = forms.CharField(max_length=50)
-    password = forms.CharField(widget=forms.PasswordInput)
 
+    #  Affectation
+    quartier = forms.CharField(max_length=150, required=False)
+    marche_affectation = forms.CharField(max_length=150, required=False)
+
+    #  RH
+    date_debut_fonction = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date'})
+    )
+
+    salaire_base_personnel = forms.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2
+    )
+
+    type_contrat = forms.ChoiceField(
+        choices=Agent.TYPE_CONTRAT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    date_fin_contrat = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date'})
+    )
+
+    #  Organisation
     type_agent = forms.ChoiceField(
         choices=Agent.TYPE_AGENT_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -90,21 +117,38 @@ class DirectionAgentCreationForm(forms.ModelForm):
             'type_agent',
             'superviseur',
             'est_actif',
+            'quartier',
+            'marche_affectation',
+            'date_debut_fonction',
+            'salaire_base_personnel',
+            'type_contrat',
+            'date_fin_contrat',
         ]
 
     def save(self, commit=True):
         nom = self.cleaned_data['nom']
         prenom = self.cleaned_data['prenom']
         telephone = self.cleaned_data['telephone']
-        password = self.cleaned_data['password']
         est_actif = self.cleaned_data.get('est_actif', True)
-
+    
+        # RH
+        quartier = self.cleaned_data.get('quartier')
+        marche = self.cleaned_data.get('marche_affectation')
+        date_debut = self.cleaned_data.get('date_debut_fonction')
+        salaire = self.cleaned_data.get('salaire_base_personnel')
+        type_contrat = self.cleaned_data.get('type_contrat')
+        date_fin = self.cleaned_data.get('date_fin_contrat')
+    
+        #  password générique
+        password = "temp123"
+    
+        # username auto
         username = f"{prenom.lower()}.{nom.lower()}"
         i = 1
         while User.objects.filter(username=username).exists():
             username = f"{prenom.lower()}.{nom.lower()}{i}"
             i += 1
-
+    
         user = User.objects.create_user(
             username=username,
             password=password,
@@ -112,16 +156,24 @@ class DirectionAgentCreationForm(forms.ModelForm):
             last_name=nom,
             is_active=est_actif
         )
-
+    
         agent = super().save(commit=False)
         agent.user = user
         agent.telephone = telephone
         agent.est_actif = est_actif
-
+    
+        #  Champs ajoutés
+        agent.quartier = quartier
+        agent.marche_affectation = marche
+        agent.date_debut_fonction = date_debut
+        agent.salaire_base_personnel = salaire
+        agent.type_contrat = type_contrat
+        agent.date_fin_contrat = date_fin
+    
         if commit:
             agent.save()
-
         return agent
+
 
 
 class RotSupervisorCreationForm(forms.ModelForm):

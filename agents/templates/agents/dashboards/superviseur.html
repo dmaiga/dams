@@ -87,7 +87,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>Produit</th>
-                        <th class="text-end">Qté initiale</th>
+                        <th class="text-end">Qté reçu</th>
                         <th class="text-end">Qté restante</th>
                     </tr>
                 </thead>
@@ -111,79 +111,7 @@
     </div>
 
     <!-- ================= AGENTS FINANCIERS ================= -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light fw-semibold">
-            <i class="fas fa-users me-2"></i>
-            Situation financière des agents
-        </div>
 
-        <!-- 📱 Mobile : cards -->
-        <div class="d-md-none">
-            {% for row in agents_financiers %}
-            <div class="card border-0 border-bottom">
-                <div class="card-body py-2">
-                    <strong>{{ row.agent.full_name }}</strong>
-
-                    <div class="row small mt-1">
-                        <div class="col-6">
-                            Ventes<br>
-                            <strong>{{ row.total_ventes|fcfa }}</strong>
-                        </div>
-                        <div class="col-6 text-end">
-                            Recouvré<br>
-                            <strong class="text-success">
-                                {{ row.total_recouvre|fcfa }}
-                            </strong>
-                        </div>
-                    </div>
-
-                    <div class="mt-1">
-                        Reste :
-                        <strong class="{% if row.reste_a_rendre > 0 %}text-danger{% endif %}">
-                            {{ row.reste_a_rendre|fcfa }}
-                        </strong>
-                    </div>
-                </div>
-            </div>
-            {% empty %}
-            <div class="text-center text-muted py-4">
-                Aucun agent terrain actif
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- 🖥️ Desktop : table -->
-        <div class="table-responsive d-none d-md-block">
-            <table class="table table-sm table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Agent</th>
-                        <th class="text-end">Ventes</th>
-                        <th class="text-end">Recouvré</th>
-                        <th class="text-end">Reste à rendre</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in agents_financiers %}
-                    <tr>
-                        <td>{{ row.agent.full_name }}</td>
-                        <td class="text-end">{{ row.total_ventes|fcfa }}</td>
-                        <td class="text-end text-success">{{ row.total_recouvre|fcfa }}</td>
-                        <td class="text-end fw-bold {% if row.reste_a_rendre > 0 %}text-danger{% endif %}">
-                            {{ row.reste_a_rendre|fcfa }}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="text-center text-muted">
-                            Aucun agent terrain actif
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
 
     <!-- ================= ACTIVITÉ ================= -->
     <div class="card shadow-sm">

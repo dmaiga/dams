@@ -8,7 +8,7 @@
     <!-- Titre -->
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-base-content">
-            ➕ Création d’un agent
+            Création d’un agent
         </h1>
         <p class="text-sm text-base-content/70">
             Formulaire réservé à l’administration / direction
@@ -56,19 +56,16 @@
                     {% endif %}
                 </div>
 
-                <!-- Mot de passe -->
+
+
+                <!-- Superviseur -->
                 <div class="form-control">
                     <label class="label">
-                        <span class="label-text">Mot de passe initial</span>
+                        <span class="label-text">Superviseur</span>
                     </label>
-                    {{ form.password|add_class:"input input-bordered w-full" }}
-                    <label class="label">
-                        <span class="label-text-alt text-warning">
-                            ⚠️ À communiquer à l’agent après création
-                        </span>
-                    </label>
-                    {% if form.password.errors %}
-                        <p class="text-error text-sm">{{ form.password.errors.0 }}</p>
+                    {{ form.superviseur|add_class:"select select-bordered w-full" }}
+                    {% if form.superviseur.errors %}
+                        <p class="text-error text-sm">{{ form.superviseur.errors.0 }}</p>
                     {% endif %}
                 </div>
 
@@ -82,7 +79,78 @@
                         <p class="text-error text-sm">{{ form.type_agent.errors.0 }}</p>
                     {% endif %}
                 </div>
+<!-- Affectation -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Quartier</span>
+        </label>
+        {{ form.quartier|add_class:"input input-bordered w-full" }}
+        {% if form.quartier.errors %}
+            <p class="text-error text-sm">{{ form.quartier.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Marché d’affectation</span>
+        </label>
+        {{ form.marche_affectation|add_class:"input input-bordered w-full" }}
+        {% if form.marche_affectation.errors %}
+            <p class="text-error text-sm">{{ form.marche_affectation.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+</div>
+<!-- Infos RH -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Date début fonction</span>
+        </label>
+        {{ form.date_debut_fonction|add_class:"input input-bordered w-full" }}
+        {% if form.date_debut_fonction.errors %}
+            <p class="text-error text-sm">{{ form.date_debut_fonction.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Salaire de base</span>
+        </label>
+        {{ form.salaire_base_personnel|add_class:"input input-bordered w-full" }}
+        {% if form.salaire_base_personnel.errors %}
+            <p class="text-error text-sm">{{ form.salaire_base_personnel.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+</div>
+<!-- Contrat -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Type de contrat</span>
+        </label>
+        {{ form.type_contrat|add_class:"select select-bordered w-full" }}
+        {% if form.type_contrat.errors %}
+            <p class="text-error text-sm">{{ form.type_contrat.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+    <div class="form-control">
+        <label class="label">
+            <span class="label-text">Date fin contrat</span>
+        </label>
+        {{ form.date_fin_contrat|add_class:"input input-bordered w-full" }}
+        {% if form.date_fin_contrat.errors %}
+            <p class="text-error text-sm">{{ form.date_fin_contrat.errors.0 }}</p>
+        {% endif %}
+    </div>
+
+</div>
                 <!-- Actif -->
                 <div class="form-control">
                     <label class="cursor-pointer label justify-start gap-4">

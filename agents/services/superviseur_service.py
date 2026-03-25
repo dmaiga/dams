@@ -69,6 +69,7 @@ class SuperviseurDashboardService:
             AffectationLotSuperviseur.objects
             .filter(superviseur=superviseur)
             .select_related('lot__produit')
+            .order_by('lot__produit')
         )
 
         stock = {}
