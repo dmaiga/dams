@@ -164,28 +164,28 @@
     <!-- STATS PÉRIODE -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <!-- Montant investi -->
-        <div class="card bg-base-100 shadow-xl border-l-4 border-l-accent">
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-primary">
             <div class="card-body p-4">
                 <h3 class="card-title text-sm"><i class="fas fa-money-bill-wave"></i> Investi</h3>
-                <p class="text-2xl font-bold text-accent">{{ stats_periode.total_investi|fcfa }}</p>
+                <p class="text-2xl font-bold ">{{ stats_periode.total_investi|fcfa }}</p>
                 <p class="text-xs text-base-content/60 mt-1">{{ stats_periode.quantite_recue|format_number }} unités reçues</p>
             </div>
         </div>
 
         <!-- CA réalisé -->
-        <div class="card bg-base-100 shadow-xl border-l-4 border-l-success">
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-info">
             <div class="card-body p-4">
                 <h3 class="card-title text-sm"><i class="fas fa-chart-line"></i> CA</h3>
-                <p class="text-2xl font-bold text-success">{{ stats_periode.total_ca|fcfa }}</p>
+                <p class="text-2xl font-bold text-info">{{ stats_periode.total_ca|fcfa }}</p>
                 <p class="text-xs text-base-content/60 mt-1">{{ stats_periode.quantite_vendue|format_number }} unités vendues</p>
             </div>
         </div>
 
         <!-- Marge réalisée -->
-        <div class="card bg-base-100 shadow-xl border-l-4 border-l-info">
+        <div class="card bg-base-100 shadow-xl border-l-4 border-l-success">
             <div class="card-body p-4">
                 <h3 class="card-title text-sm"><i class="fas fa-hand-holding-usd"></i> Marge</h3>
-                <p class="text-2xl font-bold text-info">{{ stats_periode.total_marge|fcfa }}</p>
+                <p class="text-2xl font-bold text-success">{{ stats_periode.total_marge|fcfa }}</p>
                 <p class="text-xs text-base-content/60 mt-1">Marge totale</p>
             </div>
         </div>
@@ -230,7 +230,6 @@
                         <th class="text-right">CA Réalisé</th>
                         <th class="text-right">Marge</th>
                         <th class="text-center">Taux Marge</th>
-                        <th class="text-center">ROI</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -249,12 +248,15 @@
                         <td class="text-center">
                             <span class="font-bold">{{ product_data.quantite_vendue|format_number }}</span> unités
                         </td>
-                        <td class="text-right font-mono font-bold text-success">
+
+                        <td class="text-right font-mono font-bold ">
                             {{ product_data.total_ca|fcfa }} FCFA
                         </td>
-                        <td class="text-right font-mono font-bold text-info">
+                        
+                        <td class="text-right font-mono font-bold text-success">
                             {{ product_data.marge_totale|fcfa }} FCFA
                         </td>
+                        
                         <td class="text-center">
                             <div class="tooltip" data-tip="Taux: {{ product_data.taux_marge|floatformat:1 }}%">
                                 <div class="radial-progress 
@@ -266,16 +268,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="text-center">
-                            <div class="tooltip" data-tip="Retour sur investissement">
-                                <span class="badge 
-                                    {% if product_data.roi > 50 %}badge-success
-                                    {% elif product_data.roi > 20 %}badge-warning
-                                    {% else %}badge-error{% endif %}">
-                                    {{ product_data.roi|floatformat:0 }}%
-                                </span>
-                            </div>
-                        </td>
+                        
                         <td>
                             <a href="{% url 'product_detail' product_data.produit_id %}?periode={{ periode_selectionnee }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}" 
                                class="btn btn-sm btn-primary">

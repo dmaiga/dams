@@ -63,7 +63,7 @@
 
 
 
-    <!-- Taux de Marge -->
+        <!-- Taux de Marge -->
     
         <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
@@ -87,6 +87,53 @@
             </div>
         </div>
     </div>
+
+        <!-- Ventes mensuelles -->
+    {% if product_data.monthly_sales %}
+    <div class="card bg-base-100 shadow-xl mt-6">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Ventes Mensuelles</h2>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>Mois</th>
+                            <th class="text-center">Quantité Vendue</th>
+                            <th class="text-right">Chiffre d'Affaires</th>
+                            <th class="text-right">Marge Obtenue</th>
+                            <th class="text-center">Taux Marge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mois in product_data.monthly_sales %}
+                        <tr>
+                            <td class="font-semibold">{{ mois.month_name }}</td>
+                            <td class="text-center">{{ mois.total_quantity|format_number }} unités</td>
+                            <td class="text-right font-mono">{{ mois.total_revenue|fcfa }}</td>
+                            <td class="text-right font-mono {% if mois.total_marge > 0 %}text-success{% else %}text-error{% endif %}">
+                                {{ mois.total_marge|fcfa }}
+                            </td>
+                            <td class="text-center">
+                                {% if mois.total_revenue > 0 %}
+                                {% widthratio mois.total_marge mois.total_revenue 100 as taux_marge %}
+                                <span class="badge 
+                                    {% if taux_marge > 30 %}badge-success
+                                    {% elif taux_marge > 15 %}badge-warning
+                                    {% else %}badge-error{% endif %}">
+                                    {{ taux_marge|format_number }}%
+                                </span>
+                                {% else %}
+                                <span class="badge badge-secondary">0%</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Détails des lots -->
     <div class="card bg-base-100 shadow-xl">
@@ -180,51 +227,6 @@
         </div>
     </div>
 
-    <!-- Ventes mensuelles -->
-    {% if product_data.monthly_sales %}
-    <div class="card bg-base-100 shadow-xl mt-6">
-        <div class="card-body">
-            <h2 class="card-title mb-4">Ventes Mensuelles</h2>
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>Mois</th>
-                            <th class="text-center">Quantité Vendue</th>
-                            <th class="text-right">Chiffre d'Affaires</th>
-                            <th class="text-right">Marge Obtenue</th>
-                            <th class="text-center">Taux Marge</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for mois in product_data.monthly_sales %}
-                        <tr>
-                            <td class="font-semibold">{{ mois.month_name }}</td>
-                            <td class="text-center">{{ mois.total_quantity|format_number }} unités</td>
-                            <td class="text-right font-mono">{{ mois.total_revenue|fcfa }}</td>
-                            <td class="text-right font-mono {% if mois.total_marge > 0 %}text-success{% else %}text-error{% endif %}">
-                                {{ mois.total_marge|fcfa }}
-                            </td>
-                            <td class="text-center">
-                                {% if mois.total_revenue > 0 %}
-                                {% widthratio mois.total_marge mois.total_revenue 100 as taux_marge %}
-                                <span class="badge 
-                                    {% if taux_marge > 30 %}badge-success
-                                    {% elif taux_marge > 15 %}badge-warning
-                                    {% else %}badge-error{% endif %}">
-                                    {{ taux_marge|format_number }}%
-                                </span>
-                                {% else %}
-                                <span class="badge badge-secondary">0%</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+
 </div>
 {% endblock %}
