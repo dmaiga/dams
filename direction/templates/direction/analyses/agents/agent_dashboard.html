@@ -148,55 +148,86 @@
         </div>
     </div>
 
+<!-- Superviseurs & Produits affectés -->
+<div class="card bg-base-100 shadow-xl mt-8">
+    <div class="card-body">
+        <h2 class="card-title mb-4">
+            <i class="fas fa-boxes-stacked text-primary"></i>
+            Superviseurs & Produits Affectés
+        </h2>
 
-    <!-- Superviseurs & Produits affectés -->
-    <div class="card bg-base-100 shadow-xl mt-8">
-        <div class="card-body">
-            <h2 class="card-title mb-4">
-                <i class="fas fa-boxes-stacked text-primary"></i>
-                Superviseurs & Produits Affectés
-            </h2>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th>Superviseur</th>
+                        <th>Produit</th>
+                        <th>Quantité</th>
+                        <th>Prix</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
 
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
+                <tbody>
+                    {% for row in superviseurs_produits %}
+                        {% for p in row.produits %}
                         <tr>
-                            <th>Superviseur</th>
-                            <th>Produit</th>
-                            <th>Lot</th>
-                            <th>Qté restante</th>
-                            <th>Qté initiale</th>
-                            <th>Date affectation</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in superviseurs_produits %}
-                            {% for p in row.produits %}
-                            <tr>
-                                <td class="font-semibold">
-                                    {{ row.superviseur.full_name }}
-                                </td>
-                                <td>{{ p.produit }}</td>
-                                <td>{{ p.lot }}</td>
-                                <td class="font-bold text-warning">
+                            <!-- Superviseur -->
+                            <td class="font-semibold">
+                                {{ row.superviseur.full_name }}
+                            </td>
+
+                            <!-- Produit + lot -->
+                            <td>
+                                <div class="font-medium">
+                                    {{ p.produit }}
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    Lot : {{ p.lot }}
+                                </div>
+                            </td>
+
+                            <!-- Quantité -->
+                            <td class="font-semibold">
+                                <span class="text-warning">
                                     {{ p.quantite_restante }}
-                                </td>
-                                <td>{{ p.quantite_initiale }}</td>
-                                <td>{{ p.date_affectation|date:"d/m/Y" }}</td>
-                            </tr>
-                            {% endfor %}
-                        {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center text-gray-500 py-4">
-                                    Aucun produit affecté aux superviseurs
-                                </td>
-                            </tr>
+                                </span>
+                                <span class="text-gray-400 text-sm">
+                                    / {{ p.quantite_initiale }}
+                                </span>
+                            </td>
+
+                            <!-- Prix (UNE ligne = meilleur choix) -->
+                            <td>
+                                <div class="flex flex-col text-sm">
+                                    <span class="text-blue-600">
+                                        Gros : {{ p.prix_gros|fcfa }}
+                                    </span>
+                                    <span class="text-green-600">
+                                        Détail : {{ p.prix_detail|fcfa }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- Date -->
+                            <td class="text-sm text-gray-500">
+                                {{ p.date_affectation|date:"d/m/Y" }}
+                            </td>
+                        </tr>
                         {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-500 py-4">
+                                Aucun produit affecté aux superviseurs
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
+    
  
     <!-- Agents avec Produits en Possession -->
     <div class="card bg-base-100 shadow-xl mt-8">

@@ -106,7 +106,7 @@ class DirectionAgentCreationForm(forms.ModelForm):
     )
 
     superviseur = forms.ModelChoiceField(
-        queryset=Agent.objects.filter(type_agent='entrepot'),
+        queryset=Agent.objects.filter(type_agent='entrepot',est_actif=True),
         required=False
     )
 
@@ -775,8 +775,9 @@ class VenteSuperviseurSimplifieeForm(forms.Form):
         # =========================
         self.fields['affectation'].label_from_instance = lambda obj: (
             f"{obj.lot.produit.nom} | "
-            f"Init: {obj.quantite_initiale} | "
-            f"Restant: {obj.quantite_restante} | "
+            f"{obj.lot.date_reception.strftime('%d/%m/%Y')} | "
+            f"I/R: {obj.quantite_initiale}/{obj.quantite_restante} | "
+            
             f"Affecté le: {obj.date_affectation.strftime('%d/%m/%Y')}"
             
         )

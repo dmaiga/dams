@@ -172,7 +172,8 @@ class FournisseurAnalyseService:
             fournisseur=fournisseur,
             date_reception__gte=date_debut,
             date_reception__lte=date_fin
-        ).select_related('produit')
+        ).select_related('produit').order_by('date_reception')
+        
 
         lot_ids = list(lots_qs.values_list('id', flat=True))
 

@@ -441,6 +441,8 @@ class DashboardAgentAnalysisService:
                 "quantite_restante": aff.quantite_restante,
                 "quantite_initiale": aff.quantite_initiale,
                 "date_affectation": aff.date_affectation,
+                "prix_gros": aff.prix_gros,
+                "prix_detail": aff.prix_detail,
             })
 
         return list(data.values())
