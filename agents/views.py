@@ -62,7 +62,7 @@ from agents.forms import (
                             SupervisorDistributionForm,
                             RecouvrementSuperviseurForm,
                             SupervisorTerrainAgentUpdateForm,
-                            VenteSuperviseurSimplifieeForm
+                            DistributionSuperviseurSimplifieeForm
                             
                             )
 
@@ -299,11 +299,12 @@ def distribuer_lot_agent(request):
 
 
 @login_required
-def vente_superviseur_simplifiee(request):
+def distribution_superviseur(request):
     superviseur = request.user.agent
-    form = VenteSuperviseurSimplifieeForm(
+
+    form = DistributionSuperviseurSimplifieeForm(
         request.POST or None,
-        superviseur=superviseur   
+        superviseur=superviseur
     )
 
     if form.is_valid():
@@ -325,30 +326,17 @@ def vente_superviseur_simplifiee(request):
             if quantite > affectation.quantite_restante:
                 raise ValidationError("Stock insuffisant")
 
-            produit = affectation.lot.produit
-
             # =========================
-            # 1. PRIX
-            # =========================
-            if agent.type_agent == 'agent_gros':
-                prix = affectation.prix_gros
-                type_vente = 'gros'
-            else:
-                prix = affectation.prix_detail
-                type_vente = 'detail'
-
-            # =========================
-            # 2. DISTRIBUTION AUTO
+            # 🔥 DISTRIBUTION UNIQUEMENT
             # =========================
             distribution = DistributionAgent.objects.create(
                 superviseur=superviseur,
                 agent_terrain=agent,
                 type_distribution='TERRAIN',
                 quantite_totale=quantite
-
             )
 
-            detail = DetailDistribution.objects.create(
+            DetailDistribution.objects.create(
                 distribution=distribution,
                 lot=affectation.lot,
                 quantite=quantite,
@@ -357,44 +345,19 @@ def vente_superviseur_simplifiee(request):
             )
 
             # =========================
-            # 3. VENTE
-            # =========================
-            vente = Vente.objects.create(
-                agent=agent,
-                detail_distribution=detail,
-                quantite=quantite,
-                prix_vente_unitaire=prix,
-                type_vente=type_vente,
-                date_vente=timezone.now()
-            )
-
-            # =========================
-            # 4. RECOUVREMENT AUTO
-            # =========================
-            montant = quantite * prix
-
-            Recouvrement.objects.create(
-                agent=agent,
-                superviseur=superviseur,
-                montant_recouvre=montant,
-                date_recouvrement=timezone.now()
-            )
-
-            # =========================
-            # 5. MAJ STOCK
+            # 🔥 MAJ STOCK SUPERVISEUR
             # =========================
             affectation.quantite_restante -= quantite
             affectation.save()
 
-        messages.success(request, "✅ Vente enregistrée ")
+        messages.success(request, "✅ Distribution effectuée avec succès")
         return redirect('tableau_de_bord_superviseur')
 
     return render(
         request,
-        'agents/superviseur/vente_all_superviseur.html',
+        'agents/superviseur/distribution_superviseur.html',  
         {'form': form}
     )
-
 
 @login_required
 def liste_agents_sup(request):
@@ -741,6 +704,75 @@ def liste_distribution_sup(request):
         'agents/superviseur/liste_distributions.html',
         context
     )
+
+
+@login_required
+def vente_distribution_rapide(request, detail_id):
+    superviseur = request.user.agent
+
+    detail = get_object_or_404(
+        DetailDistribution.objects.select_related(
+            'distribution',
+            'distribution__agent_terrain'
+        ),
+        id=detail_id,
+        distribution__superviseur=superviseur
+    )
+
+    if request.method == "POST":
+
+        agent = detail.distribution.agent_terrain
+
+        reste = detail.quantite - detail.quantite_vendue
+        
+        if reste <= 0:
+            messages.warning(request, "⚠️ Produit déjà vendu")
+            return redirect('liste_distribution_sup')
+
+        quantite = reste  # 🔥 vente totale simple
+
+        # =========================
+        # PRIX
+        # =========================
+        if agent.type_agent == 'agent_gros':
+            prix = detail.prix_gros
+            type_vente = 'gros'
+        else:
+            prix = detail.prix_detail
+            type_vente = 'detail'
+
+        # =========================
+        # VENTE
+        # =========================
+        vente = Vente.objects.create(
+            agent=agent,
+            detail_distribution=detail,
+            quantite=quantite,
+            prix_vente_unitaire=prix,
+            type_vente=type_vente
+        )
+
+        # =========================
+        # RECOUVREMENT
+        # =========================
+        montant = quantite * prix
+
+        Recouvrement.objects.create(
+            vente=vente,
+            agent=agent,
+            superviseur=superviseur,
+            montant_recouvre=montant
+        )
+
+        # =========================
+        # MAJ
+        # =========================
+        detail.quantite_vendue += quantite
+        detail.save()
+
+        messages.success(request, "✅ Vente + encaissement effectués")
+
+    return redirect('liste_distribution_sup')
 
 ####
 

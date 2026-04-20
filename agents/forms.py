@@ -725,7 +725,7 @@ class RecouvrementSuperviseurForm(forms.ModelForm):
         return date
 
 
-class VenteSuperviseurSimplifieeForm(forms.Form):
+class DistributionSuperviseurSimplifieeForm(forms.Form):
 
     agent = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
@@ -801,3 +801,5 @@ class VenteSuperviseurSimplifieeForm(forms.Form):
                 )
     
         return cleaned_data
+
+

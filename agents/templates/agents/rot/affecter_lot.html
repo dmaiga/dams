@@ -28,6 +28,9 @@ input, select{
     font-size:1.1rem;
     font-weight:600;
 }
+.spinner-border{
+    margin-left:10px;
+}
 </style>
 
 <h5 class="mb-3">🔁 Affectation de lot</h5>
@@ -87,11 +90,31 @@ input, select{
 {{ form.quantite_initiale }}
 
 <!-- ================= ACTION ================= -->
-<button type="submit" class="btn btn-primary w-100 btn-submit">
-    ✅ Valider l’affectation
+<button type="submit" class="btn btn-primary w-100 btn-submit" id="submitBtn">
+    <span id="btnText">✅ Valider l’affectation</span>
+    <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
 </button>
 
 </form>
 
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.querySelector("form");
+    const btn = document.getElementById("submitBtn");
+    const spinner = document.getElementById("btnSpinner");
+    const text = document.getElementById("btnText");
+
+    form.addEventListener("submit", function() {
+        // Empêche double clic
+        btn.disabled = true;
+
+        // Affiche spinner
+        spinner.classList.remove("d-none");
+
+        // Change texte
+        text.innerText = "Traitement...";
+    });
+});
+</script>
 {% endblock %}

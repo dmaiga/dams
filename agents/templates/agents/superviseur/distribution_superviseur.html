@@ -10,7 +10,7 @@
         <!-- CARD -->
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">🧾 Enregistrer une vente</h5>
+                <h5 class="mb-0">Enregistrer une distribution</h5>
             </div>
 
             <div class="card-body">
@@ -63,9 +63,10 @@
 
                     <!-- ACTIONS -->
                     <div class="d-grid">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            ✅ Valider la vente
-                        </button>
+<button type="submit" class="btn btn-success btn-lg" id="submitBtn">
+    <span id="btnText">Distribuer</span>
+    <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+</button>
                     </div>
 
                 </form>
@@ -78,5 +79,23 @@
 
 
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const form = document.querySelector("form");
+    const btn = document.getElementById("submitBtn");
+    const spinner = document.getElementById("btnSpinner");
+    const text = document.getElementById("btnText");
 
+    form.addEventListener("submit", function() {
+        // bloque double clic
+        btn.disabled = true;
+
+        // affiche spinner
+        spinner.classList.remove("d-none");
+
+        // change texte
+        text.innerText = "Traitement...";
+    });
+});
+</script>
 {% endblock %}

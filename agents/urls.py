@@ -16,10 +16,14 @@ urlpatterns = [
   path('affectation/lot', views.superviseur_lots_affectes, name='superviseur_lots_affectes'),
   path('affectation/agent', views.distribuer_lot_agent, name='distribuer_lot_agent'),
 
-    path('vente/agent', views.vente_superviseur_simplifiee, name='vente_superviseur_simplifiee'),
+  path('distribution/agent', views.distribution_superviseur, name='distribution_superviseur'),
 
   path('sup/distribution/liste', views.liste_distribution_sup, name='liste_distribution_sup'),
-
+  path(
+        'sup/distribution/vente/<int:detail_id>/',
+        views.vente_distribution_rapide,
+        name='vente_distribution_rapide'
+    ),
   path('affectation/liste_rot', views.rot_affectations_liste, name='rot_affectations_liste'),
   path('affectation/creer_rot', views.affecter_lot_superviseur, name='affecter_lot_superviseur'),
   path("rot/agents/", views.liste_agents_rot, name="liste_agents_rot"),
