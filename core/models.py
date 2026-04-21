@@ -130,6 +130,9 @@ class Fournisseur(models.Model):
         )['total'] or Decimal('0.00')
 
 
+
+
+
 class Agent(models.Model):
     """
     RÈGLES FINANCIÈRES (POST-TRANSITION)
@@ -145,15 +148,17 @@ class Agent(models.Model):
       - total_versements_superviseur
 
     Toute modification doit respecter cette séparation.
+    entrepot correspond au superviseur, terrain à l’agent de terrain, agent_gros à l’agent de vente en gros, rot au responsable opérations et stagiaire au stagiaire.
     """
 
     TYPE_AGENT_CHOICES = (
         ('direction', 'Direction'),
         ('rot', 'Responsable Opérations'),
         ('entrepot', 'Superviseur'),
-        ('terrain', 'Mamy'),
-        ('agent_gros', 'Agent (Vente en Gros)'), 
+        ('terrain', 'Mami'),
+        ('agent_gros', 'Agent Gros'), 
         ('stagiaire', 'Stagiaire'), 
+        ('gestionnaire_stock', 'Gestionnaire Stock')
     )
     TYPE_CONTRAT_CHOICES = (
     ('prestation', 'Contrat de prestation'),
@@ -492,7 +497,12 @@ class Agent(models.Model):
     def est_rot(self):
         """Vérifie si l'agent est un rot"""
         return self.type_agent == 'rot'
-    
+
+    @property
+    def est_gestionnaire_stock(self):
+        """Vérifie si l'agent est un gestionnaire de stock"""
+        return self.type_agent == 'gestionnaire_stock'
+
     @property
     def est_superviseur(self):
         """Vérifie si l'agent est un superviseur"""
@@ -863,6 +873,11 @@ class LotEntrepot(models.Model):
 
     date_reception = models.DateTimeField(default=timezone.now)
     date_enregistrement = models.DateTimeField(auto_now_add=True)
+    quantite_disponible_rot = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
     reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
 
  
@@ -897,7 +912,10 @@ class LotEntrepot(models.Model):
 
         if self.quantite_restante < 0:
             raise ValidationError("Quantité restante négative")
-
+        
+        if self.quantite_disponible_rot < 0:
+            raise ValidationError("Quantité disponible pour le ROT négative")
+        
         super().save(*args, **kwargs)
         
     @property
@@ -1024,6 +1042,27 @@ class LotEntrepot(models.Model):
         return (self.quantite_initiale / self.produit.poids_unitaire_kg).quantize(
             Decimal("1"), rounding=ROUND_FLOOR
         )
+
+
+class MiseDispositionRot(models.Model):
+    lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
+
+    quantite = models.DecimalField(max_digits=10, decimal_places=2)
+
+    effectue_par = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        limit_choices_to={'type_agent': 'gestionnaire_stock'},
+        related_name='mises_disposition_effectuees'
+    )
+
+    date_operation = models.DateTimeField(auto_now_add=True)
+
+    commentaire = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.lot.produit.nom} - {self.quantite} (ROT)"
 
 
 class FactureLotEntrepot(models.Model):

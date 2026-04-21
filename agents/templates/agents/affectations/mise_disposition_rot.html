@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load format_fcfa %}
+
+{% block title %}Mise à disposition du ROT{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <h5 class="mb-3">Mettre à disposition du ROT</h5>
+
+    <!-- 🔥 ALERT UX -->
+    <div id="lot-alert" class="alert alert-warning d-none small"></div>
+
+    <form method="post" id="form">
+        {% csrf_token %}
+
+        <!-- PRODUIT -->
+        <div class="mb-2">
+            <label class="small text-muted">Produit</label>
+            {{ form.produit }}
+        </div>
+
+        <!-- LOT -->
+        <div class="mb-2">
+            <label class="small text-muted">Lot</label>
+            {{ form.lot }}
+        </div>
+
+        <!-- QUANTITÉ -->
+        <div class="mb-3">
+            <label class="small text-muted">Quantité</label>
+            {{ form.quantite }}
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100" id="btn">
+            <span class="text-btn">Valider</span>
+            <span class="spinner-border spinner-border-sm d-none"></span>
+        </button>
+    </form>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    const produitSelect = document.getElementById("id_produit");
+    const lotSelect = document.getElementById("id_lot");
+    const alertBox = document.getElementById("lot-alert");
+    const btn = document.getElementById("btn");
+    const form = document.getElementById("form");
+
+    // 🔥 CHANGEMENT PRODUIT
+    produitSelect.addEventListener("change", function() {
+
+        const produitId = this.value;
+
+        if (!produitId) return;
+
+        fetch("{% url 'lots_par_produit' %}?produit_id=" + produitId)
+            .then(response => response.json())
+            .then(data => {
+
+                lotSelect.innerHTML = "";
+
+                if (data.length === 0) {
+
+                    const option = document.createElement("option");
+                    option.text = "Aucun lot disponible";
+                    option.disabled = true;
+                    option.selected = true;
+                    lotSelect.appendChild(option);
+
+                    // 🔥 MESSAGE UX
+                    alertBox.classList.remove("d-none");
+                    alertBox.innerText = "Ce produit n’a pas de stock disponible.";
+
+                    // 🔒 BLOQUER ACTION
+                    btn.disabled = true;
+
+                    return;
+                }
+
+                // reset alert
+                alertBox.classList.add("d-none");
+                btn.disabled = false;
+
+                data.forEach(lot => {
+                    const option = document.createElement("option");
+                    option.value = lot.id;
+                    option.text = lot.label;
+                    lotSelect.appendChild(option);
+                });
+
+            })
+            .catch(error => {
+                console.error("Erreur:", error);
+            });
+
+    });
+
+    // 🔥 SPINNER SUBMIT
+    form.addEventListener("submit", function() {
+
+        btn.disabled = true;
+        btn.querySelector(".spinner-border").classList.remove("d-none");
+        btn.querySelector(".text-btn").innerText = "...";
+
+    });
+
+});
+</script>
+
+{% endblock %}

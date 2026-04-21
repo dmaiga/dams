@@ -102,7 +102,10 @@ def custom_login(request):
                         return redirect("tableau_de_bord_superviseur")
                     
                     elif agent.type_agent == "rot":
-                                            return redirect("dashboard_rot")
+                        return redirect("dashboard_rot")
+                    
+                    elif agent.type_agent == "gestionnaire_stock":
+                        return redirect("dashboard_gestionnaire_stock")
                     # Cas terrain
                     elif agent.type_agent == "terrain":
                         return redirect("dashboard_agent")
@@ -147,12 +150,22 @@ def access_denied(request, reason=None):
                 "redirect_url": "dashboard_rot",
                 "redirect_label": "Aller au tableau de bord ROT",
             })
+
         elif agent.est_superviseur:
             context.update({
                 "message": "Cette action est réservée au Responsable des Opérations (ROT).",
                 "redirect_url": "tableau_de_bord_superviseur",
                 "redirect_label": "Retour à mon tableau de bord",
             })
+
+        # 🔥 NOUVEAU CAS
+        elif agent.est_gestionnaire_stock:
+            context.update({
+                "message": "Cette fonctionnalité n’est pas accessible depuis votre espace de gestion du stock.",
+                "redirect_url": "mise_disposition_rot",  
+                "redirect_label": "Retour à la gestion du stock",
+            })
+
         else:
             context.update({
                 "redirect_url": "dashboard_agent",
@@ -160,7 +173,6 @@ def access_denied(request, reason=None):
             })
 
     return render(request, "core/errors/403.html", context, status=403)
-
 #=========
 #AGENT
 #========
@@ -2833,9 +2845,3 @@ def tous_les_bonus(request):
     }
     
     return render(request, 'core/analyses/tous_les_bonus_admin.html', context)
-
-# core/views/dashboard.py
-
-
-# core/views.py
-

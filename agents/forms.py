@@ -450,11 +450,19 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
         # 🔹 Lots disponibles (stock > 0)
         self.fields['lot'].queryset = (
             LotEntrepot.objects
-            .filter(quantite_restante__gt=0)
+            .filter(quantite_disponible_rot__gt=0)
             .select_related('produit')
             .order_by('produit__nom', 'date_reception')
         )
 
+        # 🔥 Affichage métier direct
+
+        self.fields['lot'].label_from_instance = lambda obj: (
+            f"{obj.produit.nom} | "
+            f"{obj.fournisseur.nom if obj.fournisseur else '—'} | "
+            f"{timezone.localtime(obj.date_reception).strftime('%d/%m/%Y')} | "
+            f"Disp : {obj.quantite_disponible_rot}"
+        )
         # 🔹 Superviseurs actifs
         self.fields['superviseur'].queryset = (
             Agent.objects
@@ -483,10 +491,10 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
             return cleaned_data
 
         # --- STOCK ---
-        if quantite > lot.quantite_restante:
+        if quantite > lot.quantite_disponible_rot:
             self.add_error(
                 'quantite_saisie',
-                f"Stock insuffisant (disponible : {lot.quantite_restante})."
+                f"Stock insuffisant (disponible : {lot.quantite_disponible_rot})."
             )
 
         # --- PRIX ---
@@ -518,10 +526,10 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
         if commit:
             affectation.save()
 
-            # 🔒 Décrément du stock entrepôt
+            # 🔒 Décrément du stock disponible pour le ROT
             lot = affectation.lot
-            lot.quantite_restante -= quantite
-            lot.save(update_fields=['quantite_restante'])
+            lot.quantite_disponible_rot -= quantite
+            lot.save(update_fields=['quantite_disponible_rot'])
 
         return affectation
 
@@ -781,6 +789,10 @@ class DistributionSuperviseurSimplifieeForm(forms.Form):
             f"Affecté le: {obj.date_affectation.strftime('%d/%m/%Y')}"
             
         )
+        self.fields['agent'].label_from_instance = lambda obj: (
+            f"{obj.full_name} | "
+            f"{'Mami' if obj.type_agent == 'terrain' else 'Gros'}"
+        )
 
         # =========================
         # UI Bootstrap
@@ -803,3 +815,40 @@ class DistributionSuperviseurSimplifieeForm(forms.Form):
         return cleaned_data
 
 
+class MiseDispositionRotForm(forms.Form):
+
+    produit = forms.ModelChoiceField(
+        queryset=Produit.objects.all(),
+        label="Produit",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    lot = forms.ModelChoiceField(
+        queryset=LotEntrepot.objects.none(),  # 🔥 vide au départ
+        label="Lot",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    quantite = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        label="Quantité",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if 'produit' in self.data:
+            try:
+                produit_id = int(self.data.get('produit'))
+                self.fields['lot'].queryset = LotEntrepot.objects.filter(
+                    produit_id=produit_id,
+                    quantite_restante__gt=0
+                ).select_related('fournisseur')
+            except:
+                pass

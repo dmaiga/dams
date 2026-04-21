@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load format_fcfa %}
+
+{% block content %}
+<div class="container py-2">
+
+<!-- HEADER -->
+<h6 class="fw-bold mb-2">📊 Détail</h6>
+
+<!-- CARD PRINCIPALE -->
+<div class="card mb-2 shadow-sm">
+    <div class="card-body py-2">
+
+        <!-- LIGNE 1 -->
+        <div class="fw-semibold small">
+            {{ detail.lot.produit.nom }}
+        </div>
+
+        <!-- LIGNE 2 -->
+        <div class="small text-muted">
+           {{ detail.distribution.date_distribution|date:"d/m H:i" }}
+        </div>
+
+        <!-- LIGNE 3 -->
+        <div class="small">
+            👤 {{ detail.distribution.agent_terrain.full_name }}
+        </div>
+
+
+
+        <!-- QUANTITÉS -->
+        <div class="d-flex justify-content-between text-center mt-2 small">
+            <div>
+                <div class="text-muted">Total</div>
+                <div class="fw-bold">{{ detail.quantite }}</div>
+            </div>
+            <div>
+                <div class="text-muted">Vendu</div>
+                <div class="fw-bold text-success">{{ detail.quantite_vendue }}</div>
+            </div>
+            <div>
+                <div class="text-muted">Reste</div>
+                <div class="fw-bold text-danger">{{ reste }}</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- FORM -->
+{% if reste > 0 %}
+<div class="card mb-2 shadow-sm">
+    <div class="card-body py-2">
+
+        <form method="post" id="venteForm">
+            {% csrf_token %}
+
+            <div class="row g-2">
+                <div class="col-6">
+                    <input type="number" step="0.01" name="quantite"
+                           class="form-control form-control-sm"
+                           placeholder="Qté" required>
+                </div>
+                <div class="col-6">
+                    <input type="date" name="date_vente"
+                           class="form-control form-control-sm" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success btn-sm w-100 mt-2" id="submitBtn">
+                <span class="btn-text">Enregistrer</span>
+                <span class="spinner-border spinner-border-sm d-none"></span>
+            </button>
+
+        </form>
+
+    </div>
+</div>
+{% endif %}
+
+<!-- HISTORIQUE -->
+<div class="card shadow-sm">
+    <div class="card-body py-2">
+
+        <div class="fw-semibold small mb-1">Historique</div>
+
+        {% for v in ventes %}
+        <div class="border-top pt-1 mt-1 d-flex justify-content-between small">
+            <span>{{ v.quantite }}</span>
+            <span class="text-muted">{{ v.date_vente|date:"d/m" }}</span>
+        </div>
+        {% empty %}
+        <div class="text-muted small">Aucune</div>
+        {% endfor %}
+
+    </div>
+</div>
+
+</div>
+
+<!-- 🔥 SPINNER SCRIPT -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    const form = document.getElementById("venteForm");
+    const btn = document.getElementById("submitBtn");
+
+    if (form) {
+        form.addEventListener("submit", function() {
+
+            const spinner = btn.querySelector(".spinner-border");
+            const text = btn.querySelector(".btn-text");
+
+            btn.disabled = true;
+            spinner.classList.remove("d-none");
+            text.innerText = "..."
+
+        });
+    }
+
+});
+</script>
+
+{% endblock %}

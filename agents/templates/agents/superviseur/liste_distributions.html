@@ -126,7 +126,7 @@
     <!-- DETAILS -->
     <div class="px-3 pb-3">
 
-        {% for detail in d.detaildistribution_set.all %}
+    {% for detail in d.detaildistribution_set.all %}
     <div class="border-top pt-2 mt-2">
 
         <div class="fw-semibold">
@@ -140,31 +140,29 @@
         {% with reste=detail.quantite|floatformat:0|add:"-"|add:detail.quantite_vendue|default:0 %}
         {% endwith %}
 
-        <div class="d-flex justify-content-between small mt-1">
-        <span>
-            Restant: {{ detail.quantite|floatformat:0 }} - {{ detail.quantite_vendue|default:0 }}
-        </span>
-        <span>{{ detail.prix_detail|fcfa }}</span>
+<div class="row g-2 mb-2">
+            <div class="col-6">
+                <div class="p-2 border rounded bg-light text-center">
+                    <small class="text-muted d-block" style="font-size: 0.7rem; text-transform: uppercase;">Prix Détail</small>
+                    <span class="fw-bold text-primary">{{ detail.prix_detail|fcfa }}</span>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="p-2 border rounded bg-light text-center">
+                    <small class="text-muted d-block" style="font-size: 0.7rem; text-transform: uppercase;">Prix Gros</small>
+                    <span class="fw-bold text-success">{{ detail.prix_gros|fcfa }}</span>
+                </div>
+            </div>
         </div>
 
         <!-- 🔥 ACTION -->
 
         {% if detail.quantite_vendue < detail.quantite %}
 
-        <form method="post" action="{% url 'vente_distribution_rapide' detail.id %}">
-            {% csrf_token %}
-        
-<button 
-    type="submit"
-    class="btn btn-success btn-sm w-100 mt-2 submit-btn"
-    onclick="return confirm('Confirmer la vente et encaissement ?')">
-
-    <span class="btn-text">💰 Vendre + Encaisser</span>
-    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-
-</button>
-
-        </form>
+        <a href="{% url 'detail_distribution_sup' detail.id %}" 
+           class="btn btn-primary btn-sm w-100 mt-2">
+           📊 Gérer vente
+        </a>
 
         {% else %}
 
@@ -183,12 +181,12 @@
 
         </div>
 
-</div>
-{% empty %}
-<div class="alert alert-info text-center">
-    Aucune distribution enregistrée
-</div>
-{% endfor %}
+    </div>
+    {% empty %}
+    <div class="alert alert-info text-center">
+        Aucune distribution enregistrée
+    </div>
+    {% endfor %}
 
 <!-- PAGINATION -->
 {% if page_obj.has_other_pages %}

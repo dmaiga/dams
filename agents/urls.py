@@ -12,7 +12,11 @@ urlpatterns = [
   path('sup/agent/<int:agent_id>/', views.detail_agent_sup, name='detail_agent_sup'),
   path('sup/agents/creer/', views.creer_agent, name='creer_agent'),
   path('sup/agents/modifier/<int:agent_id>/', views.modifier_agent, name='modifier_agent'),
-
+  
+  path('stock/dashboard/', views.dashboard_gestionnaire_stock, name='dashboard_gestionnaire_stock'),
+  path('stock/mise-disposition/', views.mise_disposition_rot, name='mise_disposition_rot'),
+  path('stock/mise-disposition/historique/', views.historique_mise_disposition, name='historique_mise_disposition'),
+  path('ajax/lots-par-produit/', views.lots_par_produit, name='lots_par_produit'),
   path('affectation/lot', views.superviseur_lots_affectes, name='superviseur_lots_affectes'),
   path('affectation/agent', views.distribuer_lot_agent, name='distribuer_lot_agent'),
 
@@ -24,6 +28,12 @@ urlpatterns = [
         views.vente_distribution_rapide,
         name='vente_distribution_rapide'
     ),
+  path(
+      'superviseur/distribution/detail/<int:detail_id>/',
+      views.detail_distribution_sup,
+      name='detail_distribution_sup'
+  ),
+
   path('affectation/liste_rot', views.rot_affectations_liste, name='rot_affectations_liste'),
   path('affectation/creer_rot', views.affecter_lot_superviseur, name='affecter_lot_superviseur'),
   path("rot/agents/", views.liste_agents_rot, name="liste_agents_rot"),

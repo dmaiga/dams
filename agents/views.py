@@ -36,7 +36,7 @@ from urllib3 import request
 from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
 from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
 from core.models import (
-    Agent, Client, Vente, Produit,Depense,
+    Agent, Client, MiseDispositionRot, Vente, Produit,Depense,
     LotEntrepot, DetailDistribution, DistributionAgent,
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
@@ -62,7 +62,8 @@ from agents.forms import (
                             SupervisorDistributionForm,
                             RecouvrementSuperviseurForm,
                             SupervisorTerrainAgentUpdateForm,
-                            DistributionSuperviseurSimplifieeForm
+                            DistributionSuperviseurSimplifieeForm,
+                            MiseDispositionRotForm
                             
                             )
 
@@ -84,6 +85,12 @@ from agents.services.agent_dashboard_service import AgentDashboardService
 from agents.services.superviseur_stock_service import SuperviseurStockService
 from agents.services.rot_dashboard_service import RotDashboardService
 from django.db.models import DecimalField, ExpressionWrapper
+from django.utils.dateparse import parse_date
+from django.core.paginator import Paginator
+from django.utils import timezone
+from datetime import timedelta
+from django.core.paginator import Paginator
+from urllib.parse import urlencode
 from django.utils.dateparse import parse_date
 
 def safe_parse_date(value):
@@ -144,12 +151,6 @@ def dashboard_agent(request):
 
 
 #
-from django.core.paginator import Paginator
-from django.utils import timezone
-from datetime import timedelta
-from django.core.paginator import Paginator
-from urllib.parse import urlencode
-from django.utils.dateparse import parse_date
 
 @login_required
 def superviseur_lots_affectes(request):
@@ -705,6 +706,92 @@ def liste_distribution_sup(request):
         context
     )
 
+from decimal import Decimal
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+
+
+@login_required
+def detail_distribution_sup(request, detail_id):
+    superviseur = request.user.agent
+
+    detail = get_object_or_404(
+        DetailDistribution.objects.select_related(
+            'lot', 'lot__produit',
+            'distribution', 'distribution__agent_terrain'
+        ),
+        id=detail_id,
+        distribution__superviseur=superviseur
+    )
+
+    ventes = (
+        Vente.objects
+        .filter(detail_distribution=detail)
+        .select_related('agent')
+        .order_by('-id')
+    )
+
+    reste = detail.quantite - detail.quantite_vendue
+
+    if request.method == "POST":
+        try:
+            quantite = Decimal(request.POST.get('quantite'))
+            date_vente = request.POST.get('date_vente')
+    
+            reste = detail.quantite - detail.quantite_vendue
+    
+            if quantite <= 0:
+                raise ValueError("Quantité invalide")
+    
+            if quantite > reste:
+                messages.error(request, f"Quantité > reste ({reste})")
+                return redirect('detail_distribution_sup', detail_id=detail.id)
+    
+            agent = detail.distribution.agent_terrain
+    
+            # 🔥 PRIX SNAPSHOT
+            if agent.type_agent == 'agent_gros':
+                prix = detail.prix_gros
+                type_vente = 'gros'
+            else:
+                prix = detail.prix_detail
+                type_vente = 'detail'
+    
+            # 🔥 VENTE
+            vente = Vente.objects.create(
+                agent=agent,
+                detail_distribution=detail,
+                quantite=quantite,
+                prix_vente_unitaire=prix,
+                type_vente=type_vente,
+                date_vente=date_vente,
+                mode_paiement='comptant'  # 🔒 imposé
+            )
+    
+            # 🔥 MONTANT CALCULÉ (pas saisi)
+            montant = quantite * prix
+    
+            Recouvrement.objects.create(
+                vente=vente,
+                agent=agent,
+                superviseur=superviseur,
+                montant_recouvre=montant
+            )
+    
+            messages.success(request, f"✅ Vente enregistrée ({montant} FCFA)")
+            return redirect('detail_distribution_sup', detail_id=detail.id)
+    
+        except Exception as e:
+            messages.error(request, str(e))
+    
+    context = {
+        'detail': detail,
+        'ventes': ventes,
+        'reste': reste,
+    }
+
+    return render(request, 'agents/superviseur/detail_distribution.html', context)
 
 @login_required
 def vente_distribution_rapide(request, detail_id):
@@ -774,10 +861,139 @@ def vente_distribution_rapide(request, detail_id):
 
     return redirect('liste_distribution_sup')
 
+
+
 ####
+
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def dashboard_gestionnaire_stock(request):
+    agent = request.user.agent
+
+    if not agent.est_gestionnaire_stock:
+        return redirect('access_denied')
+
+    # 📦 Lots en stock
+    lots = (
+        LotEntrepot.objects
+        .select_related('produit')
+        .order_by('-date_reception')
+        .filter(quantite_restante__gt=0)
+    )
+
+    # 📊 Totaux
+    total_stock = sum(l.quantite_restante for l in lots)
+    total_dispo_rot = sum(l.quantite_disponible_rot for l in lots)
+
+    # 🕒 Historique récent
+    historiques = (
+        MiseDispositionRot.objects
+        .select_related('lot__produit')
+        .order_by('-date_operation')[:10]
+    )
+
+    return render(request, 'agents/affectations/dashboard_gestionnaire_stock.html', {
+        'lots': lots,
+        'total_stock': total_stock,
+        'total_dispo_rot': total_dispo_rot,
+        'historiques': historiques
+    })
+
+@login_required
+def mise_disposition_rot(request):
+    agent = request.user.agent
+
+
+    if not agent.est_gestionnaire_stock:
+        return redirect('access_denied')
+
+    if request.method == 'POST':
+        form = MiseDispositionRotForm(request.POST)
+
+        if form.is_valid():
+            lot = form.cleaned_data['lot']
+            quantite = form.cleaned_data['quantite']
+
+            # 🔒 logique stock
+            lot.quantite_restante -= quantite
+            lot.quantite_disponible_rot += quantite
+            lot.save(update_fields=[
+                'quantite_restante',
+                'quantite_disponible_rot'
+            ])
+
+            # 🧾 historique
+            MiseDispositionRot.objects.create(
+                lot=lot,
+                quantite=quantite,
+                effectue_par=request.user.agent
+            )
+
+            messages.success(
+                request,
+                f"{quantite} unités mises à disposition du ROT avec succès."
+            )
+
+            return redirect('mise_disposition_rot')
+
+    else:
+        form = MiseDispositionRotForm()
+
+    return render(request, 'agents/affectations/mise_disposition_rot.html', {
+        'form': form
+    })
+
+from django.http import JsonResponse
+
+def lots_par_produit(request):
+    produit_id = request.GET.get('produit_id')
+
+    lots = LotEntrepot.objects.filter(
+        produit_id=produit_id,
+        quantite_restante__gt=0
+    ).select_related('fournisseur')
+
+
+    data = [
+        {
+            'id': lot.id,
+            'label': (
+                f"{lot.produit.nom} | "
+                f"{lot.fournisseur.nom if lot.fournisseur else '—'} | "
+                f"{timezone.localtime(lot.date_reception).strftime('%d/%m/%Y')} | "
+                f"{lot.quantite_restante}"
+            )
+        }
+        for lot in lots
+    ]
+
+    return JsonResponse(data, safe=False)
+
+@login_required
+def historique_mise_disposition(request):
+    agent = request.user.agent
+
+    if not agent.est_gestionnaire_stock:
+        return redirect('access_denied')
+
+    historiques = MiseDispositionRot.objects.select_related(
+        'lot__produit',
+        'effectue_par'
+    ).order_by('-date_operation')
+
+    return render(request, 'agents/affectations/historique_mise_disposition.html', {
+        'historiques': historiques
+    })
 
 ########""
 #rot -> supperviseur
+
+
+
+
 @login_required
 def affecter_lot_superviseur(request):
     agent = request.user.agent

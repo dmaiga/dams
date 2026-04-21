@@ -440,7 +440,22 @@
 
                      
                     </div>
+                    {# ===== MENU Gestionnaire stock  ===== #}
+                    {% elif request.user.agent.est_gestionnaire_stock %}
+                    <!-- ===== MENU Gestionnaire stock ===== -->
                     
+                    <div class="nav flex-column">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_gestionnaire_stock' %}active{% endif %}" 
+                            href="{% url 'dashboard_gestionnaire_stock' %}">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span>Tableau de Bord</span>                      
+
+                        <a class="nav-link" href="{% url 'mise_disposition_rot' %}">
+                            <i class="fas fa-pallet"></i>
+                            Lots affectés
+                        </a>
+
+                    </div>
                     {# ===== MENU SUPERVISEUR  ===== #}
                     {% elif request.user.agent.est_superviseur %}
                     <!-- ===== MENU SUPERVISEUR ===== -->
@@ -568,6 +583,7 @@
                         <small class="text-muted">
                             {% if request.user.agent and request.user.agent.type_agent == 'direction' %}
                                 Direction
+
                             {% elif request.user.agent and request.user.agent.type_agent == 'superviseur' %}
                                 Superviseur
                             {% elif request.user.agent and request.user.agent.type_agent in 'terrain,stagiaire' %}

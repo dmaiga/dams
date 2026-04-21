@@ -6,7 +6,8 @@ from .models import (
     MouvementStock,Recouvrement,VersementBancaire,
     PaiementFournisseur,RecouvrementSuperviseur,
     Dette, PaiementDette, BonusAgent,Depense,
-    AffectationLotSuperviseur,RecuVersement
+    AffectationLotSuperviseur,RecuVersement,
+    MiseDispositionRot
 
 )
 from django.db.models import Sum
@@ -755,3 +756,40 @@ class FactureLotEntrepotAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related('lot__produit', 'lot__fournisseur')
 
 
+
+
+@admin.register(MiseDispositionRot)
+class MiseDispositionRotAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'lot',
+        'produit_nom',
+        'quantite',
+        'effectue_par',
+        'date_operation',
+    )
+
+    list_filter = (
+        'date_operation',
+        'effectue_par',
+    )
+
+    search_fields = (
+        'lot__reference_lot',
+        'lot__produit__nom',
+        'effectue_par__nom',
+    )
+
+    readonly_fields = ('date_operation',)
+
+    ordering = ('-date_operation',)
+
+    # 🔥 Optimisation SQL directe (évite N+1 queries)
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('lot__produit', 'effectue_par')
+
+    # 🔥 Affichage propre sans surcharge requête (grâce au select_related)
+    def produit_nom(self, obj):
+        return obj.lot.produit.nom
+    produit_nom.short_description = "Produit"
