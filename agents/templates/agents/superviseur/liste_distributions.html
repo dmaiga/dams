@@ -157,23 +157,21 @@
 
         <!-- 🔥 ACTION -->
 
-        {% if detail.quantite_vendue < detail.quantite %}
+{% if detail.quantite_vendue < detail.quantite %}
 
-        <a href="{% url 'detail_distribution_sup' detail.id %}" 
-           class="btn btn-primary btn-sm w-100 mt-2">
-           📊 Gérer vente
-        </a>
+<a href="{% url 'detail_distribution_sup' detail.id %}" 
+   class="btn btn-warning btn-sm w-100 mt-2">
+    Enregistrer une vente
+</a>
 
-        {% else %}
+{% else %}
 
-        <div class="mt-2 text-center">
-            <span class="badge bg-secondary w-100 p-2">
-                ✔️ Déjà vendu
-            </span>
-        </div>
+<a href="{% url 'detail_distribution_sup' detail.id %}" 
+   class="btn btn-outline-secondary btn-sm w-100 mt-2">
+     Voir les ventes (terminé)
+</a>
 
-        {% endif %}
-
+{% endif %}
         </div>
         {% empty %}
         <div class="text-muted small">Aucun détail</div>

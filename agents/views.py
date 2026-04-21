@@ -17,7 +17,7 @@ from django.core.paginator import Paginator
 # DB / ORM
 from django.db import models, transaction
 from django.db.models import (
-    Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField,Prefetch
+    IntegerField, Sum, Count, Avg, F, Q, ExpressionWrapper, DecimalField,Prefetch, When, When
 )
 from django.db.models.functions import Coalesce
 
@@ -92,6 +92,9 @@ from datetime import timedelta
 from django.core.paginator import Paginator
 from urllib.parse import urlencode
 from django.utils.dateparse import parse_date
+
+from django.db.models import Sum, F, Case, When, IntegerField
+
 
 def safe_parse_date(value):
     if isinstance(value, str) and value:
@@ -352,7 +355,7 @@ def distribution_superviseur(request):
             affectation.save()
 
         messages.success(request, "✅ Distribution effectuée avec succès")
-        return redirect('tableau_de_bord_superviseur')
+        return redirect('distribution_superviseur')
 
     return render(
         request,
@@ -613,7 +616,18 @@ def liste_distribution_sup(request):
                 .select_related('lot', 'lot__produit')
             )
         )
-        .order_by('-date_distribution')
+        .annotate(
+            total_quantite=Sum('detaildistribution__quantite'),
+            total_vendue=Sum('detaildistribution__quantite_vendue'),
+        )
+        .annotate(
+            non_vendu=Case(
+                When(total_vendue__lt=F('total_quantite'), then=1),
+                default=0,
+                output_field=   IntegerField()
+            )
+        )
+        .order_by('-non_vendu', '-date_distribution')
     )
 
     # -------------------------
@@ -962,9 +976,8 @@ def lots_par_produit(request):
             'id': lot.id,
             'label': (
                 f"{lot.produit.nom} | "
-                f"{lot.fournisseur.nom if lot.fournisseur else '—'} | "
                 f"{timezone.localtime(lot.date_reception).strftime('%d/%m/%Y')} | "
-                f"{lot.quantite_restante}"
+                f"INIT:{lot.quantite_initiale} - STOCK : {lot.quantite_restante}"
             )
         }
         for lot in lots
