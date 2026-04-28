@@ -60,6 +60,7 @@ from agents.forms import (
                             RotSupervisorCreationForm,
                             RotAffectationLotSuperviseurForm,
                             SupervisorDistributionForm,
+                            DistributionSuperviseurOverrideForm,
                             RecouvrementSuperviseurForm,
                             SupervisorTerrainAgentUpdateForm,
                             DistributionSuperviseurSimplifieeForm,
@@ -301,6 +302,58 @@ def distribuer_lot_agent(request):
         'stock_superviseur': stock_superviseur,
     })
 
+@login_required
+def distribution_superviseur_override(request):
+    superviseur = request.user.agent
+
+    if superviseur.user.username != "jeanclaude.sup":
+        return redirect('access_denied')
+
+    form = DistributionSuperviseurOverrideForm(
+        request.POST or None,
+        superviseur=superviseur
+    )
+
+    if form.is_valid():
+        with transaction.atomic():
+
+            agent = form.cleaned_data['agent']
+            affectation = form.cleaned_data['affectation']
+            quantite = form.cleaned_data['quantite']
+            prix_gros = form.cleaned_data['prix_gros']
+
+            if agent.superviseur != superviseur:
+                raise ValidationError("Agent invalide")
+
+            if affectation.superviseur != superviseur:
+                raise ValidationError("Affectation invalide")
+
+            if quantite > affectation.quantite_restante:
+                raise ValidationError("Stock insuffisant")
+
+            distribution = DistributionAgent.objects.create(
+                superviseur=superviseur,
+                agent_terrain=agent,
+                type_distribution='TERRAIN',
+                quantite_totale=quantite
+            )
+
+            DetailDistribution.objects.create(
+                distribution=distribution,
+                lot=affectation.lot,
+                quantite=quantite,
+                prix_gros=prix_gros,  # 🔥 override forcé
+                prix_detail=affectation.prix_detail
+            )
+
+            affectation.quantite_restante -= quantite
+            affectation.save()
+
+        return redirect('distribution_superviseur_override')
+
+    return render(request, 'agents/superviseur/distribution_override.html', {
+        'form': form
+    })
 
 @login_required
 def distribution_superviseur(request):
@@ -729,6 +782,7 @@ from django.contrib.auth.decorators import login_required
 @login_required
 def detail_distribution_sup(request, detail_id):
     superviseur = request.user.agent
+    is_override_user = request.user.username == "jeanclaude.sup"
 
     detail = get_object_or_404(
         DetailDistribution.objects.select_related(
@@ -748,30 +802,56 @@ def detail_distribution_sup(request, detail_id):
 
     reste = detail.quantite - detail.quantite_vendue
 
-    if request.method == "POST":
+    # =========================================================
+    # 🔥 OVERRIDE PRIX (UNIQUEMENT JEAN CLAUDE)
+    # =========================================================
+    if request.method == "POST" and is_override_user:
+        try:
+            new_prix_gros = request.POST.get('prix_gros')
+            new_prix_detail = request.POST.get('prix_detail')
+
+            if new_prix_gros:
+                detail.prix_gros = Decimal(new_prix_gros)
+
+            if new_prix_detail:
+                detail.prix_detail = Decimal(new_prix_detail)
+
+            detail.save(update_fields=['prix_gros', 'prix_detail'])
+
+            messages.success(request, "✅ Prix mis à jour avec succès")
+
+            return redirect('detail_distribution_sup', detail_id=detail.id)
+
+        except Exception as e:
+            messages.error(request, str(e))
+
+    # =========================================================
+    # 🔥 ENREGISTREMENT VENTE
+    # =========================================================
+    if request.method == "POST" and not is_override_user:
         try:
             quantite = Decimal(request.POST.get('quantite'))
             date_vente = request.POST.get('date_vente')
-    
+
             reste = detail.quantite - detail.quantite_vendue
-    
+
             if quantite <= 0:
                 raise ValueError("Quantité invalide")
-    
+
             if quantite > reste:
                 messages.error(request, f"Quantité > reste ({reste})")
                 return redirect('detail_distribution_sup', detail_id=detail.id)
-    
+
             agent = detail.distribution.agent_terrain
-    
-            # 🔥 PRIX SNAPSHOT
+
+            # 🔥 PRIX SNAPSHOT ACTUEL
             if agent.type_agent == 'agent_gros':
                 prix = detail.prix_gros
                 type_vente = 'gros'
             else:
                 prix = detail.prix_detail
                 type_vente = 'detail'
-    
+
             # 🔥 VENTE
             vente = Vente.objects.create(
                 agent=agent,
@@ -780,32 +860,37 @@ def detail_distribution_sup(request, detail_id):
                 prix_vente_unitaire=prix,
                 type_vente=type_vente,
                 date_vente=date_vente,
-                mode_paiement='comptant'  # 🔒 imposé
+                mode_paiement='comptant'
             )
-    
-            # 🔥 MONTANT CALCULÉ (pas saisi)
+
             montant = quantite * prix
-    
+
             Recouvrement.objects.create(
                 vente=vente,
                 agent=agent,
                 superviseur=superviseur,
                 montant_recouvre=montant
             )
-    
+
             messages.success(request, f"✅ Vente enregistrée ({montant} FCFA)")
             return redirect('detail_distribution_sup', detail_id=detail.id)
-    
+
         except Exception as e:
             messages.error(request, str(e))
-    
+
+    # =========================================================
+    # CONTEXT
+    # =========================================================
     context = {
         'detail': detail,
         'ventes': ventes,
         'reste': reste,
+        'is_override_user': is_override_user
     }
 
     return render(request, 'agents/superviseur/detail_distribution.html', context)
+
+
 
 @login_required
 def vente_distribution_rapide(request, detail_id):
@@ -968,7 +1053,8 @@ def lots_par_produit(request):
     lots = LotEntrepot.objects.filter(
         produit_id=produit_id,
         quantite_restante__gt=0
-    ).select_related('fournisseur')
+    ).order_by('date_reception').select_related('fournisseur')
+    
 
 
     data = [

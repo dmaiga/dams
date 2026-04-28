@@ -30,7 +30,14 @@
         <!-- QUANTITÉ -->
         <div class="mb-3">
             <label class="small text-muted">Quantité</label>
+        
             {{ form.quantite }}
+        
+            {% if form.quantite.errors %}
+                <div class="text-danger small mt-1">
+                    {{ form.quantite.errors.0 }}
+                </div>
+            {% endif %}
         </div>
 
         <button type="submit" class="btn btn-primary w-100" id="btn">
@@ -99,15 +106,17 @@ document.addEventListener("DOMContentLoaded", function() {
 
     });
 
-    // 🔥 SPINNER SUBMIT
-    form.addEventListener("submit", function() {
-
+        // 🔥 SPINNER SUBMIT
+    form.addEventListener("submit", function(e) {
+    
+        if (!form.checkValidity()) return;
+    
         btn.disabled = true;
         btn.querySelector(".spinner-border").classList.remove("d-none");
         btn.querySelector(".text-btn").innerText = "...";
-
+    
     });
-
+    
 });
 </script>
 

@@ -5,12 +5,13 @@
 <div class="container py-2">
 
 <!-- HEADER -->
+  <div class="d-flex justify-content-between mb-2 small">
 <h6 class="fw-bold mb-2">📊 Détail</h6>
 
     <a href="{% url 'liste_distribution_sup' %}" class="btn btn-sm btn-outline-secondary mb-3">
         ← Retour
     </a>
-
+</div>
 <!-- CARD PRINCIPALE -->
 <div class="card mb-2 shadow-sm">
     <div class="card-body py-2">
@@ -82,6 +83,8 @@
 </div>
 {% endif %}
 
+
+
 <!-- HISTORIQUE -->
 <div class="card shadow-sm">
     <div class="card-body py-2">
@@ -99,6 +102,53 @@
 
     </div>
 </div>
+
+{% if is_override_user %}
+
+<div class="card  mt-3 shadow-sm">
+    <div class="card-body py-2">
+
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0 text-warning">
+                ⚠️ Override prix marché
+            </h6>
+           
+        </div>
+
+        <div class="small text-muted mb-2">
+            Prix actuel enregistré dans le système :
+        </div>
+
+        <div class="d-flex justify-content-between mb-2 small">
+            <span>Prix gros</span>
+            <span class="fw-bold">{{ detail.prix_gros|floatformat:0 }}</span>
+        </div>
+
+        
+
+        <form method="post">
+            {% csrf_token %}
+
+            <label class="form-label small">Nouveau prix gros</label>
+            <input type="number"
+                   name="prix_gros"
+                   value="{{ detail.prix_gros }}"
+                   class="form-control form-control-sm mb-2"
+                   step="0.01">
+
+            
+
+            
+
+            <button class="btn btn-warning btn-sm w-100">
+                Mettre à jour les prix marché
+            </button>
+        </form>
+
+    </div>
+</div>
+
+{% endif %}
 
 </div>
 

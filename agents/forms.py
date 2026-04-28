@@ -369,6 +369,7 @@ from core.models import AffectationLotSuperviseur, LotEntrepot, Agent
 
 #A INCLURE LES PRIX DANS LE MODEL AFFECTATION LOT SUPERVISEUR
 
+
 class RotAffectationLotSuperviseurForm(forms.ModelForm):
     # -------------------------------------------------
     # QUANTITÉ (UNITÉS)
@@ -533,7 +534,255 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
 
         return affectation
 
+class RecouvrementSuperviseurForm(forms.ModelForm):
 
+    date_recouvrement = forms.DateTimeField(
+        label="Date de remise au ROT",
+        initial=timezone.now,
+        widget=forms.DateTimeInput(
+            attrs={
+                "type": "datetime-local",
+                "class": "form-control"
+            }
+        )
+    )
+
+    class Meta:
+        model = RecouvrementSuperviseur
+        fields = [
+            'superviseur',
+            'montant',
+            'date_recouvrement',
+            'commentaire',
+        ]
+        widgets = {
+            'superviseur': forms.Select(attrs={'class': 'form-select'}),
+            'montant': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01'
+            }),
+            'commentaire': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Observation éventuelle…'
+            }),
+        }
+
+    def clean_date_recouvrement(self):
+        date = self.cleaned_data['date_recouvrement']
+
+        if date > timezone.now():
+            raise ValidationError(
+                "La date de recouvrement ne peut pas être dans le futur."
+            )
+
+        return date
+
+
+class DistributionSuperviseurSimplifieeForm(forms.Form):
+
+    agent = forms.ModelChoiceField(
+        queryset=Agent.objects.none(),
+        label="Agent"
+    )
+
+    affectation = forms.ModelChoiceField(
+        queryset=AffectationLotSuperviseur.objects.none(),
+        label="Produit (stock disponible)"
+    )
+
+    quantite = forms.DecimalField(
+        
+        label="Quantité"
+    )
+
+    def __init__(self, *args, **kwargs):
+        superviseur = kwargs.pop('superviseur')
+        super().__init__(*args, **kwargs)
+
+        # =========================
+        # AGENTS DU SUPERVISEUR
+        # =========================
+        self.fields['agent'].queryset = Agent.objects.filter(
+            superviseur=superviseur,
+            type_agent__in=['terrain', 'agent_gros'],
+            est_actif=True
+        ).select_related('user')
+
+        # =========================
+        # STOCK DISPONIBLE
+        # =========================
+        qs = (
+            AffectationLotSuperviseur.objects
+            .filter(
+                superviseur=superviseur,
+                quantite_restante__gt=0
+            )
+            .select_related('lot__produit')
+            .order_by('-date_affectation')
+        )
+
+        self.fields['affectation'].queryset = qs
+
+        # =========================
+        # AFFICHAGE LISIBLE
+        # =========================
+        self.fields['affectation'].label_from_instance = lambda obj: (
+            f"{obj.lot.produit.nom} | "
+            f"{obj.lot.date_reception.strftime('%d/%m/%Y')} | "
+            f"I/R: {obj.quantite_initiale}/{obj.quantite_restante} | "
+            
+            f"Affecté le: {obj.date_affectation.strftime('%d/%m/%Y')}"
+            
+        )
+        self.fields['agent'].label_from_instance = lambda obj: (
+            f"{obj.full_name} | "
+            f"{'Mami' if obj.type_agent == 'terrain' else 'Gros'}"
+        )
+
+        # =========================
+        # UI Bootstrap
+        # =========================
+        self.fields['agent'].widget.attrs.update({'class': 'form-select'})
+        self.fields['affectation'].widget.attrs.update({'class': 'form-select'})
+        self.fields['quantite'].widget.attrs.update({'class': 'form-control'})
+
+    def clean(self):
+        cleaned_data = super().clean()
+        affectation = cleaned_data.get('affectation')
+        quantite = cleaned_data.get('quantite')
+    
+        if affectation and quantite:
+            if quantite > affectation.quantite_restante:
+                raise forms.ValidationError(
+                    "Quantité supérieure au stock disponible"
+                )
+    
+        return cleaned_data
+
+class DistributionSuperviseurOverrideForm(forms.Form):
+
+    agent = forms.ModelChoiceField(
+        queryset=Agent.objects.none(),
+        label="Agent"
+    )
+
+    affectation = forms.ModelChoiceField(
+        queryset=AffectationLotSuperviseur.objects.none(),
+        label="Produit"
+    )
+
+    quantite = forms.DecimalField(
+        label="Quantité"
+    )
+
+    prix_gros = forms.DecimalField(
+        label="Prix gros (override ROT)",
+        required=True,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        superviseur = kwargs.pop('superviseur')
+        super().__init__(*args, **kwargs)
+
+        self.superviseur = superviseur
+
+        self.fields['agent'].queryset = Agent.objects.filter(
+            superviseur=superviseur,
+            type_agent__in=['terrain', 'agent_gros'],
+            est_actif=True
+        ).select_related('user')
+
+        qs = AffectationLotSuperviseur.objects.filter(
+            superviseur=superviseur,
+            quantite_restante__gt=0
+        ).select_related('lot__produit')
+
+        self.fields['affectation'].queryset = qs
+
+        self.fields['prix_gros'].initial = None
+
+        # UI
+        for f in self.fields:
+            self.fields[f].widget.attrs.update({'class': 'form-control'})
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        affectation = cleaned_data.get('affectation')
+        quantite = cleaned_data.get('quantite')
+
+        if affectation and quantite:
+            if quantite > affectation.quantite_restante:
+                raise forms.ValidationError("Stock insuffisant")
+
+        prix = cleaned_data.get('prix_gros')
+        if prix is None or prix < 0:
+            raise forms.ValidationError("Prix invalide")
+
+        return cleaned_data
+
+class MiseDispositionRotForm(forms.Form):
+
+    produit = forms.ModelChoiceField(
+        queryset=Produit.objects.all(),
+        label="Produit",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    lot = forms.ModelChoiceField(
+        queryset=LotEntrepot.objects.none(),  # 🔥 vide au départ
+        label="Lot",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    quantite = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        label="Quantité",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if 'produit' in self.data:
+            try:
+                produit_id = int(self.data.get('produit'))
+                self.fields['lot'].queryset = LotEntrepot.objects.filter(
+                    produit_id=produit_id,
+                    quantite_restante__gt=0
+                ).select_related('fournisseur')
+            except:
+                pass
+
+
+    def clean(self):
+        cleaned_data = super().clean()
+        lot = cleaned_data.get('lot')
+        quantite = cleaned_data.get('quantite')
+
+        if lot and quantite:
+            if quantite > lot.quantite_restante:
+                self.add_error(
+                    'quantite',
+                    f"Max disponible : {lot.quantite_restante}"
+                )
+
+        return cleaned_data
+
+
+
+
+## Deprecie
 class SupervisorDistributionForm(forms.Form):
 
     # -------------------------------------------------
@@ -542,7 +791,7 @@ class SupervisorDistributionForm(forms.Form):
     agent_terrain = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
         label="Agent terrain",
-        required=False,
+        required=True,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -687,168 +936,153 @@ class SupervisorDistributionForm(forms.Form):
 
         return distribution
 
+class SupervisorOverrideForm(forms.Form):
 
-class RecouvrementSuperviseurForm(forms.ModelForm):
-
-    date_recouvrement = forms.DateTimeField(
-        label="Date de remise au ROT",
-        initial=timezone.now,
-        widget=forms.DateTimeInput(
-            attrs={
-                "type": "datetime-local",
-                "class": "form-control"
-            }
-        )
-    )
-
-    class Meta:
-        model = RecouvrementSuperviseur
-        fields = [
-            'superviseur',
-            'montant',
-            'date_recouvrement',
-            'commentaire',
-        ]
-        widgets = {
-            'superviseur': forms.Select(attrs={'class': 'form-select'}),
-            'montant': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.01'
-            }),
-            'commentaire': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Observation éventuelle…'
-            }),
-        }
-
-    def clean_date_recouvrement(self):
-        date = self.cleaned_data['date_recouvrement']
-
-        if date > timezone.now():
-            raise ValidationError(
-                "La date de recouvrement ne peut pas être dans le futur."
-            )
-
-        return date
-
-
-class DistributionSuperviseurSimplifieeForm(forms.Form):
-
-    agent = forms.ModelChoiceField(
+    # -------------------------------------------------
+    # AGENT
+    # -------------------------------------------------
+    agent_terrain = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
-        label="Agent"
-    )
-
-    affectation = forms.ModelChoiceField(
-        queryset=AffectationLotSuperviseur.objects.none(),
-        label="Produit (stock disponible)"
-    )
-
-    quantite = forms.DecimalField(
-        
-        label="Quantité"
-    )
-
-    def __init__(self, *args, **kwargs):
-        superviseur = kwargs.pop('superviseur')
-        super().__init__(*args, **kwargs)
-
-        # =========================
-        # AGENTS DU SUPERVISEUR
-        # =========================
-        self.fields['agent'].queryset = Agent.objects.filter(
-            superviseur=superviseur,
-            type_agent__in=['terrain', 'agent_gros'],
-            est_actif=True
-        ).select_related('user')
-
-        # =========================
-        # STOCK DISPONIBLE
-        # =========================
-        qs = (
-            AffectationLotSuperviseur.objects
-            .filter(
-                superviseur=superviseur,
-                quantite_restante__gt=0
-            )
-            .select_related('lot__produit')
-            .order_by('-date_affectation')
-        )
-
-        self.fields['affectation'].queryset = qs
-
-        # =========================
-        # AFFICHAGE LISIBLE
-        # =========================
-        self.fields['affectation'].label_from_instance = lambda obj: (
-            f"{obj.lot.produit.nom} | "
-            f"{obj.lot.date_reception.strftime('%d/%m/%Y')} | "
-            f"I/R: {obj.quantite_initiale}/{obj.quantite_restante} | "
-            
-            f"Affecté le: {obj.date_affectation.strftime('%d/%m/%Y')}"
-            
-        )
-        self.fields['agent'].label_from_instance = lambda obj: (
-            f"{obj.full_name} | "
-            f"{'Mami' if obj.type_agent == 'terrain' else 'Gros'}"
-        )
-
-        # =========================
-        # UI Bootstrap
-        # =========================
-        self.fields['agent'].widget.attrs.update({'class': 'form-select'})
-        self.fields['affectation'].widget.attrs.update({'class': 'form-select'})
-        self.fields['quantite'].widget.attrs.update({'class': 'form-control'})
-
-    def clean(self):
-        cleaned_data = super().clean()
-        affectation = cleaned_data.get('affectation')
-        quantite = cleaned_data.get('quantite')
-    
-        if affectation and quantite:
-            if quantite > affectation.quantite_restante:
-                raise forms.ValidationError(
-                    "Quantité supérieure au stock disponible"
-                )
-    
-        return cleaned_data
-
-
-class MiseDispositionRotForm(forms.Form):
-
-    produit = forms.ModelChoiceField(
-        queryset=Produit.objects.all(),
-        label="Produit",
-        required=True,
+        required=False,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
+    auto_distribution = forms.BooleanField(required=False)
+
     lot = forms.ModelChoiceField(
-        queryset=LotEntrepot.objects.none(),  # 🔥 vide au départ
-        label="Lot",
+        queryset=AffectationLotSuperviseur.objects.none(),
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     quantite = forms.DecimalField(
         min_value=Decimal('0.01'),
         decimal_places=2,
-        label="Quantité",
+        widget=forms.NumberInput(attrs={'class': 'form-control'})
+    )
+
+    prix_gros = forms.DecimalField(
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        label="Prix gros (obligatoire)",
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
             'step': '0.01'
         })
     )
 
+    date_distribution = forms.DateTimeField(
+        initial=timezone.now,
+        widget=forms.DateTimeInput(attrs={
+            'type': 'datetime-local',
+            'class': 'form-control'
+        })
+    )
+    # =================================================
+    # INIT
+    # =================================================
     def __init__(self, *args, **kwargs):
+        self.superviseur = kwargs.pop('superviseur')
+        self.allow_override = kwargs.pop('allow_override', False)
         super().__init__(*args, **kwargs)
 
-        if 'produit' in self.data:
-            try:
-                produit_id = int(self.data.get('produit'))
-                self.fields['lot'].queryset = LotEntrepot.objects.filter(
-                    produit_id=produit_id,
-                    quantite_restante__gt=0
-                ).select_related('fournisseur')
-            except:
-                pass
+        # Agents terrain
+        self.fields['agent_terrain'].queryset = (
+            Agent.objects
+            .filter(
+                superviseur=self.superviseur,
+                type_agent__in=['terrain', 'agent_gros'],
+                est_actif=True
+            )
+            .select_related('user')
+            .order_by('user__last_name')
+        )
+
+        # Lots disponibles
+        self.fields['lot'].queryset = (
+            AffectationLotSuperviseur.objects
+            .filter(
+                superviseur=self.superviseur,
+                quantite_restante__gt=0
+            )
+            .select_related('lot__produit')
+            .order_by('-date_affectation')
+        )
+
+
+        self.fields['prix_gros_override'] = forms.DecimalField(
+            required=False,
+            min_value=Decimal('0.00'),
+            decimal_places=2,
+            label="Prix gros (override)",
+            widget=forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.01',
+                'placeholder': 'Optionnel'
+            })
+        )
+
+    # =================================================
+    # CLEAN
+    # =================================================
+    def clean(self):
+        cleaned_data = super().clean()
+
+        auto = cleaned_data.get('auto_distribution')
+        agent = cleaned_data.get('agent_terrain')
+        affectation = cleaned_data.get('lot')
+        quantite = cleaned_data.get('quantite')
+        prix = cleaned_data.get('prix_gros')
+
+        if auto:
+            cleaned_data['agent_terrain'] = self.superviseur
+        elif not agent:
+            raise ValidationError("Agent requis")
+
+        if not affectation or not quantite:
+            return cleaned_data
+
+        if quantite > affectation.quantite_restante:
+            raise ValidationError("Stock insuffisant")
+
+        if prix is None or prix < 0:
+            raise ValidationError("Prix gros obligatoire")
+
+        return cleaned_data
+    # =================================================
+    # SAVE
+    # =================================================
+    def save(self):
+        affectation = self.cleaned_data['lot']
+        agent = self.cleaned_data['agent_terrain']
+        quantite = self.cleaned_data['quantite']
+        date_distribution = self.cleaned_data['date_distribution']
+        prix_gros = self.cleaned_data['prix_gros']
+
+        distribution = DistributionAgent.objects.create(
+            superviseur=self.superviseur,
+            agent_terrain=agent,
+            date_distribution=date_distribution,
+            est_retroactive=date_distribution < timezone.now()
+        )
+
+        DetailDistribution.objects.create(
+            distribution=distribution,
+            lot=affectation.lot,
+            quantite=quantite,
+            prix_gros=prix_gros,   # 🔥 toujours override
+            prix_detail=affectation.prix_detail
+        )
+
+        affectation.quantite_restante -= quantite
+        affectation.save(update_fields=['quantite_restante'])
+
+        distribution.quantite_totale = quantite
+        distribution.nombre_produits_differents = 1
+        distribution.save(update_fields=[
+            'quantite_totale',
+            'nombre_produits_differents'
+        ])
+
+        return distribution
+
+###

@@ -246,7 +246,16 @@ class DashboardAgentAnalysisService:
             if reste <= 0:
                 continue
 
-            valeur = reste * (d.prix_gros or 0)
+            agent = d.distribution.agent_terrain
+
+            if agent.type_agent == 'agent_gros':
+                prix = d.prix_gros or Decimal("0.00")
+                type_label = "Gros"
+            else:
+                prix = d.prix_detail or Decimal("0.00")
+                type_label = "Mami"
+
+            valeur = reste * prix
 
             bucket = result[d.distribution.agent_terrain_id]
             bucket["valeur_stock"] += valeur
@@ -255,7 +264,8 @@ class DashboardAgentAnalysisService:
                 "distribution_date": d.distribution.date_distribution,
                 "produit": d.lot.produit.nom,
                 "quantite_restante": reste,
-                "prix_gros": d.prix_gros,
+                "prix": prix,  # 🔥 prix dynamique
+                "type_agent": type_label,  # 🔥 Mami / Gros
                 "valeur": valeur,
                 "lot": d.lot.reference_lot,
             })

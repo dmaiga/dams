@@ -18,7 +18,9 @@ urlpatterns = [
   path('stock/mise-disposition/historique/', views.historique_mise_disposition, name='historique_mise_disposition'),
   path('ajax/lots-par-produit/', views.lots_par_produit, name='lots_par_produit'),
   path('affectation/lot', views.superviseur_lots_affectes, name='superviseur_lots_affectes'),
+  
   path('affectation/agent', views.distribuer_lot_agent, name='distribuer_lot_agent'),
+    path('affectation/agent/override', views.distribution_superviseur_override, name='distribution_superviseur_override'),
 
   path('distribution/agent', views.distribution_superviseur, name='distribution_superviseur'),
 
