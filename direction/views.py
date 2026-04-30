@@ -613,6 +613,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
         return context
 
+
 class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
 
@@ -629,24 +630,28 @@ class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         # 1) Dates
         date_debut, date_fin = VenteAnalyseService.normalize_period(periode, params)
 
-        # 2) Queryset
+        # 2) ✅ EXACT SAME FILTERS
         ventes = VenteAnalyseService.filter_ventes(
-            date_debut, date_fin,
+            date_debut=date_debut,
+            date_fin=date_fin,
             agent_id=params.get("agent"),
             type_vente=params.get("type"),
+            produit_id=params.get("produit"),
+            lot_id=params.get("lot"),
         )
 
-        # 3) Génération Excel
+        # 3) Export
         buffer = VenteExportService.export_excel(ventes, date_debut, date_fin)
 
-        # 4) Réponse HTTP
         response = HttpResponse(
             buffer,
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        response["Content-Disposition"] = f"attachment; filename=ventes_{date_debut.date()}_{date_fin.date()}.xlsx"
-        return response
+        response["Content-Disposition"] = (
+            f"attachment; filename=ventes_{date_debut.date()}_{date_fin.date()}.xlsx"
+        )
 
+        return response
 
 class ExportVentesPDFView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Vente
