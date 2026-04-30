@@ -157,9 +157,11 @@ class Agent(models.Model):
         ('entrepot', 'Superviseur'),
         ('terrain', 'Mami'),
         ('agent_gros', 'Agent Gros'), 
+        ('agent_polivalent', 'Agent Polivalent'),
         ('stagiaire', 'Stagiaire'), 
         ('gestionnaire_stock', 'Gestionnaire Stock')
     )
+
     TYPE_CONTRAT_CHOICES = (
     ('prestation', 'Contrat de prestation'),
     ('stage', 'Stage'),
@@ -364,8 +366,44 @@ class Agent(models.Model):
     def __str__(self):
         return f"{self.full_name} - {self.get_type_agent_display()}"
     
- 
+    @property
+    def peut_override_prix(self):
+        return self.type_agent in [
+            'entrepot',        # superviseur
+            'agent_polivalent',
+            'agent_gros',
+            'stagiaire'
+        ]
+    
+    
+    @property
+    def peut_modifier_type_vente(self):
+        return self.type_agent in [
+            'entrepot',
+            'agent_polivalent',
+            'stagiaire'
+        ]
 
+    def type_vente_par_defaut(self):
+        if self.type_agent == "terrain":
+            return "detail"
+        if self.type_agent == "agent_gros":
+            return "gros"
+        return None  # décidé par superviseur
+    
+    def get_prix_vente(self, detail, override=None):
+        if self.type_agent == "agent_gros":
+            return Decimal(override or detail.prix_gros)
+
+        if self.type_agent == "terrain":
+            return detail.prix_detail
+
+        return Decimal(override or detail.prix_detail)
+    def get_type_vente(self, request):
+        if self.type_agent in ["terrain", "agent_gros"]:
+            return self.type_vente_par_defaut()
+    
+        return request.POST.get("type_vente")
     @property
     def est_en_test(self):
         return self.jours_restants_test and self.jours_restants_test > 0
@@ -492,6 +530,10 @@ class Agent(models.Model):
     def est_direction(self):
         """Vérifie si l'agent fait partie de la direction"""
         return self.type_agent == 'direction'
+    @property
+    def est_agent_polivalent(self):
+        """Vérifie si l'agent est un agent polivalent"""
+        return self.type_agent == 'agent_polivalent'
     
     @property
     def est_rot(self):

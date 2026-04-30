@@ -64,7 +64,10 @@ from agents.forms import (
                             RecouvrementSuperviseurForm,
                             SupervisorTerrainAgentUpdateForm,
                             DistributionSuperviseurSimplifieeForm,
-                            MiseDispositionRotForm
+                            MiseDispositionRotForm,
+                            VenteFlexForm,
+                            VenteAgentGrosForm,
+                            VenteTerrainForm,
                             
                             )
 
@@ -276,6 +279,7 @@ def superviseur_lots_affectes(request):
         context
     )
 
+# deprecier
 @login_required
 def distribuer_lot_agent(request):
     superviseur = request.user.agent
@@ -372,7 +376,12 @@ def distribution_superviseur(request):
             quantite = form.cleaned_data['quantite']
 
             # 🔒 sécurité agent
-            if agent.superviseur != superviseur:
+            # 🔒 sécurité agent (version corrigée)
+            if not (
+                agent.superviseur == superviseur
+                or agent.id == superviseur.id
+                or agent.type_agent == 'agent_polivalent'
+            ):
                 raise ValidationError("Agent non autorisé")
 
             # 🔒 sécurité affectation
@@ -778,116 +787,41 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 
+def get_form_class(agent_concerne):
+    if agent_concerne.type_agent == "terrain":
+        return VenteTerrainForm
+    if agent_concerne.type_agent == "agent_gros":
+        return VenteAgentGrosForm
+    return VenteFlexForm
 
 @login_required
 def detail_distribution_sup(request, detail_id):
-    superviseur = request.user.agent
-    is_override_user = request.user.username == "jeanclaude.sup"
+    agent_user = request.user.agent # Le superviseur connecté
+    detail = get_object_or_404(DetailDistribution, id=detail_id, distribution__superviseur=agent_user)
+    
+    # On choisit le formulaire selon l'agent qui a reçu le lot
+    FormClass = get_form_class(detail.distribution.agent_terrain)
+    form = FormClass(data=request.POST or None, detail=detail, agent_user=agent_user)
 
-    detail = get_object_or_404(
-        DetailDistribution.objects.select_related(
-            'lot', 'lot__produit',
-            'distribution', 'distribution__agent_terrain'
-        ),
-        id=detail_id,
-        distribution__superviseur=superviseur
-    )
-
-    ventes = (
-        Vente.objects
-        .filter(detail_distribution=detail)
-        .select_related('agent')
-        .order_by('-id')
-    )
-
-    reste = detail.quantite - detail.quantite_vendue
-
-    # =========================================================
-    # 🔥 OVERRIDE PRIX (UNIQUEMENT JEAN CLAUDE)
-    # =========================================================
-    if request.method == "POST" and is_override_user:
-        try:
-            new_prix_gros = request.POST.get('prix_gros')
-            new_prix_detail = request.POST.get('prix_detail')
-
-            if new_prix_gros:
-                detail.prix_gros = Decimal(new_prix_gros)
-
-            if new_prix_detail:
-                detail.prix_detail = Decimal(new_prix_detail)
-
-            detail.save(update_fields=['prix_gros', 'prix_detail'])
-
-            messages.success(request, "✅ Prix mis à jour avec succès")
-
-            return redirect('detail_distribution_sup', detail_id=detail.id)
-
-        except Exception as e:
-            messages.error(request, str(e))
-
-    # =========================================================
-    # 🔥 ENREGISTREMENT VENTE
-    # =========================================================
-    if request.method == "POST" and not is_override_user:
-        try:
-            quantite = Decimal(request.POST.get('quantite'))
-            date_vente = request.POST.get('date_vente')
-
-            reste = detail.quantite - detail.quantite_vendue
-
-            if quantite <= 0:
-                raise ValueError("Quantité invalide")
-
-            if quantite > reste:
-                messages.error(request, f"Quantité > reste ({reste})")
-                return redirect('detail_distribution_sup', detail_id=detail.id)
-
-            agent = detail.distribution.agent_terrain
-
-            # 🔥 PRIX SNAPSHOT ACTUEL
-            if agent.type_agent == 'agent_gros':
-                prix = detail.prix_gros
-                type_vente = 'gros'
-            else:
-                prix = detail.prix_detail
-                type_vente = 'detail'
-
-            # 🔥 VENTE
-            vente = Vente.objects.create(
-                agent=agent,
-                detail_distribution=detail,
-                quantite=quantite,
-                prix_vente_unitaire=prix,
-                type_vente=type_vente,
-                date_vente=date_vente,
-                mode_paiement='comptant'
-            )
-
-            montant = quantite * prix
-
-            Recouvrement.objects.create(
-                vente=vente,
-                agent=agent,
-                superviseur=superviseur,
-                montant_recouvre=montant
-            )
-
-            messages.success(request, f"✅ Vente enregistrée ({montant} FCFA)")
-            return redirect('detail_distribution_sup', detail_id=detail.id)
-
-        except Exception as e:
-            messages.error(request, str(e))
-
-    # =========================================================
-    # CONTEXT
-    # =========================================================
+    if request.method == "POST" and form.is_valid():
+        # Extraction sécurisée par le formulaire
+        vente = Vente.objects.create(
+            agent=detail.distribution.agent_terrain,
+            detail_distribution=detail,
+            quantite=form.cleaned_data['quantite'],
+            prix_vente_unitaire=form.get_prix_final(),
+            type_vente=form.get_type_vente_final(),
+            date_vente=form.cleaned_data['date_vente']
+        )
+        # Recouvrement...
+        return redirect('detail_distribution_sup', detail_id=detail.id)
+    
     context = {
-        'detail': detail,
-        'ventes': ventes,
-        'reste': reste,
-        'is_override_user': is_override_user
+        "detail": detail,
+        "form": form,
+        "ventes": Vente.objects.filter(detail_distribution=detail).order_by('-id'),
+        "reste": detail.quantite - detail.quantite_vendue
     }
-
     return render(request, 'agents/superviseur/detail_distribution.html', context)
 
 
@@ -1086,11 +1020,6 @@ def historique_mise_disposition(request):
     return render(request, 'agents/affectations/historique_mise_disposition.html', {
         'historiques': historiques
     })
-
-########""
-#rot -> supperviseur
-
-
 
 
 @login_required

@@ -108,7 +108,7 @@ class VenteAnalyseService:
     @staticmethod
     def get_agents_list():
         return Agent.objects.filter(
-            type_agent__in=["terrain", "entrepot", "stagiaire"],
+            type_agent__in=["terrain", 'agent_gros' ,"entrepot", "stagiaire", "agent_polivalent"],
             est_actif=True
 
         ).select_related("user").order_by("user__first_name")

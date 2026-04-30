@@ -4,175 +4,149 @@
 {% block content %}
 <div class="container py-2">
 
-<!-- HEADER -->
-  <div class="d-flex justify-content-between mb-2 small">
-<h6 class="fw-bold mb-2">📊 Détail</h6>
-
-    <a href="{% url 'liste_distribution_sup' %}" class="btn btn-sm btn-outline-secondary mb-3">
-        ← Retour
-    </a>
-</div>
-<!-- CARD PRINCIPALE -->
-<div class="card mb-2 shadow-sm">
-    <div class="card-body py-2">
-
-        <!-- LIGNE 1 -->
-        <div class="fw-semibold small">
-            {{ detail.lot.produit.nom }}
-        </div>
-
-        <!-- LIGNE 2 -->
-        <div class="small text-muted">
-           {{ detail.distribution.date_distribution|date:"d/m H:i" }}
-        </div>
-
-        <!-- LIGNE 3 -->
-        <div class="small">
-            👤 {{ detail.distribution.agent_terrain.full_name }}
-        </div>
-
-
-
-        <!-- QUANTITÉS -->
-        <div class="d-flex justify-content-between text-center mt-2 small">
-            <div>
-                <div class="text-muted">Total</div>
-                <div class="fw-bold">{{ detail.quantite }}</div>
-            </div>
-            <div>
-                <div class="text-muted">Vendu</div>
-                <div class="fw-bold text-success">{{ detail.quantite_vendue }}</div>
-            </div>
-            <div>
-                <div class="text-muted">Reste</div>
-                <div class="fw-bold text-danger">{{ reste }}</div>
-            </div>
-        </div>
-
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between mb-2 small">
+        <h6 class="fw-bold mb-0">📊 Suivi Distribution</h6>
+        <a href="{% url 'liste_distribution_sup' %}" class="btn btn-sm btn-outline-secondary">
+            ← Retour
+        </a>
     </div>
-</div>
 
-<!-- FORM -->
+    <!-- CARTE RÉCAPITULATIVE -->
+    <div class="card mb-3 shadow-sm border-0 bg-light">
+        <div class="card-body py-2">
+            <div class="fw-bold text-primary">{{ detail.lot.produit.nom }}</div>
+            <div class="small text-muted mb-1">Affecté à : <strong>{{ detail.distribution.agent_terrain.full_name }}</strong></div>
+            
+            <div class="row text-center g-0 border-top pt-2">
+                <div class="col-4 border-end">
+                    <div class="small text-muted" style="font-size: 0.7rem;">TOTAL</div>
+                    <div class="fw-bold">{{ detail.quantite }}</div>
+                </div>
+                <div class="col-4 border-end">
+                    <div class="small text-muted" style="font-size: 0.7rem;">VENDU</div>
+                    <div class="fw-bold text-success">{{ detail.quantite_vendue }}</div>
+                </div>
+                <div class="col-4">
+                    <div class="small text-muted" style="font-size: 0.7rem;">RESTE</div>
+                    <div class="fw-bold text-danger">{{ reste }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORMULAIRE DE VENTE DYNAMIQUE -->
+
 {% if reste > 0 %}
-<div class="card mb-2 shadow-sm">
+<div class="card mb-3 shadow-sm border-primary">
+    <div class="card-header bg-primary text-white py-1 small fw-bold d-flex justify-content-between align-items-center">
+        <span>Saisie de vente</span>
+        <span class="badge bg-white text-primary" style="font-size: 0.7rem;">
+            {{ detail.distribution.agent_terrain.get_type_agent_display }}
+        </span>
+    </div>
     <div class="card-body py-2">
-
         <form method="post" id="venteForm">
             {% csrf_token %}
-
-            <div class="row g-2">
+            
+            <!-- Ligne Quantité et Date -->
+            <div class="row g-2 mb-2">
                 <div class="col-6">
-                    <input type="number" step="0.01" name="quantite"
-                           class="form-control form-control-sm"
-                           placeholder="Qté" required>
+                    <label class="small fw-bold text-muted">Quantité</label>
+                    {{ form.quantite }}
+                    {% if form.quantite.errors %}<div class="text-danger" style="font-size: 0.7rem;">{{ form.quantite.errors.0 }}</div>{% endif %}
                 </div>
                 <div class="col-6">
-                    <input type="date" name="date_vente"
-                           class="form-control form-control-sm" required>
+                    <label class="small fw-bold text-muted">Date</label>
+                    {{ form.date_vente }}
                 </div>
             </div>
 
+            <!-- Choix du Type (Seulement pour Polyvalent/Stagiaire/Superviseur) -->
+            {% if form.type_vente %}
+            <div class="mb-2">
+                <label class="small fw-bold text-muted">Type de vente</label>
+                {{ form.type_vente }}
+            </div>
+            {% endif %}
+
+            <!-- Override de Prix (Apparaît pour TOUS sauf Terrain) -->
+            {% if form.prix_override %}
+            <div class="mb-2 p-2 bg-light border rounded">
+                <label class="small fw-bold text-warning">
+                    <i class="bi bi-pencil-square"></i> Prix spécifique (Override)
+                </label>
+                {{ form.prix_override }}
+                <div class="form-text" style="font-size: 0.65rem;">
+                    Laisser vide pour utiliser le prix standard : 
+                    <strong>
+                        {% if detail.distribution.agent_terrain.type_agent == "agent_gros" %}
+                            {{ detail.prix_gros|fcfa }} (Gros)
+                        {% else %}
+                             Prix auto (Gros/Détail)
+                        {% endif %}
+                    </strong>
+                </div>
+            </div>
+            {% endif %}
+
             <button type="submit" class="btn btn-success btn-sm w-100 mt-2" id="submitBtn">
-                <span class="btn-text">Enregistrer</span>
-                <span class="spinner-border spinner-border-sm d-none"></span>
+                <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                <span class="btn-text fw-bold">ENREGISTRER LA VENTE</span>
             </button>
-
         </form>
-
     </div>
 </div>
 {% endif %}
 
-
-
-<!-- HISTORIQUE -->
-<div class="card shadow-sm">
-    <div class="card-body py-2">
-
-        <div class="fw-semibold small mb-1">Historique</div>
-
-        {% for v in ventes %}
-        <div class="border-top pt-1 mt-1 d-flex justify-content-between small">
-            <span>{{ v.quantite }}</span>
-            <span class="text-muted">{{ v.date_vente|date:"d/m" }}</span>
+    <!-- HISTORIQUE DES VENTES -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body py-2">
+            <div class="fw-bold small mb-2 border-bottom pb-1">Dernières transactions</div>
+            {% for v in ventes %}
+            <div class="d-flex justify-content-between align-items-center py-1 border-bottom-dashed">
+                <div>
+                    <span class="fw-bold small">{{ v.quantite }}</span> 
+                    <span class="badge bg-light text-dark border" style="font-size: 0.6rem;">{{ v.get_type_vente_display }}</span>
+                </div>
+                <div class="text-end">
+                    <div class="small fw-semibold">{{ v.prix_vente_unitaire|fcfa }}</div>
+                    <div class="text-muted" style="font-size: 0.65rem;">{{ v.date_vente|date:"d/m H:i" }}</div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted py-3 small">Aucune vente enregistrée</div>
+            {% endfor %}
         </div>
-        {% empty %}
-        <div class="text-muted small">Aucune</div>
-        {% endfor %}
-
     </div>
-</div>
-
-{% if is_override_user %}
-
-<div class="card  mt-3 shadow-sm">
-    <div class="card-body py-2">
-
-        <div class="d-flex align-items-center justify-content-between mb-2">
-            <h6 class="mb-0 text-warning">
-                ⚠️ Override prix marché
-            </h6>
-           
-        </div>
-
-        <div class="small text-muted mb-2">
-            Prix actuel enregistré dans le système :
-        </div>
-
-        <div class="d-flex justify-content-between mb-2 small">
-            <span>Prix gros</span>
-            <span class="fw-bold">{{ detail.prix_gros|floatformat:0 }}</span>
-        </div>
-
-        
-
-        <form method="post">
-            {% csrf_token %}
-
-            <label class="form-label small">Nouveau prix gros</label>
-            <input type="number"
-                   name="prix_gros"
-                   value="{{ detail.prix_gros }}"
-                   class="form-control form-control-sm mb-2"
-                   step="0.01">
-
-            
-
-            
-
-            <button class="btn btn-warning btn-sm w-100">
-                Mettre à jour les prix marché
-            </button>
-        </form>
-
-    </div>
-</div>
-
-{% endif %}
 
 </div>
 
-<!-- 🔥 SPINNER SCRIPT -->
+<!-- STYLE POUR LES POINTILLÉS -->
+<style>
+    .border-bottom-dashed { border-bottom: 1px dashed #dee2e6; }
+    .form-control-sm, .form-select-sm { font-size: 0.85rem; }
+</style>
+
+<!-- 🔥 SCRIPT SPINNER & PROTECTION DOUBLE CLIC -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-
     const form = document.getElementById("venteForm");
     const btn = document.getElementById("submitBtn");
 
     if (form) {
         form.addEventListener("submit", function() {
-
+            // Empêche le double clic
+            btn.disabled = true;
+            
+            // Affiche le spinner
             const spinner = btn.querySelector(".spinner-border");
             const text = btn.querySelector(".btn-text");
-
-            btn.disabled = true;
+            
             spinner.classList.remove("d-none");
-            text.innerText = "..."
-
+            text.innerText = " Traitement...";
         });
     }
-
 });
 </script>
-
 {% endblock %}

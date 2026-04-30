@@ -479,17 +479,24 @@
                         </a>
 
                        
-                         {% if request.user.agent.user.username == "jeanclaude.sup" %}
-                                   <a class="nav-link" href="{% url 'distribution_superviseur_override' %}">
-                                <i class="fas fa-truck-loading"></i>
-                                Distributions override
-                            </a>
-                        {% else %}
+ <!--
+     {% if request.user.agent.user.username == "jeanclaude.sup" %}
+               <a class="nav-link" href="{% url 'distribution_superviseur_override' %}">
+            <i class="fas fa-truck-loading"></i>
+            Distributions override
+        </a>
+    {% else %}
+    
+        <a class="nav-link" href="{% url 'distribution_superviseur' %}">
+            <i class="fas fa-truck-loading"></i>
+            Distributions
+        </a>
+    {% endif %}
+                    -->
                             <a class="nav-link" href="{% url 'distribution_superviseur' %}">
                                 <i class="fas fa-truck-loading"></i>
                                 Distributions
                             </a>
-                        {% endif %}
                        
                         
                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_distribution_sup' %}active{% endif %}" 

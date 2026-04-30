@@ -580,7 +580,6 @@ class RecouvrementSuperviseurForm(forms.ModelForm):
 
 
 class DistributionSuperviseurSimplifieeForm(forms.Form):
-
     agent = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
         label="Agent"
@@ -591,21 +590,18 @@ class DistributionSuperviseurSimplifieeForm(forms.Form):
         label="Produit (stock disponible)"
     )
 
-    quantite = forms.DecimalField(
-        
-        label="Quantité"
-    )
+    quantite = forms.DecimalField(label="Quantité")
 
     def __init__(self, *args, **kwargs):
         superviseur = kwargs.pop('superviseur')
         super().__init__(*args, **kwargs)
 
         # =========================
-        # AGENTS DU SUPERVISEUR
+        # AGENTS + SUPERVISEUR LUI-MÊME
         # =========================
         self.fields['agent'].queryset = Agent.objects.filter(
-            superviseur=superviseur,
-            type_agent__in=['terrain', 'agent_gros'],
+            Q(superviseur=superviseur) | Q(id=superviseur.id),
+            type_agent__in=['terrain', 'agent_gros', 'agent_polivalent', 'entrepot','stagiaire',],
             est_actif=True
         ).select_related('user')
 
@@ -625,23 +621,33 @@ class DistributionSuperviseurSimplifieeForm(forms.Form):
         self.fields['affectation'].queryset = qs
 
         # =========================
-        # AFFICHAGE LISIBLE
+        # LABELS
         # =========================
         self.fields['affectation'].label_from_instance = lambda obj: (
             f"{obj.lot.produit.nom} | "
             f"{obj.lot.date_reception.strftime('%d/%m/%Y')} | "
             f"I/R: {obj.quantite_initiale}/{obj.quantite_restante} | "
-            
             f"Affecté le: {obj.date_affectation.strftime('%d/%m/%Y')}"
-            
-        )
-        self.fields['agent'].label_from_instance = lambda obj: (
-            f"{obj.full_name} | "
-            f"{'Mami' if obj.type_agent == 'terrain' else 'Gros'}"
         )
 
+        def agent_label(obj):
+            if obj.id == superviseur.id:
+                role = "Superviseur"
+            elif obj.type_agent == 'terrain':
+                role = "Mami"
+            elif obj.type_agent == 'agent_gros':
+                role = "Gros"
+            elif obj.type_agent == 'agent_polivalent':
+                role = "Polyvalent"
+            else:
+                role = obj.get_type_agent_display()
+
+            return f"{obj.full_name} | {role}"
+
+        self.fields['agent'].label_from_instance = agent_label
+
         # =========================
-        # UI Bootstrap
+        # UI
         # =========================
         self.fields['agent'].widget.attrs.update({'class': 'form-select'})
         self.fields['affectation'].widget.attrs.update({'class': 'form-select'})
@@ -651,13 +657,13 @@ class DistributionSuperviseurSimplifieeForm(forms.Form):
         cleaned_data = super().clean()
         affectation = cleaned_data.get('affectation')
         quantite = cleaned_data.get('quantite')
-    
+
         if affectation and quantite:
             if quantite > affectation.quantite_restante:
                 raise forms.ValidationError(
                     "Quantité supérieure au stock disponible"
                 )
-    
+
         return cleaned_data
 
 class DistributionSuperviseurOverrideForm(forms.Form):
@@ -779,9 +785,80 @@ class MiseDispositionRotForm(forms.Form):
 
         return cleaned_data
 
+from django import forms
+from decimal import Decimal
 
+class BaseVenteForm(forms.Form):
+    quantite = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Qté'})
+    )
+    date_vente = forms.DateTimeField(
+            widget=forms.DateTimeInput(
+                attrs={
+                    'class': 'form-control form-control-sm', 
+                    'type': 'datetime-local' # Permet de choisir date et heure dans le navigateur
+                }
+            ),
+            label="Date et heure de vente"
+        )
 
+    def __init__(self, *args, **kwargs):
+        self.detail = kwargs.pop('detail')
+        self.superviseur = kwargs.pop('agent_user')
+        super().__init__(*args, **kwargs)
+        # On récupère l'agent de la distribution (celui qui vend réellement)
+        self.agent_terrain = self.detail.distribution.agent_terrain
+        if not self.is_bound:
+                self.fields['date_vente'].initial = timezone.now()
+    def clean_quantite(self):
+        qte = self.cleaned_data['quantite']
+        reste = self.detail.quantite - self.detail.quantite_vendue
+        if qte > reste:
+            raise forms.ValidationError(f"Stock insuffisant ({reste} restant)")
+        return qte
 
+# --- GARDE-FOU 1: Agent Terrain (Vente au détail forcée) ---
+class VenteTerrainForm(BaseVenteForm):
+    def get_type_vente_final(self): return "detail"
+    def get_prix_final(self): return self.detail.prix_detail
+
+# --- CAS 2: Agent Gros (Gros par défaut + Override Prix) ---
+class VenteAgentGrosForm(BaseVenteForm):
+    prix_override = forms.DecimalField(
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Prix Gros spécial'})
+    )
+
+    def get_type_vente_final(self): return "gros"
+    
+    def get_prix_final(self):
+        # Si saisi, on prend l'override, sinon le prix_gros du lot
+        return self.cleaned_data.get('prix_override') or self.detail.prix_gros
+    
+#--- CAS 3: Flexibles (Choix Type + Override Prix) ---
+class VenteFlexForm(BaseVenteForm):
+    type_vente = forms.ChoiceField(
+        choices=[('detail', 'Détail'), ('gros', 'Gros')],
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+    prix_override = forms.DecimalField(
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Prix spécial'})
+    )
+
+    def get_type_vente_final(self):
+        return self.cleaned_data['type_vente']
+
+    def get_prix_final(self):
+        override = self.cleaned_data.get('prix_override')
+        if override:
+            return override
+        
+        # Si pas d'override, on bascule sur le prix auto selon le type choisi
+        if self.cleaned_data['type_vente'] == 'gros':
+            return self.detail.prix_gros
+        return self.detail.prix_detail
 ## Deprecie
 class SupervisorDistributionForm(forms.Form):
 
