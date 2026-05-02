@@ -794,27 +794,49 @@ def get_form_class(agent_concerne):
         return VenteAgentGrosForm
     return VenteFlexForm
 
+from django.db import transaction # Import important pour la sécurité des données
+
 @login_required
 def detail_distribution_sup(request, detail_id):
     agent_user = request.user.agent # Le superviseur connecté
-    detail = get_object_or_404(DetailDistribution, id=detail_id, distribution__superviseur=agent_user)
+    detail = get_object_or_404(
+        DetailDistribution.objects.select_related('lot__produit', 'distribution__agent_terrain'), 
+        id=detail_id, 
+        distribution__superviseur=agent_user
+    )
     
-    # On choisit le formulaire selon l'agent qui a reçu le lot
     FormClass = get_form_class(detail.distribution.agent_terrain)
     form = FormClass(data=request.POST or None, detail=detail, agent_user=agent_user)
 
     if request.method == "POST" and form.is_valid():
-        # Extraction sécurisée par le formulaire
-        vente = Vente.objects.create(
-            agent=detail.distribution.agent_terrain,
-            detail_distribution=detail,
-            quantite=form.cleaned_data['quantite'],
-            prix_vente_unitaire=form.get_prix_final(),
-            type_vente=form.get_type_vente_final(),
-            date_vente=form.cleaned_data['date_vente']
-        )
-        # Recouvrement...
-        return redirect('detail_distribution_sup', detail_id=detail.id)
+        try:
+            # On utilise atomic() pour s'assurer que Vente + Recouvrement se font ensemble ou pas du tout
+            with transaction.atomic():
+                # 1. Création de la vente
+                vente = Vente.objects.create(
+                    agent=detail.distribution.agent_terrain,
+                    detail_distribution=detail,
+                    quantite=form.cleaned_data['quantite'],
+                    prix_vente_unitaire=form.get_prix_final(),
+                    type_vente=form.get_type_vente_final(),
+                    date_vente=form.cleaned_data['date_vente'],
+                    mode_paiement='comptant' # Ajouté pour être complet
+                )
+
+                # 2. Création du recouvrement immédiat
+                # Note : on utilise agent_user (le superviseur connecté) et pas self.agent_user
+                Recouvrement.objects.create(
+                    vente=vente,
+                    agent=vente.agent, # L'agent qui a vendu
+                    superviseur=agent_user, # Le superviseur qui encaisse
+                    montant_recouvre=vente.quantite * vente.prix_vente_unitaire
+                )
+
+            messages.success(request, f"✅ Vente et recouvrement enregistrés ({vente.quantite} unités)")
+            return redirect('detail_distribution_sup', detail_id=detail.id)
+
+        except Exception as e:
+            messages.error(request, f"Erreur lors de l'enregistrement : {str(e)}")
     
     context = {
         "detail": detail,
@@ -823,7 +845,6 @@ def detail_distribution_sup(request, detail_id):
         "reste": detail.quantite - detail.quantite_vendue
     }
     return render(request, 'agents/superviseur/detail_distribution.html', context)
-
 
 
 @login_required
@@ -1270,21 +1291,14 @@ def recouvrer_superviseur(request):
             rec = form.save(commit=False)
             rec.rot = rot
 
-            # 🔒 Sécurité comptable : pas plus que le cash restant
-            if resume and rec.montant > resume["cash_restant"]:
-                messages.error(
-                    request,
-                    "Montant supérieur au cash réellement disponible."
-                )
-            else:
-                rec.save()
-                messages.success(
-                    request,
-                    "Recouvrement enregistré avec succès."
-                )
-                return redirect(
-                    f"{request.path}?superviseur={rec.superviseur_id}"
-                )
+            rec.save()
+            messages.success(
+                request,
+                "Recouvrement enregistré avec succès."
+            )
+            return redirect(
+                f"{request.path}?superviseur={rec.superviseur_id}"
+            )
     else:
         form = RecouvrementSuperviseurForm(
             initial={"superviseur": superviseur}

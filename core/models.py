@@ -34,7 +34,6 @@ class Client(models.Model):
     class Meta:
         ordering = ['nom'] 
 
-
 class Produit(models.Model):
     nom = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -128,10 +127,6 @@ class Fournisseur(models.Model):
                 F('detail_distribution__lot__prix_achat_unitaire')
             )
         )['total'] or Decimal('0.00')
-
-
-
-
 
 class Agent(models.Model):
     """
@@ -874,9 +869,7 @@ class Agent(models.Model):
         )["total"]
     
         return recouvre - versements - depenses + (self.ajustement_solde or Decimal("0"))
-    
-
-
+ 
 class LotEntrepot(models.Model):
     produit = models.ForeignKey(Produit,
                                  on_delete=models.CASCADE,
@@ -1085,7 +1078,6 @@ class LotEntrepot(models.Model):
             Decimal("1"), rounding=ROUND_FLOOR
         )
 
-
 class MiseDispositionRot(models.Model):
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
 
@@ -1106,7 +1098,6 @@ class MiseDispositionRot(models.Model):
     def __str__(self):
         return f"{self.lot.produit.nom} - {self.quantite} (ROT)"
 
-
 class FactureLotEntrepot(models.Model):
     lot = models.ForeignKey(
         LotEntrepot,
@@ -1126,7 +1117,6 @@ class FactureLotEntrepot(models.Model):
 
     def __str__(self):
         return f"Facture {self.id} – Lot {self.lot.reference_lot}"
-
 
 class Perte(models.Model):
     lot = models.ForeignKey(
@@ -1197,7 +1187,6 @@ class Perte(models.Model):
             'quantite_originale': self.quantite_perdue_originale,
             'difference': self.difference_quantite
         }  
-
 
 class AffectationLotSuperviseur(models.Model):
     lot = models.ForeignKey(LotEntrepot, on_delete=models.CASCADE)
@@ -1274,8 +1263,6 @@ class AffectationLotSuperviseur(models.Model):
         Résumé simple et uniforme de la quantité
         """
         return f"{self.quantite_restante:.2f} / {self.quantite_initiale:.2f}"
-
-
 
 class DistributionAgent(models.Model):
     TYPE_DISTRIBUTION = (
@@ -1359,9 +1346,7 @@ class DistributionAgent(models.Model):
         indexes = [
             models.Index(fields=['date_distribution']),
             models.Index(fields=['superviseur']),
-        ]
-    
-
+        ]   
 
 class DetailDistribution(models.Model):
     distribution = models.ForeignKey(
@@ -1412,8 +1397,6 @@ class DetailDistribution(models.Model):
     class Meta:
         verbose_name = "Détail de distribution"
         verbose_name_plural = "Détails de distribution"
-
-
 
 class MouvementStock(models.Model):
     TYPE_MOUVEMENT = (
@@ -1677,8 +1660,7 @@ class Vente(models.Model):
         ordering = ['-date_vente']
         verbose_name = "Vente"
         verbose_name_plural = "Ventes"
-        
-
+       
 class Dette(models.Model):
     STATUT_CHOICES = (
         ('en_cours', 'En cours'),
@@ -1808,7 +1790,6 @@ class BonusAgent(models.Model):
 
         return total
 
- 
 class Recouvrement(models.Model):
     agent = models.ForeignKey(
         Agent,
@@ -1852,8 +1833,7 @@ class Recouvrement(models.Model):
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement"
         verbose_name_plural = "Recouvrements"
-          
-
+         
 class RecouvrementSuperviseur(models.Model):
     superviseur = models.ForeignKey(
         Agent,
@@ -1904,14 +1884,7 @@ class RecouvrementSuperviseur(models.Model):
     
         cash_restant = cash_disponible - deja_remis
     
-        if self.montant > cash_restant:
-            raise ValidationError({
-                'montant': (
-                    f"Montant supérieur au cash disponible "
-                    f"({cash_restant:,.0f} FCFA)."
-                )
-            })
-    
+   
 
     def __str__(self):
         return (
@@ -1923,7 +1896,6 @@ class RecouvrementSuperviseur(models.Model):
         ordering = ['-date_recouvrement']
         verbose_name = "Recouvrement superviseur"
         verbose_name_plural = "Recouvrements superviseurs"
-
 
 class VersementBancaire(models.Model):
     # ⛔ À déprécier
@@ -2025,7 +1997,6 @@ class VersementBancaire(models.Model):
 
     class Meta:
         ordering = ['-date_versement_reelle']
-
 
 class RecuVersement(models.Model):
     versement = models.ForeignKey(
@@ -2148,7 +2119,6 @@ class Depense(models.Model):
         ordering = ['-date_depense']
         verbose_name = "Dépense"
         verbose_name_plural = "Dépenses"
-
 
 class PaiementFournisseur(models.Model):
     """
@@ -2389,8 +2359,6 @@ class AjustementSolde(models.Model):
     def __str__(self):
         return f"{self.agent} | {self.montant} | {self.date:%d/%m/%Y}"
 
-
-
 class RegleSalaire(models.Model):
     TYPE_AGENT_CHOICES = [
         ("terrain", "Agent terrain (mamy)"),
@@ -2416,8 +2384,6 @@ class RegleSalaire(models.Model):
 
     def __str__(self):
         return f"Règle salaire — {self.get_type_agent_display()}"
-
-
 
 class Salaire(models.Model):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="salaires")

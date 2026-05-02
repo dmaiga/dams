@@ -125,7 +125,7 @@ class SuperviseurDashboardService:
         # =====================================================
         agents = Agent.objects.filter(
             superviseur=superviseur,
-            type_agent__in=["terrain", "agent_gros"],
+            type_agent__in=["terrain", "agent_gros","agent_polivalent","stagiaire"],
             est_actif=True
         )
 

@@ -793,15 +793,7 @@ class BaseVenteForm(forms.Form):
         min_value=Decimal('0.01'),
         widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Qté'})
     )
-    date_vente = forms.DateTimeField(
-            widget=forms.DateTimeInput(
-                attrs={
-                    'class': 'form-control form-control-sm', 
-                    'type': 'datetime-local' # Permet de choisir date et heure dans le navigateur
-                }
-            ),
-            label="Date et heure de vente"
-        )
+    date_vente = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
 
     def __init__(self, *args, **kwargs):
         self.detail = kwargs.pop('detail')
