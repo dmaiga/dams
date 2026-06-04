@@ -15,7 +15,7 @@ urlpatterns = [
         name='agro_operation_list'
     ),
     path(
-    ' agros/operations/<int:pk>/',
+    'agros/operations/<int:pk>/',
     operation_detail_view,
     name='agro_operation_detail'
 ),
