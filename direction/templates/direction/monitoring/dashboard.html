@@ -1,0 +1,146 @@
+{% extends "base_admin.html" %}
+{% load humanize %}
+
+{% block content %}
+
+<div class="p-6 space-y-6">
+
+  <!-- HEADER -->
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">📊 Monitoring Temps Réel</h1>
+
+    <div class="text-sm opacity-70">
+      Auto refresh : 10min
+    </div>
+  </div>
+
+<meta http-equiv="refresh" content="600">
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <!-- =========================
+         SUPERVISEURS
+    ========================== -->
+    <div class="lg:col-span-2 space-y-4">
+
+      <h2 class="text-lg font-semibold">Superviseurs</h2>
+
+      {% for item in data_superviseurs %}
+
+        <div class="card bg-base-100 shadow-md border border-base-200">
+
+          <div class="card-body">
+
+            <!-- HEADER SUP -->
+            <div class="flex justify-between items-center">
+
+              <h3 class="card-title text-base">
+                {{ item.superviseur.full_name }}
+              </h3>
+
+              {% if item.solde > 100000 %}
+                <div class="badge badge-error">CRITIQUE</div>
+              {% elif item.solde > 50000 %}
+                <div class="badge badge-warning">WARNING</div>
+              {% else %}
+                <div class="badge badge-success">OK</div>
+              {% endif %}
+
+            </div>
+
+            <!-- SOLDE -->
+            <div class="text-lg font-bold">
+              {{ item.solde|intcomma }} FCFA
+            </div>
+
+            <!-- ALERTES -->
+            <div class="mt-3 space-y-2">
+
+              <div class="text-sm font-semibold opacity-70">
+                Alertes récentes
+              </div>
+
+              {% for a in item.alertes %}
+
+                <div class="alert
+                  {% if a.niveau == 'critique' %}alert-error
+                  {% elif a.niveau == 'warning' %}alert-warning
+                  {% else %}alert-info
+                  {% endif %}
+                ">
+
+                  <span>
+                    {{ a.message }}
+                  </span>
+
+                </div>
+
+              {% empty %}
+
+                <div class="text-sm opacity-50">
+                  Aucune alerte
+                </div>
+
+              {% endfor %}
+
+            </div>
+
+          </div>
+        </div>
+
+      {% endfor %}
+
+    </div>
+
+    <!-- =========================
+         ALERTES GLOBALES
+    ========================== -->
+    <div class="space-y-4">
+
+      <h2 class="text-lg font-semibold">Alertes globales</h2>
+
+      <div class="card bg-base-100 shadow-md">
+
+        <div class="card-body space-y-2">
+
+          {% for a in alertes_globales %}
+
+            <div class="border-l-4 pl-3
+              {% if a.niveau == 'critique' %}border-red-500
+              {% elif a.niveau == 'warning' %}border-yellow-500
+              {% else %}border-blue-500
+              {% endif %}
+            ">
+
+              <div class="text-sm font-semibold">
+                {{ a.type_alerte }}
+              </div>
+
+              <div class="text-sm">
+                {{ a.message }}
+              </div>
+
+              <div class="text-xs opacity-60">
+                {{ a.date_creation|naturaltime }}
+              </div>
+
+            </div>
+
+          {% empty %}
+
+            <div class="text-sm opacity-50">
+              Aucune alerte
+            </div>
+
+          {% endfor %}
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

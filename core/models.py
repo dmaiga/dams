@@ -16,7 +16,6 @@ from decimal import Decimal, ROUND_FLOOR
 from dateutil.relativedelta import relativedelta
 from django.utils import formats
 
-
 class Client(models.Model):
     TYPE_CLIENT_CHOICES = (
         ('grossiste', 'Grossiste'),
@@ -48,6 +47,55 @@ class Produit(models.Model):
 
     def __str__(self):
         return f"{self.nom}"
+
+
+class Alerte(models.Model):
+
+    NIVEAUX = [
+        ("info", "Info"),
+        ("warning", "Warning"),
+        ("critique", "Critique"),
+    ]
+
+    TYPES = [
+        ("solde", "Solde superviseur"),
+        ("stock", "Stock ancien"),
+        ("prix", "Variation prix"),
+        ("activite", "Baisse activité"),
+    ]
+
+    type_alerte = models.CharField(max_length=30, choices=TYPES)
+    niveau = models.CharField(max_length=20, choices=NIVEAUX)
+
+    message = models.TextField()
+
+    superviseur = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="alertes_superviseur"
+    )
+
+    agent = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="alertes_agent"
+    )
+
+    produit = models.ForeignKey(
+        Produit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+    )
+
+    est_vue = models.BooleanField(default=False)
+
+    date_creation = models.DateTimeField(auto_now_add=True)
+
 
 class Fournisseur(models.Model):
     nom = models.CharField(max_length=100, unique=True)
@@ -816,7 +864,12 @@ class Agent(models.Model):
             total=Coalesce(Sum("montant_vente"), Decimal("0.00"))
         )["total"]
     
-        return recouvre_agents + ventes_perso - versements_vente
+        return (
+            recouvre_agents
+            + ventes_perso
+            - versements_vente
+            + (self.ajustement_solde or Decimal("0.00"))
+        )
     
     @property
     def cash_disponible_superviseur(self):
@@ -1794,7 +1847,6 @@ class Recouvrement(models.Model):
     agent = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        limit_choices_to={'type_agent__in': ['terrain','agent_gros']},
         related_name='recouvrements'
     )
     superviseur = models.ForeignKey(
@@ -2404,3 +2456,4 @@ class Salaire(models.Model):
 
     def __str__(self):
         return f"Salaire {self.agent.full_name} ({self.date_debut} → {self.date_fin})"
+

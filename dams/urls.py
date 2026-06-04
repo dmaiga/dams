@@ -34,8 +34,8 @@ urlpatterns = [
     path('direction/', include('direction.urls')),
     path('agents/', include('agents.urls')),
     path('paie/', include('paie.urls')),
-
-    path("app/", include("mobile.urls")),
+    path('champs/', include('analyse_champ.urls')),
+    path("app/", include("mobile.urls"))
 
 
 

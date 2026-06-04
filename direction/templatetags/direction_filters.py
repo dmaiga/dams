@@ -2,6 +2,7 @@
 from django import template
 from django.utils.formats import number_format
 from decimal import Decimal
+from datetime import datetime
 
 register = template.Library()
 
@@ -132,4 +133,28 @@ def format_number(value):
         return f"{int_str}{decimal_str}"
 
     except Exception:
+        return value
+
+
+@register.filter
+def short_datetime(value):
+
+    if not value:
+        return ''
+
+    try:
+
+        dt = datetime.fromisoformat(
+            value.replace(
+                'Z',
+                '+00:00'
+            )
+        )
+
+        return dt.strftime(
+            '%d/%m/%y %H:%M'
+        )
+
+    except Exception:
+
         return value

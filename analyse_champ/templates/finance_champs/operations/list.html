@@ -1,0 +1,278 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+
+<!-- Header -->
+
+<div class="breadcrumbs text-sm mb-2">
+
+    <ul>
+
+        <li>
+
+            <a href="{% url 'agro_dashboard' %}">
+
+                Dashboard
+
+            </a>
+
+        </li>
+
+        <li>
+
+            Produits
+
+        </li>
+
+    </ul>
+
+</div>
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Opérations
+        </h1>
+
+        <p class="text-base-content/60">
+            Revenus, dépenses et investissements stock
+        </p>
+
+    </div>
+
+    <form method="get" class="flex flex-wrap gap-2">
+
+        <select
+            name="type"
+            class="select select-bordered"
+        >
+            <option value="">
+                Toutes
+            </option>
+
+            <option
+                value="revenu"
+                {% if selected_type == 'revenu' %}
+                selected
+                {% endif %}
+            >
+                Revenus
+            </option>
+
+            <option
+                value="depense"
+                {% if selected_type == 'depense' %}
+                selected
+                {% endif %}
+            >
+                Dépenses
+            </option>
+
+        </select>
+<select
+    name="categorie"
+    class="select select-bordered"
+>
+
+    <option value="">
+        Toutes catégories
+    </option>
+
+    {% for categorie in categories %}
+
+        <option
+            value="{{ categorie.id }}"
+            {% if selected_categorie == categorie.id|stringformat:"s" %}
+            selected
+            {% endif %}
+        >
+            {{ categorie.nom }}
+        </option>
+
+    {% endfor %}
+
+</select>
+        <select
+            name="period"
+            class="select select-bordered"
+        >
+            <option value="">
+                Toute période
+            </option>
+
+            <option value="today">
+                Aujourd'hui
+            </option>
+
+            <option value="week">
+                Cette semaine
+            </option>
+
+            <option value="month">
+                Ce mois
+            </option>
+
+            <option value="year">
+                Cette année
+            </option>
+
+        </select>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Filtrer
+        </button>
+
+    </form>
+
+</div>
+
+<!-- Tableau -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body p-0">
+
+        <div class="overflow-x-auto">
+
+            <table class="table table-zebra">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Date</th>
+
+                        <th>Type</th>
+
+                        <th>Catégorie</th>
+
+                        <th>Libellé</th>
+                        
+                        <th>Quantité</th>
+                        <th>Montant init</th>
+
+                        <th>Correction</th>
+                        <th></th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for operation in operations %}
+
+                    <tr>
+
+                        <td>
+                            {{ operation.operation_date }}
+                        </td>
+
+                        <td>
+
+                            {% if operation.operation_type == 'revenu' %}
+
+                                <div class="badge badge-success">
+                                    Revenu
+                                </div>
+
+                            {% else %}
+
+                                <div class="badge badge-error">
+                                    Dépense
+                                </div>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+                            {{ operation.categorie_nom }}
+                        </td>
+
+                        <td>
+
+                            <div class="font-semibold">
+                                {{ operation.label }}
+                            </div>
+
+                        </td>
+                       
+                            <td>
+
+                            <div class="font-bold">
+                                {% if operation.quantity  %}
+                                    {{ operation.quantity }}
+                                {% else %}
+                                     -
+                                {% endif %}
+                                </div>
+
+                            </td>
+                       
+
+                            </div>
+
+                        </td>
+                        <td>
+
+                            <div class="font-bold">
+
+                                {{ operation.montant_initial }}
+
+                            </div>
+
+                        </td>
+
+                        <td>
+
+                            {% if operation.is_corrected %}
+
+                                <div class="badge badge-warning">
+                                    {{ operation.montant_ecart }}
+                                </div>
+
+                            {% else %}
+
+                                <div class="badge badge-ghost">
+                                    -
+                                </div>
+
+                            {% endif %}
+
+                        </td>
+<td>
+
+    <a
+        href="{% url 'agro_operation_detail' operation.id %}"
+        class="btn btn-xs btn-outline btn-primary"
+    >
+        Détail
+    </a>
+
+</td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+</div>
+
+{% endblock %}

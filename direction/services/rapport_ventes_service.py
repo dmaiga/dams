@@ -21,7 +21,8 @@ class RapportVentesService:
                 "agent__user__first_name",
                 "agent__user__last_name",
                 "date_vente__date",
-                "detail_distribution__lot__produit__nom"
+                "detail_distribution__lot__produit__nom",
+                "detail_distribution__lot__produit__poids_unitaire_kg"
             )
             .annotate(
                 # 🔹 Quantité vendue (unités)
@@ -74,7 +75,7 @@ class RapportVentesService:
             Agent.objects
             .filter(
                 est_actif=True,
-                type_agent__in=["terrain", "agent_gros"]
+                type_agent__in=['terrain', 'agent_gros','stagiaire','agent_polivalent']
             )
             .exclude(id__in=agents_ayant_vendu)
             .select_related("user")

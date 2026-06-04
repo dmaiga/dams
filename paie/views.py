@@ -2,27 +2,31 @@ from multiprocessing import context
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import datetime, timedelta
-from django.utils import timezone
-from django.contrib.auth.mixins import LoginRequiredMixin
+
 from django.views import View
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from core.models import Salaire
+from core.models import Salaire,Vente,Agent
+from paie.services.salaire_calculator import CalculatorSalaire
 from paie.services.salaire_liste_service import SalaireListeService
 from paie.services.salaire_generation_service import SalaireGenerationService
 
+
+from datetime import date
+from calendar import monthrange
+from decimal import Decimal
+
 import openpyxl
-from openpyxl.styles import Font
+
 from django.http import HttpResponse
-
-from calendar import monthrange
-from datetime import date
 from django.utils import timezone
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
+
+from openpyxl.styles import Font
 
 
-from calendar import monthrange
-from datetime import date
-from django.utils import timezone
+
 
 class SalaireLectureView(LoginRequiredMixin, TemplateView):
     template_name = "paie/salaire_liste.html"
@@ -120,9 +124,14 @@ class SalaireLectureView(LoginRequiredMixin, TemplateView):
         return context
 
 
+
 def export_salaires_mamies_excel(request):
+
     today = timezone.now().date()
 
+    # ==========================
+    # PARAMS
+    # ==========================
     month = request.GET.get("month")
     year = request.GET.get("year")
 
@@ -133,11 +142,30 @@ def export_salaires_mamies_excel(request):
         month = today.month
         year = today.year
 
+    # ==========================
+    # PERIODE COURANTE (N)
+    # ==========================
     last_day = monthrange(year, month)[1]
     date_debut = date(year, month, 1)
     date_fin = date(year, month, last_day)
 
-    # 🔹 On filtre uniquement les mamies
+    # ==========================
+    # PERIODE N-1
+    # ==========================
+    if month == 1:
+        prev_month = 12
+        prev_year = year - 1
+    else:
+        prev_month = month - 1
+        prev_year = year
+
+    prev_last_day = monthrange(prev_year, prev_month)[1]
+    date_debut_prev = date(prev_year, prev_month, 1)
+    date_fin_prev = date(prev_year, prev_month, prev_last_day)
+
+    # ==========================
+    # DATA MOIS COURANT (SERVICE)
+    # ==========================
     result = SalaireListeService.get_salaires(
         date_debut=date_debut,
         date_fin=date_fin,
@@ -147,7 +175,7 @@ def export_salaires_mamies_excel(request):
     mamies = result["mamies"]
 
     # ==========================
-    # CREATION EXCEL
+    # EXCEL
     # ==========================
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -156,7 +184,9 @@ def export_salaires_mamies_excel(request):
     headers = [
         "Agent",
         "Superviseur",
-        "Kg vendus",
+        "Kg vendus (N)",
+        "Kg vendus (N-1)",
+        "Variation Kg",
         "Salaire base",
         "Incentive",
         "Salaire total",
@@ -170,11 +200,30 @@ def export_salaires_mamies_excel(request):
     for cell in ws[1]:
         cell.font = Font(bold=True)
 
+    # ==========================
+    # DATA LIGNES
+    # ==========================
     for s in mamies:
+
+        agent = s["agent"]
+
+
+        calc_prev = CalculatorSalaire.calcul_salaire_mamy(
+            agent,
+            date_debut_prev,
+            date_fin_prev
+        )
+
+        kilo_n_1 = calc_prev["kilo_total"]
+
+        variation = s["kilo_total"] - kilo_n_1
+
         ws.append([
-            s["agent"].full_name,
+            agent.full_name,
             s["superviseur"].full_name if s["superviseur"] else "",
             float(s["kilo_total"]),
+            float(kilo_n_1),
+            float(variation),
             float(s["salaire_base"]),
             float(s["incentive"]),
             float(s["salaire_total"]),
@@ -182,16 +231,27 @@ def export_salaires_mamies_excel(request):
             s.get("jours_mois"),
         ])
 
+    # ==========================
+    # AUTO SIZE
+    # ==========================
+    for column_cells in ws.columns:
+        length = max(len(str(cell.value or "")) for cell in column_cells)
+        ws.column_dimensions[column_cells[0].column_letter].width = length + 5
+
+    # ==========================
+    # RESPONSE
+    # ==========================
     filename = f"salaires_mamies_{month}_{year}.xlsx"
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     wb.save(response)
-    return response
 
+    return response
 
 def export_salaires_gros_excel(request):
     today = timezone.now().date()

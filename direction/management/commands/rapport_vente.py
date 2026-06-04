@@ -1,3 +1,4 @@
+#rapport_vente.py
 from django.core.management.base import BaseCommand
 from datetime import datetime
 import os

@@ -96,7 +96,7 @@ class SuperviseurDashboardService:
     def get_agents(superviseur):
         return Agent.objects.filter(
             superviseur=superviseur,
-            type_agent__in=['terrain', 'agent_gros'],
+            type_agent__in=['terrain', 'agent_gros','stagiaire','agent_polivalent'],
             est_actif=True
         ).select_related('user')
 

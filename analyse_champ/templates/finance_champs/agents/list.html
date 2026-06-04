@@ -1,0 +1,255 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+<!-- Header -->
+
+<div class="breadcrumbs text-sm mb-2">
+
+    <ul>
+
+        <li>
+
+            <a href="{% url 'agro_dashboard' %}">
+
+                Dashboard
+
+            </a>
+
+        </li>
+
+        <li>
+
+            Produits
+
+        </li>
+
+    </ul>
+
+</div>
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Agents
+        </h1>
+
+        <p class="text-base-content/60">
+            Performance et participation à la production
+        </p>
+
+    </div>
+
+    <form method="get" class="flex gap-2">
+
+        <select
+            name="period"
+            class="select select-bordered"
+        >
+            <option value="">
+                Toute période
+            </option>
+
+            <option value="today">
+                Aujourd'hui
+            </option>
+
+            <option value="week">
+                Cette semaine
+            </option>
+
+            <option value="month">
+                Ce mois
+            </option>
+
+            <option value="year">
+                Cette année
+            </option>
+
+        </select>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Filtrer
+        </button>
+
+    </form>
+
+</div>
+
+<!-- Résumé -->
+
+<div class="stats shadow w-full">
+
+    <div class="stat">
+
+        <div class="stat-title">
+            Agents actifs
+        </div>
+
+        <div class="stat-value">
+
+            {{ agents|length }}
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Classement -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Classement des agents
+        </h2>
+
+        <div class="overflow-x-auto">
+
+            <table class="table table-zebra">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Rang
+                        </th>
+
+                        <th>
+                            Agent
+                        </th>
+
+                        <th>
+                            Interventions
+                        </th>
+
+                        <th>
+                            Quantité attachée
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for agent in agents %}
+
+                    <tr>
+
+                        <td>
+
+                            <div class="badge badge-primary">
+
+                                {{ forloop.counter }}
+
+                            </div>
+
+                        </td>
+
+                        <td>
+
+                            <div class="font-bold">
+
+                            
+                                {{ agent.agent_nom }}
+
+                            </div>
+
+                        </td>
+
+                        <td>
+
+                            {{ agent.nombre_interventions }}
+
+                        </td>
+
+                        <td>
+
+                            <span class="font-bold text-success">
+
+                                {{ agent.quantite_totale }}
+
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td
+                            colspan="4"
+                            class="text-center py-8"
+                        >
+
+                            Aucune donnée disponible.
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Top 3 -->
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    {% for agent in agents|slice:":3" %}
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body text-center">
+
+            <div class="text-lg font-bold">
+
+                {{ agent.agent__prenom }}
+                {{ agent.agent__nom }}
+
+            </div>
+
+            <div class="text-4xl font-black text-primary">
+
+                {{ agent.quantite_totale }}
+
+            </div>
+
+            <p class="text-base-content/60">
+
+                unités attachées
+
+            </p>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+
+</div>
+
+{% endblock %}

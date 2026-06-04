@@ -1,5 +1,5 @@
 from django import forms
-from datetime import datetime
+from datetime import date, datetime
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.db import models
@@ -577,9 +577,9 @@ class RecouvrementSuperviseurForm(forms.ModelForm):
             )
 
         return date
-
-
+    
 class DistributionSuperviseurSimplifieeForm(forms.Form):
+    
     agent = forms.ModelChoiceField(
         queryset=Agent.objects.none(),
         label="Agent"

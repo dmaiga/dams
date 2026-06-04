@@ -18,7 +18,8 @@ from direction.views import (
                                  liste_clotures,apercu_cloture,cloturer_periode,  
                                  api_calcul_salaire_rapide,export_salaires_excel,
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
-                                 RotDetailView,analyse_operationnelle                                     
+                                 RotDetailView,analyse_operationnelle ,
+                                 suivi_distributions,monitoring_alertes_dashboard                                  
                               )
 
 
@@ -124,6 +125,12 @@ urlpatterns = [
     path('salaires/export-excel/', export_salaires_excel, name='export_salaires_excel'),
     path('api/salaires/calcul-rapide/', api_calcul_salaire_rapide, name='api_calcul_salaire_rapide'),
 
+     path(
+         "suivi-distributions/",
+         suivi_distributions,
+         name="suivi_distributions"
+     ),
+    path("monitoring/alertes/", monitoring_alertes_dashboard, name="monitoring_alertes"),
 ]
 
 

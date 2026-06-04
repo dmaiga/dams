@@ -1,0 +1,337 @@
+{% extends 'base_admin.html' %}
+{% load direction_filters format_fcfa %}
+{% block content %}
+
+<div class="space-y-6">
+<!-- Retour -->
+
+<div>
+
+    <a
+        href="{% url 'agro_operation_list' %}"
+        class="btn btn-ghost"
+    >
+        ← Retour aux opérations
+    </a>
+
+</div>
+
+<!-- En-tête -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <div class="flex flex-col lg:flex-row lg:justify-between gap-4">
+
+            <div>
+
+                <h1 class="text-3xl font-bold">
+
+                    {{ operation.label }}
+
+                </h1>
+
+                <p class="text-base-content/60">
+
+                    {{ operation.operation_date }}
+
+                </p>
+
+            </div>
+
+            <div>
+
+                {% if operation.operation_type == 'revenu' %}
+
+                    <div class="badge badge-success badge-lg">
+
+                        Revenu
+
+                    </div>
+
+                {% else %}
+
+                    <div class="badge badge-error badge-lg">
+
+                        Dépense
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Informations -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Informations générales
+        </h2>
+
+        <div class="overflow-x-auto">
+
+            <table class="table">
+
+                <tbody>
+
+                    <tr>
+
+                        <th>
+                            Catégorie
+                        </th>
+
+                        <td>
+
+                            {{ operation.categorie_nom }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            Quantité
+                        </th>
+
+                        <td>
+
+                            {{ operation.quantity|format_number }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            Prix unitaire
+                        </th>
+
+                        <td>
+
+                            {{ operation.unit_price|fcfa }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            Date opération
+                        </th>
+
+                        <td>
+
+                            {{ operation.operation_date }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            Créée le
+                        </th>
+
+                        <td>
+
+                            {{ operation.created_at|short_datetime }}
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Montants -->
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Montant retenu
+        </div>
+
+        <div class="stat-value ">
+
+            {{ operation.montant_reel|fcfa }}
+
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Montant initial
+        </div>
+
+        <div class="stat-value text-slate-400">
+
+            {{ operation.montant_initial|fcfa }}
+
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Écart
+        </div>
+
+        <div class="stat-value text-error">
+
+            {{ operation.montant_ecart|fcfa }}
+
+        </div>
+
+    </div>
+
+</div>
+<!-- Note -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Note de l'opération
+        </h2>
+
+        {% if operation.note %}
+
+            <div class="prose max-w-none">
+
+                {{ operation.note|linebreaks }}
+
+            </div>
+
+        {% else %}
+
+            <p class="text-base-content/50">
+
+                Aucune note renseignée.
+
+            </p>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+<!-- Corrections -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+
+            Historique des corrections
+
+        </h2>
+
+        {% if operation.corrections %}
+
+            <div class="overflow-x-auto">
+
+                <table class="table table-zebra">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Date
+                            </th>
+
+                            <th>
+                                Montant
+                            </th>
+
+                            <th>
+                                Justification
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for correction in operation.corrections %}
+
+                        <tr>
+
+                            <td>
+
+                                {{ correction.created_at|short_datetime }}
+
+                            </td>
+
+                            <td>
+
+                                {{ correction.amount|fcfa }}
+
+                            </td>
+
+                            <td>
+
+                                {{ correction.note }}
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <div class="alert">
+
+                <span>
+                    Cette opération n'a jamais été corrigée.
+                </span>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+
+</div>
+
+{% endblock %}

@@ -11,7 +11,7 @@ from datetime import datetime, time
 class VenteAnalyseService:
  
     @staticmethod
-    def filter_ventes(date_debut, date_fin, agent_id=None, type_vente=None, produit_id=None, lot_id=None  ):
+    def filter_ventes(date_debut, date_fin, agent_id=None,superviseur_id=None, type_vente=None, produit_id=None, lot_id=None  ):
         qs = (
             Vente.objects
             .select_related(
@@ -35,7 +35,10 @@ class VenteAnalyseService:
             qs = qs.filter(detail_distribution__lot__produit_id=produit_id)
         if lot_id:
             qs = qs.filter(detail_distribution__lot_id=lot_id)
-        
+        if superviseur_id:
+            qs = qs.filter(
+                agent__superviseur_id=superviseur_id
+            )
         return qs
 
     # ------------------------------------------------------------------
@@ -113,6 +116,21 @@ class VenteAnalyseService:
 
         ).select_related("user").order_by("user__first_name")
 
+    @staticmethod
+    def get_superviseurs_list():
+
+        return (
+            Agent.objects
+            .filter(
+                est_actif=True,
+                type_agent="entrepot"
+            )
+            .select_related("user")
+            .order_by(
+                "user__first_name",
+                "user__last_name"
+            )
+        )
     # ------------------------------------------------------------------
     @staticmethod
     def normalize_period(periode, params):

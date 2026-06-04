@@ -1,0 +1,252 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+
+<!-- Header -->
+
+<!-- Fil d'Ariane -->
+
+<div class="breadcrumbs text-sm mb-2">
+
+    <ul>
+
+        <li>
+
+            <a href="{% url 'agro_dashboard' %}">
+
+                Dashboard
+
+            </a>
+
+        </li>
+
+        <li>
+
+            Produits
+
+        </li>
+
+    </ul>
+
+</div>
+
+<!-- Header -->
+
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+    <div>
+
+        <h1 class="text-3xl font-bold">
+            Produits
+        </h1>
+
+        <p class="text-base-content/60">
+            Suivi des stocks et de la production
+        </p>
+
+    </div>
+
+    <form method="get" class="flex gap-2">
+
+        <select
+            name="period"
+            class="select select-bordered"
+        >
+            <option value="">
+                Toute période
+            </option>
+
+            <option value="today">
+                Aujourd'hui
+            </option>
+
+            <option value="week">
+                Cette semaine
+            </option>
+
+            <option value="month">
+                Ce mois
+            </option>
+
+            <option value="year">
+                Cette année
+            </option>
+
+        </select>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Filtrer
+        </button>
+
+    </form>
+
+</div>
+
+<!-- Tableau -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body p-0">
+
+        <div class="overflow-x-auto">
+
+            <table class="table table-zebra">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Produit</th>
+
+                        <th>Date</th>
+
+                        <th>Achat</th>
+
+                        <th>Initial</th>
+
+                        <th>Vendu</th>
+
+                        <th>Offert</th>
+
+                        <th>Perdu</th>
+
+                        <th>Restant</th>
+
+                        <th>Production</th>
+
+                        <th></th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for product in products %}
+
+                    <tr>
+
+                        <td>
+
+                            <div class="font-bold">
+                                {{ product.nom }}
+                            </div>
+
+                            <div class="text-sm opacity-60">
+                                {{ product.categorie_nom }}
+                            </div>
+
+                        </td>
+
+                        <td>
+                            {{ product.operation_date }}
+                        </td>
+
+                        <td>
+
+                            {{ product.montant_achat }}
+
+                        </td>
+
+                        <td>
+
+                            {{ product.quantite_initiale }}
+
+                        </td>
+
+                        <td class="text-success font-semibold">
+
+                            {{ product.quantite_vendue }}
+
+                        </td>
+
+                        <td class="text-info font-semibold">
+
+                            {{ product.quantite_offerte }}
+
+                        </td>
+
+                        <td class="text-error font-semibold">
+
+                            {{ product.quantite_perdue }}
+
+                        </td>
+
+                        <td>
+
+                            <div class="badge badge-primary">
+
+                                {{ product.stock_restant }}
+
+                            </div>
+
+                        </td>
+
+                        <td>
+
+                            {% if product.production_est_equilibree %}
+
+                                <div class="badge badge-success">
+                                    OK
+                                </div>
+
+                            {% else %}
+
+                                <div class="badge badge-warning">
+                                    Pas equilibrée
+                                </div>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td>
+
+                            <a
+                                href="{% url 'agro_product_detail' product.id %}"
+                                class="btn btn-sm btn-outline"
+                            >
+                                Détail
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td
+                            colspan="10"
+                            class="text-center py-8"
+                        >
+
+                            Aucun produit trouvé.
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+</div>
+
+{% endblock %}

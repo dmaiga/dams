@@ -148,6 +148,36 @@
                     <option value="detail" {% if request.GET.type == 'detail' %}selected{% endif %}>Détail</option>
                 </select>
             </div>
+            <div>
+    <label class="block text-xs font-medium text-gray-700 mb-1">
+        <i class="fas fa-user-tie text-gray-400 mr-1"></i>
+        Superviseur
+    </label>
+
+    <select
+        name="superviseur"
+        class="select select-sm select-bordered w-full"
+    >
+
+        <option value="">
+            Tous les superviseurs
+        </option>
+
+        {% for superviseur in superviseurs_list %}
+
+        <option
+            value="{{ superviseur.id }}"
+            {% if request.GET.superviseur == superviseur.id|stringformat:"i" %}
+            selected
+            {% endif %}
+        >
+            {{ superviseur.full_name }}
+        </option>
+
+        {% endfor %}
+
+    </select>
+</div>
 
             <!-- Boutons d'action -->
             <div class="flex-1 flex justify-end gap-2">

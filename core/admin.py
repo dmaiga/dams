@@ -17,6 +17,54 @@ from django.forms import ModelForm
 from django.utils.html import format_html
 from .models import FactureLotEntrepot
 
+# direction/admin.py
+
+from django.contrib import admin
+from core.models import Alerte
+
+
+@admin.register(Alerte)
+class AlerteSoldeAdmin(admin.ModelAdmin):
+
+    list_display = (
+        "id",
+        "type_alerte",
+        "niveau",
+        "superviseur",
+        "agent",
+        "produit",
+        "est_vue",
+        "date_creation",
+    )
+
+    list_filter = (
+        "type_alerte",
+        "niveau",
+        "est_vue",
+        "date_creation",
+    )
+
+    search_fields = (
+        "message",
+        "superviseur__username",
+        "superviseur__first_name",
+        "superviseur__last_name",
+        "agent__username",
+        "agent__first_name",
+        "agent__last_name",
+        "produit__nom",
+    )
+
+    readonly_fields = (
+        "date_creation",
+    )
+
+    ordering = (
+        "-date_creation",
+    )
+
+    list_per_page = 50
+
 @admin.register(Fournisseur)
 class FournisseurAdmin(admin.ModelAdmin):
     list_display = ('nom', 'contact', 'email', 'adresse', 'date_ajout')
@@ -27,8 +75,6 @@ class FournisseurAdmin(admin.ModelAdmin):
 class ProduitAdmin(admin.ModelAdmin):
     list_display = ['nom', 'description', 'poids_unitaire_kg']
     search_fields = ['nom']
-
-
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):

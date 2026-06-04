@@ -15,6 +15,12 @@ from pathlib import Path
 import environ
 from datetime import date
 import environ
+import os
+from pathlib import Path
+from django.utils.translation import gettext_lazy as _
+from dotenv import load_dotenv
+
+load_dotenv()
 
 DATE_DEBUT_ROT = date(2026, 1, 1)
 
@@ -26,14 +32,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-2x4e*#nq132qb-klx01z-9yp=n*$u6=e#m$ce54z&$e1mo6ii('
 
+API_URL=os.getenv(
+    "API_URL",
+    "127.0.0.1"
+)
+
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "unsafe-dev-secret-key"
+)
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "127.0.0.1,localhost"
+).split(",")
 
-import os
+
 
 # URLs de redirection
 LOGIN_URL = 'login'
@@ -59,13 +76,12 @@ INSTALLED_APPS = [
     'agents',
     'direction',
     'paie',
+    'analyse_champ',
     'mobile',
 
 
-
-
-
 ]
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # l’authentification classique
     'core.backends.TelephoneBackend',             # ✅ ton backend téléphone
@@ -128,6 +144,27 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT'),
     }
 }
+#if DEBUG:
+#
+#    DATABASES = {
+#        'default': {
+#            'ENGINE': 'django.db.backends.sqlite3',
+#            'NAME': BASE_DIR / 'db.sqlite3',
+#        }
+#    }
+#
+#else:
+#
+#    DATABASES = {
+#        'default': {
+#            'ENGINE': 'django.db.backends.postgresql',
+#            'NAME': os.getenv('DB_NAME'),
+#            'USER': os.getenv('DB_USER'),
+#            'PASSWORD': os.getenv('DB_PASSWORD'),
+#            'HOST': os.getenv('DB_HOST'),
+#            'PORT': os.getenv('DB_PORT'),
+#        }
+#    }
 
 CACHES = {
     "default": {
@@ -137,13 +174,7 @@ CACHES = {
 
 
 
-#DATABASES = {
-#    'default': dj_database_url.config(
-#        default=env("DATABASE_URL"),
-#        conn_max_age=600,
-#        ssl_require=True
-#    )
-#}
+
 
 
 # Password validation
@@ -168,7 +199,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'fr-fr'
 
 TIME_ZONE = 'UTC'
 

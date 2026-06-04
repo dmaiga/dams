@@ -54,7 +54,7 @@ class Command(BaseCommand):
         superviseurs = Agent.objects.filter(type_agent="entrepot", est_actif=True)
 
         if not superviseurs.exists():
-            self.stdout.write(self.style.WARNING("⚠️ Aucun superviseur trouvé"))
+            self.stdout.write(self.style.WARNING(" Aucun superviseur trouvé"))
             return
 
         for month_start in months:
@@ -71,7 +71,7 @@ class Command(BaseCommand):
 
             self.stdout.write(
                 self.style.NOTICE(
-                    f"\n📅 Clôture {mois:02d}/{annee} ({date_debut} → {date_fin})"
+                    f"\n Clôture {mois:02d}/{annee} ({date_debut} -> {date_fin})"
                 )
             )
 
@@ -94,7 +94,7 @@ class Command(BaseCommand):
                     if cloture.est_cloture:
                         self.stdout.write(
                             self.style.WARNING(
-                                f"⏭️ {superviseur} : déjà clôturé"
+                                f"{superviseur} : déjà clôturé"
                             )
                         )
                         continue
@@ -115,11 +115,11 @@ class Command(BaseCommand):
 
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"✅ {superviseur} | Solde clôturé = {cloture.solde_cloture}"
+                            f" {superviseur} | Solde clôturé = {cloture.solde_cloture}"
                         )
                     )
 
-        self.stdout.write(self.style.SUCCESS("\n🎉 Clôture terminée"))
+        self.stdout.write(self.style.SUCCESS("\n Clôture terminée"))
 
     def _get_solde_ouverture(self, superviseur):
         derniere = ClotureMensuelle.objects.filter(

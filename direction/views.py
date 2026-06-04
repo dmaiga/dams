@@ -520,6 +520,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         type_vente = params.get("type")
         produit_id = params.get("produit")
         lot_id = params.get("lot")
+        superviseur_id = params.get("superviseur")
 
         qs = VenteAnalyseService.filter_ventes(
             date_debut=date_debut,
@@ -528,6 +529,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             type_vente=type_vente,
             produit_id=produit_id,
             lot_id=lot_id,
+            superviseur_id=superviseur_id
         )
 
         dernier_recouvrement = Recouvrement.objects.filter(
@@ -578,7 +580,10 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         stats = VenteAnalyseService.compute_stats(ventes_qs)
         top_agents = VenteAnalyseService.compute_top_agents(ventes_qs)
         agents_list = VenteAnalyseService.get_agents_list()
-
+        superviseurs_list = (
+            VenteAnalyseService
+            .get_superviseurs_list()
+        )
         current_year = timezone.now().year
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),
@@ -598,6 +603,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
             "top_agents": top_agents,
             "agents_list": agents_list,
+            "superviseurs_list": superviseurs_list,
             "produits_list": Produit.objects.only("id", "nom").order_by("nom"),
             "lots_list": LotEntrepot.objects.select_related("produit")
                         .order_by("-date_reception"),
@@ -1655,3 +1661,199 @@ def api_calcul_salaire_rapide(request):
             
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+
+
+from decimal import Decimal
+
+from django.core.paginator import Paginator
+from django.db.models import (
+    F,
+    Q,
+    Sum,
+    Value,
+    DecimalField,
+    ExpressionWrapper
+)
+from django.db.models.functions import Coalesce
+from django.shortcuts import render
+
+from core.models import (
+    Agent,
+    Produit,
+    DetailDistribution,
+)
+
+
+def suivi_distributions(request):
+
+    details = (
+        DetailDistribution.objects
+        .select_related(
+            "lot",
+            "lot__produit",
+            "distribution",
+            "distribution__superviseur",
+            "distribution__agent_terrain",
+        )
+        .annotate(
+
+            # Total vendu RÉEL
+            total_vendu=Coalesce(
+                Sum(
+                    "vente__quantite",
+                    filter=Q(vente__est_supprime=False)
+                ),
+                Value(Decimal("0.00")),
+                output_field=DecimalField(
+                    max_digits=10,
+                    decimal_places=2
+                )
+            )
+        )
+        .annotate(
+
+            # Stock restant
+            restant=ExpressionWrapper(
+                F("quantite") - F("total_vendu"),
+                output_field=DecimalField(
+                    max_digits=10,
+                    decimal_places=2
+                )
+            )
+        )
+    )
+
+    # ==================================================
+    # FILTRES
+    # ==================================================
+
+    superviseur_id = request.GET.get("superviseur")
+    agent_id = request.GET.get("agent")
+    produit_id = request.GET.get("produit")
+    statut = request.GET.get("statut")
+
+    date_debut = request.GET.get("date_debut")
+    date_fin = request.GET.get("date_fin")
+
+    if superviseur_id:
+        details = details.filter(
+            distribution__superviseur_id=superviseur_id
+        )
+
+    if agent_id:
+        details = details.filter(
+            distribution__agent_terrain_id=agent_id
+        )
+
+    if produit_id:
+        details = details.filter(
+            lot__produit_id=produit_id
+        )
+
+    if date_debut:
+        details = details.filter(
+            distribution__date_distribution__date__gte=date_debut
+        )
+
+    if date_fin:
+        details = details.filter(
+            distribution__date_distribution__date__lte=date_fin
+        )
+
+    # ==================================================
+    # STATUTS
+    # ==================================================
+
+    if statut == "restant":
+        details = details.filter(restant__gt=0)
+
+    elif statut == "ecoule":
+        details = details.filter(restant__lte=0)
+
+    elif statut == "dormant":
+        details = details.filter(restant__gt=0)
+
+    # ==================================================
+    # PAGINATION
+    # ==================================================
+
+    paginator = Paginator(
+        details.order_by(
+            "-distribution__date_distribution"
+        ),
+        20
+    )
+
+    page_number = request.GET.get("page")
+
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+
+        "superviseurs": Agent.objects.filter(
+            type_agent='entrepot'
+        ),
+
+        "agents": Agent.objects.filter(
+            type_agent__in=['terrain', 'agent_gros','stagiaire','agent_polivalent']
+        ),
+
+        "produits": Produit.objects.all(),
+        "labels_agents": {
+            'terrain': 'Mami',
+            'agent_gros': 'Agent Gros',
+            'stagiaire': 'Stagiaire',
+            'agent_polivalent': 'Polyvalent'
+        }
+    }
+
+    return render(
+        request,
+        "direction/analyses/stock/suivi_distributions.html",
+        context
+    )
+
+# direction/views.py
+
+from django.shortcuts import render
+from core.models import Agent, Alerte
+from direction.services.alertes.solde import SoldeAlertService
+
+
+def monitoring_alertes_dashboard(request):
+
+    # superviseurs actifs
+    superviseurs = Agent.objects.filter(
+        type_agent="entrepot",
+        est_actif=True
+    ).select_related("user")
+
+    data_superviseurs = []
+
+    for sup in superviseurs:
+
+        # recalcul solde + génération alertes
+        solde = SoldeAlertService.check_superviseur_solde(sup)
+
+        # alertes non vues
+        alertes = Alerte.objects.filter(
+            superviseur=sup.user,
+            est_vue=False
+        ).order_by("-date_creation")[:10]
+
+        data_superviseurs.append({
+            "superviseur": sup,
+            "solde": solde,
+            "alertes": alertes,
+        })
+
+    # alertes globales récentes
+    alertes_globales = Alerte.objects.all().order_by("-date_creation")[:30]
+
+    return render(request, "direction/monitoring/dashboard.html", {
+        "data_superviseurs": data_superviseurs,
+        "alertes_globales": alertes_globales,
+    })

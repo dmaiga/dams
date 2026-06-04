@@ -1,0 +1,356 @@
+{% extends 'base_admin.html' %}
+{% load direction_filters format_fcfa %}
+{% block content %}
+
+<div class="space-y-6">
+
+<!-- Retour -->
+
+<div>
+
+    <a
+        href="{% url 'agro_product_list' %}"
+        class="btn btn-ghost"
+    >
+        ← Retour
+    </a>
+
+</div>
+
+<!-- Header -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <div class="flex flex-col lg:flex-row lg:justify-between gap-4">
+
+            <div>
+
+                <h1 class="text-3xl font-bold">
+                    {{ product.nom }}
+                </h1>
+
+                <p class="text-base-content/60">
+
+                    {{ product.categorie_nom }}
+
+                </p>
+
+            </div>
+
+            <div>
+
+                {% if product.production_est_equilibree %}
+
+                    <div class="badge badge-success badge-lg">
+                        Production équilibrée
+                    </div>
+
+                {% else %}
+
+                    <div class="badge badge-warning badge-lg">
+                        Vérification requise
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- KPI Produit -->
+
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+
+    <div class="stat bg-base-100 shadow rounded-box">
+
+        <div class="stat-title">
+            Initial
+        </div>
+
+        <div class="stat-value text-primary">
+
+            {{ product.quantite_initiale }}
+
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box">
+
+        <div class="stat-title">
+            Vendu
+        </div>
+
+        <div class="stat-value text-success">
+
+            {{ product.quantite_vendue }}
+
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box">
+
+        <div class="stat-title">
+            Offert
+        </div>
+
+        <div class="stat-value text-info">
+
+            {{ product.quantite_offerte }}
+
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box">
+
+        <div class="stat-title">
+            Perdu
+        </div>
+
+        <div class="stat-value text-error">
+
+            {{ product.quantite_perdue }}
+
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box">
+
+        <div class="stat-title">
+            Restant
+        </div>
+
+        <div class="stat-value">
+
+            {{ product.stock_restant }}
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Informations achat -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Informations du lot
+        </h2>
+
+        <div class="overflow-x-auto">
+
+            <table class="table">
+
+                <tbody>
+
+                    <tr>
+
+                        <th>
+                            Date d'achat
+                        </th>
+
+                        <td>
+                            {{ product.operation_date }}
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            Montant d'achat
+                        </th>
+
+                        <td>
+
+                            {{ product.montant_achat|fcfa }}
+
+                        </td>
+
+                    </tr>
+
+                    <tr>
+
+                        <th>
+                            Observations
+                        </th>
+
+                        <td>
+
+                            {{ product.note|default:"Aucune note" }}
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Contrôle Production -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Contrôle de production
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div class="alert">
+
+                <div>
+
+                    <span class="font-bold">
+                        Quantité attendue
+                    </span>
+
+                    <div>
+
+                        {{ product.quantite_theorique }}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="alert">
+
+                <div>
+
+                    <span class="font-bold">
+                        Quantité attachée
+                    </span>
+
+                    <div>
+
+                        {{ product.quantite_attachee_totale }}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Contributions -->
+
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Contributions des agents
+        </h2>
+
+        <div class="overflow-x-auto">
+
+            <table class="table table-zebra">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Agent
+                        </th>
+
+                        <th>
+                            Quantité attachée
+                        </th>
+
+                        <th>
+                            Date
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for contribution in product.contributions %}
+
+                    <tr>
+
+                        <td>
+
+                            {{ contribution.agent_nom }}
+
+                        </td>
+
+                        <td>
+
+                            <span class="font-bold">
+
+                                {{ contribution.quantite_attachee }}
+
+                            </span>
+
+                        </td>
+
+                        <td>
+
+                            {{ contribution.created_at|short_datetime }}
+
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+
+                    <tr>
+
+                        <td
+                            colspan="3"
+                            class="text-center py-8"
+                        >
+
+                            Aucune contribution enregistrée.
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+</div>
+
+{% endblock %}

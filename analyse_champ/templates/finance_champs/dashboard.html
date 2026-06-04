@@ -1,0 +1,245 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+
+<!-- Header -->
+
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+    <div>
+        <h1 class="text-3xl font-bold">
+            Tableau de bord
+        </h1>
+
+        <p class="text-base-content/60">
+            Vue consolidée des activités DAM'S Agro
+        </p>
+    </div>
+
+    <form method="get" class="flex gap-2">
+
+        <select
+            name="period"
+            class="select select-bordered"
+        >
+            <option value="">
+                Toute période
+            </option>
+
+            <option value="today">
+                Aujourd'hui
+            </option>
+
+            <option value="week">
+                Cette semaine
+            </option>
+
+            <option value="month">
+                Ce mois
+            </option>
+
+            <option value="year">
+                Cette année
+            </option>
+
+        </select>
+
+        <button
+            type="submit"
+            class="btn btn-primary"
+        >
+            Filtrer
+        </button>
+
+    </form>
+
+</div>
+
+<!-- KPIs -->
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Revenus
+        </div>
+
+        <div class="stat-value text-success">
+            {{ dashboard.revenus }}
+        </div>
+
+        <div class="stat-desc">
+            FCFA
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Dépenses
+        </div>
+
+        <div class="stat-value text-error">
+            {{ dashboard.depenses }}
+        </div>
+
+        <div class="stat-desc">
+            FCFA
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Résultat
+        </div>
+
+        <div class="stat-value">
+
+            {{ dashboard.resultat }}
+
+        </div>
+
+        <div class="stat-desc">
+            FCFA
+        </div>
+
+    </div>
+
+    <div class="stat bg-base-100 rounded-box shadow">
+
+        <div class="stat-title">
+            Opérations
+        </div>
+
+        <div class="stat-value">
+
+            {{ dashboard.nombre_operations }}
+
+        </div>
+
+        <div class="stat-desc">
+            Enregistrées
+        </div>
+
+    </div>
+
+</div>
+
+<!-- KPIs secondaires -->
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body">
+
+            <h2 class="card-title">
+                Produits
+            </h2>
+
+            <div class="text-4xl font-bold">
+
+                {{ dashboard.nombre_produits }}
+
+            </div>
+
+            <p class="text-base-content/60">
+                Lots enregistrés
+            </p>
+
+        </div>
+
+    </div>
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body">
+
+            <h2 class="card-title">
+                Agents
+            </h2>
+
+            <div class="text-4xl font-bold">
+
+                {{ dashboard.nombre_agents }}
+
+            </div>
+
+            <p class="text-base-content/60">
+                Agents ayant participé
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Navigation rapide -->
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <a
+        href="{% url 'agro_operation_list' %}"
+        class="card bg-primary text-primary-content shadow hover:shadow-lg transition"
+    >
+        <div class="card-body">
+
+            <h2 class="card-title">
+                Opérations
+            </h2>
+
+            <p>
+                Consulter revenus et dépenses
+            </p>
+
+        </div>
+    </a>
+
+    <a
+        href="{% url 'agro_product_list' %}"
+        class="card bg-secondary text-secondary-content shadow hover:shadow-lg transition"
+    >
+        <div class="card-body">
+
+            <h2 class="card-title">
+                Produits
+            </h2>
+
+            <p>
+                Suivre les stocks et les lots
+            </p>
+
+        </div>
+    </a>
+
+    <a
+        href="{% url 'agro_agent_list' %}"
+        class="card bg-accent text-accent-content shadow hover:shadow-lg transition"
+    >
+        <div class="card-body">
+
+            <h2 class="card-title">
+                Agents
+            </h2>
+
+            <p>
+                Analyser les contributions
+            </p>
+
+        </div>
+    </a>
+
+</div>
+
+
+</div>
+
+{% endblock %}
