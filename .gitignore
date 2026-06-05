@@ -52,13 +52,11 @@ local_settings.py
 # Environnements virtuels
 # -----------------------------
 venv/
-env/
-.venv/
-.env/
-.env.local
-.env.production
-.env.development
 .env
+.env.*
+*.pem
+*.key
+
 # -----------------------------
 # IDEs & OS
 # -----------------------------
