@@ -49,7 +49,9 @@ def format_currency(value, currency="FCFA"):
 def add_class(field, css):
     return field.as_widget(attrs={"class": css})
 
-
+@register.filter
+def multiply(value, arg):
+    return value * arg
 
 @register.filter
 def percentage(value, decimals=2):

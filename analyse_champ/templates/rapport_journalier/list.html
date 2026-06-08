@@ -1,0 +1,303 @@
+{% extends 'base_admin.html' %}
+{% load direction_filters %}
+
+{% block content %}
+<div class="breadcrumbs text-sm mb-2">
+
+    <ul>
+
+        <li>
+
+            <a href="{% url 'agro_dashboard' %}">
+
+                Dashboard
+
+            </a>
+
+        </li>
+
+        <li>
+
+            Rapports
+
+        </li>
+
+    </ul>
+
+</div>
+<div class="space-y-6">
+
+    <div>
+        <h1 class="text-2xl font-bold">
+            Rapports d'activité
+        </h1>
+
+        <p class="text-gray-500">
+            Suivi des activités terrain réalisées par les superviseurs
+        </p>
+    </div>
+
+    <!-- KPI -->
+
+    <div class="stats shadow w-full">
+
+        <div class="stat">
+
+            <div class="stat-title">
+                Rapports trouvés
+            </div>
+
+            <div class="stat-value text-primary">
+                {{ rapports.count }}
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- FILTRES -->
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body">
+
+            <form method="get">
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+                    <div>
+
+                        <label class="label">
+                            <span class="label-text">
+                                Période
+                            </span>
+                        </label>
+
+                        <select
+                            name="period"
+                            class="select select-bordered w-full">
+
+<option value="today"
+{% if request.GET.period == 'today' %}selected{% endif %}
+>
+    Aujourd'hui
+</option>
+
+<option value="week"
+{% if request.GET.period == 'week' %}selected{% endif %}
+>
+    7 derniers jours
+</option>
+
+<option value="month"
+{% if request.GET.period == 'month' %}selected{% endif %}
+>
+    30 derniers jours
+</option>
+
+<option value="year"
+{% if request.GET.period == 'year' %}selected{% endif %}
+>
+    12 derniers mois
+</option>
+
+                        </select>
+
+                    </div>
+
+                    <div>
+
+                        <label class="label">
+                            <span class="label-text">
+                                Date début
+                            </span>
+                        </label>
+
+                        <input
+                            type="date"
+                            name="date_from"
+                            value="{{ request.GET.date_from }}"
+                            class="input input-bordered w-full">
+
+                    </div>
+
+                    <div>
+
+                        <label class="label">
+                            <span class="label-text">
+                                Date fin
+                            </span>
+                        </label>
+
+                        <input
+                            type="date"
+                            name="date_to"
+                            value="{{ request.GET.date_to }}"
+                            class="input input-bordered w-full">
+
+                    </div>
+
+                    <div>
+
+                        <label class="label">
+                            <span class="label-text">
+                                Superviseur
+                            </span>
+                        </label>
+
+                        <select
+                            name="superviseur"
+                            class="select select-bordered w-full">
+
+<option value="">
+    Tous
+</option>
+
+{% for superviseur in superviseurs %}
+
+<option
+    value="{{ superviseur.id }}"
+    {% if request.GET.superviseur == superviseur.id|stringformat:"s" %}
+        selected
+    {% endif %}
+>
+    {{ superviseur.first_name }}
+    {{ superviseur.last_name }}
+</option>
+
+{% endfor %}
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+<div class="mt-4 flex gap-2">
+
+    <button
+        type="submit"
+        class="btn btn-primary"
+    >
+        Filtrer
+    </button>
+
+    <a
+        href="{% url 'direction_rapport_list' %}"
+        class="btn btn-ghost"
+    >
+        Réinitialiser
+    </a>
+
+</div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+    <!-- TABLE -->
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body p-0">
+
+            <div class="overflow-x-auto">
+
+                <table class="table table-zebra">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Date</th>
+
+                            <th>Superviseur</th>
+
+                            <th>Participants</th>
+
+                            <th>Activité</th>
+
+                            <th></th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for rapport in rapports.results %}
+
+                            <tr>
+
+                                <td>
+
+                                    {{ rapport.date }}
+
+                                </td>
+
+                                <td>
+
+                                    {{ rapport.superviseur.first_name }}
+                                    {{ rapport.superviseur.last_name }}
+
+                                </td>
+
+                                <td>
+
+                                    <div class="badge badge-primary">
+
+                                        {{ rapport.nombre_participants }}
+
+                                    </div>
+
+                                </td>
+
+                                <td>
+
+                                    {{ rapport.activite_realisee|truncatechars:60 }}
+
+                                </td>
+
+                                <td>
+
+                                    <a
+                                        href="{% url 'direction_rapport_detail' rapport.id %}"
+                                        class="btn btn-sm btn-outline">
+
+                                        Voir
+
+                                    </a>
+
+                                </td>
+
+                            </tr>
+
+                        {% empty %}
+
+                            <tr>
+
+                                <td colspan="5">
+
+                                    Aucun rapport trouvé.
+
+                                </td>
+
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -184,20 +184,26 @@
 
 <!-- Navigation rapide -->
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
     <a
         href="{% url 'agro_operation_list' %}"
-        class="card bg-primary text-primary-content shadow hover:shadow-lg transition"
+        class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition"
     >
         <div class="card-body">
 
-            <h2 class="card-title">
-                Opérations
-            </h2>
+            <div class="flex items-center gap-3">
 
-            <p>
-                Consulter revenus et dépenses
+                <i class="fas fa-wallet text-xl text-primary"></i>
+
+                <h2 class="card-title text-base">
+                    Opérations
+                </h2>
+
+            </div>
+
+            <p class="text-sm text-base-content/70">
+                Revenus, dépenses et mouvements financiers.
             </p>
 
         </div>
@@ -205,16 +211,22 @@
 
     <a
         href="{% url 'agro_product_list' %}"
-        class="card bg-secondary text-secondary-content shadow hover:shadow-lg transition"
+        class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition"
     >
         <div class="card-body">
 
-            <h2 class="card-title">
-                Produits
-            </h2>
+            <div class="flex items-center gap-3">
 
-            <p>
-                Suivre les stocks et les lots
+                <i class="fas fa-boxes-stacked text-xl text-success"></i>
+
+                <h2 class="card-title text-base">
+                    Produits
+                </h2>
+
+            </div>
+
+            <p class="text-sm text-base-content/70">
+                Stocks, lots et suivi des produits.
             </p>
 
         </div>
@@ -222,24 +234,51 @@
 
     <a
         href="{% url 'agro_agent_list' %}"
-        class="card bg-accent text-accent-content shadow hover:shadow-lg transition"
+        class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition"
     >
         <div class="card-body">
 
-            <h2 class="card-title">
-                Agents
-            </h2>
+            <div class="flex items-center gap-3">
 
-            <p>
-                Analyser les contributions
+                <i class="fas fa-users text-xl text-info"></i>
+
+                <h2 class="card-title text-base">
+                    Agents
+                </h2>
+
+            </div>
+
+            <p class="text-sm text-base-content/70">
+                Participation, implication et maîtrise des activités.
+            </p>
+
+        </div>
+    </a>
+
+    <a
+        href="{% url 'direction_rapport_list' %}"
+        class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition"
+    >
+        <div class="card-body">
+
+            <div class="flex items-center gap-3">
+
+                <i class="fas fa-clipboard-list text-xl text-warning"></i>
+
+                <h2 class="card-title text-base">
+                    Rapports
+                </h2>
+
+            </div>
+
+            <p class="text-sm text-base-content/70">
+                Activités terrain, difficultés rencontrées et résultats obtenus.
             </p>
 
         </div>
     </a>
 
 </div>
-
-
 </div>
 
 {% endblock %}

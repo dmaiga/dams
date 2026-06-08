@@ -79,3 +79,22 @@ def get_product_detail(pk):
 def get_agents(params=None):
     """Récupère les performances des agents (quantités attachées, totaux)."""
     return fetch_json('agents/', params=params)
+
+# =========================
+# RAPPORTS
+# =========================
+def get_superviseurs():
+    return fetch_json(
+        'superviseurs/'
+    )
+
+def get_rapports(params=None):
+    return fetch_json(
+        'rapports/',
+        params=params
+    )
+
+def get_rapport_detail(pk):
+    return fetch_json(
+        f'rapports/{pk}/'
+    )

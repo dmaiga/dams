@@ -37,4 +37,15 @@ urlpatterns = [
         agent_list_view,
         name='agro_agent_list'
     ),
+    path(
+        'agros/rapports/',
+        rapport_list_view,
+        name='direction_rapport_list'
+    ),
+
+    path(
+        'agros/rapports/<int:pk>/',
+        rapport_detail_view,
+        name='direction_rapport_detail'
+    ),
 ]

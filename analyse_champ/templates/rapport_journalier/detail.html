@@ -1,0 +1,251 @@
+{% extends 'base_admin.html' %}
+{% load direction_filters %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+    <div class="flex justify-between items-center">
+
+        <div>
+
+            <h1 class="text-2xl font-bold">
+                Rapport du {{ rapport.date }}
+            </h1>
+
+            <p class="text-gray-500">
+                Détail de l'activité terrain
+            </p>
+
+        </div>
+
+        <a
+            href="{% url 'direction_rapport_list' %}"
+            class="btn btn-outline">
+
+            Retour
+
+        </a>
+
+    </div>
+
+    <!-- INFOS -->
+
+<div class="stats shadow w-full">
+
+    <div class="stat">
+
+        <div class="stat-title">
+            Superviseur
+        </div>
+
+        <div class="stat-value text-lg">
+            {{ rapport.superviseur.first_name }}
+            {{ rapport.superviseur.last_name }}
+        </div>
+
+    </div>
+
+    <div class="stat">
+
+        <div class="stat-title">
+            Date activité
+        </div>
+
+        <div class="stat-value text-lg">
+            {{ rapport.date }}
+        </div>
+
+    </div>
+
+    <div class="stat">
+
+        <div class="stat-title">
+            Participants
+        </div>
+
+        <div class="stat-value text-lg">
+            {{ rapport.nombre_participants }}
+        </div>
+
+    </div>
+
+</div>
+    <!-- ACTIVITE -->
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Compte rendu d'activité
+        </h2>
+
+        <div class="divider"></div>
+
+        <div class="space-y-5">
+
+            <div>
+                <h3 class="font-semibold text-sm uppercase text-gray-500">
+                    Activité réalisée
+                </h3>
+
+                <p class="mt-2">
+                    {{ rapport.activite_realisee }}
+                </p>
+            </div>
+
+            {% if rapport.probleme %}
+            <div>
+                <h3 class="font-semibold text-sm uppercase text-gray-500">
+                    Difficultés rencontrées
+                </h3>
+
+                <p class="mt-2">
+                    {{ rapport.probleme }}
+                </p>
+            </div>
+            {% endif %}
+
+            {% if rapport.solution %}
+            <div>
+                <h3 class="font-semibold text-sm uppercase text-gray-500">
+                    Solutions appliquées
+                </h3>
+
+                <p class="mt-2">
+                    {{ rapport.solution }}
+                </p>
+            </div>
+            {% endif %}
+
+            {% if rapport.resultat_obtenu %}
+            <div>
+                <h3 class="font-semibold text-sm uppercase text-gray-500">
+                    Résultats obtenus
+                </h3>
+
+                <p class="mt-2">
+                    {{ rapport.resultat_obtenu }}
+                </p>
+            </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+    <!-- PARTICIPANTS -->
+<div class="card bg-base-100 shadow">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            Participants
+        </h2>
+
+        <div class="space-y-4">
+
+            {% for participant in rapport.participants %}
+
+            <div class="border border-base-300 rounded-xl p-4">
+
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+
+                    <div>
+
+                        <h3 class="font-semibold text-lg">
+                            {{ participant.agent }}
+                        </h3>
+
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+
+                        <div class="badge badge-primary badge-outline">
+
+                            Implication :
+                            {{ participant.implication_display }}
+
+                        </div>
+
+                        <div class="badge badge-secondary badge-outline">
+
+                            Maîtrise :
+                            {{ participant.maitrise_display }}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4 mt-4">
+
+                    <div>
+
+                        <p class="text-xs uppercase text-gray-500 mb-2">
+
+                            Implication
+
+                        </p>
+
+                        <progress
+                            class="progress progress-primary w-full"
+                            value="{{ participant.implication }}"
+                            max="5">
+                        </progress>
+
+                    </div>
+
+                    <div>
+
+                        <p class="text-xs uppercase text-gray-500 mb-2">
+
+                            Maîtrise
+
+                        </p>
+
+                        <progress
+                            class="progress progress-secondary w-full"
+                            value="{{ participant.maitrise }}"
+                            max="5">
+                        </progress>
+
+                    </div>
+
+                </div>
+
+                {% if participant.observation %}
+
+                <div class="mt-4">
+
+                    <p class="text-xs uppercase text-gray-500">
+
+                        Observation
+
+                    </p>
+
+                    <p class="mt-1">
+
+                        {{ participant.observation }}
+
+                    </p>
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</div>
+                        </div>
+
+{% endblock %}

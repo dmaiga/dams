@@ -1,12 +1,19 @@
 from django.shortcuts import render
 from .services import (
     get_dashboard,
+
     get_operations,
     get_operation_detail,
+
     get_categories,
     get_products,
     get_product_detail,
-    get_agents
+
+    get_agents,
+
+    get_superviseurs,
+    get_rapports,
+    get_rapport_detail,
 )
 
 def build_filters(request):
@@ -140,3 +147,38 @@ def agent_list_view(request):
     agents = get_agents(params=params)
     
     return render(request, 'finance_champs/agents/list.html', {'agents': agents})
+# =========================
+# RAPPORTS
+# =========================
+
+def rapport_list_view(request):
+    params = build_filters(request)
+    superviseur = request.GET.get(
+        'superviseur'
+    )
+    if superviseur:
+        params['superviseur'] = superviseur
+    rapports = get_rapports(
+        params=params
+    )
+    superviseurs = get_superviseurs()
+    context = {
+        'rapports': rapports,
+        'superviseurs': superviseurs['results'],
+    }
+    return render(
+        request,
+        'rapport_journalier/list.html',
+        context
+    )
+
+def rapport_detail_view(request,pk):
+    rapport = get_rapport_detail(pk)
+    context = {
+        'rapport': rapport
+    }
+    return render(
+        request,
+        'rapport_journalier/detail.html',
+        context
+    )
