@@ -534,6 +534,7 @@ class RotAffectationLotSuperviseurForm(forms.ModelForm):
 
         return affectation
 
+
 class RecouvrementSuperviseurForm(forms.ModelForm):
 
     date_recouvrement = forms.DateTimeField(
@@ -756,6 +757,45 @@ class MiseDispositionRotForm(forms.Form):
             'step': '0.01'
         })
     )
+    prix_gros = forms.DecimalField(
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        label="Prix de gros",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+
+    prix_detail = forms.DecimalField(
+        min_value=Decimal('0.00'),
+        decimal_places=2,
+        label="Prix de détail",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01'
+        })
+    )
+
+    superviseur = forms.ModelChoiceField(
+        queryset=Agent.objects.filter(
+            type_agent='entrepot',
+            est_actif=True
+        ).select_related('user'),
+        label="Superviseur",
+        widget=forms.Select(attrs={
+            'class': 'form-select'
+        })
+    )
+
+    date_affectation = forms.DateField(
+        label="Date de distribution",
+        required=False,
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        })
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -769,12 +809,30 @@ class MiseDispositionRotForm(forms.Form):
                 ).select_related('fournisseur')
             except:
                 pass
+       
+        self.fields['lot'].label_from_instance = lambda obj: (
+            f"{obj.produit.nom} | "
+            f"{obj.fournisseur.nom if obj.fournisseur else '—'} | "
+            f"{timezone.localtime(obj.date_reception).strftime('%d/%m/%Y')} | "
+            f"Disp : {obj.quantite_disponible_rot}"
+        )
+        # 🔹 Superviseurs actifs
+        
+        self.fields['superviseur'].queryset = (
+            Agent.objects
+            .filter(type_agent='entrepot', est_actif=True)
+            .select_related('user')
+            .order_by('user__last_name')
+        )
 
 
     def clean(self):
         cleaned_data = super().clean()
+
         lot = cleaned_data.get('lot')
         quantite = cleaned_data.get('quantite')
+        prix_gros = cleaned_data.get('prix_gros')
+        prix_detail = cleaned_data.get('prix_detail')
 
         if lot and quantite:
             if quantite > lot.quantite_restante:
@@ -783,7 +841,51 @@ class MiseDispositionRotForm(forms.Form):
                     f"Max disponible : {lot.quantite_restante}"
                 )
 
+        if prix_gros is None or prix_detail is None:
+            raise ValidationError("Les prix doivent être renseignés.")
+
+
         return cleaned_data
+
+    def save(self, agent):
+        lot = self.cleaned_data['lot']
+        quantite = self.cleaned_data['quantite']
+        
+        # sécurité supplémentaire
+        if quantite > lot.quantite_restante:
+            raise ValidationError(
+                f"Stock insuffisant. Disponible : {lot.quantite_restante}"
+            )
+
+        affectation = AffectationLotSuperviseur.objects.create(
+            lot=lot,
+            superviseur=self.cleaned_data['superviseur'],
+            quantite_initiale=quantite,
+            quantite_restante=quantite,
+            prix_gros=self.cleaned_data['prix_gros'],
+            prix_detail=self.cleaned_data['prix_detail'],
+            date_affectation=(
+                self.cleaned_data.get('date_affectation')
+                or timezone.now().date()
+            ),
+            attribue_par=agent
+        )
+
+        # Décrément du stock réel
+        lot.quantite_restante -= quantite
+
+        # Compatibilité avec l'ancien workflow
+        lot.quantite_disponible_rot += quantite
+
+        lot.save(
+            update_fields=[
+                'quantite_restante',
+                'quantite_disponible_rot'
+            ]
+        )
+
+        return affectation
+
 
 from django import forms
 from decimal import Decimal

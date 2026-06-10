@@ -766,7 +766,7 @@ def liste_distribution_sup(request):
         'agents': agents,
         'produits': produits,
         'lots': lots,
-
+        
         'filters': {
             'agent': agent_id,
             'produit': produit_id,
@@ -968,29 +968,20 @@ def mise_disposition_rot(request):
         form = MiseDispositionRotForm(request.POST)
 
         if form.is_valid():
-            lot = form.cleaned_data['lot']
-            quantite = form.cleaned_data['quantite']
-
-            # 🔒 logique stock
-            lot.quantite_restante -= quantite
-            lot.quantite_disponible_rot += quantite
-            lot.save(update_fields=[
-                'quantite_restante',
-                'quantite_disponible_rot'
-            ])
-
-            # 🧾 historique
+        
+            affectation = form.save(agent)
             MiseDispositionRot.objects.create(
-                lot=lot,
-                quantite=quantite,
-                effectue_par=request.user.agent
+                lot=affectation.lot,
+                quantite=affectation.quantite_initiale,
+                effectue_par=agent
             )
 
             messages.success(
                 request,
-                f"{quantite} unités mises à disposition du ROT avec succès."
+                f"{affectation.quantite_initiale} unité(s) de "
+                f"{affectation.lot.produit.nom} affectée(s) à "
+                f"{affectation.superviseur.full_name}"
             )
-
             return redirect('mise_disposition_rot')
 
     else:

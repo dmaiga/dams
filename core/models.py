@@ -1262,6 +1262,7 @@ class AffectationLotSuperviseur(models.Model):
         max_digits=10,
         decimal_places=2
     )
+    
     prix_gros = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -1280,7 +1281,6 @@ class AffectationLotSuperviseur(models.Model):
         Agent,
         on_delete=models.SET_NULL,
         null=True,
-        limit_choices_to={'type_agent': 'rot'},
         related_name='affectations_realisees'
     )
 

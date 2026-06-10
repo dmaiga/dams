@@ -7,14 +7,25 @@
 {% block content %}
 <div class="container mt-4">
 
-    <h5 class="mb-3">Mettre à disposition du ROT</h5>
+    <h5 class="mb-3">
+        Affecter un lot à un superviseur
+    </h5>
 
     <!-- 🔥 ALERT UX -->
     <div id="lot-alert" class="alert alert-warning d-none small"></div>
 
     <form method="post" id="form">
         {% csrf_token %}
+<div class="mb-2">
+    <label class="small text-muted">Superviseur</label>
+    {{ form.superviseur }}
 
+    {% if form.superviseur.errors %}
+        <div class="text-danger small">
+            {{ form.superviseur.errors.0 }}
+        </div>
+    {% endif %}
+</div>
         <!-- PRODUIT -->
         <div class="mb-2">
             <label class="small text-muted">Produit</label>
@@ -39,6 +50,41 @@
                 </div>
             {% endif %}
         </div>
+
+<div class="mb-2">
+    <label class="small text-muted">Prix de gros</label>
+    {{ form.prix_gros }}
+
+    {% if form.prix_gros.errors %}
+        <div class="text-danger small">
+            {{ form.prix_gros.errors.0 }}
+        </div>
+    {% endif %}
+</div>
+<div class="mb-2">
+    <label class="small text-muted">Prix de détail</label>
+    {{ form.prix_detail }}
+
+    {% if form.prix_detail.errors %}
+        <div class="text-danger small">
+            {{ form.prix_detail.errors.0 }}
+        </div>
+    {% endif %}
+</div>
+
+<div class="mb-3">
+    <label class="small text-muted">
+        Date de distribution
+    </label>
+
+    {{ form.date_affectation }}
+
+    {% if form.date_affectation.errors %}
+        <div class="text-danger small">
+            {{ form.date_affectation.errors.0 }}
+        </div>
+    {% endif %}
+</div>
 
         <button type="submit" class="btn btn-primary w-100" id="btn">
             <span class="text-btn">Valider</span>
