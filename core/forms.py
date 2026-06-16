@@ -371,7 +371,7 @@ class FactureLotForm(forms.Form):
         
         return cleaned_data
 
-    def save(self, lot):
+    def save(self, lot, user=None, rot=None):
         fichiers = self.cleaned_data.get('fichiers', [])
         description = self.cleaned_data.get('description_generale', '')
         montants_list = self.cleaned_data.get('montants_list', [])
@@ -381,23 +381,43 @@ class FactureLotForm(forms.Form):
             fichiers = [fichiers] if fichiers else []
         
         factures = []
+        from django.db import transaction
+        
         for index, fichier in enumerate(fichiers):
-            if fichier:  # Vérifier que le fichier n'est pas None
-                # Attribuer un montant si disponible, sinon None
-                montant = None
-                if index < len(montants_list):
-                    montant = montants_list[index]
-                
-                # Créer la facture
+        
+            montant = (
+                montants_list[index]
+                if index < len(montants_list)
+                else None
+            )
+        
+            with transaction.atomic():
+            
                 facture = FactureLotEntrepot.objects.create(
                     lot=lot,
                     fichier=fichier,
                     montant=montant,
                     description=description
                 )
+        
+                if montant:
+                
+                    paiement = PaiementFournisseur.objects.create(
+                        fournisseur=lot.fournisseur,
+                        lot=lot,
+                        montant=montant,
+                        date_paiement=timezone.now().date(),
+                        effectue_par=rot,
+                        cree_par=user
+                    )
+        
+                    facture.paiement_fournisseur = paiement
+                    facture.save(update_fields=['paiement_fournisseur'])
+        
                 factures.append(facture)
         
         return factures
+
 # core/forms.py
 
 

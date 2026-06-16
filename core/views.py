@@ -1472,7 +1472,7 @@ def gestion_factures_lot(request, lot_id):
         form = FactureLotForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                factures_crees = form.save(lot=lot)
+                factures_crees = form.save(lot=lot, user=request.user, rot=request.user.agent)
                 count = len(factures_crees)
                 
                 # Message de succès

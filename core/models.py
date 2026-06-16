@@ -1157,7 +1157,14 @@ class FactureLotEntrepot(models.Model):
         on_delete=models.CASCADE,
         related_name='factures'
     )
-
+    paiement_fournisseur = models.OneToOneField(
+        'PaiementFournisseur',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='facture_associee'
+    )
+    
     fichier = models.FileField(upload_to='factures_entrepot/%Y/%m/')
     montant = models.DecimalField(
         max_digits=10,
