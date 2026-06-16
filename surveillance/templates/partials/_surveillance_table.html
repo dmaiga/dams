@@ -1,0 +1,36 @@
+<div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body">
+        <div class="flex justify-between items-center mb-2">
+            <h2 class="card-title">{{ title }}</h2>
+            <a href="#" class="link link-primary text-sm">Voir tout</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="table table-zebra table-sm">
+                <thead>
+                    <tr>
+                        <th>Nom</th>
+                        <th>Actuel</th>
+                        <th>Référence</th>
+                        <th>Var.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td class="font-semibold">
+                            {% if type == 'sup' %}{{ item.superviseur.full_name }}{% else %}{{ item.produit.nom }}{% endif %}
+                        </td>
+                        <td>{{ item.kg_actuel|floatformat:0 }}</td>
+                        <td>{{ item.kg_prec|floatformat:0 }}</td>
+                        <td>
+                            <span class="badge badge-xs {% if item.variation < 0 %}badge-error{% else %}badge-success{% endif %}">
+                                {{ item.variation }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

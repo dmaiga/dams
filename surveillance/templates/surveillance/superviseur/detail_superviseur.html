@@ -1,0 +1,204 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+    <div>
+
+        <h1 class="text-2xl font-bold">
+
+            {{ superviseur.full_name }}
+
+        </h1>
+
+        <p class="text-sm opacity-60">
+
+            Analyse hebdomadaire
+
+        </p>
+
+    </div>
+
+    <!-- KPI -->
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <div class="stat bg-base-100 shadow">
+
+            <div class="stat-title">
+
+                Kg semaine
+
+            </div>
+
+            <div class="stat-value">
+
+                {{ kg_actuel|floatformat:0 }}
+
+            </div>
+
+        </div>
+
+        <div class="stat bg-base-100 shadow">
+
+            <div class="stat-title">
+
+                Semaine précédente
+
+            </div>
+
+            <div class="stat-value">
+
+                {{ kg_prec|floatformat:0 }}
+
+            </div>
+
+        </div>
+
+        <div class="stat bg-base-100 shadow">
+
+            <div class="stat-title">
+
+                Variation
+
+            </div>
+
+            <div class="stat-value {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
+
+                {{ variation }}%
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Agents -->
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body">
+
+            <h2 class="card-title">
+
+                Agents
+
+            </h2>
+
+            <div class="overflow-x-auto">
+
+                <table class="table table-zebra">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Agent</th>
+                            <th>Kg</th>
+                            <th>Produits</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in agents_stats %}
+
+                        <tr>
+
+                            <td>
+
+                                {{ item.agent.full_name }}
+
+                            </td>
+
+                            <td>
+
+                                {{ item.kg|floatformat:0 }}
+
+                            </td>
+
+                            <td>
+
+                                {{ item.nb_produits }}
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Produits -->
+
+    <div class="card bg-base-100 shadow">
+
+        <div class="card-body">
+
+            <h2 class="card-title">
+
+                Produits
+
+            </h2>
+
+            <div class="overflow-x-auto">
+
+                <table class="table table-zebra">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Produit</th>
+                            <th>Kg</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for item in produits_stats %}
+
+                        <tr>
+
+                            <td>
+
+                                {{ item.produit.nom }}
+
+                            </td>
+
+                            <td>
+
+                                {{ item.kg|floatformat:0 }}
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

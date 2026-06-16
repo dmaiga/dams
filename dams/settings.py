@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     'paie',
     'analyse_champ',
     'mobile',
+    'surveillance',
 
 
 ]

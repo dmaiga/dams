@@ -1,0 +1,175 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight">Tableau de bord</h1>
+            <p class="text-base-content/60">Suivi opérationnel des ventes et alertes prix.</p>
+        </div>
+        <div class="tabs tabs-boxed bg-base-200 p-1">
+            <a class="tab tab-active">Vue globale</a>
+            <a href="{% url 'liste_kg_vendu' %}" class="tab">Ventes</a>
+            <a href="{% url 'surveillance_prix' %}" class="tab">Prix</a>
+        </div>
+    </div>
+
+    <div class="stats stats-vertical lg:stats-horizontal shadow w-full bg-base-100 border border-base-200">
+        <div class="stat">
+            <div class="stat-title text-xs uppercase font-bold">Kg (Semaine)</div>
+            <div class="stat-value text-2xl">{{ kg_semaine|floatformat:0 }}</div>
+            <div class="stat-desc">vs {{ kg_semaine_prec|floatformat:0 }} (N-1)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title text-xs uppercase font-bold">Variation Hebdo</div>
+            <div class="stat-value text-2xl {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
+                {{ variation }}%
+            </div>
+        </div>
+        <div class="stat">
+            <div class="stat-title text-xs uppercase font-bold">Kg (Mois)</div>
+            <div class="stat-value text-2xl">{{ kg_mois|floatformat:0 }}</div>
+            <div class="stat-desc">vs {{ kg_mois_prec|floatformat:0 }} (N-1)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title text-xs uppercase font-bold">Variation Mensuelle</div>
+            <div class="stat-value text-2xl {% if variation_mois < 0 %}text-error{% else %}text-success{% endif %}">
+                {{ variation_mois }}%
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="stat border-l-4 border-neutral shadow-sm bg-base-100">
+            <div class="stat-title">Superviseurs à surveiller</div>
+            <div class="stat-value text-xl">{{ superviseurs_surveillance|length }}</div>
+        </div>
+        <div class="stat border-l-4 border-info shadow-sm bg-base-100">
+            <div class="stat-title">Produits à surveiller</div>
+            <div class="stat-value text-xl">{{ produits_surveillance|length }}</div>
+        </div>
+        <div class="stat border-l-4 border-error shadow-sm bg-base-100">
+            <div class="stat-title">Lots en anomalie prix</div>
+            <div class="stat-value text-xl text-error">{{ nb_produits_rouges }}</div>
+        </div>
+    </div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    
+    <!-- CARTE SUPERVISEURS -->
+    <div class="card bg-base-100 shadow border border-base-200">
+        <div class="card-body p-6">
+            <h2 class="card-title text-base mb-2">Superviseurs à surveiller</h2>
+            <table class="table table-sm">
+                <thead>
+                    <tr class="text-xs uppercase opacity-60">
+                        <th>Nom</th>
+                        <th class="text-right">Kg</th>
+                        <th class="text-right">Var.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in superviseurs_surveillance %}
+                    <tr class="hover">
+                        <td>
+                            <a href="{% url 'detail_superviseur' item.superviseur.id %}" 
+                               class="link link-primary font-medium">
+                               {{ item.superviseur.full_name }}
+                            </a>
+                        </td>
+                        <td class="text-right font-mono">{{ item.kg_actuel|floatformat:0 }}</td>
+                        <td class="text-right">
+                            <span class="badge badge-xs font-bold {% if item.variation < 0 %}badge-error{% else %}badge-success{% endif %}">
+                                {{ item.variation }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- CARTE PRODUITS -->
+    <div class="card bg-base-100 shadow border border-base-200">
+        <div class="card-body p-6">
+            <h2 class="card-title text-base mb-2">Produits à surveiller</h2>
+            <table class="table table-sm">
+                <thead>
+                    <tr class="text-xs uppercase opacity-60">
+                        <th>Nom</th>
+                        <th class="text-right">Kg</th>
+                        <th class="text-right">Var.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in produits_surveillance %}
+                    <tr class="hover">
+                        <td>
+                            <a href="{% url 'detail_produit' item.produit.id %}" 
+                               class="link link-primary font-medium">
+                               {{ item.produit.nom }}
+                            </a>
+                        </td>
+                        <td class="text-right font-mono">{{ item.kg_actuel|floatformat:0 }}</td>
+                        <td class="text-right">
+                            <span class="badge badge-xs font-bold {% if item.variation < 0 %}badge-error{% else %}badge-success{% endif %}">
+                                {{ item.variation }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+    <div class="card bg-base-100 shadow-md border border-base-200">
+        <div class="card-body">
+            <h2 class="card-title text-error mb-4">Anomalies de prix</h2>
+            <div class="overflow-x-auto">
+                <table class="table table-hover">
+                    <thead>
+                        <tr class="bg-base-200">
+                            <th>Produit / Info</th>
+                            <th>Achat</th>
+                            <th>Prix Min</th>
+                            <th>Vendeurs</th>
+                            <th>Alertes</th>
+                            <th></th>
+                            
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in ventes_rouges %}
+                        <tr class="hover">
+                            <td>
+                                <div class="font-bold">{{ item.produit.nom|upper }}</div>
+                                <div class="flex gap-2 mt-1">
+                                    <span class="badge badge-ghost badge-xs">{{ item.fournisseur.nom|default:"-" }}</span>
+                                    <span class="badge badge-ghost badge-xs">{{ item.date_reception|date:"d/m/Y" }}</span>
+                                </div>
+                            </td>
+                            <td class="font-mono">{{ item.prix_achat }}</td>
+                            <td class="font-bold text-error">{{ item.prix_min }}</td>
+                            <td><span class="badge badge-info badge-sm">{{ item.nb_vendeurs }}</span></td>
+                            <td><span class="badge badge-warning badge-sm font-bold">{{ item.nb_ventes_rouges }}</span></td>
+                            <td>
+                                <a
+                                    href="{% url 'detail_produit' item.produit.id %}"
+                                    class="link link-primary">
+
+                                    Voir
+                                </a>
+                            </td>
+                            
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -35,6 +35,7 @@ urlpatterns = [
     path('agents/', include('agents.urls')),
     path('paie/', include('paie.urls')),
     path('champs/', include('analyse_champ.urls')),
+    path('surveillance/', include('surveillance.urls')),
     path("app/", include("mobile.urls"))
 
 
