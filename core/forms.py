@@ -277,7 +277,7 @@ from django.core.exceptions import ValidationError
 
 class FactureLotForm(forms.Form):
     fichiers = MultiFileField(
-        required=True,
+        required=False,
         widget=MultiFileInput(attrs={
             'class': 'form-control',
             'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx'
@@ -316,27 +316,33 @@ class FactureLotForm(forms.Form):
         if not isinstance(fichiers, list):
             fichiers = [fichiers] if fichiers else []
         
-        # Validation des fichiers
-        if not fichiers:
-            self.add_error('fichiers', 'Veuillez sélectionner au moins un fichier')
-        else:
-            # Vérifier chaque fichier
+        # Validation des fichiers (uniquement si des fichiers sont fournis)
+        if fichiers:
             for fichier in fichiers:
-                if fichier:  # Vérifier que le fichier n'est pas None
+                if fichier:
                     # Vérifier la taille (max 10MB)
                     if fichier.size > 10 * 1024 * 1024:
-                        self.add_error('fichiers', 
-                            f'Le fichier "{fichier.name}" dépasse 10MB (taille: {fichier.size // (1024*1024)}MB)')
-                    
+                        self.add_error(
+                            'fichiers',
+                            f'Le fichier "{fichier.name}" dépasse 10MB '
+                            f'(taille: {fichier.size // (1024*1024)}MB)'
+                        )
+
                     # Vérifier l'extension
-                    extensions_autorisees = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx']
-                    extension = os.path.splitext(fichier.name)[1].lower()
+                    extensions_autorisees = [
+                        '.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'
+                    ]
+
+                    extension = os.path.splitext(
+                        fichier.name
+                    )[1].lower()
+
                     if extension not in extensions_autorisees:
-                        self.add_error('fichiers',
-                            f'Type de fichier non autorisé pour "{fichier.name}". Formats acceptés: {", ".join(extensions_autorisees)}')
-                else:
-                    self.add_error('fichiers', 'Un ou plusieurs fichiers sont invalides')
-        
+                        self.add_error(
+                            'fichiers',
+                            f'Type de fichier non autorisé pour "{fichier.name}". '
+                            f'Formats acceptés: {", ".join(extensions_autorisees)}'
+                        )
         # Validation des montants
         if montants_raw:
             montants_list = [m.strip() for m in montants_raw.split(',') if m.strip()]
@@ -379,9 +385,12 @@ class FactureLotForm(forms.Form):
         # S'assurer que fichiers est une liste
         if not isinstance(fichiers, list):
             fichiers = [fichiers] if fichiers else []
-        
-        factures = []
         from django.db import transaction
+
+        factures = []
+        
+        if not fichiers:
+            fichiers = [None]
         
         for index, fichier in enumerate(fichiers):
         

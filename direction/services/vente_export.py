@@ -70,7 +70,8 @@ class VenteExportService:
         buffer.seek(0)
 
         return buffer
-    # -------------------------------------------------------------------
+   
+   # -------------------------------------------------------------------
     @staticmethod
     def export_pdf(ventes_queryset, date_debut, date_fin):
         """Retourne un fichier PDF (BytesIO)"""

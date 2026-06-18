@@ -644,6 +644,7 @@ class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             type_vente=params.get("type"),
             produit_id=params.get("produit"),
             lot_id=params.get("lot"),
+            superviseur_id=params.get("superviseur"),   
         )
 
         # 3) Export
@@ -677,9 +678,13 @@ class ExportVentesPDFView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
         # 2) Queryset
         ventes = VenteAnalyseService.filter_ventes(
-            date_debut, date_fin,
+            date_debut=date_debut,
+            date_fin=date_fin,
             agent_id=params.get("agent"),
             type_vente=params.get("type"),
+            produit_id=params.get("produit"),
+            lot_id=params.get("lot"),
+            superviseur_id=params.get("superviseur"),   
         )
 
         # 3) Génération PDF

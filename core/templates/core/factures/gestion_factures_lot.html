@@ -102,14 +102,26 @@
             <div class="list-group-item border-0 px-3 py-3">
               <div class="d-flex justify-content-between align-items-start">
                 <div class="d-flex align-items-start" style="flex: 1;">
-                  <i class="fas fa-file-{% if '.pdf' in facture.fichier.name %}pdf text-danger{% else %}image text-primary{% endif %} mt-1 me-3 fs-4"></i>
+{% if facture.fichier %}
+    <i class="fas fa-file-{% if '.pdf' in facture.fichier.name|lower %}pdf text-danger{% else %}image text-primary{% endif %} mt-1 me-3 fs-4"></i>
+{% else %}
+    <i class="fas fa-file-invoice text-secondary mt-1 me-3 fs-4"></i>
+{% endif %}
                   <div style="min-width: 0;">
                     <div class="d-flex justify-content-between align-items-start">
                       <div>
                         <div class="fw-bold mb-1">
-                          <a href="{{ facture.fichier.url }}" target="_blank" class="text-decoration-none text-dark">
-                            Facture #{{ forloop.counter }}
-                          </a>
+{% if facture.fichier %}
+<a href="{{ facture.fichier.url }}"
+   target="_blank"
+   class="text-decoration-none text-dark">
+    Facture #{{ forloop.counter }}
+</a>
+{% else %}
+<span class="text-dark">
+    Paiement #{{ forloop.counter }}
+</span>
+{% endif %}
                         </div>
                         <div class="small text-muted mb-1">
                           <i class="fas fa-calendar me-1"></i>
@@ -128,14 +140,25 @@
                   {% else %}
                   <div class="small text-muted mb-1">Montant non précisé</div>
                   {% endif %}
-                  <div class="d-flex gap-1">
-                    <a href="{{ facture.fichier.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                      <i class="fas fa-eye"></i>
-                    </a>
-                    <a href="{{ facture.fichier.url }}" download class="btn btn-sm btn-outline-secondary">
-                      <i class="fas fa-download"></i>
-                    </a>
-                  </div>
+{% if facture.fichier %}
+<div class="d-flex gap-1">
+    <a href="{{ facture.fichier.url }}"
+       target="_blank"
+       class="btn btn-sm btn-outline-primary">
+        <i class="fas fa-eye"></i>
+    </a>
+
+    <a href="{{ facture.fichier.url }}"
+       download
+       class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-download"></i>
+    </a>
+</div>
+{% else %}
+<span class="badge bg-warning text-dark">
+    Sans justificatif
+</span>
+{% endif %}
                 </div>
               </div>
             </div>
@@ -399,23 +422,10 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
         
-        // Vérifier la correspondance fichiers/montants
-        if (montantsInput && montantsInput.value.trim() !== '') {
-          const montantsCount = montantsInput.value.split(',').filter(m => m.trim() !== '').length;
-          if (montantsCount > files.length) {
-            event.preventDefault();
-            alert(`⚠️ Vous avez ${montantsCount} montants pour ${files.length} fichier(s).\n\nSupprimez ${montantsCount - files.length} montant(s) ou ajoutez des fichiers.`);
-            return false;
-          }
-        }
+
       }
       
-      // Vérifier qu'au moins un fichier est sélectionné
-      if (!fileInput.files || fileInput.files.length === 0) {
-        event.preventDefault();
-        alert('📁 Veuillez sélectionner au moins un fichier.');
-        return false;
-      }
+
     });
   }
   

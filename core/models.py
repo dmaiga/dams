@@ -1165,7 +1165,10 @@ class FactureLotEntrepot(models.Model):
         related_name='facture_associee'
     )
     
-    fichier = models.FileField(upload_to='factures_entrepot/%Y/%m/')
+    fichier = models.FileField( upload_to='factures_entrepot/%Y/%m/',    
+                                null=True,
+                                blank=True
+                              )
     montant = models.DecimalField(
         max_digits=10,
         decimal_places=2,
