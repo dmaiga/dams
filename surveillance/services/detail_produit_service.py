@@ -1,141 +1,103 @@
-from collections import defaultdict
+from decimal import Decimal
 
-from core.models import Vente
+from django.db.models import Sum
 
+from core.models import Agent, Vente
 from surveillance.services.comparaison_service import (
     ComparaisonPeriodeService,
     ComparaisonService,
 )
+from surveillance.services.vente_service import KG_EXPRESSION
 
 
 class DetailProduitService:
 
     @staticmethod
     def get_data(produit):
+        debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine_actuelle()
+        debut_prec, fin_prec = ComparaisonPeriodeService.semaine_precedente()
 
-        debut_actuel, fin_actuel = (
-            ComparaisonPeriodeService.semaine_actuelle()
-        )
-
-        debut_prec, fin_prec = (
-            ComparaisonPeriodeService.semaine_precedente()
-        )
-
-        ventes_actuelles = Vente.objects.filter(
+        base = dict(
             detail_distribution__lot__produit=produit,
             est_supprime=False,
-            date_vente__date__gte=debut_actuel,
-            date_vente__date__lte=fin_actuel,
-        ).select_related(
-            "agent",
-            "agent__superviseur",
         )
 
-        ventes_prec = Vente.objects.filter(
-            detail_distribution__lot__produit=produit,
-            est_supprime=False,
-            date_vente__date__gte=debut_prec,
-            date_vente__date__lte=fin_prec,
+        # 2 requêtes d'agrégation scalaire
+        kg_actuel = (
+            Vente.objects
+            .filter(**base, date_vente__date__gte=debut_actuel, date_vente__date__lte=fin_actuel)
+            .aggregate(total=Sum(KG_EXPRESSION))['total']
+            or Decimal('0')
+        )
+        kg_prec = (
+            Vente.objects
+            .filter(**base, date_vente__date__gte=debut_prec, date_vente__date__lte=fin_prec)
+            .aggregate(total=Sum(KG_EXPRESSION))['total']
+            or Decimal('0')
         )
 
-        kg_actuel = sum(
-            vente.quantite_en_kg
-            for vente in ventes_actuelles
-        )
+        variation = ComparaisonService.variation(kg_actuel, kg_prec)
 
-        kg_prec = sum(
-            vente.quantite_en_kg
-            for vente in ventes_prec
-        )
-
-        variation = (
-            ComparaisonService.variation(
-                kg_actuel,
-                kg_prec
+        # 1 requête : kg groupé par superviseur
+        sup_rows = (
+            Vente.objects
+            .filter(
+                **base,
+                date_vente__date__gte=debut_actuel,
+                date_vente__date__lte=fin_actuel,
+                agent__superviseur__isnull=False,
             )
+            .values('agent__superviseur')
+            .annotate(kg=Sum(KG_EXPRESSION))
+            .order_by('-kg')
         )
 
-        superviseurs = defaultdict(
-            lambda: {
-                "superviseur": None,
-                "kg": 0,
+        sup_ids = [r['agent__superviseur'] for r in sup_rows]
+        sups_map = {s.id: s for s in Agent.objects.filter(id__in=sup_ids)}
+
+        superviseurs_stats = [
+            {
+                "superviseur": sups_map[r['agent__superviseur']],
+                "kg": r['kg'],
             }
+            for r in sup_rows
+            if r['agent__superviseur'] in sups_map
+        ]
+
+        # 1 requête : kg groupé par agent
+        agent_rows = (
+            Vente.objects
+            .filter(
+                **base,
+                date_vente__date__gte=debut_actuel,
+                date_vente__date__lte=fin_actuel,
+            )
+            .values('agent')
+            .annotate(kg=Sum(KG_EXPRESSION))
+            .order_by('-kg')
         )
 
-        agents = defaultdict(
-            lambda: {
-                "agent": None,
-                "superviseur": None,
-                "kg": 0,
+        agent_ids = [r['agent'] for r in agent_rows]
+        agents_map = {
+            a.id: a
+            for a in Agent.objects.filter(id__in=agent_ids).select_related('superviseur')
+        }
+
+        agents_stats = [
+            {
+                "agent": agents_map[r['agent']],
+                "superviseur": agents_map[r['agent']].superviseur,
+                "kg": r['kg'],
             }
-        )
-
-        for vente in ventes_actuelles:
-
-            superviseur = vente.agent.superviseur
-
-            if superviseur:
-
-                superviseurs[
-                    superviseur.id
-                ]["superviseur"] = superviseur
-
-                superviseurs[
-                    superviseur.id
-                ]["kg"] += vente.quantite_en_kg
-
-            agents[
-                vente.agent.id
-            ]["agent"] = vente.agent
-
-            agents[
-                vente.agent.id
-            ]["superviseur"] = superviseur
-
-            agents[
-                vente.agent.id
-            ]["kg"] += vente.quantite_en_kg
-
-        superviseurs_stats = list(
-            superviseurs.values()
-        )
-
-        superviseurs_stats.sort(
-            key=lambda x: x["kg"],
-            reverse=True
-        )
-
-        agents_stats = list(
-            agents.values()
-        )
-
-        agents_stats.sort(
-            key=lambda x: x["kg"],
-            reverse=True
-        )
+            for r in agent_rows
+            if r['agent'] in agents_map
+        ]
 
         return {
-
             "produit": produit,
-
-            "kg_actuel": round(
-                kg_actuel,
-                2
-            ),
-
-            "kg_prec": round(
-                kg_prec,
-                2
-            ),
-
-            "variation": round(
-                variation,
-                2
-            ),
-
-            "superviseurs_stats":
-                superviseurs_stats,
-
-            "agents_stats":
-                agents_stats,
+            "kg_actuel": round(kg_actuel, 2),
+            "kg_prec": round(kg_prec, 2),
+            "variation": round(variation, 2),
+            "superviseurs_stats": superviseurs_stats,
+            "agents_stats": agents_stats,
         }

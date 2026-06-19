@@ -48,7 +48,6 @@ class Produit(models.Model):
     def __str__(self):
         return f"{self.nom}"
 
-
 class Alerte(models.Model):
 
     NIVEAUX = [
@@ -95,7 +94,6 @@ class Alerte(models.Model):
     est_vue = models.BooleanField(default=False)
 
     date_creation = models.DateTimeField(auto_now_add=True)
-
 
 class Fournisseur(models.Model):
     nom = models.CharField(max_length=100, unique=True)
@@ -1534,7 +1532,7 @@ class Vente(models.Model):
     agent = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        limit_choices_to={'type_agent__in': ['terrain', 'entrepot']}
+
     )
     stagiaire = models.ForeignKey(
         Agent, 

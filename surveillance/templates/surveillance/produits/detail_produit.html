@@ -1,339 +1,153 @@
 {% extends "base_admin.html" %}
 
 {% block content %}
-
 <div class="space-y-6">
 
-    <!-- HEADER -->
+  <!-- BREADCRUMB -->
+  <div class="breadcrumbs text-sm">
+    <ul>
+      <li><a href="/">Accueil</a></li>
+      <li><a href="{% url 'dashboard_surveillance' %}">Surveillance</a></li>
+      <li><a href="{% url 'liste_kg_vendu' %}">Kg vendus</a></li>
+      <li class="font-semibold">{{ produit.nom }}</li>
+    </ul>
+  </div>
 
-    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+  <!-- HEADER -->
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">{{ produit.nom }}</h1>
+      <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire — semaine en cours vs semaine précédente.</p>
+    </div>
+    <a href="{% url 'liste_kg_vendu' %}" class="btn btn-sm btn-outline self-start sm:self-auto">← Retour</a>
+  </div>
 
+  <!-- KPI -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+    <div class="stat bg-base-100 shadow rounded-box border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Kg — Semaine</div>
+      <div class="stat-value text-2xl text-primary">{{ kg_actuel|floatformat:0 }}</div>
+      <div class="stat-desc">Volume vendu cette semaine</div>
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Kg — Semaine précédente</div>
+      <div class="stat-value text-2xl text-base-content/70">{{ kg_prec|floatformat:0 }}</div>
+      <div class="stat-desc">Référence N-1</div>
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Variation</div>
+      <div class="stat-value text-2xl {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
+        {% if variation < 0 %}▼{% else %}▲{% endif %} {{ variation }}%
+      </div>
+      <div class="stat-desc">Semaine N vs N-1</div>
+    </div>
+
+  </div>
+
+  <!-- SUPERVISEURS -->
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
         <div>
-
-            <h1 class="text-2xl font-bold">
-
-                {{ produit.nom }}
-
-            </h1>
-
-            <p class="text-sm opacity-70">
-
-                Analyse hebdomadaire du produit
-
-            </p>
-
+          <h2 class="card-title text-base">Par superviseur</h2>
+          <p class="text-xs text-base-content/50 mt-0.5">Quel superviseur vend ce produit cette semaine ?</p>
         </div>
-
-        <div class="join">
-
-            <a href="{% url 'dashboard_surveillance' %}"
-               class="btn btn-outline join-item">
-
-                Dashboard
-
-            </a>
-
-            <a href="{% url 'liste_kg_vendu' %}"
-               class="btn btn-outline join-item">
-
-                Analyse Kg
-
-            </a>
-
-        </div>
-
+        <span class="badge badge-primary badge-outline">{{ superviseurs_stats|length }}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-xs uppercase text-base-content/50">
+              <th>#</th>
+              <th>Superviseur</th>
+              <th class="text-right">Kg vendus</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in superviseurs_stats %}
+            <tr class="hover">
+              <td class="text-base-content/40 font-mono text-xs w-8">{{ forloop.counter }}</td>
+              <td>
+                {% if item.superviseur %}
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}"
+                   class="link link-primary font-semibold">
+                  {{ item.superviseur.full_name }}
+                </a>
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-right font-mono font-bold">
+                {{ item.kg|floatformat:0 }} <span class="text-xs font-normal text-base-content/50">kg</span>
+              </td>
+              <td class="text-right">
+                {% if item.superviseur %}
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}" class="btn btn-xs btn-ghost">→</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun résultat cette semaine</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  </div>
 
-
-    <!-- KPI -->
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-        <div class="stat bg-base-100 shadow rounded-box">
-
-            <div class="stat-title">
-
-                Kg semaine
-
-            </div>
-
-            <div class="stat-value text-primary">
-
-                {{ kg_actuel|floatformat:0 }}
-
-            </div>
-
-            <div class="stat-desc">
-
-                Volume vendu
-
-            </div>
-
+  <!-- AGENTS -->
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="card-title text-base">Par agent</h2>
+          <p class="text-xs text-base-content/50 mt-0.5">Quels agents vendent réellement ce produit cette semaine ?</p>
         </div>
-
-        <div class="stat bg-base-100 shadow rounded-box">
-
-            <div class="stat-title">
-
-                Semaine précédente
-
-            </div>
-
-            <div class="stat-value">
-
-                {{ kg_prec|floatformat:0 }}
-
-            </div>
-
-            <div class="stat-desc">
-
-                Référence
-
-            </div>
-
-        </div>
-
-        <div class="stat bg-base-100 shadow rounded-box">
-
-            <div class="stat-title">
-
-                Variation
-
-            </div>
-
-            <div class="stat-value {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
-
-                {{ variation }}%
-
-            </div>
-
-            <div class="stat-desc">
-
-                Semaine N vs N-1
-
-            </div>
-
-        </div>
-
+        <span class="badge badge-secondary badge-outline">{{ agents_stats|length }}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-xs uppercase text-base-content/50">
+              <th>#</th>
+              <th>Agent</th>
+              <th>Superviseur</th>
+              <th class="text-right">Kg vendus</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in agents_stats %}
+            <tr class="hover">
+              <td class="text-base-content/40 font-mono text-xs w-8">{{ forloop.counter }}</td>
+              <td>
+                <div class="font-semibold">{{ item.agent.full_name }}</div>
+                <div class="text-xs text-base-content/50">{{ item.agent.get_type_agent_display }}</div>
+              </td>
+              <td class="text-base-content/70">
+                {% if item.superviseur %}
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}" class="link link-hover">
+                  {{ item.superviseur.full_name }}
+                </a>
+                {% else %}—{% endif %}
+              </td>
+              <td class="text-right font-mono font-bold">
+                {{ item.kg|floatformat:0 }} <span class="text-xs font-normal text-base-content/50">kg</span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun résultat cette semaine</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-
-
-    <!-- SUPERVISEURS -->
-
-    <div class="card bg-base-100 shadow">
-
-        <div class="card-body">
-
-            <div class="flex justify-between items-center">
-
-                <h2 class="card-title">
-
-                    Répartition par superviseur
-
-                </h2>
-
-                <span class="badge badge-primary">
-
-                    {{ superviseurs_stats|length }}
-
-                </span>
-
-            </div>
-
-            <div class="overflow-x-auto">
-
-                <table class="table table-zebra">
-
-                    <thead>
-
-                        <tr>
-
-                            <th>Superviseur</th>
-                            <th>Kg vendus</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        {% for item in superviseurs_stats %}
-
-                        <tr>
-
-                            <td>
-
-                                {% if item.superviseur %}
-
-                                <a
-                                    href="{% url 'detail_superviseur' item.superviseur.id %}"
-                                    class="link link-primary font-semibold">
-
-                                    {{ item.superviseur.full_name }}
-
-                                </a>
-
-                                {% else %}
-
-                                    -
-
-                                {% endif %}
-
-                            </td>
-
-                            <td>
-
-                                <span class="font-bold">
-
-                                    {{ item.kg|floatformat:0 }}
-
-                                </span>
-
-                                kg
-
-                            </td>
-
-                        </tr>
-
-                        {% empty %}
-
-                        <tr>
-
-                            <td colspan="2"
-                                class="text-center py-10 opacity-50">
-
-                                Aucun résultat
-
-                            </td>
-
-                        </tr>
-
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- AGENTS -->
-
-    <div class="card bg-base-100 shadow">
-
-        <div class="card-body">
-
-            <div class="flex justify-between items-center">
-
-                <h2 class="card-title">
-
-                    Répartition par agent
-
-                </h2>
-
-                <span class="badge badge-secondary">
-
-                    {{ agents_stats|length }}
-
-                </span>
-
-            </div>
-
-            <div class="overflow-x-auto">
-
-                <table class="table table-zebra">
-
-                    <thead>
-
-                        <tr>
-
-                            <th>Agent</th>
-                            <th>Superviseur</th>
-                            <th>Kg vendus</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        {% for item in agents_stats %}
-
-                        <tr>
-
-                            <td>
-
-                                <div class="font-semibold">
-
-                                    {{ item.agent.full_name }}
-
-                                </div>
-
-                                <div class="text-xs opacity-60">
-
-                                    {{ item.agent.get_type_agent_display }}
-
-                                </div>
-
-                            </td>
-
-                            <td>
-
-                                {% if item.superviseur %}
-
-                                    {{ item.superviseur.full_name }}
-
-                                {% else %}
-
-                                    -
-
-                                {% endif %}
-
-                            </td>
-
-                            <td>
-
-                                <span class="font-bold">
-
-                                    {{ item.kg|floatformat:0 }}
-
-                                </span>
-
-                                kg
-
-                            </td>
-
-                        </tr>
-
-                        {% empty %}
-
-                        <tr>
-
-                            <td colspan="3"
-                                class="text-center py-10 opacity-50">
-
-                                Aucun résultat
-
-                            </td>
-
-                        </tr>
-
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-        </div>
-
-    </div>
+  </div>
 
 </div>
-
 {% endblock %}

@@ -1,237 +1,118 @@
 {% extends "base_admin.html" %}
 
 {% block content %}
-
 <div class="space-y-6">
 
-    <!-- HEADER -->
+  <!-- BREADCRUMB -->
+  <div class="breadcrumbs text-sm">
+    <ul>
+      <li><a href="/">Accueil</a></li>
+      <li><a href="{% url 'dashboard_surveillance' %}">Surveillance</a></li>
+      <li class="font-semibold">Anomalies prix</li>
+    </ul>
+  </div>
 
-    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+  <!-- HEADER -->
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Surveillance Prix</h1>
+      <p class="text-sm text-base-content/60 mt-0.5">Lots dont des ventes ont été réalisées sous le prix d'achat.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'dashboard_surveillance' %}" class="btn btn-sm btn-outline">Dashboard</a>
+      <a href="{% url 'liste_kg_vendu' %}" class="btn btn-sm btn-outline">Kg vendus</a>
+    </div>
+  </div>
 
+  <!-- KPI -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+    <div class="stat bg-base-100 shadow rounded-box border-l-4 border-error border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Lots en anomalie</div>
+      <div class="stat-value text-2xl text-error">{{ stats.nb_lots_rouges }}</div>
+      <div class="stat-desc">Lots avec ventes sous coût</div>
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box border-l-4 border-warning border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Ventes sous coût</div>
+      <div class="stat-value text-2xl text-warning">{{ stats.nb_ventes_rouges }}</div>
+      <div class="stat-desc">Transactions concernées</div>
+    </div>
+
+    <div class="stat bg-base-100 shadow rounded-box border-l-4 border-info border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Vendeurs concernés</div>
+      <div class="stat-value text-2xl text-info">{{ stats.nb_vendeurs_concernes }}</div>
+      <div class="stat-desc">Agents impliqués</div>
+    </div>
+
+  </div>
+
+  <!-- TABLE PRINCIPALE -->
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
         <div>
-
-            <h1 class="text-2xl font-bold">
-                Surveillance Prix
-            </h1>
-
-            <p class="text-sm opacity-70">
-                Contrôle des prix de vente par rapport aux prix d'achat.
-            </p>
-
+          <h2 class="card-title text-base">Lots en anomalie</h2>
+          <p class="text-xs text-base-content/50 mt-0.5">Où ai-je un problème ? Quelle est sa gravité ? Combien de personnes sont concernées ?</p>
         </div>
-
-        <div class="join">
-
-            <a href="{% url 'dashboard_surveillance' %}"
-               class="btn btn-outline join-item">
-
-                Dashboard
-
-            </a>
-
-            <a href="{% url 'liste_kg_vendu' %}"
-               class="btn btn-outline join-item">
-
-                Analyse Kg
-
-            </a>
-
-        </div>
-
+        <span class="badge badge-error badge-outline">{{ lignes|length }} lots</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-xs uppercase text-base-content/50">
+              <th>Produit / Lot</th>
+              <th class="text-right">Prix achat</th>
+              <th class="text-right">Prix min observé</th>
+              <th class="text-right">Écart</th>
+              <th class="text-right">Vendeurs</th>
+              <th class="text-right">Alertes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in lignes %}
+            <tr class="hover">
+              <td>
+                <a href="{% url 'detail_prix' item.lot.id %}"
+                   class="link link-primary font-bold">
+                  {{ item.produit.nom }}
+                </a>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <span class="badge badge-ghost badge-xs">{{ item.fournisseur.nom|default:"Sans fournisseur" }}</span>
+                  <span class="badge badge-ghost badge-xs">{{ item.date_reception|date:"d/m/Y" }}</span>
+                  <span class="badge badge-ghost badge-xs">Qté {{ item.quantite_initiale }}</span>
+                </div>
+              </td>
+              <td class="text-right font-mono text-base-content/70">{{ item.prix_achat }}</td>
+              <td class="text-right font-mono font-bold text-error">{{ item.prix_min }}</td>
+              <td class="text-right">
+                <span class="badge badge-error font-mono">{{ item.ecart }}</span>
+              </td>
+              <td class="text-right">
+                <span class="badge badge-info">{{ item.nb_vendeurs }}</span>
+              </td>
+              <td class="text-right">
+                <span class="badge badge-warning font-bold">{{ item.nb_ventes_rouges }}</span>
+              </td>
+              <td>
+                <a href="{% url 'detail_prix' item.lot.id %}" class="btn btn-xs btn-ghost">Détail →</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center py-10 text-base-content/40">
+                <div class="text-3xl mb-2">✓</div>
+                <div class="font-semibold">Aucune anomalie de prix détectée</div>
+                <div class="text-xs mt-1">Tous les prix de vente sont au-dessus des prix d'achat.</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-
-    <!-- KPI -->
-
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-    <div class="stat bg-base-100 shadow rounded-box">
-
-        <div class="stat-title">
-            Lots en anomalie
-        </div>
-
-        <div class="stat-value text-error">
-            {{ stats.nb_lots_rouges }}
-        </div>
-
-    </div>
-
-    <div class="stat bg-base-100 shadow rounded-box">
-
-        <div class="stat-title">
-            Ventes sous coût
-        </div>
-
-        <div class="stat-value text-warning">
-            {{ stats.nb_ventes_rouges }}
-        </div>
-
-    </div>
-
-    <div class="stat bg-base-100 shadow rounded-box">
-
-        <div class="stat-title">
-            Vendeurs concernés
-        </div>
-
-        <div class="stat-value text-primary">
-            {{ stats.nb_vendeurs_concernes }}
-        </div>
-
-    </div>
+  </div>
 
 </div>
-
-    <!-- TABLE -->
-
-    <div class="card bg-base-100 shadow">
-
-        <div class="card-body">
-
-            <div class="flex justify-between items-center">
-
-                <h2 class="card-title">
-                    Prix de vente
-                </h2>
-
-                <span class="badge badge-primary">
-                    {{ lignes|length }} lots
-                </span>
-
-            </div>
-
-            <div class="overflow-x-auto">
-
-                <table class="table table-zebra">
-
-                    <thead>
-                    
-                        <tr>
-                        
-                            <th>Produit</th>
-                        
-                            <th>Achat</th>
-                        
-                            <th>Prix Min</th>
-                        
-                            <th>Ecart</th>
-                        
-                            <th>Vendeurs</th>
-                        
-                            <th>Alertes</th>
-                        
-                        </tr>
-                    
-                    </thead>
-
-                    <tbody>
-
-                        {% for item in lignes %}
-
-                        <tr>
-                        
-                            <td>
-                            
-                                <a href="{% url 'detail_prix' item.lot.id %}"
-                                   class="link link-primary font-semibold">
-                            
-                                    {{ item.produit.nom }}
-                            
-                                </a>
-                            
-                                <div class="flex flex-wrap gap-1 mt-2">
-                                
-                                    <span class="badge badge-outline badge-sm">
-                                    
-                                        {{ item.fournisseur.nom|default:"Sans fournisseur" }}
-                                    
-                                    </span>
-                                
-                                    <span class="badge badge-outline badge-sm">
-                                    
-                                        {{ item.date_reception|date:"d/m/Y" }}
-                                    
-                                    </span>
-                                
-                                    <span class="badge badge-outline badge-sm">
-                                    
-                                        Qté {{ item.quantite_initiale }}
-                                    
-                                    </span>
-                                
-                                </div>
-                            
-                            </td>
-                        
-                            <td>
-                            
-                                {{ item.prix_achat }}
-                            
-                            </td>
-                        
-                            <td class="font-bold text-error">
-                            
-                                {{ item.prix_min }}
-                            
-                            </td>
-                        
-                            <td>
-                            
-                                <span class="badge badge-error">
-                                
-                                    {{ item.ecart }}
-                                
-                                </span>
-                            
-                            </td>
-                        
-                            <td>
-                            
-                                <span class="badge badge-info">
-                                
-                                    {{ item.nb_vendeurs }}
-                                
-                                </span>
-                            
-                            </td>
-                        
-                            <td>
-                            
-                                <span class="badge badge-warning">
-                                
-                                    {{ item.nb_ventes_rouges }}
-                                
-                                </span>
-                            
-                            </td>
-                        
-                        </tr>
-
-                        {% empty %}
-
-                        <tr>
-
-                            <td colspan="5"
-                                class="text-center py-10 opacity-50">
-
-                                Aucun lot trouvé
-
-                            </td>
-
-                        </tr>
-
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
 {% endblock %}

@@ -1,134 +1,107 @@
-from core.models import (
-    Vente,
-    Agent,
-    Produit,
-)
+from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Count, Sum
+
+from core.models import Agent, Produit, Vente
+from surveillance.services.vente_service import KG_EXPRESSION
+
 
 class ListeKgVenduService:
 
     @staticmethod
-    def get_kpis(date_debut,date_fin):
-    
-        ventes = Vente.objects.filter(
-            date_vente__date__gte=date_debut,
-            date_vente__date__lte=date_fin,
-            est_supprime=False
-        )
-    
-        kg_total = sum(
-            vente.quantite_en_kg
-            for vente in ventes
-        )
-    
-        return {
-            "kg_total": kg_total,
-            "nb_superviseurs":
-                Agent.objects.filter(
-                    type_agent="entrepot",
-                    est_actif=True
-                ).count(),
-    
-            "nb_agents":
-                Agent.objects.filter(
-                    type_agent__in=[
-                        "terrain",
-                        "agent_gros",
-                        "agent_polivalent"
-                    ],
-                    est_actif=True
-                ).count(),
-    
-            "nb_produits":
-                Produit.objects.count(),
-        }
-    
-    @staticmethod
-    def get_superviseurs(date_debut,date_fin):
-    
-        resultat = []
-    
-        superviseurs = Agent.objects.filter(
-            type_agent="entrepot",
-            est_actif=True
-        )
-    
-        for superviseur in superviseurs:
-        
-            ventes = Vente.objects.filter(
-                agent__superviseur=superviseur,
+    def get_kpis(date_debut, date_fin):
+        kg_total = (
+            Vente.objects
+            .filter(
                 date_vente__date__gte=date_debut,
                 date_vente__date__lte=date_fin,
-                est_supprime=False
+                est_supprime=False,
             )
-    
-            kg = sum(
-                vente.quantite_en_kg
-                for vente in ventes
-            )
-    
-            agents_count = superviseur.agents_geres.count()
-    
-            resultat.append({
-                "superviseur": superviseur,
-                "kg": kg,
-                "agents_count": agents_count,
-            })
-    
-        resultat.sort(
-            key=lambda x: x["kg"],
-            reverse=True
+            .aggregate(total=Sum(KG_EXPRESSION))['total']
+            or Decimal('0')
         )
-    
-        return resultat
-    
+
+        return {
+            "kg_total": kg_total,
+            "nb_superviseurs": Agent.objects.filter(
+                type_agent="entrepot",
+                est_actif=True,
+            ).count(),
+            "nb_agents": Agent.objects.filter(
+                type_agent__in=["terrain", "agent_gros", "agent_polivalent"],
+                est_actif=True,
+            ).count(),
+            "nb_produits": Produit.objects.count(),
+        }
+
     @staticmethod
-    def get_agents( date_debut,date_fin,superviseur=None,produit=None):
-    
-        ventes = Vente.objects.filter(
+    def get_superviseurs(date_debut, date_fin):
+        # 1 requête : kg total groupé par superviseur
+        kg_rows = (
+            Vente.objects
+            .filter(
+                date_vente__date__gte=date_debut,
+                date_vente__date__lte=date_fin,
+                est_supprime=False,
+                agent__superviseur__isnull=False,
+            )
+            .values('agent__superviseur')
+            .annotate(kg=Sum(KG_EXPRESSION))
+        )
+        kg_par_sup = {row['agent__superviseur']: row['kg'] for row in kg_rows}
+
+        # 1 requête : superviseurs avec count d'agents géré via annotation
+        superviseurs = (
+            Agent.objects
+            .filter(type_agent="entrepot", est_actif=True)
+            .annotate(agents_count=Count('agents_geres'))
+        )
+
+        resultat = [
+            {
+                "superviseur": sup,
+                "kg": kg_par_sup.get(sup.id, Decimal('0')),
+                "agents_count": sup.agents_count,
+            }
+            for sup in superviseurs
+        ]
+
+        resultat.sort(key=lambda x: x["kg"], reverse=True)
+        return resultat
+
+    @staticmethod
+    def get_agents(date_debut, date_fin, superviseur=None, produit=None):
+        qs = Vente.objects.filter(
             date_vente__date__gte=date_debut,
             date_vente__date__lte=date_fin,
-            est_supprime=False
+            est_supprime=False,
         )
-    
         if superviseur:
-        
-            ventes = ventes.filter(
-                agent__superviseur_id=superviseur
-            )
-    
+            qs = qs.filter(agent__superviseur_id=superviseur)
         if produit:
-        
-            ventes = ventes.filter(
-                detail_distribution__lot__produit_id=produit
-            )
-    
-        agents_data = {}
-    
-        for vente in ventes:
-        
-            agent = vente.agent
-    
-            if agent.id not in agents_data:
-            
-                agents_data[agent.id] = {
-                    "agent": agent,
-                    "superviseur": agent.superviseur,
-                    "kg": 0,
-                }
-    
-            agents_data[agent.id]["kg"] += (
-                vente.quantite_en_kg
-            )
-    
-        resultat = list(
-            agents_data.values()
+            qs = qs.filter(detail_distribution__lot__produit_id=produit)
+
+        # 1 requête : kg groupé par agent, trié en DB
+        rows = (
+            qs
+            .values('agent')
+            .annotate(kg=Sum(KG_EXPRESSION))
+            .order_by('-kg')
         )
-    
-        resultat.sort(
-            key=lambda x: x["kg"],
-            reverse=True
-        )
-    
-        return resultat
+
+        # 1 requête : hydratation des objets Agent avec superviseur en 1 JOIN
+        agent_ids = [r['agent'] for r in rows]
+        agents_map = {
+            a.id: a
+            for a in Agent.objects.filter(id__in=agent_ids).select_related('superviseur')
+        }
+
+        return [
+            {
+                "agent": agents_map[r['agent']],
+                "superviseur": agents_map[r['agent']].superviseur,
+                "kg": r['kg'],
+            }
+            for r in rows
+            if r['agent'] in agents_map
+        ]

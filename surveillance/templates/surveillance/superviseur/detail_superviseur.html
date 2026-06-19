@@ -1,204 +1,137 @@
 {% extends "base_admin.html" %}
 
 {% block content %}
-
 <div class="space-y-6">
 
+  <!-- BREADCRUMB -->
+  <div class="breadcrumbs text-sm">
+    <ul>
+      <li><a href="/">Accueil</a></li>
+      <li><a href="{% url 'dashboard_surveillance' %}">Surveillance</a></li>
+      <li><a href="{% url 'liste_kg_vendu' %}">Kg vendus</a></li>
+      <li class="font-semibold">{{ superviseur.full_name }}</li>
+    </ul>
+  </div>
+
+  <!-- HEADER -->
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
     <div>
+      <h1 class="text-2xl font-bold tracking-tight">{{ superviseur.full_name }}</h1>
+      <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire — semaine en cours vs semaine précédente.</p>
+    </div>
+    <a href="{% url 'liste_kg_vendu' %}" class="btn btn-sm btn-outline self-start sm:self-auto">← Retour</a>
+  </div>
 
-        <h1 class="text-2xl font-bold">
+  <!-- KPI -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-            {{ superviseur.full_name }}
-
-        </h1>
-
-        <p class="text-sm opacity-60">
-
-            Analyse hebdomadaire
-
-        </p>
-
+    <div class="stat bg-base-100 shadow rounded-box border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Kg — Semaine</div>
+      <div class="stat-value text-2xl text-primary">{{ kg_actuel|floatformat:0 }}</div>
+      <div class="stat-desc">Volume vendu cette semaine</div>
     </div>
 
-    <!-- KPI -->
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-        <div class="stat bg-base-100 shadow">
-
-            <div class="stat-title">
-
-                Kg semaine
-
-            </div>
-
-            <div class="stat-value">
-
-                {{ kg_actuel|floatformat:0 }}
-
-            </div>
-
-        </div>
-
-        <div class="stat bg-base-100 shadow">
-
-            <div class="stat-title">
-
-                Semaine précédente
-
-            </div>
-
-            <div class="stat-value">
-
-                {{ kg_prec|floatformat:0 }}
-
-            </div>
-
-        </div>
-
-        <div class="stat bg-base-100 shadow">
-
-            <div class="stat-title">
-
-                Variation
-
-            </div>
-
-            <div class="stat-value {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
-
-                {{ variation }}%
-
-            </div>
-
-        </div>
-
+    <div class="stat bg-base-100 shadow rounded-box border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Kg — Semaine précédente</div>
+      <div class="stat-value text-2xl text-base-content/70">{{ kg_prec|floatformat:0 }}</div>
+      <div class="stat-desc">Référence N-1</div>
     </div>
 
-    <!-- Agents -->
-
-    <div class="card bg-base-100 shadow">
-
-        <div class="card-body">
-
-            <h2 class="card-title">
-
-                Agents
-
-            </h2>
-
-            <div class="overflow-x-auto">
-
-                <table class="table table-zebra">
-
-                    <thead>
-
-                        <tr>
-
-                            <th>Agent</th>
-                            <th>Kg</th>
-                            <th>Produits</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        {% for item in agents_stats %}
-
-                        <tr>
-
-                            <td>
-
-                                {{ item.agent.full_name }}
-
-                            </td>
-
-                            <td>
-
-                                {{ item.kg|floatformat:0 }}
-
-                            </td>
-
-                            <td>
-
-                                {{ item.nb_produits }}
-
-                            </td>
-
-                        </tr>
-
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
-        </div>
-
+    <div class="stat bg-base-100 shadow rounded-box border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Variation</div>
+      <div class="stat-value text-2xl {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
+        {% if variation < 0 %}▼{% else %}▲{% endif %} {{ variation }}%
+      </div>
+      <div class="stat-desc">Semaine N vs N-1</div>
     </div>
 
-    <!-- Produits -->
+  </div>
 
-    <div class="card bg-base-100 shadow">
-
-        <div class="card-body">
-
-            <h2 class="card-title">
-
-                Produits
-
-            </h2>
-
-            <div class="overflow-x-auto">
-
-                <table class="table table-zebra">
-
-                    <thead>
-
-                        <tr>
-
-                            <th>Produit</th>
-                            <th>Kg</th>
-
-                        </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                        {% for item in produits_stats %}
-
-                        <tr>
-
-                            <td>
-
-                                {{ item.produit.nom }}
-
-                            </td>
-
-                            <td>
-
-                                {{ item.kg|floatformat:0 }}
-
-                            </td>
-
-                        </tr>
-
-                        {% endfor %}
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
+  <!-- AGENTS -->
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="card-title text-base">Agents</h2>
+          <p class="text-xs text-base-content/50 mt-0.5">Quels agents produisent ? Quels agents sont faibles ?</p>
         </div>
-
+        <span class="badge badge-primary badge-outline">{{ agents_stats|length }}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-xs uppercase text-base-content/50">
+              <th>#</th>
+              <th>Agent</th>
+              <th class="text-right">Kg vendus</th>
+              <th class="text-right">Nb produits</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in agents_stats %}
+            <tr class="hover">
+              <td class="text-base-content/40 font-mono text-xs w-8">{{ forloop.counter }}</td>
+              <td class="font-semibold">{{ item.agent.full_name }}</td>
+              <td class="text-right font-mono font-bold">
+                {{ item.kg|floatformat:0 }} <span class="text-xs font-normal text-base-content/50">kg</span>
+              </td>
+              <td class="text-right">
+                <span class="badge badge-ghost badge-sm">{{ item.nb_produits }}</span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun agent trouvé</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  </div>
+
+  <!-- PRODUITS -->
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="card-title text-base">Produits vendus</h2>
+          <p class="text-xs text-base-content/50 mt-0.5">Quels produits génèrent le volume ? Quels produits expliquent la baisse ?</p>
+        </div>
+        <span class="badge badge-secondary badge-outline">{{ produits_stats|length }}</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-xs uppercase text-base-content/50">
+              <th>#</th>
+              <th>Produit</th>
+              <th class="text-right">Kg vendus</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in produits_stats %}
+            <tr class="hover">
+              <td class="text-base-content/40 font-mono text-xs w-8">{{ forloop.counter }}</td>
+              <td class="font-semibold">{{ item.produit.nom }}</td>
+              <td class="text-right font-mono font-bold">
+                {{ item.kg|floatformat:0 }} <span class="text-xs font-normal text-base-content/50">kg</span>
+              </td>
+              <td class="text-right">
+                <a href="{% url 'detail_produit' item.produit.id %}" class="btn btn-xs btn-ghost">→</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun produit trouvé</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 </div>
-
 {% endblock %}
