@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from .services import (
+from analyse_champ.services import (
     get_dashboard,
 
     get_operations,
@@ -14,6 +14,10 @@ from .services import (
     get_superviseurs,
     get_rapports,
     get_rapport_detail,
+    
+    get_fiches,
+    get_fiche_detail,
+    get_connaissances
 )
 
 def build_filters(request):
@@ -40,7 +44,7 @@ def dashboard_view(request):
     params = build_filters(request)
     dashboard = get_dashboard(params=params)
     
-    return render(request, 'finance_champs/dashboard.html', {'dashboard': dashboard})
+    return render(request, 'dashboard.html', {'dashboard': dashboard})
 
 # =========================
 # OPERATIONS
@@ -182,3 +186,24 @@ def rapport_detail_view(request,pk):
         'rapport_journalier/detail.html',
         context
     )
+
+# =========================
+# CULTURE
+# =========================
+def fiche_list_view(request):
+    params = build_filters(request)
+    for key in ("technicien", "annee", "mois"):
+        val = request.GET.get(key)
+        if val:
+            params[key] = val
+    fiches = get_fiches(params=params)
+    return render(request, "cultures_champs/list.html", {"fiches": fiches})
+
+def fiche_detail_view(request, pk):
+    fiche = get_fiche_detail(pk)
+    return render(request, "cultures_champs/detail.html", {"fiche": fiche})
+
+def connaissances_view(request):
+    connaissances = get_connaissances()
+    return render(request, "cultures_champs/connaissances.html",
+                  {"connaissances": connaissances})

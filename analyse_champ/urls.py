@@ -48,4 +48,20 @@ urlpatterns = [
         rapport_detail_view,
         name='direction_rapport_detail'
     ),
+
+    path(
+        'agros/cultures/',
+        fiche_list_view,
+        name='agro_culture_list'
+    ),
+    path(
+        'agros/cultures/connaissances/',
+        connaissances_view,
+        name='agro_culture_connaissances'
+    ),
+    path(
+        'agros/cultures/<int:pk>/',
+        fiche_detail_view,
+        name='agro_culture_detail'
+    ),
 ]

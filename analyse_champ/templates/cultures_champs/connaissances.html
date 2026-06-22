@@ -1,0 +1,89 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="breadcrumbs text-sm mb-2">
+        <ul>
+            <li><a href="{% url 'agro_dashboard' %}">Dashboard</a></li>
+            <li><a href="{% url 'agro_culture_list' %}">Cultures</a></li>
+            <li>Base de connaissances</li>
+        </ul>
+    </div>
+
+    <!-- En-tête -->
+    <div>
+        <h1 class="text-2xl font-bold">Base de connaissances</h1>
+        <p class="text-base-content/60">
+            Moyennes des rendements par culture — tous agents, tous cycles récoltés.
+        </p>
+    </div>
+
+    <!-- Table -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Culture</th>
+                            <th>Campagnes</th>
+                            <th>Rdt moyen estimé</th>
+                            <th>Rdt moyen réel</th>
+                            <th>Écart moyen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        {% for item in connaissances %}
+                        <tr>
+
+                            <td class="font-medium">{{ item.culture }}</td>
+
+                            <td>
+                                <span class="badge badge-ghost">{{ item.nb_campagnes }}</span>
+                            </td>
+
+                            <td>
+                                {% if item.moy_estime %}
+                                    {{ item.moy_estime }} {{ item.unite }}
+                                {% else %}
+                                    <span class="text-base-content/40">—</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="font-semibold">
+                                {{ item.moy_reel }} {{ item.unite }}
+                            </td>
+
+                            <td>
+                                {% if item.ecart_pct %}
+                                    <span class="badge badge-outline text-xs
+                                        {% if item.ecart_pct|floatformat:0 == '0' %}badge-ghost
+                                        {% elif item.ecart_pct|slice:':1' == '-' %}badge-error
+                                        {% else %}badge-success
+                                        {% endif %}">
+                                        {% if item.ecart_pct|slice:':1' != '-' %}+{% endif %}{{ item.ecart_pct }} %
+                                    </span>
+                                {% else %}
+                                    <span class="text-base-content/40">—</span>
+                                {% endif %}
+                            </td>
+
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-base-content/60">
+                                Aucun rendement réel enregistré.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

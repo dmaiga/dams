@@ -1,0 +1,177 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="breadcrumbs text-sm mb-2">
+        <ul>
+            <li><a href="{% url 'agro_dashboard' %}">Dashboard</a></li>
+            <li><a href="{% url 'agro_culture_list' %}">Cultures</a></li>
+            <li>{{ fiche.saison_label }}</li>
+        </ul>
+    </div>
+
+    <!-- En-tête -->
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold">Fiche — {{ fiche.saison_label }}</h1>
+            <p class="text-base-content/60">
+                {% if fiche.technicien.first_name %}
+                    {{ fiche.technicien.first_name }} {{ fiche.technicien.last_name }}
+                {% else %}
+                    {{ fiche.technicien }}
+                {% endif %}
+            </p>
+        </div>
+        <a href="{% url 'agro_culture_list' %}" class="btn btn-outline btn-sm">Retour</a>
+    </div>
+
+    <!-- Infos fiche -->
+    <div class="stats shadow w-full">
+
+        <div class="stat">
+            <div class="stat-title">Date de mise en culture</div>
+            <div class="stat-value text-lg">{{ fiche.date_debut }}</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-title">Superficie</div>
+            <div class="stat-value text-lg">{{ fiche.superficie_ha }} ha</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-title">Cultures</div>
+            <div class="stat-value text-lg">{{ fiche.nb_cultures }}</div>
+        </div>
+
+    </div>
+
+    {% if fiche.note %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <span>{{ fiche.note }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Cultures / Besoins -->
+    <div>
+        <h2 class="text-lg font-semibold mb-3">Détail par culture</h2>
+        <div class="space-y-4">
+
+            {% for besoin in fiche.besoins %}
+            <div class="card bg-base-100 shadow border border-base-300">
+                <div class="card-body">
+
+                    <!-- Titre culture + badge avancement -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <h3 class="font-bold text-lg">{{ besoin.culture.nom }}</h3>
+                        {% if besoin.date_recolte %}
+                            <span class="badge badge-success">Récoltée</span>
+                        {% else %}
+                            <span class="badge badge-ghost">En cours</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        <!-- Intrants -->
+                        <div class="space-y-3">
+                            <h4 class="text-xs uppercase font-semibold text-base-content/50 tracking-wide">Intrants fournis</h4>
+
+                            {% if besoin.semence_quantite %}
+                            <div>
+                                <p class="text-sm text-base-content/60">Semences</p>
+                                <p class="font-medium">{{ besoin.semence_quantite }} {{ besoin.semence_unite }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.engrais %}
+                            <div>
+                                <p class="text-sm text-base-content/60">Engrais</p>
+                                <p class="font-medium">{{ besoin.engrais }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.produit_phyto %}
+                            <div>
+                                <p class="text-sm text-base-content/60">Produits phytosanitaires</p>
+                                <p class="font-medium">{{ besoin.produit_phyto }}</p>
+                            </div>
+                            {% endif %}
+
+                        </div>
+
+                        <!-- Rendements -->
+                        <div class="space-y-3">
+                            <h4 class="text-xs uppercase font-semibold text-base-content/50 tracking-wide">Rendements</h4>
+
+                            <div class="grid grid-cols-2 gap-3">
+
+                                <div class="bg-base-200 rounded-lg p-3 text-center">
+                                    <p class="text-xs text-base-content/60 mb-1">Estimé</p>
+                                    <p class="font-bold text-lg">
+                                        {% if besoin.rendement_estime %}
+                                            {{ besoin.rendement_estime }} {{ besoin.unite_rendement }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </p>
+                                </div>
+
+                                <div class="bg-base-200 rounded-lg p-3 text-center">
+                                    <p class="text-xs text-base-content/60 mb-1">Réel</p>
+                                    <p class="font-bold text-lg">
+                                        {% if besoin.rendement_reel %}
+                                            {{ besoin.rendement_reel }} {{ besoin.unite_rendement }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </p>
+                                </div>
+
+                            </div>
+
+                            {% if besoin.rendement_reel and besoin.rendement_estime %}
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                <div class="badge {% if besoin.ecart_pct >= 0 %}badge-success{% else %}badge-error{% endif %} badge-outline">
+                                    Écart : {{ besoin.ecart_rendement|floatformat:1 }} {{ besoin.unite_rendement }}
+                                    ({% if besoin.ecart_pct >= 0 %}+{% endif %}{{ besoin.ecart_pct|floatformat:1 }} %)
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.date_recolte %}
+                            <div class="mt-2 text-sm">
+                                <span class="text-base-content/60">Date de récolte :</span>
+                                <span class="font-medium ml-1">{{ besoin.date_recolte }}</span>
+                                {% if besoin.duree_cycle_jours %}
+                                <span class="text-base-content/40 ml-2">({{ besoin.duree_cycle_jours }} jours)</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                    {% if besoin.observation %}
+                    <div class="divider my-2"></div>
+                    <div>
+                        <p class="text-xs uppercase font-semibold text-base-content/50 tracking-wide mb-1">Observation direction</p>
+                        <p class="text-sm">{{ besoin.observation }}</p>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+            {% empty %}
+            <div class="alert">
+                <span>Aucune culture enregistrée sur cette fiche.</span>
+            </div>
+            {% endfor %}
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

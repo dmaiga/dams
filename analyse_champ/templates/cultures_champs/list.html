@@ -1,0 +1,159 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="breadcrumbs text-sm mb-2">
+        <ul>
+            <li><a href="{% url 'agro_dashboard' %}">Dashboard</a></li>
+            <li>Cultures</li>
+        </ul>
+    </div>
+
+    <!-- En-tête -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold">Fiches de culture</h1>
+            <p class="text-base-content/60">Cycles agricoles enregistrés par les agents</p>
+        </div>
+        <a href="{% url 'agro_culture_connaissances' %}" class="btn btn-outline btn-sm">
+            <i class="fas fa-book-open mr-1"></i>
+            Base de connaissances
+        </a>
+    </div>
+
+    <!-- KPI -->
+    <div class="stats shadow w-full">
+        <div class="stat">
+            <div class="stat-title">Fiches trouvées</div>
+            <div class="stat-value text-primary">{{ fiches.count }}</div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <form method="get">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+                    <div>
+                        <label class="label"><span class="label-text">Année</span></label>
+                        <input
+                            type="number"
+                            name="annee"
+                            value="{{ request.GET.annee }}"
+                            placeholder="2026"
+                            class="input input-bordered w-full">
+                    </div>
+
+                    <div>
+                        <label class="label"><span class="label-text">Mois</span></label>
+                        <select name="mois" class="select select-bordered w-full">
+                            <option value="">Tous</option>
+                            <option value="1"  {% if request.GET.mois == "1"  %}selected{% endif %}>Janvier</option>
+                            <option value="2"  {% if request.GET.mois == "2"  %}selected{% endif %}>Février</option>
+                            <option value="3"  {% if request.GET.mois == "3"  %}selected{% endif %}>Mars</option>
+                            <option value="4"  {% if request.GET.mois == "4"  %}selected{% endif %}>Avril</option>
+                            <option value="5"  {% if request.GET.mois == "5"  %}selected{% endif %}>Mai</option>
+                            <option value="6"  {% if request.GET.mois == "6"  %}selected{% endif %}>Juin</option>
+                            <option value="7"  {% if request.GET.mois == "7"  %}selected{% endif %}>Juillet</option>
+                            <option value="8"  {% if request.GET.mois == "8"  %}selected{% endif %}>Août</option>
+                            <option value="9"  {% if request.GET.mois == "9"  %}selected{% endif %}>Septembre</option>
+                            <option value="10" {% if request.GET.mois == "10" %}selected{% endif %}>Octobre</option>
+                            <option value="11" {% if request.GET.mois == "11" %}selected{% endif %}>Novembre</option>
+                            <option value="12" {% if request.GET.mois == "12" %}selected{% endif %}>Décembre</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label"><span class="label-text">Date début</span></label>
+                        <input
+                            type="date"
+                            name="date_from"
+                            value="{{ request.GET.date_from }}"
+                            class="input input-bordered w-full">
+                    </div>
+
+                    <div>
+                        <label class="label"><span class="label-text">Date fin</span></label>
+                        <input
+                            type="date"
+                            name="date_to"
+                            value="{{ request.GET.date_to }}"
+                            class="input input-bordered w-full">
+                    </div>
+
+                </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button type="submit" class="btn btn-primary">Filtrer</button>
+                    <a href="{% url 'agro_culture_list' %}" class="btn btn-ghost">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Liste -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Saison</th>
+                            <th>Technicien</th>
+                            <th>Superficie</th>
+                            <th>Avancement</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        {% for fiche in fiches.results %}
+                        <tr>
+                            <td class="font-medium">{{ fiche.saison_label }}</td>
+
+                            <td>
+                                {% if fiche.technicien.first_name %}
+                                    {{ fiche.technicien.first_name }} {{ fiche.technicien.last_name }}
+                                {% else %}
+                                    {{ fiche.technicien }}
+                                {% endif %}
+                            </td>
+
+                            <td>{{ fiche.superficie_ha }} ha</td>
+
+                            <td>
+                                {% if fiche.nb_cultures == 0 %}
+                                    <span class="text-base-content/40 text-sm">—</span>
+                                {% elif fiche.nb_recoltes == fiche.nb_cultures %}
+                                    <span class="badge badge-success">Terminée ({{ fiche.nb_recoltes }}/{{ fiche.nb_cultures }})</span>
+                                {% elif fiche.nb_recoltes == 0 %}
+                                    <span class="badge badge-ghost">{{ fiche.nb_cultures }} culture{{ fiche.nb_cultures|pluralize }} · en cours</span>
+                                {% else %}
+                                    <span class="badge badge-warning">{{ fiche.nb_recoltes }}/{{ fiche.nb_cultures }} récoltée(s)</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <a href="{% url 'agro_culture_detail' fiche.id %}" class="btn btn-sm btn-outline">
+                                    Voir
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-base-content/60">
+                                Aucune fiche trouvée.
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

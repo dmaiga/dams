@@ -1,5 +1,5 @@
 {% extends 'base_admin.html' %}
-
+{% load format_fcfa %}
 {% block content %}
 
 <div class="space-y-6">
@@ -69,7 +69,7 @@
         </div>
 
         <div class="stat-value text-success">
-            {{ dashboard.revenus }}
+            {{ dashboard.revenus|fcfa }}
         </div>
 
         <div class="stat-desc">
@@ -85,7 +85,7 @@
         </div>
 
         <div class="stat-value text-error">
-            {{ dashboard.depenses }}
+            {{ dashboard.depenses|fcfa }}
         </div>
 
         <div class="stat-desc">
@@ -102,7 +102,7 @@
 
         <div class="stat-value">
 
-            {{ dashboard.resultat }}
+            {{ dashboard.solde|fcfa }}
 
         </div>
 
@@ -273,6 +273,29 @@
 
             <p class="text-sm text-base-content/70">
                 Activités terrain, difficultés rencontrées et résultats obtenus.
+            </p>
+
+        </div>
+    </a>
+
+    <a
+        href="{% url 'agro_culture_list' %}"
+        class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition"
+    >
+        <div class="card-body">
+
+            <div class="flex items-center gap-3">
+
+                <i class="fas fa-seedling text-xl text-success"></i>
+
+                <h2 class="card-title text-base">
+                    Cultures
+                </h2>
+
+            </div>
+
+            <p class="text-sm text-base-content/70">
+                Cycles agricoles, intrants, rendements et base de connaissances.
             </p>
 
         </div>

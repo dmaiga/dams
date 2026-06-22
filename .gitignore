@@ -1,3 +1,8 @@
+CLAUDE.md
+AGENTS.md
+docs/
+rules/
+
 # -----------------------------
 # Python
 # -----------------------------
@@ -149,5 +154,3 @@ requirements/*.txt
 
 
 *.exe
-
-rules/

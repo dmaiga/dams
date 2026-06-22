@@ -98,3 +98,14 @@ def get_rapport_detail(pk):
     return fetch_json(
         f'rapports/{pk}/'
     )
+
+
+# ── Cultures ──────────────────────────────────────────────────
+def get_fiches(params=None):
+    return fetch_json("cultures/", params=params)
+
+def get_fiche_detail(pk):
+    return fetch_json(f"cultures/{pk}/")
+
+def get_connaissances():
+    return fetch_json("cultures/connaissances/")
