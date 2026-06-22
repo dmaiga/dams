@@ -1,6 +1,7 @@
 {% extends 'base_admin.html' %}
-
+{% load format_fcfa %}
 {% block content %}
+{% load direction_filters %}
 
 <div class="space-y-6">
 
@@ -73,29 +74,29 @@
             </option>
 
         </select>
-<select
-    name="categorie"
-    class="select select-bordered"
->
-
-    <option value="">
-        Toutes catégories
-    </option>
-
-    {% for categorie in categories %}
-
-        <option
-            value="{{ categorie.id }}"
-            {% if selected_categorie == categorie.id|stringformat:"s" %}
-            selected
-            {% endif %}
+        <select
+            name="categorie"
+            class="select select-bordered"
         >
-            {{ categorie.nom }}
-        </option>
-
-    {% endfor %}
-
-</select>
+            
+            <option value="">
+                Toutes catégories
+            </option>
+        
+            {% for categorie in categories %}
+        
+                <option
+                    value="{{ categorie.id }}"
+                    {% if selected_categorie == categorie.id|stringformat:"s" %}
+                    selected
+                    {% endif %}
+                >
+                    {{ categorie.nom }}
+                </option>
+            
+            {% endfor %}
+            
+        </select>
         <select
             name="period"
             class="select select-bordered"
@@ -209,7 +210,7 @@
 
                             <div class="font-bold">
                                 {% if operation.quantity  %}
-                                    {{ operation.quantity }}
+                                    {{ operation.quantity|format_number }}
                                 {% else %}
                                      -
                                 {% endif %}
@@ -225,7 +226,7 @@
 
                             <div class="font-bold">
 
-                                {{ operation.montant_initial }}
+                                {{ operation.montant_initial|fcfa }}
 
                             </div>
 
@@ -236,7 +237,7 @@
                             {% if operation.is_corrected %}
 
                                 <div class="badge badge-warning">
-                                    {{ operation.montant_ecart }}
+                                    {{ operation.montant_ecart|fcfa }}
                                 </div>
 
                             {% else %}
@@ -248,16 +249,16 @@
                             {% endif %}
 
                         </td>
-<td>
-
-    <a
-        href="{% url 'agro_operation_detail' operation.id %}"
-        class="btn btn-xs btn-outline btn-primary"
-    >
-        Détail
-    </a>
-
-</td>
+                        <td>
+                        
+                            <a
+                                href="{% url 'agro_operation_detail' operation.id %}"
+                                class="btn btn-xs btn-outline btn-primary"
+                            >
+                                Détail
+                            </a>
+                        
+                        </td>
                     </tr>
 
                     {% endfor %}

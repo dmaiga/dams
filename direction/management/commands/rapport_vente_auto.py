@@ -102,12 +102,12 @@ class Command(BaseCommand):
             ),
             destinataires=[
                 "mdmaiga01@gmail.com",
-                #"mdmaiga@antares-rh.com",
-                #
-                #"fofanaaminata764@gmail.com",
-                #"a.fofana@antares-rh.com",
-                #
-                #"s.diarra@antares-rh.com"
+                "mdmaiga@antares-rh.com",
+                
+                "fofanaaminata764@gmail.com",
+                "a.fofana@antares-rh.com",
+                
+                "s.diarra@antares-rh.com"
             ]
         )
 
