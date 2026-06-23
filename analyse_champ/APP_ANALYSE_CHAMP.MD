@@ -90,21 +90,40 @@ Analyse quantitative des volumes de ventes et des dotations rattachées aux agen
 Garantit la traçabilité de l'activité des encadrants de la ferme.
 
 * **Fonctions Client** :
-* `get_superviseurs()` ➔ Appelle `GET /api/superviseurs/`
-* `get_rapports(params=None)` ➔ Appelle `GET /api/rapports/`
-* `get_rapport_detail(pk)` ➔ Appelle `GET /api/rapports/{pk}/`
-
+  * `get_superviseurs()` ➔ Appelle `GET /api/superviseurs/` — retourne un objet paginé `{count, results}` avec `id`, `first_name`, `last_name`, `phone_number`
+  * `get_rapports(params=None)` ➔ Appelle `GET /api/rapports/` — filtre `period`, `date_from`, `date_to`, `superviseur`
+  * `get_rapport_detail(pk)` ➔ Appelle `GET /api/rapports/{pk}/`
 
 * **Contrôleurs Vues** :
-* `rapport_list_view(request)` : Récupère la liste des rapports filtrés et extrait la clé `results` du dictionnaire renvoyé par le endpoint des superviseurs pour alimenter les listes de sélection de `rapport_journalier/list.html`.
-* `rapport_detail_view(request, pk)` ➔ Restitue `rapport_journalier/detail.html`.
+  * `rapport_list_view(request)` : Alimente le select superviseur via `superviseurs['results']` dans `rapport_journalier/list.html`.
+  * `rapport_detail_view(request, pk)` ➔ Restitue `rapport_journalier/detail.html`.
 
+---
 
+### 6. Module Cycles Agricoles (`Cultures`)
+
+Visualisation lecture seule des fiches de culture saisies dans dams_agro.
+
+* **Fonctions Client** :
+  * `get_fiches(params=None)` ➔ Appelle `GET /api/cultures/` — filtre `period`, `date_from`, `date_to`, `annee`, `mois`
+  * `get_fiche_detail(pk)` ➔ Appelle `GET /api/cultures/{pk}/` — prefetch passages + rapport + participations
+  * `get_rapports_culture(params=None)` ➔ Appelle `GET /api/cultures/rapports/` — filtre `culture` (nom, icontains)
+  * `get_connaissances()` ➔ Appelle `GET /api/cultures/connaissances/` — agrégat rendements + évaluations agents par culture
+
+* **Contrôleurs Vues** :
+  * `fiche_list_view(request)` ➔ `cultures_champs/list.html` — tableau avec badges `culture_nom` par fiche (depuis `fiche.besoins`), filtres année/mois/période. **Pas de filtre technicien** (une seule personne habilitée).
+  * `fiche_detail_view(request, pk)` ➔ `cultures_champs/detail.html` — technicien en stat, intrants, rendements, bloc rapport de clôture (bilan + évaluation agents) conditionnel par besoin.
+  * `rapports_culture_list_view(request)` ➔ `cultures_champs/rapports.html` — bilans de clôture avec filtre par nom de culture.
+  * `connaissances_view(request)` ➔ `cultures_champs/connaissances.html` — moyennes rendements par culture tous cycles récoltés.
+
+* **Ordre URL critique** : `cultures/rapports/` et `cultures/connaissances/` déclarés **avant** `cultures/<int:pk>/`.
 
 ---
 
 ## 🧪 Points de Vigilance pour le Développement
 
-* **Variables d'environnement** : Assurez-vous que la variable globale `API_URL` est correctement renseignée dans votre conteneur Docker ou votre fichier `.env` local. Une absence de cette variable lèvera une erreur d'URL malformée dès l'initialisation de `BASE_URL`.
-* **Format des Données de Listes** : L'accès aux listes dans l'API REST utilise parfois une structure paginée. C'est le cas du endpoint `superviseurs/` qui nécessite l'extraction explicite du dictionnaire `['results']` au niveau de la vue (contrairement à `categories/` ou `operations/` qui retournent des listes directes). Veillez à respecter cette structure lors d'éventuels changements du format de sérialisation côté serveur.
-* **Gestion des exceptions réseau** : Bien que `raise_for_status()` empêche l'application d'afficher des données corrompues en cas de panne de l'API, il est recommandé d'implémenter à l'avenir un bloc `try/except MaxRetryError` ou `Timeout` pour rediriger proprement l'utilisateur vers une page d'erreur maintenable en production.
+* **`technicien` est un entier** dans `FicheCultureSerializer` (PK Django, pas un objet imbriqué). Ne pas accéder à `.first_name` ni `.last_name` depuis les templates cultures — afficher directement `{{ fiche.technicien }}`.
+* **`rapport_culture` peut être `null`** — conditionner son affichage dans les templates (`{% if besoin.rapport_culture %}`).
+* **Pagination** : les endpoints retournent `{"count": N, "results": [...]}`. Utiliser `.results` dans les templates pour itérer. `categories/` et `connaissances/` retournent une liste directe (non paginée).
+* **Variable d'environnement** : `API_URL` doit pointer sur la racine de dams_agro (ex : `http://localhost:8000`). Son absence lève une erreur d'URL malformée au démarrage.
+* **Toute modification d'endpoint** dans dams_agro doit être répercutée dans `services.py` **et** dans ce fichier dans le même commit.
