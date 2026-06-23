@@ -15,19 +15,17 @@
     <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold">Fiche — {{ fiche.saison_label }}</h1>
-            <p class="text-base-content/60">
-                {% if fiche.technicien.first_name %}
-                    {{ fiche.technicien.first_name }} {{ fiche.technicien.last_name }}
-                {% else %}
-                    {{ fiche.technicien }}
-                {% endif %}
-            </p>
         </div>
         <a href="{% url 'agro_culture_list' %}" class="btn btn-outline btn-sm">Retour</a>
     </div>
 
     <!-- Infos fiche -->
     <div class="stats shadow w-full">
+
+        <div class="stat">
+            <div class="stat-title">Technicien</div>
+            <div class="stat-value text-lg">{{ fiche.technicien }}</div>
+        </div>
 
         <div class="stat">
             <div class="stat-title">Date de mise en culture</div>
@@ -159,6 +157,81 @@
                     <div>
                         <p class="text-xs uppercase font-semibold text-base-content/50 tracking-wide mb-1">Observation direction</p>
                         <p class="text-sm">{{ besoin.observation }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if besoin.rapport_culture %}
+                    <div class="divider my-2"></div>
+                    <div class="space-y-3">
+                        <h4 class="text-xs uppercase font-semibold text-base-content/50 tracking-wide">Rapport de clôture</h4>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+
+                            {% if besoin.rapport_culture.bilan_activites %}
+                            <div>
+                                <p class="font-semibold text-base-content/70 mb-1">Bilan des activités</p>
+                                <p>{{ besoin.rapport_culture.bilan_activites }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.rapport_culture.problemes %}
+                            <div>
+                                <p class="font-semibold text-base-content/70 mb-1">Problèmes</p>
+                                <p>{{ besoin.rapport_culture.problemes }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.rapport_culture.solutions %}
+                            <div>
+                                <p class="font-semibold text-base-content/70 mb-1">Solutions</p>
+                                <p>{{ besoin.rapport_culture.solutions }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.rapport_culture.resultats %}
+                            <div>
+                                <p class="font-semibold text-base-content/70 mb-1">Résultats</p>
+                                <p>{{ besoin.rapport_culture.resultats }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if besoin.rapport_culture.perspectives %}
+                            <div class="md:col-span-2">
+                                <p class="font-semibold text-base-content/70 mb-1">Perspectives</p>
+                                <p>{{ besoin.rapport_culture.perspectives }}</p>
+                            </div>
+                            {% endif %}
+
+                        </div>
+
+                        {% if besoin.rapport_culture.participations %}
+                        <div>
+                            <p class="font-semibold text-sm mb-2">Évaluation des agents</p>
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Agent</th>
+                                            <th>Implication</th>
+                                            <th>Maîtrise</th>
+                                            <th>Observation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for p in besoin.rapport_culture.participations %}
+                                        <tr>
+                                            <td class="font-medium">{{ p.agent_prenom }} {{ p.agent_nom }}</td>
+                                            <td>{{ p.implication_display }}</td>
+                                            <td>{{ p.maitrise_display }}</td>
+                                            <td class="text-base-content/60">{{ p.observation|default:"—" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+
                     </div>
                     {% endif %}
 

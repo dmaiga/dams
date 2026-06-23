@@ -107,5 +107,8 @@ def get_fiches(params=None):
 def get_fiche_detail(pk):
     return fetch_json(f"cultures/{pk}/")
 
+def get_rapports_culture(params=None):
+    return fetch_json("cultures/rapports/", params=params)
+
 def get_connaissances():
     return fetch_json("cultures/connaissances/")

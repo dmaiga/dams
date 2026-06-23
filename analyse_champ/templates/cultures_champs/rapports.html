@@ -1,0 +1,147 @@
+{% extends 'base_admin.html' %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <div class="breadcrumbs text-sm mb-2">
+        <ul>
+            <li><a href="{% url 'agro_dashboard' %}">Dashboard</a></li>
+            <li><a href="{% url 'agro_culture_list' %}">Cultures</a></li>
+            <li>Rapports de clôture</li>
+        </ul>
+    </div>
+
+    <!-- En-tête -->
+    <div>
+        <h1 class="text-2xl font-bold">Rapports de clôture</h1>
+        <p class="text-base-content/60">Bilans de fin de cycle par culture — tous agents.</p>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <form method="get">
+                <div class="grid grid-cols-1 gap-4">
+
+                    <div>
+                        <label class="label"><span class="label-text">Culture</span></label>
+                        <input
+                            type="text"
+                            name="culture"
+                            value="{{ request.GET.culture }}"
+                            placeholder="Maïs, Arachide…"
+                            class="input input-bordered w-full">
+                    </div>
+
+                </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button type="submit" class="btn btn-primary">Filtrer</button>
+                    <a href="{% url 'agro_culture_rapports' %}" class="btn btn-ghost">Réinitialiser</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Liste -->
+    {% for rapport in rapports.results %}
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <!-- En-tête rapport -->
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-2 mb-4">
+                <div>
+                    <h2 class="text-lg font-bold">{{ rapport.culture_nom }}</h2>
+                    <p class="text-sm text-base-content/60">{{ rapport.saison_label }}</p>
+                </div>
+                {% if rapport.rendement_reel %}
+                <div class="stat bg-base-200 rounded-box p-3">
+                    <div class="stat-title text-xs">Rendement réel</div>
+                    <div class="stat-value text-lg text-success">
+                        {{ rapport.rendement_reel }} {{ rapport.unite_rendement }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Bilan -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+                {% if rapport.bilan_activites %}
+                <div>
+                    <p class="font-semibold text-base-content/70 mb-1">Bilan des activités</p>
+                    <p>{{ rapport.bilan_activites }}</p>
+                </div>
+                {% endif %}
+
+                {% if rapport.problemes %}
+                <div>
+                    <p class="font-semibold text-base-content/70 mb-1">Problèmes rencontrés</p>
+                    <p>{{ rapport.problemes }}</p>
+                </div>
+                {% endif %}
+
+                {% if rapport.solutions %}
+                <div>
+                    <p class="font-semibold text-base-content/70 mb-1">Solutions appliquées</p>
+                    <p>{{ rapport.solutions }}</p>
+                </div>
+                {% endif %}
+
+                {% if rapport.resultats %}
+                <div>
+                    <p class="font-semibold text-base-content/70 mb-1">Résultats obtenus</p>
+                    <p>{{ rapport.resultats }}</p>
+                </div>
+                {% endif %}
+
+                {% if rapport.perspectives %}
+                <div class="md:col-span-2">
+                    <p class="font-semibold text-base-content/70 mb-1">Perspectives</p>
+                    <p>{{ rapport.perspectives }}</p>
+                </div>
+                {% endif %}
+
+            </div>
+
+            <!-- Participations agents -->
+            {% if rapport.participations %}
+            <div class="mt-4">
+                <p class="font-semibold text-sm mb-2">Évaluation des agents</p>
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th>Implication</th>
+                                <th>Maîtrise</th>
+                                <th>Observation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in rapport.participations %}
+                            <tr>
+                                <td>{{ p.agent_prenom }} {{ p.agent_nom }}</td>
+                                <td>{{ p.implication_display }}</td>
+                                <td>{{ p.maitrise_display }}</td>
+                                <td class="text-base-content/60">{{ p.observation|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+    {% empty %}
+    <div class="card bg-base-100 shadow">
+        <div class="card-body text-center text-base-content/60">
+            Aucun rapport de clôture trouvé.
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}

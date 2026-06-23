@@ -55,6 +55,11 @@ urlpatterns = [
         name='agro_culture_list'
     ),
     path(
+        'agros/cultures/rapports/',
+        rapports_culture_list_view,
+        name='agro_culture_rapports'
+    ),
+    path(
         'agros/cultures/connaissances/',
         connaissances_view,
         name='agro_culture_connaissances'

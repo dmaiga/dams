@@ -14,9 +14,10 @@ from analyse_champ.services import (
     get_superviseurs,
     get_rapports,
     get_rapport_detail,
-    
+
     get_fiches,
     get_fiche_detail,
+    get_rapports_culture,
     get_connaissances
 )
 
@@ -192,7 +193,7 @@ def rapport_detail_view(request,pk):
 # =========================
 def fiche_list_view(request):
     params = build_filters(request)
-    for key in ("technicien", "annee", "mois"):
+    for key in ("annee", "mois"):
         val = request.GET.get(key)
         if val:
             params[key] = val
@@ -202,6 +203,14 @@ def fiche_list_view(request):
 def fiche_detail_view(request, pk):
     fiche = get_fiche_detail(pk)
     return render(request, "cultures_champs/detail.html", {"fiche": fiche})
+
+def rapports_culture_list_view(request):
+    params = {}
+    val = request.GET.get("culture")
+    if val:
+        params["culture"] = val
+    rapports = get_rapports_culture(params=params)
+    return render(request, "cultures_champs/rapports.html", {"rapports": rapports})
 
 def connaissances_view(request):
     connaissances = get_connaissances()

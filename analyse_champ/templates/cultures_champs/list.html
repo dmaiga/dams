@@ -16,10 +16,16 @@
             <h1 class="text-2xl font-bold">Fiches de culture</h1>
             <p class="text-base-content/60">Cycles agricoles enregistrés par les agents</p>
         </div>
-        <a href="{% url 'agro_culture_connaissances' %}" class="btn btn-outline btn-sm">
-            <i class="fas fa-book-open mr-1"></i>
-            Base de connaissances
-        </a>
+        <div class="flex gap-2">
+            <a href="{% url 'agro_culture_rapports' %}" class="btn btn-outline btn-sm">
+                <i class="fas fa-file-alt mr-1"></i>
+                Rapports de clôture
+            </a>
+            <a href="{% url 'agro_culture_connaissances' %}" class="btn btn-outline btn-sm">
+                <i class="fas fa-book-open mr-1"></i>
+                Base de connaissances
+            </a>
+        </div>
     </div>
 
     <!-- KPI -->
@@ -34,7 +40,7 @@
     <div class="card bg-base-100 shadow">
         <div class="card-body">
             <form method="get">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                     <div>
                         <label class="label"><span class="label-text">Année</span></label>
@@ -101,7 +107,7 @@
                     <thead>
                         <tr>
                             <th>Saison</th>
-                            <th>Technicien</th>
+                            <th>Cultures</th>
                             <th>Superficie</th>
                             <th>Avancement</th>
                             <th></th>
@@ -114,11 +120,11 @@
                             <td class="font-medium">{{ fiche.saison_label }}</td>
 
                             <td>
-                                {% if fiche.technicien.first_name %}
-                                    {{ fiche.technicien.first_name }} {{ fiche.technicien.last_name }}
-                                {% else %}
-                                    {{ fiche.technicien }}
-                                {% endif %}
+                                {% for besoin in fiche.besoins %}
+                                    <span class="badge badge-ghost badge-sm">{{ besoin.culture_nom }}</span>
+                                {% empty %}
+                                    <span class="text-base-content/40">—</span>
+                                {% endfor %}
                             </td>
 
                             <td>{{ fiche.superficie_ha }} ha</td>
