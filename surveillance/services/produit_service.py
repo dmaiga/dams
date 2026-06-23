@@ -12,10 +12,11 @@ from surveillance.services.vente_service import KG_EXPRESSION
 
 def _kg_par_produit(date_debut, date_fin):
     """Retourne un dict {produit_id: kg_total} pour la période donnée."""
+    from surveillance.constants import DATE_PLANCHER_VENTES
     rows = (
         Vente.objects
         .filter(
-            date_vente__date__gte=date_debut,
+            date_vente__date__gte=max(date_debut, DATE_PLANCHER_VENTES),
             date_vente__date__lte=date_fin,
             est_supprime=False,
         )
@@ -28,9 +29,13 @@ def _kg_par_produit(date_debut, date_fin):
 class ProduitSurveillanceService:
 
     @staticmethod
-    def variations_semaine():
-        debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine_actuelle()
-        debut_prec, fin_prec = ComparaisonPeriodeService.semaine_precedente()
+    def variations_semaine(debut_semaine=None):
+        if debut_semaine:
+            debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine(debut_semaine)
+            debut_prec, fin_prec = ComparaisonPeriodeService.semaine_prec(debut_semaine)
+        else:
+            debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine_actuelle()
+            debut_prec, fin_prec = ComparaisonPeriodeService.semaine_precedente()
 
         # 2 requêtes d'agrégation (au lieu de 2N+2 auparavant)
         kg_actuel_map = _kg_par_produit(debut_actuel, fin_actuel)

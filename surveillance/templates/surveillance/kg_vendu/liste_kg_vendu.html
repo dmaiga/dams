@@ -13,14 +13,17 @@
   </div>
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-base-200 pb-4">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">Analyse Kg Vendus</h1>
       <p class="text-sm text-base-content/60 mt-0.5">Volumes vendus par superviseur et par agent.</p>
     </div>
-    <div class="flex gap-2">
-      <a href="{% url 'dashboard_surveillance' %}" class="btn btn-sm btn-outline">Dashboard</a>
-      <a href="{% url 'surveillance_prix' %}" class="btn btn-sm btn-outline">Anomalies prix</a>
+    <div class="flex flex-wrap items-center gap-3">
+      {% include "partials/_filtre_semaine.html" %}
+      <div class="flex gap-2">
+        <a href="{% url 'dashboard_surveillance' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-sm btn-outline">Dashboard</a>
+        <a href="{% url 'surveillance_prix' %}" class="btn btn-sm btn-outline">Anomalies prix</a>
+      </div>
     </div>
   </div>
 
@@ -86,7 +89,7 @@
               </td>
               <td class="text-right font-mono font-bold">{{ item.kg|floatformat:0 }} <span class="text-xs font-normal text-base-content/50">kg</span></td>
               <td class="text-right">
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}" class="btn btn-xs btn-ghost">Détail →</a>
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-xs btn-ghost">Détail →</a>
               </td>
             </tr>
             {% empty %}
@@ -105,22 +108,15 @@
     <div class="card-body p-5">
       <h2 class="card-title text-base mb-3">Filtres — Détail agents</h2>
       <form method="get">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-
-          <div class="form-control">
-            <label class="label pb-1"><span class="label-text text-xs font-semibold uppercase text-base-content/60">Période</span></label>
-            <select name="periode" class="select select-bordered select-sm">
-              <option value="semaine" {% if periode == "semaine" %}selected{% endif %}>Semaine</option>
-              <option value="mois" {% if periode == "mois" %}selected{% endif %}>Mois</option>
-            </select>
-          </div>
+        <input type="hidden" name="semaine" value="{{ semaine_selectionnee }}">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
           <div class="form-control">
             <label class="label pb-1"><span class="label-text text-xs font-semibold uppercase text-base-content/60">Superviseur</span></label>
             <select name="superviseur" class="select select-bordered select-sm">
               <option value="">Tous</option>
               {% for superviseur in superviseurs %}
-              <option value="{{ superviseur.id }}" {% if selected_superviseur == superviseur.id|stringformat:"s" %}selected{% endif %}>
+              <option value="{{ superviseur.id }}" {% if selected_superviseur == superviseur.id %}selected{% endif %}>
                 {{ superviseur.full_name }}
               </option>
               {% endfor %}
@@ -132,7 +128,7 @@
             <select name="produit" class="select select-bordered select-sm">
               <option value="">Tous</option>
               {% for produit in produits %}
-              <option value="{{ produit.id }}" {% if selected_produit == produit.id|stringformat:"s" %}selected{% endif %}>
+              <option value="{{ produit.id }}" {% if selected_produit == produit.id %}selected{% endif %}>
                 {{ produit.nom }}
               </option>
               {% endfor %}

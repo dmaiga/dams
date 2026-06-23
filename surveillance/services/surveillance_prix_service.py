@@ -1,17 +1,19 @@
 from django.db.models import BooleanField, Case, Count, F, Min, Value, When
 
 from core.models import LotEntrepot, Vente
+from surveillance.constants import DATE_PLANCHER_PRIX
 
 
 class SurveillancePrixService:
 
     @staticmethod
-    def get_resume():
+    def get_resume(order_by=None):
         # 1 requête : tous les lots ayant des ventes sous prix d'achat + agrégats
         rows = (
             Vente.objects
             .filter(
                 est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
                 prix_vente_unitaire__lt=F(
                     'detail_distribution__lot__prix_achat_unitaire'
                 ),
@@ -55,7 +57,13 @@ class SurveillancePrixService:
                 "nb_ventes_rouges": row['nb_ventes_rouges'],
             })
 
-        lignes.sort(key=lambda x: x["ecart"])
+        # Tri personnalisé
+        if order_by == "date_reception":
+            lignes.sort(key=lambda x: x["date_reception"])
+        elif order_by == "-date_reception":
+            lignes.sort(key=lambda x: x["date_reception"], reverse=True)
+        else:
+            lignes.sort(key=lambda x: x["ecart"])
 
         return {
             "stats": {
@@ -74,6 +82,7 @@ class SurveillancePrixService:
             .filter(
                 detail_distribution__lot=lot,
                 est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
             )
             .select_related('agent', 'agent__superviseur')
             .annotate(
@@ -112,6 +121,7 @@ class SurveillancePrixService:
             .filter(
                 detail_distribution__lot=lot,
                 est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
                 prix_vente_unitaire__lt=lot.prix_achat_unitaire,
             )
             .values('agent')

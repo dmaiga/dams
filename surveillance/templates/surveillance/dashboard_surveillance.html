@@ -6,15 +6,18 @@
 
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-base-200 pb-4">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">Tableau de bord</h1>
       <p class="text-sm text-base-content/60 mt-0.5">Suivi opérationnel des ventes et alertes prix.</p>
     </div>
-    <div class="tabs tabs-boxed bg-base-200 self-start sm:self-auto">
-      <a class="tab tab-active font-semibold">Vue globale</a>
-      <a href="{% url 'liste_kg_vendu' %}" class="tab">Kg vendus</a>
-      <a href="{% url 'surveillance_prix' %}" class="tab">Anomalies prix</a>
+    <div class="flex flex-wrap items-center gap-3">
+      {% include "partials/_filtre_semaine.html" %}
+      <div class="tabs tabs-boxed bg-base-200">
+        <a class="tab tab-active font-semibold">Vue globale</a>
+        <a href="{% url 'liste_kg_vendu' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="tab">Kg vendus</a>
+        <a href="{% url 'surveillance_prix' %}" class="tab">Anomalies prix</a>
+      </div>
     </div>
   </div>
 
@@ -98,7 +101,7 @@
               {% for item in superviseurs_surveillance %}
               <tr class="hover">
                 <td>
-                  <a href="{% url 'detail_superviseur' item.superviseur.id %}"
+                  <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}"
                      class="link link-primary font-medium">
                     {{ item.superviseur.full_name }}
                   </a>
@@ -143,7 +146,7 @@
               {% for item in produits_surveillance %}
               <tr class="hover">
                 <td>
-                  <a href="{% url 'detail_produit' item.produit.id %}"
+                  <a href="{% url 'detail_produit' item.produit.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}"
                      class="link link-primary font-medium">
                     {{ item.produit.nom }}
                   </a>

@@ -6,24 +6,25 @@ from dateutil.relativedelta import relativedelta
 
 class ComparaisonPeriodeService:
     @staticmethod
+    def semaine(debut):
+        return debut, debut + timedelta(days=6)
+
+    @staticmethod
+    def semaine_prec(debut):
+        prec = debut - timedelta(days=7)
+        return prec, prec + timedelta(days=6)
+
+    @staticmethod
     def semaine_actuelle():
         today = timezone.now().date()
 
         debut = today - timedelta(days=today.weekday())
-        fin = debut + timedelta(days=6)
-
-        return debut, fin
+        return ComparaisonPeriodeService.semaine(debut)
 
     @staticmethod
     def semaine_precedente():
-        debut, fin = (
-            ComparaisonPeriodeService.semaine_actuelle()
-        )
-
-        return (
-            debut - timedelta(days=7),
-            fin - timedelta(days=7)
-        )
+        debut, _ = ComparaisonPeriodeService.semaine_actuelle()
+        return ComparaisonPeriodeService.semaine_prec(debut)
 
     @staticmethod
     def mois_actuel():

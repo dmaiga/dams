@@ -13,22 +13,27 @@ from surveillance.services.vente_service import KG_EXPRESSION
 class DetailSuperviseurService:
 
     @staticmethod
-    def get_data(superviseur):
-        debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine_actuelle()
-        debut_prec, fin_prec = ComparaisonPeriodeService.semaine_precedente()
+    def get_data(superviseur, debut_semaine=None):
+        from surveillance.constants import DATE_PLANCHER_VENTES
+        if debut_semaine:
+            debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine(debut_semaine)
+            debut_prec, fin_prec = ComparaisonPeriodeService.semaine_prec(debut_semaine)
+        else:
+            debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine_actuelle()
+            debut_prec, fin_prec = ComparaisonPeriodeService.semaine_precedente()
 
         base = dict(agent__superviseur=superviseur, est_supprime=False)
 
         # 2 requêtes d'agrégation scalaire
         kg_actuel = (
             Vente.objects
-            .filter(**base, date_vente__date__gte=debut_actuel, date_vente__date__lte=fin_actuel)
+            .filter(**base, date_vente__date__gte=max(debut_actuel, DATE_PLANCHER_VENTES), date_vente__date__lte=fin_actuel)
             .aggregate(total=Sum(KG_EXPRESSION))['total']
             or Decimal('0')
         )
         kg_prec = (
             Vente.objects
-            .filter(**base, date_vente__date__gte=debut_prec, date_vente__date__lte=fin_prec)
+            .filter(**base, date_vente__date__gte=max(debut_prec, DATE_PLANCHER_VENTES), date_vente__date__lte=fin_prec)
             .aggregate(total=Sum(KG_EXPRESSION))['total']
             or Decimal('0')
         )
@@ -40,7 +45,7 @@ class DetailSuperviseurService:
             Vente.objects
             .filter(
                 **base,
-                date_vente__date__gte=debut_actuel,
+                date_vente__date__gte=max(debut_actuel, DATE_PLANCHER_VENTES),
                 date_vente__date__lte=fin_actuel,
             )
             .values('agent')
@@ -72,7 +77,7 @@ class DetailSuperviseurService:
             Vente.objects
             .filter(
                 **base,
-                date_vente__date__gte=debut_actuel,
+                date_vente__date__gte=max(debut_actuel, DATE_PLANCHER_VENTES),
                 date_vente__date__lte=fin_actuel,
             )
             .values('detail_distribution__lot__produit')

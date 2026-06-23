@@ -7,19 +7,22 @@
   <div class="breadcrumbs text-sm">
     <ul>
  
-      <li><a href="{% url 'dashboard_surveillance' %}">Accueil</a></li>
-      <li><a href="{% url 'liste_kg_vendu' %}">Kg vendus</a></li>
+      <li><a href="{% url 'dashboard_surveillance' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}">Accueil</a></li>
+      <li><a href="{% url 'liste_kg_vendu' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}">Kg vendus</a></li>
       <li class="font-semibold">{{ produit.nom }}</li>
     </ul>
   </div>
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-base-200 pb-4">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">{{ produit.nom }}</h1>
-      <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire — semaine en cours vs semaine précédente.</p>
+      <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire de performance.</p>
     </div>
-    <a href="{% url 'liste_kg_vendu' %}" class="btn btn-sm btn-outline self-start sm:self-auto">← Retour</a>
+    <div class="flex flex-wrap items-center gap-3">
+      {% include "partials/_filtre_semaine.html" %}
+      <a href="{% url 'liste_kg_vendu' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-sm btn-outline">← Retour</a>
+    </div>
   </div>
 
   <!-- KPI -->
@@ -73,7 +76,7 @@
               <td class="text-base-content/40 font-mono text-xs w-8">{{ forloop.counter }}</td>
               <td>
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}"
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}"
                    class="link link-primary font-semibold">
                   {{ item.superviseur.full_name }}
                 </a>
@@ -84,7 +87,7 @@
               </td>
               <td class="text-right">
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}" class="btn btn-xs btn-ghost">→</a>
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-xs btn-ghost">→</a>
                 {% endif %}
               </td>
             </tr>
@@ -129,7 +132,7 @@
               </td>
               <td class="text-base-content/70">
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}" class="link link-hover">
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="link link-hover">
                   {{ item.superviseur.full_name }}
                 </a>
                 {% else %}—{% endif %}

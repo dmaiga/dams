@@ -4,6 +4,7 @@ from django.db.models import Count, Sum
 
 from core.models import Agent, Produit, Vente
 from surveillance.services.vente_service import KG_EXPRESSION
+from surveillance.constants import DATE_PLANCHER_VENTES
 
 
 class ListeKgVenduService:
@@ -13,7 +14,7 @@ class ListeKgVenduService:
         kg_total = (
             Vente.objects
             .filter(
-                date_vente__date__gte=date_debut,
+                date_vente__date__gte=max(date_debut, DATE_PLANCHER_VENTES),
                 date_vente__date__lte=date_fin,
                 est_supprime=False,
             )
@@ -40,7 +41,7 @@ class ListeKgVenduService:
         kg_rows = (
             Vente.objects
             .filter(
-                date_vente__date__gte=date_debut,
+                date_vente__date__gte=max(date_debut, DATE_PLANCHER_VENTES),
                 date_vente__date__lte=date_fin,
                 est_supprime=False,
                 agent__superviseur__isnull=False,
@@ -72,7 +73,7 @@ class ListeKgVenduService:
     @staticmethod
     def get_agents(date_debut, date_fin, superviseur=None, produit=None):
         qs = Vente.objects.filter(
-            date_vente__date__gte=date_debut,
+            date_vente__date__gte=max(date_debut, DATE_PLANCHER_VENTES),
             date_vente__date__lte=date_fin,
             est_supprime=False,
         )

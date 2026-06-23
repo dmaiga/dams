@@ -1,0 +1,22 @@
+<form method="get" class="flex items-center gap-2">
+    {% if request.GET.superviseur %}
+    <input type="hidden" name="superviseur" value="{{ request.GET.superviseur }}">
+    {% endif %}
+    {% if request.GET.produit %}
+    <input type="hidden" name="produit" value="{{ request.GET.produit }}">
+    {% endif %}
+    
+    <label class="label-text text-sm font-semibold text-base-content/75">Semaine :</label>
+    <input
+        type="week"
+        name="semaine"
+        value="{{ semaine_selectionnee }}"
+        max="{{ semaine_max }}"
+        class="input input-bordered input-sm font-mono text-xs w-44"
+    >
+    <button type="submit" class="btn btn-primary btn-sm font-semibold">Appliquer</button>
+    
+    {% if request.GET.semaine %}
+    <a href="?{% if request.GET.superviseur %}&superviseur={{ request.GET.superviseur }}{% endif %}{% if request.GET.produit %}&produit={{ request.GET.produit }}{% endif %}" class="btn btn-ghost btn-sm text-xs">Semaine courante</a>
+    {% endif %}
+</form>

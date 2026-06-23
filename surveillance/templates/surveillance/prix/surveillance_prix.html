@@ -13,9 +13,12 @@
   </div>
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-base-200 pb-4">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">Surveillance Prix</h1>
+      <div class="flex flex-wrap items-center gap-2">
+        <h1 class="text-2xl font-bold tracking-tight">Surveillance Prix</h1>
+        <span class="badge badge-info badge-outline badge-sm font-semibold">Données depuis le 01/06/2026</span>
+      </div>
       <p class="text-sm text-base-content/60 mt-0.5">Lots dont des ventes ont été réalisées sous le prix d'achat.</p>
     </div>
     <div class="flex gap-2">
@@ -62,6 +65,12 @@
           <thead>
             <tr class="text-xs uppercase text-base-content/50">
               <th>Produit / Lot</th>
+              <th>
+                <a href="?order={% if current_order == 'date_reception' %}-date_reception{% else %}date_reception{% endif %}" class="link link-hover flex items-center gap-1 font-bold">
+                  Date réception
+                  {% if current_order == 'date_reception' %}▲{% elif current_order == '-date_reception' %}▼{% endif %}
+                </a>
+              </th>
               <th class="text-right">Prix achat</th>
               <th class="text-right">Prix min observé</th>
               <th class="text-right">Écart</th>
@@ -80,9 +89,11 @@
                 </a>
                 <div class="flex flex-wrap gap-1 mt-1">
                   <span class="badge badge-ghost badge-xs">{{ item.fournisseur.nom|default:"Sans fournisseur" }}</span>
-                  <span class="badge badge-ghost badge-xs">{{ item.date_reception|date:"d/m/Y" }}</span>
                   <span class="badge badge-ghost badge-xs">Qté {{ item.quantite_initiale }}</span>
                 </div>
+              </td>
+              <td class="font-mono text-sm text-base-content/70">
+                {{ item.date_reception|date:"d/m/Y" }}
               </td>
               <td class="text-right font-mono text-base-content/70">{{ item.prix_achat }}</td>
               <td class="text-right font-mono font-bold text-error">{{ item.prix_min }}</td>
@@ -101,7 +112,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="7" class="text-center py-10 text-base-content/40">
+              <td colspan="8" class="text-center py-10 text-base-content/40">
                 <div class="text-3xl mb-2">✓</div>
                 <div class="font-semibold">Aucune anomalie de prix détectée</div>
                 <div class="text-xs mt-1">Tous les prix de vente sont au-dessus des prix d'achat.</div>

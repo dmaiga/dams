@@ -1,17 +1,19 @@
 from django.db.models import Count, F, Min
 
 from core.models import Agent, LotEntrepot, Vente
+from surveillance.constants import DATE_PLANCHER_PRIX
 
 
 class PrixSurveillanceService:
 
     @staticmethod
-    def ventes_a_perte():
+    def ventes_a_perte(limit=None):
         # 1 requête : lots avec ventes sous prix d'achat + agrégats en DB
         lot_stats = (
             Vente.objects
             .filter(
                 est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
                 prix_vente_unitaire__lt=F(
                     'detail_distribution__lot__prix_achat_unitaire'
                 ),
@@ -21,8 +23,13 @@ class PrixSurveillanceService:
                 prix_min=Min('prix_vente_unitaire'),
                 nb_ventes_rouges=Count('id'),
                 nb_vendeurs=Count('agent', distinct=True),
+                ecart=Min('prix_vente_unitaire') - F('detail_distribution__lot__prix_achat_unitaire')
             )
+            .order_by('ecart')
         )
+
+        if limit:
+            lot_stats = lot_stats[:limit]
 
         lot_ids = [r['detail_distribution__lot'] for r in lot_stats]
 
@@ -42,6 +49,7 @@ class PrixSurveillanceService:
             Vente.objects
             .filter(
                 est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
                 prix_vente_unitaire__lt=F(
                     'detail_distribution__lot__prix_achat_unitaire'
                 ),
@@ -93,3 +101,19 @@ class PrixSurveillanceService:
 
         resultat.sort(key=lambda x: x["ecart"])
         return resultat
+
+    @staticmethod
+    def count_anomalies():
+        return (
+            Vente.objects
+            .filter(
+                est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
+                prix_vente_unitaire__lt=F(
+                    'detail_distribution__lot__prix_achat_unitaire'
+                ),
+            )
+            .values('detail_distribution__lot')
+            .distinct()
+            .count()
+        )

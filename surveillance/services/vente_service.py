@@ -24,8 +24,9 @@ class VenteSurveillanceService:
 
     @staticmethod
     def kg_vendus(date_debut, date_fin, superviseur=None, produit=None):
+        from surveillance.constants import DATE_PLANCHER_VENTES
         qs = Vente.objects.filter(
-            date_vente__date__gte=date_debut,
+            date_vente__date__gte=max(date_debut, DATE_PLANCHER_VENTES),
             date_vente__date__lte=date_fin,
             est_supprime=False,
         )
