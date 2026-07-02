@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize', 
+    'django_extensions',
     'mathfilters',
     'tinymce',
     'debug_toolbar',

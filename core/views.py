@@ -466,7 +466,7 @@ def liste_lots(request):
 
     produit_filter = request.GET.get('produit')
     fournisseur_filter = request.GET.get('fournisseur')
-    statut_filter = request.GET.get('statut', 'disponible')
+    statut_filter = request.GET.get('statut')  # <-- plus de valeur par défaut
 
     if produit_filter:
         lots = lots.filter(produit__nom__icontains=produit_filter)
@@ -474,14 +474,16 @@ def liste_lots(request):
     if fournisseur_filter:
         lots = lots.filter(fournisseur__nom__icontains=fournisseur_filter)
 
+    # Le filtre n'est appliqué que si l'utilisateur le choisit
     if statut_filter == 'disponible':
         lots = lots.filter(quantite_restante__gt=0)
     elif statut_filter == 'epuise':
         lots = lots.filter(quantite_restante=0)
-    
+
     paginator = Paginator(lots, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
     query_params = request.GET.copy()
     query_params.pop('page', None)
 
@@ -489,6 +491,7 @@ def liste_lots(request):
         k: v for k, v in query_params.items()
         if v not in [None, '', 'None']
     })
+
     stats = lots.aggregate(
         total_lots=models.Count('id'),
         total_stock=Coalesce(
@@ -524,7 +527,6 @@ def liste_lots(request):
         'statut_filter': statut_filter,
         **stats,
     })
-
 
 @login_required
 def detail_lot(request, lot_id):

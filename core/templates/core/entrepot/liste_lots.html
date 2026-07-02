@@ -60,15 +60,21 @@
            placeholder="Fournisseur..."
            value="{{ request.GET.fournisseur }}">
 
-    <select class="form-select mb-2" name="statut">
-    <option value="">Tous</option>
-    <option value="disponible" {% if request.GET.statut == 'disponible' or not request.GET.statut %}selected{% endif %}>
+<select class="form-select mb-2" name="statut">
+    <option value="" {% if not request.GET.statut %}selected{% endif %}>
+        Tous les lots
+    </option>
+
+    <option value="disponible"
+            {% if request.GET.statut == 'disponible' %}selected{% endif %}>
         Disponible
     </option>
-    <option value="epuise" {% if request.GET.statut == 'epuise' %}selected{% endif %}>
+
+    <option value="epuise"
+            {% if request.GET.statut == 'epuise' %}selected{% endif %}>
         Épuisé
     </option>
-    </select>
+</select>
 
     <button class="btn btn-outline-primary w-100">
         Filtrer
