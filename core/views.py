@@ -419,7 +419,7 @@ def supprimer_fournisseur(request, fournisseur_id):
 @login_required
 def reception_lot(request):
     agent = request.user.agent
-    if not agent.est_rot:
+    if not (agent.est_rot or agent.est_gestionnaire_stock):
         return redirect('access_denied')
     
     if request.method == 'POST':

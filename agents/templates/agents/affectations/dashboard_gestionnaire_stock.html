@@ -1,132 +1,95 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid py-3 px-3">
 
-    <h3 class="mb-4">Dashboard Gestionnaire de Stock</h3>
+  <h4 class="fw-bold mb-4">Stock central</h4>
 
-    <div class="row mb-4 g-3">
-        <div class="col-6 col-md-6">
-            <div class="card p-3 shadow-sm border-0 bg-light">
-                <small class="text-muted d-block text-truncate">Stock entrepôt</small>
-                <h4 class="fw-bold mb-0">{{ total_stock }}</h4>
-            </div>
-        </div>
-        <div class="col-6 col-md-6">
-            <div class="card p-3 shadow-sm border-0 bg-light">
-                <small class="text-muted d-block text-truncate">Stock disponible ROT</small>
-                <h4 class="fw-bold mb-0">{{ total_dispo_rot }}</h4>
-            </div>
-        </div>
+  <!-- Résumé -->
+  <div class="row g-3 mb-4">
+    <div class="col-6">
+      <div class="card border-0 shadow-sm p-3 text-center">
+        <small class="text-muted">Quantité totale</small>
+        <div class="fw-bold fs-5">{{ total_stock|floatformat:0|intcomma }}</div>
+      </div>
     </div>
-
-    <div class="d-grid d-md-block gap-2 mb-4">
-        <a href="{% url 'mise_disposition_rot' %}" class="btn btn-primary">
-            ➕ Mettre à disposition
-        </a>
-        <a href="{% url 'historique_mise_disposition' %}" class="btn btn-outline-secondary">
-            📋 Historique
-        </a>
+    <div class="col-6">
+      <div class="card border-0 shadow-sm p-3 text-center">
+        <small class="text-muted">Lots actifs</small>
+        <div class="fw-bold fs-5">{{ nb_lots }}</div>
+      </div>
     </div>
+  </div>
 
-    <div class="mb-4">
-        <h5 class="mb-3">Dernières mises à disposition</h5>
-        
-        <div class="card d-none d-md-block">
-            <div class="table-responsive">
-                <table class="table mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Date</th>
-                            <th>Produit</th>
-                            <th>Quantité</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for h in historiques %}
-                        <tr>
-                            <td>{{ h.date_operation|date:"d/m/Y H:i" }}</td>
-                            <td>{{ h.lot.produit.nom }}</td>
-                            <td><strong>{{ h.quantite }}</strong></td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="3" class="text-center">Aucune opération</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- Actions -->
+  <div class="d-grid gap-2 mb-4">
+    <a href="{% url 'marchandise:reception_lot' %}" class="btn btn-primary btn-lg">
+      <i class="fas fa-truck me-2"></i>Réceptionner un lot
+    </a>
+    <a href="{% url 'marchandise:affecter_superviseur' %}" class="btn btn-success btn-lg">
+      <i class="fas fa-share me-2"></i>Affecter à un superviseur
+    </a>
+    <a href="{% url 'marchandise:liste_lots' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-boxes me-2"></i>Voir le stock central
+    </a>
+  </div>
 
-        <div class="d-md-none">
-            {% for h in historiques %}
-            <div class="card mb-2 shadow-sm border-start border-4">
-                <div class="card-body p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="fw-bold">{{ h.lot.produit.nom }}</div>
-                            <small class="text-muted">{{ h.date_operation|date:"d/m/Y H:i" }}</small>
-                        </div>
-                        <div class="badge bg-primary rounded-pill">{{ h.quantite }}</div>
-                    </div>
-                </div>
-            </div>
-            {% empty %}
-            <p class="text-center text-muted">Aucune opération</p>
+  <!-- Dernières affectations -->
+  <h5 class="mb-3">Dernières affectations</h5>
+
+  {% if dernieres_affectations %}
+
+    <!-- Desktop -->
+    <div class="card d-none d-md-block shadow-sm mb-3">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Produit</th>
+              <th>Superviseur</th>
+              <th>Fournisseur</th>
+              <th class="text-end">Quantité</th>
+              <th>Date sortie</th>
+              <th>Date réception</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for aff in dernieres_affectations %}
+            <tr>
+              <td class="fw-semibold">{{ aff.lot.produit.nom }}</td>
+              <td>{{ aff.superviseur.full_name }}</td>
+              <td>{{ aff.lot.fournisseur.nom|default:"—" }}</td>
+              <td class="text-end">{{ aff.quantite_initiale|floatformat:2|intcomma }}</td>
+              <td>{{ aff.date_affectation|date:"d/m/Y" }}</td>
+              <td>{{ aff.lot.date_reception|date:"d/m/Y" }}</td>
+            </tr>
             {% endfor %}
-        </div>
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="mb-4">
-        <h5 class="mb-3">Stock par lot</h5>
-
-        <div class="card d-none d-md-block">
-            <div class="table-responsive">
-                <table class="table mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Produit</th>
-                            <th>Entrepôt</th>
-                            <th>ROT</th>
-                            <th>Réception</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for lot in lots %}
-                        <tr>
-                            <td>{{ lot.produit.nom }}</td>
-                            <td>{{ lot.quantite_restante }}</td>
-                            <td>{{ lot.quantite_disponible_rot }}</td>
-                            <td>{{ lot.date_reception|date:"d/m/Y" }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <!-- Mobile -->
+    <div class="d-md-none">
+      {% for aff in dernieres_affectations %}
+      <div class="card mb-2 shadow-sm border-start border-4 border-primary">
+        <div class="card-body p-3">
+          <div class="fw-bold">{{ aff.lot.produit.nom }}</div>
+          <div class="text-muted small">{{ aff.lot.fournisseur.nom|default:"—" }} · reçu le {{ aff.lot.date_reception|date:"d/m/Y" }}</div>
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <span class="small">→ {{ aff.superviseur.full_name }}</span>
+            <span class="badge bg-primary rounded-pill">{{ aff.quantite_initiale|floatformat:0 }}</span>
+          </div>
+          <div class="text-muted small mt-1">{{ aff.date_affectation|date:"d/m/Y" }}</div>
         </div>
-
-        <div class="d-md-none">
-            {% for lot in lots %}
-            <div class="card mb-3 shadow-sm">
-                <div class="card-body p-3">
-                    <div class="fw-bold border-bottom pb-2 mb-2">{{ lot.produit.nom }}</div>
-                    <div class="row text-center">
-                        <div class="col-6 border-end">
-                            <small class="text-muted d-block">Entrepôt</small>
-                            <span class="fw-bold">{{ lot.quantite_restante }}</span>
-                        </div>
-                        <div class="col-6">
-                            <small class="text-muted d-block">ROT</small>
-                            <span class="fw-bold text-success">{{ lot.quantite_disponible_rot }}</span>
-                        </div>
-                    </div>
-                    <div class="mt-2 pt-2 border-top">
-                        <small class="text-muted">Reçu le : {{ lot.date_reception|date:"d/m/Y" }}</small>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
+      </div>
+      {% endfor %}
     </div>
+
+  {% else %}
+    <p class="text-muted text-center py-3">Aucune affectation enregistrée.</p>
+  {% endif %}
 
 </div>
 {% endblock %}

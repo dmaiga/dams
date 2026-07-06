@@ -36,9 +36,11 @@ urlpatterns = [
     path('paie/', include('paie.urls')),
     path('champs/', include('analyse_champ.urls')),
     path('surveillance/', include('surveillance.urls')),
-    path("app/", include("mobile.urls"))
-
-
+    path("app/", include("mobile.urls")),
+      path(
+        "marchandise/",
+        include(("marchandise.urls", "marchandise"), namespace="marchandise"),
+    )
 
 
 ]

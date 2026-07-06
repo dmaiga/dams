@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid py-3 px-3">
+
+  <div class="mb-3">
+    <a href="{% url 'marchandise:liste_lots' %}" class="text-muted text-decoration-none small">
+      <i class="fas fa-arrow-left me-1"></i> Stock central
+    </a>
+    <h4 class="fw-bold mb-0 mt-1">Réception d'un nouveau lot</h4>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" id="reception-form">
+    {% csrf_token %}
+
+    <!-- PRODUIT -->
+    <div class="card mb-3">
+      <div class="card-header"><strong>Produit</strong></div>
+      <div class="card-body">
+
+        <div class="form-check form-switch mb-3">
+          {{ form.nouveau_produit }}
+          <label class="form-check-label" for="{{ form.nouveau_produit.id_for_label }}">
+            Nouveau produit
+          </label>
+        </div>
+
+        <div id="produit-existant-group" class="mb-3">
+          <label class="form-label">Produit existant</label>
+          {{ form.produit }}
+          {% if form.produit.errors %}
+            <div class="text-danger small">{{ form.produit.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div id="nouveau-produit-group" class="mb-3" style="display:none;">
+          <label class="form-label">Nom du produit</label>
+          {{ form.nouveau_produit_nom }}
+          {% if form.nouveau_produit_nom.errors %}
+            <div class="text-danger small">{{ form.nouveau_produit_nom.errors }}</div>
+          {% endif %}
+          <div class="mt-2">
+            <label class="form-label">Description</label>
+            {{ form.nouveau_produit_description }}
+          </div>
+          <div class="mt-2">
+            <label class="form-label">Poids unitaire (kg)</label>
+            {{ form.nouveau_produit_poids }}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FOURNISSEUR -->
+    <div class="card mb-3">
+      <div class="card-header"><strong>Fournisseur</strong></div>
+      <div class="card-body">
+
+        <div class="form-check form-switch mb-3">
+          {{ form.nouveau_fournisseur }}
+          <label class="form-check-label" for="{{ form.nouveau_fournisseur.id_for_label }}">
+            Nouveau fournisseur
+          </label>
+        </div>
+
+        <div id="fournisseur-existant-group" class="mb-3">
+          <label class="form-label">Fournisseur existant</label>
+          {{ form.fournisseur }}
+          {% if form.fournisseur.errors %}
+            <div class="text-danger small">{{ form.fournisseur.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div id="nouveau-fournisseur-group" class="mb-3" style="display:none;">
+          <label class="form-label">Nom du fournisseur</label>
+          {{ form.nouveau_fournisseur_nom }}
+          {% if form.nouveau_fournisseur_nom.errors %}
+            <div class="text-danger small">{{ form.nouveau_fournisseur_nom.errors }}</div>
+          {% endif %}
+          <div class="mt-2">
+            <label class="form-label">Contact</label>
+            {{ form.nouveau_fournisseur_contact }}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RÉCEPTION DU LOT -->
+    <div class="card mb-3">
+      <div class="card-header"><strong>Réception du lot</strong></div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label">
+            Quantité reçue
+            <span class="text-muted small">(cartons / sacs / kg selon le produit)</span>
+          </label>
+          {{ form.quantite_saisie }}
+          {% if form.quantite_saisie.errors %}
+            <div class="text-danger small">{{ form.quantite_saisie.errors }}</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PRIX & DATE -->
+    <div class="card mb-3">
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label">Prix d'achat unitaire</label>
+          {{ form.prix_achat_unitaire }}
+          {% if form.prix_achat_unitaire.errors %}
+            <div class="text-danger small">{{ form.prix_achat_unitaire.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Date de réception</label>
+          {{ form.date_reception }}
+          {% if form.date_reception.errors %}
+            <div class="text-danger small">{{ form.date_reception.errors }}</div>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="d-grid gap-2">
+      <button type="submit" class="btn btn-primary btn-lg">
+        <i class="fas fa-save me-1"></i> Enregistrer la réception
+      </button>
+      <a href="{% url 'marchandise:liste_lots' %}" class="btn btn-outline-secondary btn-lg">
+        Annuler
+      </a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const nouveauProduit   = document.getElementById("{{ form.nouveau_produit.id_for_label }}");
+  const produitExistant  = document.getElementById("produit-existant-group");
+  const nouveauProduitGp = document.getElementById("nouveau-produit-group");
+
+  const nouveauFourn     = document.getElementById("{{ form.nouveau_fournisseur.id_for_label }}");
+  const fournExistant    = document.getElementById("fournisseur-existant-group");
+  const nouveauFournGp   = document.getElementById("nouveau-fournisseur-group");
+
+  function toggleProduit() {
+    if (nouveauProduit.checked) {
+      produitExistant.style.display  = "none";
+      nouveauProduitGp.style.display = "block";
+    } else {
+      produitExistant.style.display  = "block";
+      nouveauProduitGp.style.display = "none";
+    }
+  }
+
+  function toggleFournisseur() {
+    if (nouveauFourn.checked) {
+      fournExistant.style.display  = "none";
+      nouveauFournGp.style.display = "block";
+    } else {
+      fournExistant.style.display  = "block";
+      nouveauFournGp.style.display = "none";
+    }
+  }
+
+  nouveauProduit?.addEventListener("change", toggleProduit);
+  nouveauFourn?.addEventListener("change", toggleFournisseur);
+
+  toggleProduit();
+  toggleFournisseur();
+});
+</script>
+
+{% endblock %}

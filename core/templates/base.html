@@ -445,14 +445,28 @@
                     <!-- ===== MENU Gestionnaire stock ===== -->
                     
                     <div class="nav flex-column">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_gestionnaire_stock' %}active{% endif %}" 
-                            href="{% url 'dashboard_gestionnaire_stock' %}">
-                                <i class="fas fa-tachometer-alt"></i>
-                                <span>Tableau de Bord</span>                      
+                        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_gestionnaire_stock' %}active{% endif %}"
+                           href="{% url 'dashboard_gestionnaire_stock' %}">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Tableau de Bord</span>
+                        </a>
 
-                        <a class="nav-link" href="{% url 'mise_disposition_rot' %}">
-                            <i class="fas fa-pallet"></i>
-                            Lots affectés
+                        <a class="nav-link {% if request.resolver_match.namespace == 'marchandise' and request.resolver_match.url_name == 'liste_lots' %}active{% endif %}"
+                           href="{% url 'marchandise:liste_lots' %}">
+                            <i class="fas fa-boxes"></i>
+                            <span>Stock central</span>
+                        </a>
+
+                        <a class="nav-link {% if request.resolver_match.namespace == 'marchandise' and request.resolver_match.url_name == 'reception_lot' %}active{% endif %}"
+                           href="{% url 'marchandise:reception_lot' %}">
+                            <i class="fas fa-truck"></i>
+                            <span>Réceptionner un lot</span>
+                        </a>
+
+                        <a class="nav-link {% if request.resolver_match.namespace == 'marchandise' and request.resolver_match.url_name in 'affecter_superviseur,historique_affectations' %}active{% endif %}"
+                           href="{% url 'marchandise:historique_affectations' %}">
+                            <i class="fas fa-share-alt"></i>
+                            <span>Affectations</span>
                         </a>
 
                     </div>

@@ -930,30 +930,25 @@ def dashboard_gestionnaire_stock(request):
     if not agent.est_gestionnaire_stock:
         return redirect('access_denied')
 
-    # 📦 Lots en stock
-    lots = (
-        LotEntrepot.objects
-        .select_related('produit')
-        .order_by('-date_reception')
-        .filter(quantite_restante__gt=0)
-    )
+    lots_qs = LotEntrepot.objects.filter(quantite_restante__gt=0)
+    total_stock = lots_qs.aggregate(
+        total=models.Sum('quantite_restante')
+    )['total'] or 0
+    nb_lots = lots_qs.count()
 
-    # 📊 Totaux
-    total_stock = sum(l.quantite_restante for l in lots)
-    total_dispo_rot = sum(l.quantite_disponible_rot for l in lots)
-
-    # 🕒 Historique récent
-    historiques = (
-        MiseDispositionRot.objects
-        .select_related('lot__produit')
-        .order_by('-date_operation')[:10]
+    dernieres_affectations = (
+        AffectationLotSuperviseur.objects
+        .select_related(
+            'lot__produit', 'lot__fournisseur',
+            'superviseur__user'
+        )
+        .order_by('-created_at')[:10]
     )
 
     return render(request, 'agents/affectations/dashboard_gestionnaire_stock.html', {
-        'lots': lots,
         'total_stock': total_stock,
-        'total_dispo_rot': total_dispo_rot,
-        'historiques': historiques
+        'nb_lots': nb_lots,
+        'dernieres_affectations': dernieres_affectations,
     })
 
 @login_required
