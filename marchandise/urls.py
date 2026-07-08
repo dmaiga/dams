@@ -8,5 +8,6 @@ urlpatterns = [
     path('lot/<int:pk>/', views.detail_lot, name='detail_lot'),
     path('reception/', views.reception_lot, name='reception_lot'),
     path('affecter/', views.affecter_superviseur, name='affecter_superviseur'),
+    path('ajax/agents-par-superviseur/', views.ajax_agents_par_superviseur, name='ajax_agents_par_superviseur'),
     path('historique/', views.historique_affectations, name='historique_affectations'),
 ]

@@ -2,10 +2,11 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.http import JsonResponse
 
-from core.models import LotEntrepot, AffectationLotSuperviseur, MouvementStock
+from core.models import LotEntrepot, AffectationLotSuperviseur, MouvementStock, Agent
 from core.forms import ReceptionLotForm
-from .forms import AffectationSuperviseurForm
+from .forms import AffectationSuperviseurForm, TYPES_AGENT_TERRAIN
 
 
 def _acces_stock(agent):
@@ -41,7 +42,7 @@ def detail_lot(request, pk):
     affectations = (
         AffectationLotSuperviseur.objects
         .filter(lot=lot)
-        .select_related('superviseur__user', 'attribue_par__user')
+        .select_related('superviseur__user', 'attribue_par__user', 'agent_terrain_direct__user')
         .order_by('-date_affectation')
     )
     mouvements = (
@@ -117,6 +118,23 @@ def affecter_superviseur(request):
 
 
 @login_required
+def ajax_agents_par_superviseur(request):
+    superviseur_id = request.GET.get('superviseur_id')
+
+    agents = Agent.objects.filter(
+        superviseur_id=superviseur_id,
+        type_agent__in=TYPES_AGENT_TERRAIN,
+        est_actif=True
+    ).select_related('user').order_by('user__last_name')
+
+    data = [
+        {'id': a.id, 'label': a.full_name}
+        for a in agents
+    ]
+    return JsonResponse(data, safe=False)
+
+
+@login_required
 def historique_affectations(request):
     agent = request.user.agent
     if not _acces_stock(agent):
@@ -126,7 +144,7 @@ def historique_affectations(request):
         AffectationLotSuperviseur.objects
         .select_related(
             'lot__produit', 'lot__fournisseur',
-            'superviseur__user', 'attribue_par__user'
+            'superviseur__user', 'attribue_par__user', 'agent_terrain_direct__user'
         )
         .order_by('-date_affectation')
     )

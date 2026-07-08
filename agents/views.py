@@ -940,7 +940,7 @@ def dashboard_gestionnaire_stock(request):
         AffectationLotSuperviseur.objects
         .select_related(
             'lot__produit', 'lot__fournisseur',
-            'superviseur__user'
+            'superviseur__user', 'agent_terrain_direct__user'
         )
         .order_by('-created_at')[:10]
     )

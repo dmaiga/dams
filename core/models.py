@@ -1292,6 +1292,17 @@ class AffectationLotSuperviseur(models.Model):
         related_name='affectations_realisees'
     )
 
+    # Renseigné uniquement si le gestionnaire de stock a choisi une distribution
+    # directe à un agent au moment de l'affectation (sans étape intermédiaire).
+    agent_terrain_direct = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='affectations_directes',
+        verbose_name="Agent destinataire (distribution directe)"
+    )
+
     date_affectation = models.DateField(
         verbose_name="Date de distribution"
     )

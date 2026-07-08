@@ -40,7 +40,7 @@
             <td class="fw-semibold">{{ lot.produit.nom }}</td>
             <td>{{ lot.fournisseur.nom|default:"—" }}</td>
             <td class="text-end">{{ lot.quantite_initiale|floatformat:2|intcomma }}</td>
-            <td class="text-end fw-semibold {% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+            <td class="text-end fw-semibold {% if lot.quantite_restante == 0 %}text-danger{% endif %}">
               {{ lot.quantite_restante|floatformat:2|intcomma }}
             </td>
             <td>{{ lot.date_reception|date:"d/m/Y" }}</td>
@@ -75,18 +75,28 @@
   <!-- Mobile -->
   <div class="d-md-none mb-3">
     {% for lot in lots %}
-    <div class="card mb-2 shadow-sm border-start border-4 {% if lot.quantite_restante == 0 %}border-danger{% else %}border-success{% endif %}">
+    <div class="card mb-2 shadow-sm {% if lot.quantite_restante == 0 %}border-danger-subtle{% endif %}">
       <div class="card-body p-3">
         <div class="d-flex justify-content-between align-items-start mb-2">
           <div>
             <div class="fw-bold">{{ lot.produit.nom }}</div>
             <small class="text-muted">{{ lot.fournisseur.nom|default:"—" }} · {{ lot.date_reception|date:"d/m/Y" }}</small>
           </div>
-          <div class="text-end">
-            <div class="fw-bold {% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
-              {{ lot.quantite_restante|floatformat:0 }}
+          {% if lot.quantite_restante == 0 %}
+            <span class="badge bg-danger-subtle text-danger-emphasis">Épuisé</span>
+          {% endif %}
+        </div>
+
+        <div class="d-flex gap-4 mb-2">
+          <div>
+            <div class="text-muted" style="font-size:.75rem;">Reçu</div>
+            <div class="fw-semibold">{{ lot.quantite_initiale|floatformat:0|intcomma }}</div>
+          </div>
+          <div>
+            <div class="text-muted" style="font-size:.75rem;">Restant</div>
+            <div class="fw-bold {% if lot.quantite_restante == 0 %}text-danger{% endif %}">
+              {{ lot.quantite_restante|floatformat:0|intcomma }}
             </div>
-            <small class="text-muted">/ {{ lot.quantite_initiale|floatformat:0 }}</small>
           </div>
         </div>
         <div class="d-flex gap-2">

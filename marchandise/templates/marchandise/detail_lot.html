@@ -28,7 +28,7 @@
     <div class="col-6 col-md-3">
       <div class="card border-0 shadow-sm p-3 text-center">
         <small class="text-muted">Qté restante</small>
-        <div class="fw-bold fs-5 {% if lot.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+        <div class="fw-bold fs-5 {% if lot.quantite_restante == 0 %}text-danger{% endif %}">
           {{ lot.quantite_restante|floatformat:2|intcomma }}
         </div>
       </div>
@@ -50,11 +50,9 @@
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
-            <th>Superviseur</th>
+            <th>Destinataire</th>
             <th class="text-end">Qté initiale</th>
             <th class="text-end">Qté restante</th>
-            <th class="text-end">Prix gros</th>
-            <th class="text-end">Prix détail</th>
             <th>Date sortie</th>
             <th>Affecté par</th>
           </tr>
@@ -62,19 +60,26 @@
         <tbody>
           {% for aff in affectations %}
           <tr>
-            <td>{{ aff.superviseur.full_name }}</td>
+            <td>
+              {% if aff.agent_terrain_direct %}
+                <div>{{ aff.superviseur.full_name }}</div>
+                <div class="small text-muted">
+                  <i class="fas fa-arrow-right-long me-1"></i>{{ aff.agent_terrain_direct.full_name }}
+                </div>
+              {% else %}
+                {{ aff.superviseur.full_name }}
+              {% endif %}
+            </td>
             <td class="text-end">{{ aff.quantite_initiale|floatformat:2 }}</td>
-            <td class="text-end {% if aff.quantite_restante == 0 %}text-danger{% else %}text-success{% endif %}">
+            <td class="text-end {% if aff.quantite_restante == 0 %}text-danger{% endif %}">
               {{ aff.quantite_restante|floatformat:2 }}
             </td>
-            <td class="text-end">{{ aff.prix_gros|floatformat:0|intcomma }} FCFA</td>
-            <td class="text-end">{{ aff.prix_detail|floatformat:0|intcomma }} FCFA</td>
-            <td>{{ aff.date_affectation|date:"d/m/Y" }}</td>
-            <td>{{ aff.attribue_par.full_name|default:"—" }}</td>
+            <td class="text-muted">{{ aff.date_affectation|date:"d/m/Y" }}</td>
+            <td class="text-muted">{{ aff.attribue_par.full_name|default:"—" }}</td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-3">Aucune affectation pour ce lot.</td>
+            <td colspan="5" class="text-center text-muted py-3">Aucune affectation pour ce lot.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -85,17 +90,23 @@
   <!-- Mobile affectations -->
   <div class="d-md-none mb-4">
     {% for aff in affectations %}
-    <div class="card mb-2 shadow-sm border-start border-4 border-primary">
+    <div class="card mb-2 shadow-sm">
       <div class="card-body p-3">
-        <div class="fw-bold">{{ aff.superviseur.full_name }}</div>
-        <div class="d-flex justify-content-between mt-1">
-          <div>
-            <div class="small text-muted">{{ aff.date_affectation|date:"d/m/Y" }}</div>
-            <div class="small">{{ aff.prix_detail|floatformat:0|intcomma }} FCFA / détail</div>
+        {% if aff.agent_terrain_direct %}
+          <div class="fw-bold">{{ aff.superviseur.full_name }}</div>
+          <div class="small text-muted">
+            <i class="fas fa-arrow-right-long me-1"></i>{{ aff.agent_terrain_direct.full_name }}
           </div>
+        {% else %}
+          <div class="fw-bold">{{ aff.superviseur.full_name }}</div>
+        {% endif %}
+        <div class="d-flex justify-content-between mt-2">
+          <div class="small text-muted">{{ aff.date_affectation|date:"d/m/Y" }}</div>
           <div class="text-end">
-            <div class="badge bg-primary">{{ aff.quantite_initiale|floatformat:0 }}</div>
-            <div class="small text-muted mt-1">reste {{ aff.quantite_restante|floatformat:0 }}</div>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ aff.quantite_initiale|floatformat:0 }}</span>
+            <div class="small text-muted mt-1 {% if aff.quantite_restante == 0 %}text-danger{% endif %}">
+              reste {{ aff.quantite_restante|floatformat:0 }}
+            </div>
           </div>
         </div>
       </div>
