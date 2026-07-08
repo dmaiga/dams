@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-3 py-3 pb-5">
+
+  <div class="mb-3">
+    <a href="{% url 'vente:historique_ventes' %}" class="text-muted text-decoration-none small">
+      <i class="fas fa-arrow-left me-1"></i> Historique
+    </a>
+    <h4 class="fw-bold mb-0 mt-1">Enregistrer une vente</h4>
+    <p class="text-muted small mb-0">Quantité, prix et type de vente sont saisis ici — rien n'est pré-rempli.</p>
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show py-2 small">
+        {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" novalidate id="vente-form">
+    {% csrf_token %}
+
+    <!-- Étape 1 : Agent & distribution -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-white">
+        <span class="badge bg-primary rounded-pill me-2">1</span><strong>Agent & produit</strong>
+      </div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Agent <span class="text-danger">*</span>
+          </label>
+          {{ form.agent_terrain }}
+          {% for error in form.agent_terrain.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label fw-semibold">
+            Produit distribué <span class="text-danger">*</span>
+          </label>
+          <select name="detail_distribution" id="{{ form.detail_distribution.id_for_label }}" class="form-select" disabled>
+            <option value="">— sélectionnez d'abord un agent —</option>
+          </select>
+          {% for error in form.detail_distribution.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Étape 2 : Détail de la vente -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-white">
+        <span class="badge bg-primary rounded-pill me-2">2</span><strong>Détail de la vente</strong>
+      </div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Quantité vendue <span class="text-danger">*</span>
+          </label>
+          {{ form.quantite }}
+          {% for error in form.quantite.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Type de vente <span class="text-danger">*</span>
+          </label>
+          {{ form.type_vente }}
+          {% for error in form.type_vente.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Prix unitaire <span class="text-danger">*</span>
+          </label>
+          {{ form.prix_vente_unitaire }}
+          {% for error in form.prix_vente_unitaire.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="alert alert-info py-2 small">
+          <i class="fas fa-circle-info me-1"></i>Vente au comptant — le recouvrement sera créé automatiquement.
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label fw-semibold">Date de la vente</label>
+          {{ form.date_vente }}
+          <div class="form-text">Laissez vide pour aujourd'hui. L'heure est enregistrée automatiquement.</div>
+          {% for error in form.date_vente.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2 small">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="d-grid gap-2 action-bar">
+      <button type="submit" class="btn btn-success btn-lg">
+        <i class="fas fa-check me-1"></i> Enregistrer la vente
+      </button>
+      <a href="{% url 'vente:historique_ventes' %}" class="btn btn-outline-secondary">
+        Annuler
+      </a>
+    </div>
+
+  </form>
+</div>
+
+<style>
+  #vente-form .form-select,
+  #vente-form .form-control {
+    min-height: 48px;
+    font-size: 1rem;
+    max-width: 100%;
+  }
+
+  @media (max-width: 767.98px) {
+    .action-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--bs-body-bg);
+      padding: .75rem 0 1rem;
+      margin-left: -.75rem;
+      margin-right: -.75rem;
+      padding-left: .75rem;
+      padding-right: .75rem;
+      border-top: 1px solid rgba(0,0,0,.08);
+      z-index: 10;
+    }
+    .action-bar .btn {
+      min-height: 52px;
+    }
+  }
+</style>
+
+<script>
+document.getElementById('{{ form.agent_terrain.id_for_label }}').addEventListener('change', function () {
+  const agentId = this.value;
+  const distSelect = document.getElementById('{{ form.detail_distribution.id_for_label }}');
+
+  distSelect.innerHTML = '<option value="">Chargement…</option>';
+  distSelect.disabled = true;
+
+  if (!agentId) {
+    distSelect.innerHTML = '<option value="">— sélectionnez d\'abord un agent —</option>';
+    return;
+  }
+
+  fetch(`{% url 'vente:ajax_distributions_par_agent' %}?agent_id=${agentId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.length === 0) {
+        distSelect.innerHTML = '<option value="">Aucun produit disponible pour cet agent</option>';
+        return;
+      }
+      distSelect.innerHTML = '<option value="">— choisir —</option>';
+      data.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.label;
+        opt.dataset.typeVenteSuggere = d.type_vente_suggere || '';
+        distSelect.appendChild(opt);
+      });
+      distSelect.disabled = false;
+    })
+    .catch(() => {
+      distSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+    });
+});
+
+document.getElementById('{{ form.detail_distribution.id_for_label }}').addEventListener('change', function () {
+  const suggestion = this.selectedOptions[0] ? this.selectedOptions[0].dataset.typeVenteSuggere : '';
+  if (!suggestion) return;
+  const typeVenteSelect = document.getElementById('{{ form.type_vente.id_for_label }}');
+  if (typeVenteSelect) typeVenteSelect.value = suggestion;
+});
+</script>
+{% endblock %}

@@ -28,6 +28,7 @@ from datetime import date, timedelta
 # Python stdlib
 from datetime import timedelta
 from decimal import Decimal
+from collections import defaultdict
 import json
 
 from urllib3 import request
@@ -82,7 +83,7 @@ from core.forms import TelephoneOrUsernameLoginForm
 from core.models import Agent
 from django.core.paginator import Paginator
 
-from agents.services.superviseur_service import SuperviseurDashboardService
+from agents.services.superviseur_service import SuperviseurDashboardService, get_periode_courante
 
 
 from agents.services.agent_dashboard_service import AgentDashboardService
@@ -438,7 +439,7 @@ def liste_agents_sup(request):
 
     # 🔒 FILTRAGE CLÉ
     agents = Agent.objects.filter(
-        type_agent__in=['terrain', 'agent_gros'],
+        type_agent__in=['terrain', 'agent_gros','agent_polivalent'],
         superviseur=superviseur
     ).select_related('user')
 
@@ -477,7 +478,7 @@ def detail_agent_sup(request, agent_id):
         Agent.objects.select_related("user"),
         id=agent_id,
         superviseur=superviseur,
-        type_agent__in=["terrain", "agent_gros"],
+        type_agent__in=["terrain", "agent_gros", "agent_polivalent"],
     )
 
     # =========================
@@ -551,6 +552,34 @@ def detail_agent_sup(request, agent_id):
     ).count()
 
     # =========================
+    # VOLUME VENDU (MOIS COURANT, EN KG)
+    # =========================
+    # Préoccupation n°1 du superviseur : cet agent vend-il beaucoup ?
+    # On réutilise Vente.quantite_en_kg (déjà gère le cas conditionné —
+    # carton/sac dont le poids unitaire est renseigné sur le produit — vs
+    # le cas vrac où la quantité est déjà en kg) plutôt que de refaire ce
+    # calcul ici.
+    debut_mois, maintenant = get_periode_courante()
+
+    ventes_mois = (
+        Vente.objects
+        .filter(agent=agent, date_vente__gte=debut_mois, date_vente__lte=maintenant, est_supprime=False)
+        .select_related("detail_distribution__lot__produit")
+    )
+
+    volume_par_produit_kg = defaultdict(Decimal)
+    volume_mois_kg = Decimal("0.00")
+
+    for vente in ventes_mois:
+        kg = vente.quantite_en_kg
+        volume_par_produit_kg[vente.produit_nom] += kg
+        volume_mois_kg += kg
+
+    volume_par_produit_kg = sorted(
+        volume_par_produit_kg.items(), key=lambda item: item[1], reverse=True
+    )
+
+    # =========================
     # CONTEXT
     # =========================
     context = {
@@ -571,6 +600,10 @@ def detail_agent_sup(request, agent_id):
         "ventes_detail": ventes_detail,
         "ventes_total_count": ventes_total_count,
         "ventes_30j_count": ventes_30j_count,
+
+        # volume (kg, mois courant)
+        "volume_mois_kg": volume_mois_kg,
+        "volume_par_produit_kg": volume_par_produit_kg,
 
         # listing
         "dernieres_ventes": dernieres_ventes,

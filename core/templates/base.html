@@ -487,14 +487,34 @@
                             <span>Gestion Agents</span>
                         </a>
 
-                        <a class="nav-link" href="{% url 'superviseur_lots_affectes' %}">
-                            <i class="fas fa-pallet"></i>
-                            Lots affectés
+
+
+                        {# ===== Nouvelle capacité vente (sprint 02) ===== #}
+                        <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name == 'enregistrer_vente' %}active{% endif %}"
+                           href="{% url 'vente:enregistrer_vente' %}">
+                            <i class="fas fa-cash-register"></i>
+                            <span>Vente</span>
                         </a>
 
-                       
+                        <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name == 'historique_ventes' %}active{% endif %}"
+                           href="{% url 'vente:historique_ventes' %}">
+                            <i class="fas fa-list"></i>
+                            <span>Historique ventes</span>
+                        </a>
+
+                        <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name in 'liste_affectations,creer_distribution,detail_distribution' %}active{% endif %}"
+                           href="{% url 'vente:creer_distribution' %}">
+                            <i class="fas fa-share"></i>
+                            <span>Distribuer (exception)</span>
+                        </a>
+
+
  <!--
-     {% if request.user.agent.user.username == "jeanclaude.sup" %}
+                         <a class="nav-link" href="{% url 'superviseur_lots_affectes' %}">
+                            <i class="fas fa-pallet"></i>
+                            Lots affectés
+                        </a>   
+ {% if request.user.agent.user.username == "jeanclaude.sup" %}
                <a class="nav-link" href="{% url 'distribution_superviseur_override' %}">
             <i class="fas fa-truck-loading"></i>
             Distributions override
@@ -506,7 +526,7 @@
             Distributions
         </a>
     {% endif %}
-                    -->
+
                             <a class="nav-link" href="{% url 'distribution_superviseur' %}">
                                 <i class="fas fa-truck-loading"></i>
                                 Distributions
@@ -518,9 +538,7 @@
                             <i class="fas fa-cash-register"></i>
                             <span>Ventes & Recouvrement</span>
                         </a>
-                        
-                        <!-- 
-                      
+
                         <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
                            href="{% url 'liste_ventes' %}">
                             <i class="fas fa-cash-register"></i>

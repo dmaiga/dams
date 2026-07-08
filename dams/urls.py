@@ -40,6 +40,10 @@ urlpatterns = [
       path(
         "marchandise/",
         include(("marchandise.urls", "marchandise"), namespace="marchandise"),
+    ),
+      path(
+        "vente/",
+        include(("vente.urls", "vente"), namespace="vente"),
     )
 
 

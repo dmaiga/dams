@@ -133,6 +133,35 @@
             </div>
         </div>
 -->
+
+        <!-- Volume vendu (mois courant) — préoccupation n°1 du superviseur -->
+        <div class="p-3 pb-0">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-weight-hanging me-2"></i>Volume vendu ce mois
+                    </h6>
+                    <span class="badge bg-primary rounded-pill fs-6">
+                        {{ volume_mois_kg|floatformat:1|intcomma }} kg
+                    </span>
+                </div>
+                <div class="card-body pt-0">
+                    {% if volume_par_produit_kg %}
+                    <div class="list-group list-group-flush">
+                        {% for produit_nom, kg in volume_par_produit_kg %}
+                        <div class="list-group-item border-0 px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span>{{ produit_nom }}</span>
+                            <span class="fw-semibold">{{ kg|floatformat:1|intcomma }} kg</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3 mb-0">Aucune vente enregistrée ce mois-ci.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <!-- Informations agent -->
         <div class="card border-0 shadow-sm mt-3">
             <div class="card-header bg-white border-0 py-3">

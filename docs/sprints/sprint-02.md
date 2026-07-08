@@ -1,5 +1,14 @@
 # Sprint 02 — App `vente` : ventes terrain et recouvrement auto
 
+> **Statut : ✅ implémenté.** Référence à jour du comportement réel : `vente/APP_VENTE.md`.
+>
+> **Amendement post-implémentation** (après un premier retour terrain) :
+> - Toutes les ventes sont enregistrées **au comptant** pour l'instant — pas de crédit, pas de `Dette` créée par cette app. Le champ `mode_paiement` a été retiré du formulaire (`Vente.save()` garde son support du crédit pour d'autres flux, non touché).
+> - `type_vente` est pré-coché sur **`detail`** par défaut (cas le plus fréquent), affiné ensuite par la suggestion selon le profil de l'agent.
+> - `date_vente` ne demande que le **jour** (`<input type="date">`), pas l'heure : la saisie d'un `datetime-local` complet bloquait beaucoup d'enregistrements sur téléphone (fuseau, format navigateur). Le système complète l'heure automatiquement (`timezone.localtime().time()`) au moment de l'enregistrement.
+>
+> Les sections ci-dessous reflètent la conception initiale du sprint ; là où elles mentionnent le crédit/la dette ou un `mode_paiement` au formulaire, se référer à l'amendement ci-dessus et à `vente/APP_VENTE.md`.
+
 ## Contexte
 
 Le sprint `marchandise` a changé la donne : dans le cas courant, Jean (gestionnaire de stock) distribue désormais **directement à l'agent** sous la supervision du superviseur (champ `agent_terrain` sur `AffectationSuperviseurForm` — voir `marchandise/APP_MARCHANDISE.md`). L'étape manuelle "le superviseur reçoit puis redistribue à son agent" n'est plus le chemin normal.
@@ -400,8 +409,7 @@ Superviseur enregistre une Vente (quantité, prix, type de vente, date)  [app ve
 - [ ] La distribution décrémente `AffectationLotSuperviseur.quantite_restante`.
 - [ ] `VenteForm` exige un prix à chaque vente (aucune valeur par défaut).
 - [ ] Le type de vente est suggéré selon le profil de l'agent mais reste modifiable.
-- [ ] Enregistrement d'une vente comptant → `Recouvrement` créé automatiquement avec `montant_recouvre = vente.total_vente`.
-- [ ] Enregistrement d'une vente à crédit → pas de `Recouvrement` auto, mais `Dette` créée.
+- [x] Enregistrement d'une vente → `Recouvrement` créé automatiquement avec `montant_recouvre = vente.total_vente` (toutes les ventes sont comptant — pas de flux crédit/dette dans cette app pour l'instant).
 - [ ] La quantité de la vente est refusée si elle dépasse `detail_distribution.quantite_restante_calculee`.
 - [ ] Le tableau de bord superviseur affiche "Produits en circulation" à la place de "Stock sous votre responsabilité" et "Activité récente" ; les 4 KPI financiers du haut ne changent pas.
 - [ ] Toutes les pages sont lisibles sur mobile (double layout Bootstrap, pas de bordures colorées superflues).

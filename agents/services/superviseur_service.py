@@ -8,6 +8,7 @@ from core.models import (
     Agent,
     AffectationLotSuperviseur,
     DistributionAgent,
+    DetailDistribution,
     Vente,
     Recouvrement,
     RecouvrementSuperviseur,
@@ -61,33 +62,36 @@ class SuperviseurDashboardService:
         ).first()
 
     # =====================================================
-    # STOCK ATTRIBUÉ AU SUPERVISEUR
+    # PRODUITS EN CIRCULATION
     # =====================================================
     @staticmethod
-    def get_stock_superviseur(superviseur):
-        affectations = (
-            AffectationLotSuperviseur.objects
-            .filter(superviseur=superviseur)
-            .select_related('lot__produit')
-            .order_by('lot__produit')
+    def get_produits_en_circulation(superviseur):
+        """
+        Remplace l'ancien "stock sous responsabilité" (sprint marchandise :
+        la marchandise part désormais directement chez l'agent, ce stock
+        ne bouge donc plus). Montre ce qui a été distribué à chaque agent
+        et qui n'est pas encore vendu.
+        """
+        details = (
+            DetailDistribution.objects
+            .filter(distribution__superviseur=superviseur)
+            .select_related('distribution__agent_terrain__user', 'lot__produit')
+            .order_by('-distribution__date_distribution')
         )
 
-        stock = {}
+        circulation = []
+        for d in details:
+            restante = d.quantite_restante_calculee
+            if restante > 0:
+                circulation.append({
+                    'agent': d.distribution.agent_terrain,
+                    'produit': d.lot.produit,
+                    'quantite_distribuee': d.quantite,
+                    'quantite_restante': restante,
+                    'date_distribution': d.distribution.date_distribution,
+                })
 
-        for aff in affectations:
-            produit = aff.lot.produit
-            pid = produit.id
-
-            stock.setdefault(pid, {
-                'produit': produit,
-                'quantite_initiale': 0,
-                'quantite_restante': 0,
-            })
-
-            stock[pid]['quantite_initiale'] += aff.quantite_initiale
-            stock[pid]['quantite_restante'] += aff.quantite_restante
-
-        return list(stock.values())
+        return circulation
 
     # =====================================================
     # AGENTS TERRAIN
@@ -252,17 +256,6 @@ class SuperviseurDashboardService:
         return data
 
     # =====================================================
-    # ACTIVITÉ RÉCENTE
-    # =====================================================
-    @staticmethod
-    def get_distributions_recentes(superviseur, jours=7):
-        date_min = timezone.now() - timedelta(days=jours)
-        return DistributionAgent.objects.filter(
-            superviseur=superviseur,
-            date_distribution__gte=date_min
-        ).count()
-
-    # =====================================================
     # BUILD DASHBOARD
     # =====================================================
     @staticmethod
@@ -274,8 +267,8 @@ class SuperviseurDashboardService:
         return {
             'superviseur': superviseur,
 
-            # Stock
-            'stock_superviseur': SuperviseurDashboardService.get_stock_superviseur(superviseur),
+            # Produits en circulation (distribué à un agent, pas encore vendu)
+            'produits_en_circulation': SuperviseurDashboardService.get_produits_en_circulation(superviseur),
 
             # Agents
             'agents_terrain': SuperviseurDashboardService.get_agents(superviseur),
@@ -285,7 +278,4 @@ class SuperviseurDashboardService:
 
             # Détail agents
             'agents_financiers': SuperviseurDashboardService.get_agents_financiers(superviseur),
-
-            # Activité
-            'distributions_recentes': SuperviseurDashboardService.get_distributions_recentes(superviseur),
         }

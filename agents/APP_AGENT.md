@@ -104,6 +104,24 @@ Les indicateurs de performance clés (KPI) calculés sont :
 * **Pourcentage des ventes de Gros** : $(\text{ventes\_gros} / \text{total\_ventes}) \times 100$
 * **Pourcentage des ventes de Détail** : $(\text{ventes\_detail} / \text{total\_ventes}) \times 100$
 
+### Volume vendu en kg (mois courant)
+
+La préoccupation première du superviseur reste opérationnelle avant d'être financière : *cet agent vend-il beaucoup ?* La vue ajoute donc un volume en kg, borné au mois courant (`get_periode_courante()` de `agents.services.superviseur_service` — même convention que le dashboard superviseur), avec le détail par produit :
+
+```python
+ventes_mois = Vente.objects.filter(
+    agent=agent, date_vente__gte=debut_mois, date_vente__lte=maintenant, est_supprime=False
+).select_related("detail_distribution__lot__produit")
+
+for vente in ventes_mois:
+    kg = vente.quantite_en_kg   # gère conditionné vs vrac, voir ci-dessous
+    ...
+```
+
+Le calcul kg **réutilise** la propriété `Vente.quantite_en_kg` (`core/models.py`) plutôt que de redupliquer la règle : un produit **conditionné** (`Produit.poids_unitaire_kg` renseigné — ex. un carton/sac de 10 kg) voit sa quantité vendue multipliée par ce poids unitaire ; un produit **non conditionné** (vendu directement au kg, `poids_unitaire_kg` vide) garde `quantite` telle quelle. Le regroupement par produit est fait en Python (volumes mensuels par agent, faible volumétrie) pour ne pas dupliquer cette règle métier dans une expression ORM.
+
+Contexte exposé au template : `volume_mois_kg` (total) et `volume_par_produit_kg` (liste de tuples `(nom_produit, kg)` triée décroissant).
+
 ---
 
 ## 5. Hub Logistique : Gestion de Stock & Mise à Disposition

@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid px-3 py-3 pb-5">
+
+  <div class="mb-3">
+    <a href="{% url 'vente:liste_affectations' %}" class="text-muted text-decoration-none small">
+      <i class="fas fa-arrow-left me-1"></i> Stock en attente
+    </a>
+    <h4 class="fw-bold mb-0 mt-1">Distribuer (exception)</h4>
+    <p class="text-muted small mb-0">
+      Réservé au stock que Jean ne vous a pas envoyé directement vers un agent, ou à une vente personnelle.
+    </p>
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show py-2 small">
+        {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" novalidate id="distribution-form">
+    {% csrf_token %}
+
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-white"><strong>Destinataire</strong></div>
+      <div class="card-body">
+        <div class="mb-0">
+          <label class="form-label fw-semibold">
+            Agent <span class="text-danger">*</span>
+          </label>
+          {{ form.agent_terrain }}
+          {% for error in form.agent_terrain.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+          <div class="form-text">"Moi-même" pour une vente personnelle que vous enregistrerez sous votre nom.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3 shadow-sm">
+      <div class="card-header bg-white"><strong>Lot & quantité</strong></div>
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            Lot en attente <span class="text-danger">*</span>
+          </label>
+          {{ form.affectation }}
+          {% for error in form.affectation.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label fw-semibold">
+            Quantité <span class="text-danger">*</span>
+          </label>
+          {{ form.quantite }}
+          {% for error in form.quantite.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger py-2 small">
+        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="d-grid gap-2 action-bar">
+      <button type="submit" class="btn btn-success btn-lg">
+        <i class="fas fa-check me-1"></i> Enregistrer la distribution
+      </button>
+      <a href="{% url 'vente:liste_affectations' %}" class="btn btn-outline-secondary">
+        Annuler
+      </a>
+    </div>
+
+  </form>
+</div>
+
+<style>
+  #distribution-form .form-select,
+  #distribution-form .form-control {
+    min-height: 48px;
+    font-size: 1rem;
+    max-width: 100%;
+  }
+
+  @media (max-width: 767.98px) {
+    .action-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--bs-body-bg);
+      padding: .75rem 0 1rem;
+      margin-left: -.75rem;
+      margin-right: -.75rem;
+      padding-left: .75rem;
+      padding-right: .75rem;
+      border-top: 1px solid rgba(0,0,0,.08);
+      z-index: 10;
+    }
+    .action-bar .btn {
+      min-height: 52px;
+    }
+  }
+</style>
+{% endblock %}
