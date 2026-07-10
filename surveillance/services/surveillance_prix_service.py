@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db.models import BooleanField, Case, Count, F, Min, Value, When
 
 from core.models import LotEntrepot, Vente
@@ -5,6 +7,8 @@ from surveillance.constants import DATE_PLANCHER_PRIX
 
 
 class SurveillancePrixService:
+    # Une vente dont la marge unitaire est <= 45 FCFA est une anomalie.
+    SEUIL_MARGE_MINIMALE = Decimal('45.00')
 
     @staticmethod
     def get_resume(order_by=None):
@@ -14,8 +18,9 @@ class SurveillancePrixService:
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lt=F(
-                    'detail_distribution__lot__prix_achat_unitaire'
+                prix_vente_unitaire__lte=(
+                    F('detail_distribution__lot__prix_achat_unitaire')
+                    + SurveillancePrixService.SEUIL_MARGE_MINIMALE
                 ),
             )
             .values('detail_distribution__lot')
@@ -88,7 +93,10 @@ class SurveillancePrixService:
             .annotate(
                 rouge=Case(
                     When(
-                        prix_vente_unitaire__lt=lot.prix_achat_unitaire,
+                        prix_vente_unitaire__lte=(
+                            lot.prix_achat_unitaire
+                            + SurveillancePrixService.SEUIL_MARGE_MINIMALE
+                        ),
                         then=Value(True),
                     ),
                     default=Value(False),
@@ -122,7 +130,10 @@ class SurveillancePrixService:
                 detail_distribution__lot=lot,
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lt=lot.prix_achat_unitaire,
+                prix_vente_unitaire__lte=(
+                    lot.prix_achat_unitaire
+                    + SurveillancePrixService.SEUIL_MARGE_MINIMALE
+                ),
             )
             .values('agent')
             .annotate(

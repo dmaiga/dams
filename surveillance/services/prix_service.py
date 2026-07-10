@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db.models import Count, F, Min
 
 from core.models import Agent, LotEntrepot, Vente
@@ -5,17 +7,20 @@ from surveillance.constants import DATE_PLANCHER_PRIX
 
 
 class PrixSurveillanceService:
+    # Une vente doit générer au moins 45 FCFA de marge unitaire.
+    SEUIL_MARGE_MINIMALE = Decimal('45.00')
 
     @staticmethod
     def ventes_a_perte(limit=None):
-        # 1 requête : lots avec ventes sous prix d'achat + agrégats en DB
+        # 1 requête : lots dont une vente a une marge unitaire <= 50 FCFA.
         lot_stats = (
             Vente.objects
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lt=F(
-                    'detail_distribution__lot__prix_achat_unitaire'
+                prix_vente_unitaire__lte=(
+                    F('detail_distribution__lot__prix_achat_unitaire')
+                    + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
                 ),
             )
             .values('detail_distribution__lot')
@@ -50,8 +55,9 @@ class PrixSurveillanceService:
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lt=F(
-                    'detail_distribution__lot__prix_achat_unitaire'
+                prix_vente_unitaire__lte=(
+                    F('detail_distribution__lot__prix_achat_unitaire')
+                    + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
                 ),
                 detail_distribution__lot_id__in=lot_ids,
             )
@@ -109,8 +115,9 @@ class PrixSurveillanceService:
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lt=F(
-                    'detail_distribution__lot__prix_achat_unitaire'
+                prix_vente_unitaire__lte=(
+                    F('detail_distribution__lot__prix_achat_unitaire')
+                    + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
                 ),
             )
             .values('detail_distribution__lot')

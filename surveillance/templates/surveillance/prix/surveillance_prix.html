@@ -17,7 +17,7 @@
     <div>
       <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-bold tracking-tight">Surveillance Prix</h1>
-        <span class="badge badge-info badge-outline badge-sm font-semibold">Données depuis le 01/06/2026</span>
+    
       </div>
       <p class="text-sm text-base-content/60 mt-0.5">Lots dont des ventes ont été réalisées sous le prix d'achat.</p>
     </div>
@@ -32,7 +32,7 @@
 
     <div class="stat bg-base-100 shadow rounded-box border-l-4 border-error border border-base-200">
       <div class="stat-title text-xs uppercase font-bold tracking-wide">Lots en anomalie</div>
-      <div class="stat-value text-2xl text-error">{{ stats.nb_lots_rouges }}</div>
+      <div class="stat-value text-2xl ">{{ stats.nb_lots_rouges }}</div>
       <div class="stat-desc">Lots avec ventes sous coût</div>
     </div>
 
@@ -96,9 +96,9 @@
                 {{ item.date_reception|date:"d/m/Y" }}
               </td>
               <td class="text-right font-mono text-base-content/70">{{ item.prix_achat }}</td>
-              <td class="text-right font-mono font-bold text-error">{{ item.prix_min }}</td>
+              <td class="text-right font-mono font-bold ">{{ item.prix_min }}</td>
               <td class="text-right">
-                <span class="badge badge-error font-mono">{{ item.ecart }}</span>
+                <span class="badge  font-mono">{{ item.ecart }}</span>
               </td>
               <td class="text-right">
                 <span class="badge badge-info">{{ item.nb_vendeurs }}</span>
