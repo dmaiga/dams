@@ -7,7 +7,7 @@ from .models import (
     PaiementFournisseur,RecouvrementSuperviseur,
     Dette, PaiementDette, BonusAgent,Depense,
     AffectationLotSuperviseur,RecuVersement,
-    MiseDispositionRot
+    MiseDispositionRot,Perte
 
 )
 from django.db.models import Sum
@@ -22,6 +22,7 @@ from .models import FactureLotEntrepot
 from django.contrib import admin
 from core.models import Alerte
 
+admin.site.register(Perte)
 
 @admin.register(Alerte)
 class AlerteSoldeAdmin(admin.ModelAdmin):

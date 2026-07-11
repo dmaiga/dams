@@ -488,8 +488,6 @@
                         </a>
 
 
-
-                        {# ===== Nouvelle capacité vente (sprint 02) ===== #}
                         <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name == 'enregistrer_vente' %}active{% endif %}"
                            href="{% url 'vente:enregistrer_vente' %}">
                             <i class="fas fa-cash-register"></i>
@@ -501,7 +499,23 @@
                             <i class="fas fa-list"></i>
                             <span>Historique ventes</span>
                         </a>
+                    {%if request.user.agent.user.username == "ismael.diawara"%}                        
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}" 
+                           href="{% url 'liste_lots' %}">
+                            <i class="fas fa-pallet"></i>
+                            <span>Stock Entrepôt</span>
+                        </a>
+                    {% endif %}
+                    {%if request.user.agent.user.username == "abdoulaye.kone"%}  
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_depenses' %}active{% endif %}" 
+                            href="{% url 'liste_depenses' %}">
+                             <i class="fas fa-file-invoice"></i>
+                                <span>Dépenses</span>
+                        </a>
+                    
+                    {% endif %}
 
+                        
                         <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name in 'liste_affectations,creer_distribution,detail_distribution' %}active{% endif %}"
                            href="{% url 'vente:creer_distribution' %}">
                             <i class="fas fa-share"></i>
@@ -509,50 +523,6 @@
                         </a>
 
 
- <!--
-                         <a class="nav-link" href="{% url 'superviseur_lots_affectes' %}">
-                            <i class="fas fa-pallet"></i>
-                            Lots affectés
-                        </a>   
- {% if request.user.agent.user.username == "jeanclaude.sup" %}
-               <a class="nav-link" href="{% url 'distribution_superviseur_override' %}">
-            <i class="fas fa-truck-loading"></i>
-            Distributions override
-        </a>
-    {% else %}
-    
-        <a class="nav-link" href="{% url 'distribution_superviseur' %}">
-            <i class="fas fa-truck-loading"></i>
-            Distributions
-        </a>
-    {% endif %}
-
-                            <a class="nav-link" href="{% url 'distribution_superviseur' %}">
-                                <i class="fas fa-truck-loading"></i>
-                                Distributions
-                            </a>
-                       
-                        
-                       <a class="nav-link {% if request.resolver_match.url_name in 'liste_distribution_sup' %}active{% endif %}" 
-                           href="{% url 'liste_distribution_sup' %}">
-                            <i class="fas fa-cash-register"></i>
-                            <span>Ventes & Recouvrement</span>
-                        </a>
-
-                        <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
-                           href="{% url 'liste_ventes' %}">
-                            <i class="fas fa-cash-register"></i>
-                            <span>Mes Ventes</span>
-                            
-                        </a>
-
-                        
-                        <a class="nav-link {% if request.resolver_match.url_name == 'liste_agents_recouvrement' %}active{% endif %}" 
-                                href="{% url 'liste_agents_recouvrement' %}">
-                                 <i class="fas fa-hand-holding-usd"></i>
-                                 <span>Recouvrement Agents</span>
-                             </a>
-                        -->
                     </div>
                     {% elif request.user.agent.est_rot %}
                     <!-- ===== MENU ROT ===== -->
@@ -586,19 +556,7 @@
                             <i class="fas fa-pallet"></i>
                             <span>Stock Entrepôt</span>
                         </a>
-                    <!--
-                        <a class="nav-link {% if request.resolver_match.url_name in 'rot_affectations_liste' %}active{% endif %}" 
-                           href="{% url 'rot_affectations_liste' %}">
-                            <i class="fas fa-truck-loading"></i>
-                            <span>Affecter un lot</span>
-                        </a>
-                    -->
-                       
-                          <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
-                            href="{% url 'liste_versement' %}">
-                             <i class="fas fa-file-invoice"></i>
-                                <span>Versements</span>
-                        </a>
+
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_depenses' %}active{% endif %}" 
                             href="{% url 'liste_depenses' %}">
                              <i class="fas fa-file-invoice"></i>
@@ -606,15 +564,14 @@
 
                         </a>
 
-<!-- 
-                        <a class="nav-link {% if request.resolver_match.url_name in 'enregistrer_vente,liste_ventes,detail_vente' %}active{% endif %}" 
-                           href="{% url 'liste_ventes' %}">
-                            <i class="fas fa-cash-register"></i>
-                            <span>Mes Ventes</span>
-                            
+                          <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
+                            href="{% url 'liste_versement' %}">
+                             <i class="fas fa-file-invoice"></i>
+                                <span>Versements</span>
                         </a>
--->
-                      
+
+
+     
 
                     </div>
                     {% endif %}

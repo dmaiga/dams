@@ -34,61 +34,46 @@
     </div>
   </div>
 
-  <!-- Stats financières -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-4">
-      <div class="card border-start border-primary border-3 h-100">
-        <div class="card-body p-3">
-          <div class="text-muted small mb-1">Montant total du lot</div>
-          <div class="h4 fw-bold text-primary mb-0">{{ lot.montant_total|floatformat:0 }} <small class="text-muted">FCFA</small></div>
+  <!-- Stats financières (bandeau compact) -->
+  <div class="card mb-4 stats-compact">
+    <div class="card-body py-2 px-0">
+      <div class="row g-0 text-center">
+        <div class="col-4 px-2 border-end">
+          <div class="stat-label">Montant total</div>
+          <div class="stat-value">{{ lot.montant_total|floatformat:0 }}<span class="stat-unit">FCFA</span></div>
         </div>
-      </div>
-    </div>
-    
-    <div class="col-md-4">
-      <div class="card border-start border-success border-3 h-100">
-        <div class="card-body p-3">
-          <div class="text-muted small mb-1">Total facturé</div>
-          <div class="h4 fw-bold text-success mb-0">{{ montant_total_factures|floatformat:0 }} <small class="text-muted">FCFA</small></div>
-          <div class="small text-muted">{{ pourcentage_paye|floatformat:1 }}% payé</div>
+        <div class="col-4 px-2 border-end">
+          <div class="stat-label">Facturé</div>
+          <div class="stat-value">{{ montant_total_factures|floatformat:0 }}<span class="stat-unit">FCFA</span></div>
+          <div class="stat-sub">{{ pourcentage_paye|floatformat:1 }}%</div>
         </div>
-      </div>
-    </div>
-    
-    <div class="col-md-4">
-      <div class="card border-start {% if reste_a_payer > 0 %}border-warning{% else %}border-success{% endif %} border-3 h-100">
-        <div class="card-body p-3">
-          <div class="text-muted small mb-1">Reste à payer</div>
-          <div class="h4 fw-bold {% if reste_a_payer > 0 %}text-warning{% else %}text-success{% endif %} mb-0">
-            {{ reste_a_payer|floatformat:0 }} <small class="text-muted">FCFA</small>
-          </div>
+        <div class="col-4 px-2">
+          <div class="stat-label">Reste à payer</div>
+          <div class="stat-value">{{ reste_a_payer|floatformat:0 }}<span class="stat-unit">FCFA</span></div>
           {% if lot.est_solde %}
-          <span class="badge bg-success small">Soldé ✓</span>
+          <span class="badge bg-success stat-badge">Soldé ✓</span>
           {% endif %}
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Barre de progression -->
-  <div class="card mb-4">
-    <div class="card-body p-3">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="small text-muted">Progression du paiement</div>
-        <div class="small fw-medium">{{ pourcentage_paye|floatformat:1 }}%</div>
-      </div>
-      <div class="progress" style="height: 8px;">
-        <div class="progress-bar {% if lot.est_solde %}bg-success{% else %}bg-warning{% endif %}" 
-             style="width: {{ pourcentage_paye }}%">
+      <div class="px-3 pt-2">
+        <div class="progress" style="height: 6px;">
+          <div class="progress-bar {% if lot.est_solde %}bg-success{% else %}bg-warning{% endif %}"
+               style="width: {{ pourcentage_paye }}%">
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="row g-4">
+  <!--
+    Grille par zones nommées : sur mobile, le formulaire d'ajout (raison
+    d'être de la page) passe avant la liste, potentiellement longue.
+    Sur desktop (lg+), on retrouve la disposition 7/5 d'origine.
+  -->
+  <div class="factures-layout">
 
     <!-- Liste des factures existantes -->
-    <div class="col-lg-7">
+    <div class="area-liste">
       <div class="card">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
           <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Factures ({{ factures.count }})</h5>
@@ -177,7 +162,7 @@
     </div>
 
     <!-- Formulaire d'ajout -->
-    <div class="col-lg-5">
+    <div class="area-form">
       <div class="card sticky-top" style="top: 20px;">
         <div class="card-header bg-primary text-white">
           <h5 class="mb-0 fw-bold"><i class="fas fa-plus-circle me-2"></i>Ajouter des factures</h5>
@@ -314,7 +299,59 @@
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
   }
-  
+
+  /* Grille par zones nommées : ordre mobile = formulaire d'ajout d'abord,
+     liste des factures ensuite ; ordre desktop = disposition 7/5 d'origine. */
+  .factures-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    grid-template-areas:
+      "form"
+      "liste";
+  }
+
+  .area-liste { grid-area: liste; }
+  .area-form { grid-area: form; }
+
+  /* Bandeau stats compact : les 3 chiffres restent sur une seule ligne,
+     même sur mobile, au lieu de 3 cartes empilées pleine hauteur. */
+  .stats-compact .stat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #888;
+    margin-bottom: 2px;
+  }
+
+  .stats-compact .stat-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .stats-compact .stat-unit {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: #888;
+    margin-left: 2px;
+  }
+
+  .stats-compact .stat-sub {
+    font-size: 0.7rem;
+    color: #888;
+  }
+
+  .stats-compact .stat-badge {
+    font-size: 0.65rem;
+  }
+
+  @media (min-width: 576px) {
+    .stats-compact .stat-value {
+      font-size: 1.25rem;
+    }
+  }
+
   /* Mobile optimisations */
   @media (max-width: 768px) {
     .container-fluid {
@@ -345,15 +382,21 @@
   
   /* Desktop optimisations */
   @media (min-width: 992px) {
+    .factures-layout {
+      grid-template-columns: 7fr 5fr;
+      gap: 1.5rem;
+      grid-template-areas: "liste form";
+    }
+
     .card-body {
       padding: 1.25rem;
     }
-    
+
     .sticky-top {
       position: sticky;
       z-index: 1;
     }
-    
+
     .list-group-item {
       padding: 1.25rem;
     }

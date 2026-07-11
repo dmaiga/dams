@@ -23,7 +23,7 @@
         <span class="text-muted small">{{ lot.date_reception|date:"d/m/Y H:i" }}</span>
       </div>
     </div>
-    
+
     <div class="d-flex gap-2">
       <a href="{% url 'liste_lots' %}" class="btn btn-outline-secondary d-none d-md-inline-flex">
         <i class="fas fa-arrow-left me-2"></i>Retour
@@ -34,13 +34,17 @@
     </div>
   </div>
 
-  <div class="row g-3 g-lg-4">
+  <!--
+    Grille par zones nommées : sur mobile, l'ordre suit les deux raisons d'être
+    de cette page (déclarer une perte, accéder aux factures) avant le reste,
+    purement informatif/secondaire. Sur desktop (lg+), on retrouve la
+    disposition deux colonnes d'origine.
+  -->
+  <div class="lot-layout">
 
-    <!-- Colonne principale (70% desktop) -->
-    <div class="col-lg-8">
-
-      <!-- Cartes de stats -->
-      <div class="row g-3 mb-4">
+    <!-- Stats rapides -->
+    <div class="area-stats">
+      <div class="row g-3">
         <div class="col-md-6">
           <div class="card h-100">
             <div class="card-body">
@@ -52,7 +56,7 @@
                     <span class="text-muted">/ {{ lot.quantite_initiale|floatformat:"2" }}</span>
                   </div>
                   <div class="progress mt-2" style="height: 4px;">
-                    <div class="progress-bar bg-success" 
+                    <div class="progress-bar bg-success"
                          style="width: {% widthratio lot.quantite_restante lot.quantite_initiale 100 %}%">
                     </div>
                   </div>
@@ -64,7 +68,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="col-md-6">
           <div class="card h-100">
             <div class="card-body">
@@ -80,52 +84,11 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Informations détaillées -->
-      <div class="card mb-4">
-        <div class="card-header bg-light">
-          <h5 class="mb-0 fw-bold"><i class="fas fa-info-circle me-2"></i>Informations détaillées</h5>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6 mb-3 mb-md-0">
-              <table class="table table-borderless mb-0">
-                <tr>
-                  <td class="text-muted border-0 ps-0" style="width: 40%;">Produit</td>
-                  <td class="fw-medium border-0">{{ lot.produit.nom }}</td>
-                </tr>
-                <tr>
-                  <td class="text-muted border-0 ps-0">Fournisseur</td>
-                  <td class="fw-medium border-0">{{ lot.fournisseur.nom }}</td>
-                </tr>
-                <tr>
-                  <td class="text-muted border-0 ps-0">Référence</td>
-                  <td class="fw-medium border-0">{{ lot.reference_lot }}</td>
-                </tr>
-              </table>
-            </div>
-            <div class="col-md-6">
-              <table class="table table-borderless mb-0">
-                <tr>
-                  <td class="text-muted border-0 ps-0" style="width: 40%;">Date réception</td>
-                  <td class="fw-medium border-0">{{ lot.date_reception|date:"d/m/Y H:i" }}</td>
-                </tr>
-                <tr>
-                  <td class="text-muted border-0 ps-0">Date enregistrement</td>
-                  <td class="fw-medium border-0">{{ lot.date_enregistrement|date:"d/m/Y H:i" }}</td>
-                </tr>
-                <tr>
-                  <td class="text-muted border-0 ps-0">Valeur initiale</td>
-                  <td class="fw-medium border-0">{{ lot.valeur_stock_initiale|default:"-"|floatformat:"0" }} FCFA</td>
-                </tr>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Déclaration de perte -->
-      <div class="card mb-4">
+    <!-- Action 1 : déclarer une perte -->
+    <div class="area-perte">
+      <div class="card">
         <div class="card-header bg-light">
           <h5 class="mb-0 fw-bold"><i class="fas fa-exclamation-triangle text-danger me-2"></i>Déclarer une perte</h5>
         </div>
@@ -145,68 +108,17 @@
                 {{ perte_form.description }}
               </div>
             </div>
-            <button class="btn btn-danger mt-3">
+            <button class="btn btn-danger mt-3 w-100 w-md-auto">
               <i class="fas fa-save me-2"></i>Enregistrer la perte
             </button>
           </form>
         </div>
       </div>
-
-      <!-- Historique des pertes -->
-      <div class="card">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-          <h5 class="mb-0 fw-bold"><i class="fas fa-history me-2"></i>Historique des pertes</h5>
-          <span class="badge bg-dark">{{ pertes|length }} perte(s)</span>
-        </div>
-        <div class="card-body p-0">
-          {% if pertes %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th style="width: 20%;">Date</th>
-                  <th style="width: 15%;">Quantité</th>
-                  <th>Description</th>
-                  <th style="width: 10%;" class="text-end">Valeur</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for p in pertes %}
-                <tr>
-                  <td>{{ p.date_perte|date:"d/m/Y H:i" }}</td>
-                  <td class="fw-bold text-danger">{{ p.quantite_perdue|floatformat:"2" }}</td>
-                  <td>{{ p.description|default:"-" }}</td>
-                  <td class="text-end">{{ p.valeur_perte|floatformat:"0" }} FCFA</td>
-                </tr>
-                {% endfor %}
-                {% if pertes.count > 0 %}
-                <tr class="table-light">
-                  <td colspan="2" class="fw-bold">Total pertes</td>
-                  <td></td>
-                  <td class="text-end fw-bold text-danger">
-                    {{ lot.quantite_perdue_totale|floatformat:"2" }} unités
-                  </td>
-                </tr>
-                {% endif %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="text-center py-5">
-            <i class="fas fa-check-circle fa-2x text-muted mb-3"></i>
-            <p class="text-muted mb-0">Aucune perte enregistrée</p>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-
     </div>
 
-    <!-- Colonne latérale (30% desktop) -->
-    <div class="col-lg-4">
-
-      <!-- Carte factures -->
-      <div class="card sticky-top" style="top: 20px;">
+    <!-- Action 2 : porte d'entrée factures -->
+    <div class="area-factures">
+      <div class="card factures-card">
         <div class="card-header {% if lot.est_solde %}bg-success{% else %}bg-warning{% endif %} text-white">
           <div class="d-flex justify-content-between align-items-center">
             <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>Factures</h5>
@@ -215,7 +127,7 @@
             </span>
           </div>
         </div>
-        
+
         <div class="card-body">
           <!-- Progression facturation -->
           <div class="mb-4">
@@ -224,146 +136,250 @@
               <small class="fw-medium">{{ lot.total_facture_lot|floatformat:"0" }}/{{ lot.montant_total|floatformat:"0" }} FCFA</small>
             </div>
             <div class="progress" style="height: 6px;">
-              <div class="progress-bar {% if lot.est_solde %}bg-success{% else %}bg-warning{% endif %}" 
+              <div class="progress-bar {% if lot.est_solde %}bg-success{% else %}bg-warning{% endif %}"
                    style="width: {% widthratio lot.total_facture_lot lot.montant_total 100 %}%">
               </div>
             </div>
           </div>
 
-        <!-- Liste factures -->
-        {% if factures %}
-        <div class="list-group list-group-flush mb-3">
-          {% for f in factures %}
-          <div class="list-group-item border-0 px-0 py-2">
-            <div class="d-flex justify-content-between align-items-start">
-            
-              <div class="d-flex align-items-start" style="flex: 1;">
-              
-                {% if f.fichier %}
-                  <i class="fas fa-file-{% if '.pdf' in f.fichier.name %}pdf text-danger{% else %}image text-primary{% endif %} mt-1 me-3"></i>
-                {% else %}
-                  <i class="fas fa-file-slash text-muted mt-1 me-3"></i>
-                {% endif %}
-              
-                <div style="min-width: 0;">
-                  <div class="fw-medium small mb-1 text-truncate">
-                    {% if f.fichier %}
-                      <a href="{{ f.fichier.url }}" target="_blank" class="text-decoration-none text-dark">
-                        Facture #{{ forloop.counter }}
-                      </a>
-                    {% else %}
-                      <span class="text-muted">
-                        Facture #{{ forloop.counter }}
-                      </span>
-                    {% endif %}
+          <!-- Liste factures -->
+          {% if factures %}
+          <div class="list-group list-group-flush mb-3">
+            {% for f in factures %}
+            <div class="list-group-item border-0 px-0 py-2">
+              <div class="d-flex justify-content-between align-items-start">
+
+                <div class="d-flex align-items-start" style="flex: 1;">
+
+                  {% if f.fichier %}
+                    <i class="fas fa-file-{% if '.pdf' in f.fichier.name %}pdf text-danger{% else %}image text-primary{% endif %} mt-1 me-3"></i>
+                  {% else %}
+                    <i class="fas fa-file-slash text-muted mt-1 me-3"></i>
+                  {% endif %}
+
+                  <div style="min-width: 0;">
+                    <div class="fw-medium small mb-1 text-truncate">
+                      {% if f.fichier %}
+                        <a href="{{ f.fichier.url }}" target="_blank" class="text-decoration-none text-dark">
+                          Facture #{{ forloop.counter }}
+                        </a>
+                      {% else %}
+                        <span class="text-muted">
+                          Facture #{{ forloop.counter }}
+                        </span>
+                      {% endif %}
+                    </div>
+
+                    <div class="d-flex align-items-center">
+                      <small class="text-muted">{{ f.date_upload|date:"d/m/Y" }}</small>
+
+                      {% if f.description %}
+                        <span class="mx-1">•</span>
+                        <small class="text-muted text-truncate" style="max-width: 150px;">
+                          {{ f.description }}
+                        </small>
+                      {% endif %}
+                    </div>
                   </div>
-                
-                  <div class="d-flex align-items-center">
-                    <small class="text-muted">{{ f.date_upload|date:"d/m/Y" }}</small>
-                  
-                    {% if f.description %}
-                      <span class="mx-1">•</span>
-                      <small class="text-muted text-truncate" style="max-width: 150px;">
-                        {{ f.description }}
-                      </small>
-                    {% endif %}
-                  </div>
+
                 </div>
-              
+
+                <div class="text-end ms-2">
+                  {% if f.montant %}
+                    <div class="fw-bold text-success">
+                      {{ f.montant|floatformat:"0" }} FCFA
+                    </div>
+                  {% else %}
+                    <small class="text-muted">-</small>
+                  {% endif %}
+                </div>
+
               </div>
-            
-              <div class="text-end ms-2">
-                {% if f.montant %}
-                  <div class="fw-bold text-success">
-                    {{ f.montant|floatformat:"0" }} FCFA
-                  </div>
+
+              <div class="d-flex justify-content-end gap-1 mt-2">
+                {% if f.fichier %}
+                  <a href="{{ f.fichier.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-eye"></i>
+                  </a>
+
+                  <a href="{{ f.fichier.url }}" download class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-download"></i>
+                  </a>
                 {% else %}
-                  <small class="text-muted">-</small>
+                  <span class="badge bg-secondary">
+                    Aucun fichier
+                  </span>
                 {% endif %}
               </div>
-            
+
             </div>
-          
-            <div class="d-flex justify-content-end gap-1 mt-2">
-              {% if f.fichier %}
-                <a href="{{ f.fichier.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                  <i class="fas fa-eye"></i>
-                </a>
-              
-                <a href="{{ f.fichier.url }}" download class="btn btn-sm btn-outline-secondary">
-                  <i class="fas fa-download"></i>
-                </a>
-              {% else %}
-                <span class="badge bg-secondary">
-                  Aucun fichier
-                </span>
-              {% endif %}
-            </div>
-          
+
+            {% if not forloop.last %}
+              <hr class="my-2">
+            {% endif %}
+
+            {% endfor %}
           </div>
-        
-          {% if not forloop.last %}
-            <hr class="my-2">
+
+          {% else %}
+          <div class="text-center py-4">
+            <i class="fas fa-file-invoice fa-2x text-muted mb-3"></i>
+            <p class="text-muted mb-0">Aucune facture</p>
+            <p class="text-muted small">Ajoutez une facture</p>
+          </div>
           {% endif %}
-        
-          {% endfor %}
-        </div>
-        
-        {% else %}
-        <div class="text-center py-4">
-          <i class="fas fa-file-invoice fa-2x text-muted mb-3"></i>
-          <p class="text-muted mb-0">Aucune facture</p>
-          <p class="text-muted small">Ajoutez une facture</p>
-        </div>
-        {% endif %}
-          
+
           <!-- Bouton gestion -->
-          <a href="{% url 'gestion_factures_lot' lot.id %}" 
+          <a href="{% url 'gestion_factures_lot' lot.id %}"
              class="btn {% if lot.est_solde %}btn-outline-success{% else %}btn-primary{% endif %} w-100 mt-2">
             <i class="fas fa-cog me-2"></i>Gérer les factures
           </a>
         </div>
       </div>
+    </div>
 
-      <!-- Carte statut -->
-      <div class="card mt-3">
-        <div class="card-body">
-          <h6 class="fw-bold mb-3">Statut du lot</h6>
-          <ul class="list-unstyled mb-0">
-            <li class="d-flex justify-content-between py-1">
-              <span class="text-muted">Cohérence quantités</span>
-              <span class="badge {% if lot.coherence_quantites %}bg-success{% else %}bg-danger{% endif %}">
-                {% if lot.coherence_quantites %}OK{% else %}Écart{% endif %}
-              </span>
-            </li>
-            {% if not lot.coherence_quantites %}
-            <li class="d-flex justify-content-between py-1">
-              <span class="text-muted">Écart quantité</span>
-              <span class="fw-bold {% if lot.ecart_quantite > 0 %}text-success{% else %}text-danger{% endif %}">
-                {{ lot.ecart_quantite|floatformat:"2" }}
-              </span>
-            </li>
-            {% endif %}
-            <li class="d-flex justify-content-between py-1">
-              <span class="text-muted">Valeur actuelle</span>
-              <span class="fw-bold">{{ lot.valeur_actuelle_stock|floatformat:"0" }} FCFA</span>
-            </li>
-            <li class="d-flex justify-content-between py-1">
-              <span class="text-muted">Quantité théorique</span>
-              <span class="fw-bold">{{ lot.quantite_theorique_restante|floatformat:"2" }}</span>
-            </li>
-          </ul>
-          {% if not lot.coherence_quantites %}
-          <div class="alert alert-warning mt-3 mb-0 py-2">
-            <small>
-              <i class="fas fa-exclamation-triangle me-1"></i>
-              Les quantités ne sont pas cohérentes
-            </small>
+    <!-- Informations détaillées (secondaire, repliable) -->
+    <div class="area-infos">
+      <div class="card">
+        <button type="button" class="card-header bg-light w-100 border-0 d-flex justify-content-between align-items-center text-start collapse-toggle"
+                data-bs-toggle="collapse" data-bs-target="#collapseInfos" aria-expanded="true" aria-controls="collapseInfos">
+          <h5 class="mb-0 fw-bold"><i class="fas fa-info-circle me-2"></i>Informations détaillées</h5>
+          <i class="fas fa-chevron-up chevron-icon"></i>
+        </button>
+        <div class="collapse show" id="collapseInfos">
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <li class="d-flex justify-content-between py-1 border-bottom">
+                <span class="text-muted">Produit</span>
+                <span class="fw-medium text-end">{{ lot.produit.nom }}</span>
+              </li>
+              <li class="d-flex justify-content-between py-1 border-bottom">
+                <span class="text-muted">Fournisseur</span>
+                <span class="fw-medium text-end">{{ lot.fournisseur.nom }}</span>
+              </li>
+              <li class="d-flex justify-content-between py-1 border-bottom">
+                <span class="text-muted">Référence</span>
+                <span class="fw-medium text-end">{{ lot.reference_lot }}</span>
+              </li>
+              <li class="d-flex justify-content-between py-1 border-bottom">
+                <span class="text-muted">Date réception</span>
+                <span class="fw-medium text-end">{{ lot.date_reception|date:"d/m/Y H:i" }}</span>
+              </li>
+              <li class="d-flex justify-content-between py-1 border-bottom">
+                <span class="text-muted">Date enregistrement</span>
+                <span class="fw-medium text-end">{{ lot.date_enregistrement|date:"d/m/Y H:i" }}</span>
+              </li>
+              <li class="d-flex justify-content-between py-1">
+                <span class="text-muted">Valeur initiale</span>
+                <span class="fw-medium text-end">{{ lot.valeur_stock_initiale|default:"-"|floatformat:"0" }} FCFA</span>
+              </li>
+            </ul>
           </div>
-          {% endif %}
         </div>
       </div>
+    </div>
 
+    <!-- Statut du lot (secondaire, repliable) -->
+    <div class="area-statut">
+      <div class="card">
+        <button type="button" class="card-header bg-light w-100 border-0 d-flex justify-content-between align-items-center text-start collapse-toggle"
+                data-bs-toggle="collapse" data-bs-target="#collapseStatut" aria-expanded="true" aria-controls="collapseStatut">
+          <h6 class="mb-0 fw-bold">Statut du lot</h6>
+          <i class="fas fa-chevron-up chevron-icon"></i>
+        </button>
+        <div class="collapse show" id="collapseStatut">
+          <div class="card-body">
+            <ul class="list-unstyled mb-0">
+              <li class="d-flex justify-content-between py-1">
+                <span class="text-muted">Cohérence quantités</span>
+                <span class="badge {% if lot.coherence_quantites %}bg-success{% else %}bg-danger{% endif %}">
+                  {% if lot.coherence_quantites %}OK{% else %}Écart{% endif %}
+                </span>
+              </li>
+              {% if not lot.coherence_quantites %}
+              <li class="d-flex justify-content-between py-1">
+                <span class="text-muted">Écart quantité</span>
+                <span class="fw-bold {% if lot.ecart_quantite > 0 %}text-success{% else %}text-danger{% endif %}">
+                  {{ lot.ecart_quantite|floatformat:"2" }}
+                </span>
+              </li>
+              {% endif %}
+              <li class="d-flex justify-content-between py-1">
+                <span class="text-muted">Valeur actuelle</span>
+                <span class="fw-bold">{{ lot.valeur_actuelle_stock|floatformat:"0" }} FCFA</span>
+              </li>
+              <li class="d-flex justify-content-between py-1">
+                <span class="text-muted">Quantité théorique</span>
+                <span class="fw-bold">{{ lot.quantite_theorique_restante|floatformat:"2" }}</span>
+              </li>
+            </ul>
+            {% if not lot.coherence_quantites %}
+            <div class="alert alert-warning mt-3 mb-0 py-2">
+              <small>
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                Les quantités ne sont pas cohérentes
+              </small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique des pertes (secondaire, repliable) -->
+    <div class="area-historique">
+      <div class="card">
+        <button type="button" class="card-header bg-light w-100 border-0 d-flex justify-content-between align-items-center text-start collapse-toggle"
+                data-bs-toggle="collapse" data-bs-target="#collapseHistorique" aria-expanded="true" aria-controls="collapseHistorique">
+          <span class="d-flex align-items-center">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-history me-2"></i>Historique des pertes</h5>
+            <span class="badge bg-dark ms-2">{{ pertes|length }} perte(s)</span>
+          </span>
+          <i class="fas fa-chevron-up chevron-icon"></i>
+        </button>
+        <div class="collapse show" id="collapseHistorique">
+          <div class="card-body p-0">
+            {% if pertes %}
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Date</th>
+                    <th>Quantité</th>
+                    <th>Description</th>
+                    <th class="text-end">Valeur</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for p in pertes %}
+                  <tr>
+                    <td class="text-nowrap">{{ p.date_perte|date:"d/m/Y H:i" }}</td>
+                    <td class="fw-bold text-danger text-nowrap">{{ p.quantite_perdue|floatformat:"2" }}</td>
+                    <td>{{ p.description|default:"-" }}</td>
+                    <td class="text-end text-nowrap">{{ p.valeur_perte|floatformat:"0" }} FCFA</td>
+                  </tr>
+                  {% endfor %}
+                  {% if pertes.count > 0 %}
+                  <tr class="table-light">
+                    <td colspan="2" class="fw-bold">Total pertes</td>
+                    <td></td>
+                    <td class="text-end fw-bold text-danger">
+                      {{ lot.quantite_perdue_totale|floatformat:"2" }} unités
+                    </td>
+                  </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+              <i class="fas fa-check-circle fa-2x text-muted mb-3"></i>
+              <p class="text-muted mb-0">Aucune perte enregistrée</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -377,53 +393,106 @@
     border-radius: 10px;
     transition: box-shadow 0.2s;
   }
-  
+
   .card:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   }
-  
+
   .table td {
     padding: 0.75rem;
   }
-  
+
+  /* Grille par zones nommées : ordre mobile = perte + factures d'abord,
+     reste secondaire ensuite ; ordre desktop = 2 colonnes d'origine. */
+  .lot-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    grid-template-areas:
+      "stats"
+      "perte"
+      "factures"
+      "infos"
+      "statut"
+      "historique";
+  }
+
+  .area-stats { grid-area: stats; }
+  .area-perte { grid-area: perte; }
+  .area-factures { grid-area: factures; }
+  .area-infos { grid-area: infos; }
+  .area-statut { grid-area: statut; }
+  .area-historique { grid-area: historique; }
+
+  .collapse-toggle {
+    cursor: pointer;
+  }
+
+  .chevron-icon {
+    transition: transform 0.2s;
+  }
+
+  .collapse-toggle[aria-expanded="false"] .chevron-icon {
+    transform: rotate(180deg);
+  }
+
   /* Mobile optimisations */
   @media (max-width: 768px) {
     .container-fluid {
       padding-left: 12px;
       padding-right: 12px;
     }
-    
+
     h1 {
       font-size: 1.5rem;
     }
-    
+
     .h4 {
       font-size: 1.25rem;
     }
-    
+
     .card-body {
       padding: 1rem;
     }
-    
+
     .btn {
       padding: 0.5rem 0.75rem;
       font-size: 0.9rem;
     }
-    
+
     .table-responsive {
       font-size: 0.875rem;
     }
+
+    .w-md-auto {
+      width: 100%;
+    }
   }
-  
+
   /* Desktop optimisations */
   @media (min-width: 992px) {
+    .lot-layout {
+      grid-template-columns: 2fr 1fr;
+      gap: 1.5rem;
+      grid-template-areas:
+        "stats factures"
+        "infos factures"
+        "perte statut"
+        "historique statut";
+    }
+
     .card-body {
       padding: 1.25rem;
     }
-    
-    .sticky-top {
+
+    .factures-card {
       position: sticky;
+      top: 20px;
       z-index: 1;
+    }
+
+    .w-md-auto {
+      width: auto;
     }
   }
 </style>
@@ -434,19 +503,19 @@
     // Validation perte
     const perteForm = document.querySelector('form');
     const quantitePerdueInput = document.querySelector('[name="quantite_perdue"]');
-    
+
     if (perteForm && quantitePerdueInput) {
       perteForm.addEventListener('submit', function(e) {
         const quantitePerdue = parseFloat(quantitePerdueInput.value) || 0;
         const quantiteRestante = parseFloat('{{ lot.quantite_restante|floatformat:"2" }}');
-        
+
         if (quantitePerdue <= 0) {
           e.preventDefault();
           alert('La quantité perdue doit être supérieure à 0.');
           quantitePerdueInput.focus();
           return false;
         }
-        
+
         if (quantitePerdue > quantiteRestante) {
           e.preventDefault();
           alert('❌ La quantité perdue (' + quantitePerdue + ') dépasse la quantité restante (' + quantiteRestante + ').');
@@ -455,7 +524,7 @@
         }
       });
     }
-    
+
     // Auto-calcul valeur perte si champ existe
     const descriptionInput = document.querySelector('[name="description"]');
     if (quantitePerdueInput && descriptionInput) {
@@ -463,19 +532,30 @@
         const quantite = parseFloat(this.value) || 0;
         const prixUnitaire = parseFloat('{{ lot.prix_achat_unitaire }}');
         const valeurPerte = quantite * prixUnitaire;
-        
+
         // Suggestion de description
         if (quantite > 0 && descriptionInput.value === '') {
           descriptionInput.placeholder = `Perte de ${quantite} unités (valeur: ${valeurPerte.toFixed(0)} FCFA)`;
         }
       });
     }
-    
+
     // Animation douce
     const cards = document.querySelectorAll('.card');
     cards.forEach(card => {
       card.style.transition = 'all 0.2s ease';
     });
+
+    // Sections secondaires repliées par défaut sur mobile pour réduire la densité
+    if (window.innerWidth < 768) {
+      ['collapseInfos', 'collapseStatut', 'collapseHistorique'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('show');
+        const toggle = document.querySelector('[data-bs-target="#' + id + '"]');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+    }
   });
 </script>
 {% endblock %}

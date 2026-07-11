@@ -1842,9 +1842,6 @@ def detail_depense(request, depense_id):
     depense = get_object_or_404(Depense, id=depense_id)
     agent = request.user.agent
 
-    # ✅ Permission : uniquement ROT ou Direction
-    if not (agent.est_rot or agent.est_direction):
-        return redirect('access_denied')
 
     return render(request, 'core/depenses/detail.html', {
         'depense': depense
@@ -1854,9 +1851,6 @@ def detail_depense(request, depense_id):
 @login_required
 def creer_depense(request):
     agent = request.user.agent
-
-    if not agent.est_rot:
-        return redirect('access_denied')
 
     if request.method == 'POST':
         form = DepenseForm(request.POST)
