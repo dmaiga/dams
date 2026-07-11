@@ -6,7 +6,7 @@ from django.db import transaction
 from django.http import JsonResponse
 
 from core.models import AffectationLotSuperviseur, DetailDistribution, Vente, Recouvrement
-from .forms import DistributionForm, VenteForm
+from vente.forms import DistributionForm, VenteForm
 
 
 def _acces_superviseur(agent):
@@ -166,13 +166,13 @@ def ajax_distributions_par_agent(request):
     details = (
         DetailDistribution.objects
         .filter(distribution__superviseur=superviseur, distribution__agent_terrain_id=agent_id)
-        .select_related('lot__produit')
+        .select_related('lot__produit', 'distribution')
     )
 
     data = [
         {
             'id': d.id,
-            'label': f"{d.lot.produit.nom} | reste {d.quantite_restante_calculee}",
+            'label': f"{d.lot.produit.nom} | Affecté le {d.distribution.date_distribution:%d/%m/%Y} | reste {d.quantite_restante_calculee}",
             'type_vente_suggere': (
                 d.distribution.agent_terrain.type_vente_par_defaut()
                 if d.distribution.agent_terrain_id != superviseur.id else None
