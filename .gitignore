@@ -7,7 +7,6 @@ rules/
 # -----------------------------
 __pycache__/
 *.py[cod]
- 
 *.pyc
 *$py.class
 *.so
