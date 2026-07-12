@@ -499,13 +499,12 @@
                             <i class="fas fa-list"></i>
                             <span>Historique ventes</span>
                         </a>
-                    {%if request.user.agent.user.username == "ismael.diawara"%}                        
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}" 
                            href="{% url 'liste_lots' %}">
                             <i class="fas fa-pallet"></i>
                             <span>Stock Entrepôt</span>
                         </a>
-                    {% endif %}
+                   
                     {%if request.user.agent.user.username == "abdoulaye.kone"%}  
                         <a class="nav-link {% if request.resolver_match.url_name in 'liste_depenses' %}active{% endif %}" 
                             href="{% url 'liste_depenses' %}">

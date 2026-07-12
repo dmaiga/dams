@@ -140,7 +140,7 @@
 
     <!-- ACTIONS -->
     <div class="d-grid gap-2">
-      <button type="submit" class="btn btn-primary btn-lg">
+      <button type="submit" class="btn btn-primary btn-lg" id="reception-submit-btn">
         <i class="fas fa-save me-1"></i> Enregistrer la réception
       </button>
       <a href="{% url 'marchandise:liste_lots' %}" class="btn btn-outline-secondary btn-lg">
@@ -187,6 +187,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   toggleProduit();
   toggleFournisseur();
+
+  document.getElementById('reception-form').addEventListener('submit', function () {
+    const btn = document.getElementById('reception-submit-btn');
+    if (btn.disabled) return false;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Enregistrement…';
+  });
 });
 </script>
 

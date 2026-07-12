@@ -146,7 +146,7 @@
 
     <!-- Barre d'action : sticky en bas sur mobile -->
     <div class="d-grid gap-2 action-bar">
-      <button type="submit" class="btn btn-success btn-lg">
+      <button type="submit" class="btn btn-success btn-lg" id="affectation-submit-btn">
         <i class="fas fa-check me-1"></i> Enregistrer l'affectation
       </button>
       <a href="{% url 'marchandise:historique_affectations' %}" class="btn btn-outline-secondary">
@@ -293,6 +293,13 @@ document.getElementById('{{ form.superviseur.id_for_label }}').addEventListener(
     .catch(() => {
       agentSelect.innerHTML = '<option value="">Erreur de chargement des agents</option>';
     });
+});
+
+document.getElementById('affectation-form').addEventListener('submit', function () {
+  const btn = document.getElementById('affectation-submit-btn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Enregistrement…';
 });
 </script>
 {% endblock %}

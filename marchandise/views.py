@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 
-from core.models import LotEntrepot, AffectationLotSuperviseur, MouvementStock, Agent
+from core.models import LotEntrepot, AffectationLotSuperviseur, MouvementStock, Agent, Produit, Fournisseur
 from core.forms import ReceptionLotForm
 from .forms import AffectationSuperviseurForm, TYPES_AGENT_TERRAIN
 
@@ -24,9 +24,32 @@ def liste_lots(request):
         .select_related('produit', 'fournisseur', 'receptionne_par__user')
         .order_by('-date_reception')
     )
+
+    produit_id = request.GET.get('produit')
+    fournisseur_id = request.GET.get('fournisseur')
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+
+    if produit_id:
+        lots_qs = lots_qs.filter(produit_id=produit_id)
+    if fournisseur_id:
+        lots_qs = lots_qs.filter(fournisseur_id=fournisseur_id)
+    if date_debut:
+        lots_qs = lots_qs.filter(date_reception__gte=date_debut)
+    if date_fin:
+        lots_qs = lots_qs.filter(date_reception__lte=date_fin)
+
     paginator = Paginator(lots_qs, 30)
     lots = paginator.get_page(request.GET.get('page', 1))
-    return render(request, 'marchandise/liste_lots.html', {'lots': lots})
+    return render(request, 'marchandise/liste_lots.html', {
+        'lots': lots,
+        'produits': Produit.objects.order_by('nom'),
+        'fournisseurs': Fournisseur.objects.order_by('nom'),
+        'filtre_produit': produit_id or '',
+        'filtre_fournisseur': fournisseur_id or '',
+        'filtre_date_debut': date_debut or '',
+        'filtre_date_fin': date_fin or '',
+    })
 
 
 @login_required
@@ -148,8 +171,29 @@ def historique_affectations(request):
         )
         .order_by('-date_affectation')
     )
+
+    produit_id = request.GET.get('produit')
+    superviseur_id = request.GET.get('superviseur')
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+
+    if produit_id:
+        affectations_qs = affectations_qs.filter(lot__produit_id=produit_id)
+    if superviseur_id:
+        affectations_qs = affectations_qs.filter(superviseur_id=superviseur_id)
+    if date_debut:
+        affectations_qs = affectations_qs.filter(date_affectation__gte=date_debut)
+    if date_fin:
+        affectations_qs = affectations_qs.filter(date_affectation__lte=date_fin)
+
     paginator = Paginator(affectations_qs, 30)
     affectations = paginator.get_page(request.GET.get('page', 1))
     return render(request, 'marchandise/historique_affectations.html', {
-        'affectations': affectations
+        'affectations': affectations,
+        'produits': Produit.objects.order_by('nom'),
+        'superviseurs': Agent.objects.filter(type_agent='entrepot').order_by('user__first_name'),
+        'filtre_produit': produit_id or '',
+        'filtre_superviseur': superviseur_id or '',
+        'filtre_date_debut': date_debut or '',
+        'filtre_date_fin': date_fin or '',
     })

@@ -19,6 +19,52 @@
     {% endfor %}
   {% endif %}
 
+  <!-- Filtres -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1">Produit</label>
+          <select name="produit" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for p in produits %}
+              <option value="{{ p.pk }}" {% if filtre_produit|stringformat:"s" == p.pk|stringformat:"s" %}selected{% endif %}>
+                {{ p.nom }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1">Fournisseur</label>
+          <select name="fournisseur" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for f in fournisseurs %}
+              <option value="{{ f.pk }}" {% if filtre_fournisseur|stringformat:"s" == f.pk|stringformat:"s" %}selected{% endif %}>
+                {{ f.nom }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Du</label>
+          <input type="date" name="date_debut" value="{{ filtre_date_debut }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Au</label>
+          <input type="date" name="date_fin" value="{{ filtre_date_fin }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-12 col-md-2 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+            <i class="fas fa-filter me-1"></i>Filtrer
+          </button>
+          <a href="{% url 'marchandise:liste_lots' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-times"></i>
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Desktop -->
   <div class="card shadow-sm d-none d-md-block mb-3">
     <div class="table-responsive">
@@ -124,17 +170,17 @@
     <ul class="pagination pagination-sm justify-content-center flex-wrap">
       {% if lots.has_previous %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ lots.previous_page_number }}">‹</a>
+          <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ lots.previous_page_number }}">‹</a>
         </li>
       {% endif %}
       {% for num in lots.paginator.page_range %}
         <li class="page-item {% if lots.number == num %}active{% endif %}">
-          <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+          <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ num }}">{{ num }}</a>
         </li>
       {% endfor %}
       {% if lots.has_next %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ lots.next_page_number }}">›</a>
+          <a class="page-link" href="?{{ request.GET.urlencode }}&page={{ lots.next_page_number }}">›</a>
         </li>
       {% endif %}
     </ul>
