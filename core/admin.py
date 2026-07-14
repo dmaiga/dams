@@ -1,5 +1,6 @@
 # core/admin.py
 from django.contrib import admin
+from django import forms
 from .models import (
     Agent, Produit, Client, LotEntrepot, Fournisseur,
     DistributionAgent, DetailDistribution, Vente, 
@@ -16,6 +17,7 @@ from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.utils.html import format_html
 from .models import FactureLotEntrepot
+from marchandise.services import AffectationLotService
 
 # direction/admin.py
 
@@ -723,8 +725,40 @@ class RecouvrementSuperviseurAdmin(admin.ModelAdmin):
     
     cash_disponible.short_description = "Cash dispo superviseur"
 
+class AffectationLotSuperviseurCorrectionAdminForm(ModelForm):
+    """Interface Admin deleguant toute correction au service marchandise."""
+
+    quantite = forms.DecimalField(
+        label="Quantité corrigée",
+        min_value=Decimal("0.01"),
+        decimal_places=2,
+        max_digits=10,
+        help_text="La correction ajuste automatiquement le stock du lot.",
+    )
+
+    class Meta:
+        model = AffectationLotSuperviseur
+        fields = ("date_affectation",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["quantite"].initial = self.instance.quantite_initiale
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.instance.pk:
+            AffectationLotService.valider_correction_affectation(
+                self.instance.pk,
+                quantite=cleaned_data.get("quantite"),
+                date_affectation=cleaned_data.get("date_affectation"),
+            )
+        return cleaned_data
+
+
 @admin.register(AffectationLotSuperviseur)
 class AffectationLotSuperviseurAdmin(admin.ModelAdmin):
+    form = AffectationLotSuperviseurCorrectionAdminForm
 
     list_display = (
         'id',
@@ -753,13 +787,45 @@ class AffectationLotSuperviseurAdmin(admin.ModelAdmin):
     ordering = ('-date_affectation',)
 
     readonly_fields = (
+        'lot',
+        'superviseur',
         'quantite_initiale',
         'quantite_restante',
+        'prix_gros',
+        'prix_detail',
+        'agent_terrain_direct',
         'attribue_par',
         'created_at',
     )
 
-    raw_id_fields = ('lot', 'superviseur', 'attribue_par')
+    fields = (
+        'lot',
+        'superviseur',
+        'quantite_initiale',
+        'quantite_restante',
+        'quantite',
+        'prix_gros',
+        'prix_detail',
+        'agent_terrain_direct',
+        'date_affectation',
+        'attribue_par',
+        'created_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+
+        affectation = AffectationLotService.corriger_affectation(
+            obj.pk,
+            quantite=form.cleaned_data['quantite'],
+            date_affectation=form.cleaned_data['date_affectation'],
+        )
+        obj.quantite_initiale = affectation.quantite_initiale
+        obj.date_affectation = affectation.date_affectation
 
     def get_queryset(self, request):
         return (

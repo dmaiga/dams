@@ -41,13 +41,13 @@ Les modèles restent dans `core.models`. `marchandise` les importe sans les poss
 | Modèle | Usage |
 |---|---|
 | `LotEntrepot` | Unité centrale de stock |
-| `AffectationLotSuperviseur` | Sortie stock vers superviseur (prix laissés vides — voir Invariants). Champ `agent_terrain_direct` renseigné si distribution directe. |
+| `AffectationLotSuperviseur` | Sortie de stock vers l'agent via son superviseur. `agent_terrain_direct` et `quantite_restante` restent des champs de compatibilité et de traçabilité. |
 | `MouvementStock` | Traçabilité des entrées/sorties |
 | `MiseDispositionRot` | Créé à chaque affectation pour compatibilité historique |
 | `Produit` | Référentiel produit |
 | `Fournisseur` | Référentiel fournisseur |
 | `DistributionAgent` | Créé si distribution directe à un agent lors de l'affectation |
-| `DetailDistribution` | Détail (lot, quantité, prix) de la distribution directe |
+| `DetailDistribution` | Vérité économique de la distribution (quantité réellement distribuée, base des ventes et des recouvrements). |
 
 ---
 
@@ -55,7 +55,7 @@ Les modèles restent dans `core.models`. `marchandise` les importe sans les poss
 
 ### `AffectationSuperviseurForm`
 
-Gère la sortie d'un lot du stock central vers un superviseur — avec option de distribution directe à un agent pour casser la friction du flux en deux étapes (Jean → superviseur → agent).
+Gère la sortie d'un lot du stock central vers un agent rattaché à son superviseur. La création de `DistributionAgent` et `DetailDistribution` fait partie du flux normal lorsqu'un agent est sélectionné.
 
 Champs : `produit`, `lot`, `superviseur`, `agent_terrain` (optionnel), `quantite`, `date_affectation`.
 
@@ -72,6 +72,39 @@ Le prix dépend du type de l'agent qui vendra (`terrain`/mami → détail unique
 
 **Libellés des `ModelChoiceField` — full name uniquement :**
 `superviseur` et `agent_terrain` utilisent `label_from_instance = lambda obj: obj.full_name` (pas `Agent.__str__()` qui ajoute `- {type_agent_display}`, ni de type entre parenthèses). Objectif : listes déroulantes courtes et lisibles sur mobile, où un `<select>` natif avec des libellés trop longs peut déborder visuellement dans les outils d'inspection desktop (un vrai téléphone utilise un picker natif dimensionné à l'écran, donc ce n'est un souci qu'en émulation).
+
+---
+
+## Service métier (`marchandise/services.py`)
+
+### `AffectationLotService.corriger_affectation(...)`
+
+Point d'entrée unique des corrections administratives d'une `AffectationLotSuperviseur`.
+
+Le service est appelé depuis le `ModelAdmin` centralisé dans `core/admin.py` et peut être réutilisé par toute autre interface.
+
+Il constitue le **miroir fonctionnel** de `AffectationSuperviseurForm.save()` : au lieu de créer les objets métier, il met à jour ceux déjà existants afin de conserver la cohérence du workflow.
+
+**Règles appliquées :**
+
+- Corrige les champs administratifs autorisés (`quantite`, `date_affectation`).
+- Recalcule le delta de quantité entre l'ancienne et la nouvelle valeur.
+- Met à jour de façon cohérente :
+  - `LotEntrepot`
+  - `AffectationLotSuperviseur`
+  - `DistributionAgent`
+  - `DetailDistribution`
+- Maintient la cohérence entre le stock central et les quantités réellement distribuées.
+- Refuse toute correction conduisant à un stock négatif ou à une incohérence métier.
+- Une correction de date n'a aucun impact sur les stocks.
+
+**Atomicité :**
+
+Toutes les modifications sont exécutées dans une unique `transaction.atomic()` afin de garantir que l'ensemble des objets impactés restent synchronisés.
+
+**Important :**
+
+`DetailDistribution` constitue la vérité économique de la distribution. Les ventes et les recouvrements s'appuient sur sa quantité. Toute correction d'une affectation doit donc également mettre à jour `DetailDistribution` afin de conserver la cohérence du système.
 
 ---
 
@@ -112,6 +145,9 @@ Tous les templates sont **mobile-first** : double layout Bootstrap (tableau `d-n
 ## Invariants
 
 - Une affectation décrémente `lot.quantite_restante` de manière atomique (`transaction.atomic` dans `save()`).
+- Toute correction administrative passe exclusivement par `AffectationLotService.corriger_affectation()`.
+- Le service est le miroir de `AffectationSuperviseurForm.save()` : toute correction met à jour l'ensemble des objets impactés (`LotEntrepot`, `AffectationLotSuperviseur`, `DistributionAgent` et `DetailDistribution`) dans une unique transaction atomique.
+- `DetailDistribution` reste la référence métier utilisée par les ventes et les recouvrements ; sa quantité doit toujours être synchronisée avec une correction d'affectation.
 - Le bouton "Affecter" sur la liste est masqué si `lot.quantite_restante == 0`.
 - Les prix (gros/détail) ne sont **plus** saisis dans `marchandise` — ils sont laissés à `None` et seront indiqués par le superviseur au moment d'enregistrer la vente de l'agent, avec le type de vente.
 - `lot.receptionne_par` est automatiquement renseigné avec l'agent connecté à la réception.
