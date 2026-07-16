@@ -297,7 +297,7 @@
             {% if page_obj.has_previous %}
 
             <a
-                href="?page={{ page_obj.previous_page_number }}"
+                href="?{{ pagination_query }}{% if pagination_query %}&{% endif %}page={{ page_obj.previous_page_number }}"
                 class="join-item btn"
             >
                 «
@@ -315,7 +315,7 @@
             {% if page_obj.has_next %}
 
             <a
-                href="?page={{ page_obj.next_page_number }}"
+                href="?{{ pagination_query }}{% if pagination_query %}&{% endif %}page={{ page_obj.next_page_number }}"
                 class="join-item btn"
             >
                 »

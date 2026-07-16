@@ -190,10 +190,10 @@
                                 {{ lot.date_reception|date:"d/m/Y" }}
                             </td>
                             <td class="text-center">
-                                {% if lot.pertes.exists %}
-                                <div class="tooltip" data-tip="Pertes: {{ lot.quantite_perdue_totale|format_number }} unités - {{ lot.quantite_perdue_totale|multiply:lot.prix_achat_unitaire|fcfa }}">
+                                {% if lot_data.afficher_pertes %}
+                                <div class="tooltip" data-tip="Pertes: {{ lot_data.pertes_quantite|format_number }} unités - {{ lot_data.pertes_valeur|fcfa }}">
                                     <span class="badge badge-error">
-                                        {{ lot.quantite_perdue_totale|format_number }}
+                                        {{ lot_data.pertes_quantite|format_number }}
                                     </span>
                                 </div>
                                 {% else %}

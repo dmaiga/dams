@@ -78,6 +78,8 @@ from direction.services.analyse_operationnelle_service import AnalyseOperationne
 
 from direction.services.DashboardSnapshotService import DashboardSnapshotService
 
+DATE_DEBUT_SUIVI_TERRAIN = date(2026, 5, 15)
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/dashboards/dashboard.html'
 
@@ -1695,6 +1697,9 @@ def suivi_distributions(request):
 
     details = (
         DetailDistribution.objects
+        .filter(
+            distribution__date_distribution__date__gte=DATE_DEBUT_SUIVI_TERRAIN
+        )
         .select_related(
             "lot",
             "lot__produit",
@@ -1795,8 +1800,12 @@ def suivi_distributions(request):
 
     page_obj = paginator.get_page(page_number)
 
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+
     context = {
         "page_obj": page_obj,
+        "pagination_query": pagination_params.urlencode(),
 
         "superviseurs": Agent.objects.filter(
             type_agent='entrepot'

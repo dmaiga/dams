@@ -3,7 +3,7 @@ from django.db.models import (
 )
 
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import date, timedelta, datetime
 from decimal import Decimal
 from core.models import Produit, LotEntrepot, Vente, Fournisseur, Perte
 from django.core.cache import cache
@@ -11,6 +11,11 @@ from django.db.models.functions import TruncMonth
 import calendar
 
 class ProductAnalysisService:
+
+    DATE_BASCULE_PERTES = date(2026, 6, 1)
+    DATE_BASCULE_PERTES_DATETIME = timezone.make_aware(
+        datetime.combine(DATE_BASCULE_PERTES, datetime.min.time())
+    )
 
     # ----------------------------------------------------------------------
     # 1) KPI globaux
@@ -411,7 +416,7 @@ class ProductAnalysisService:
         # ============================
         # 🔹 CACHE (par produit + fournisseur)
         # ============================
-        cache_key = f"product_detail:{product_id}:{supplier_id or 'all'}"
+        cache_key = f"product_detail:v3:{product_id}:{supplier_id or 'all'}"
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -429,12 +434,21 @@ class ProductAnalysisService:
             .filter(produit_id=product_id)
             .select_related("fournisseur")
             .annotate(
-                pertes_quantite=Sum("pertes__quantite_perdue", default=0),
+                pertes_quantite=Sum(
+                    "pertes__quantite_perdue",
+                    filter=Q(
+                        date_reception__gte=ProductAnalysisService.DATE_BASCULE_PERTES_DATETIME
+                    ),
+                    default=0,
+                ),
                 pertes_valeur=Sum(
                     F("pertes__quantite_perdue") * F("prix_achat_unitaire"),
                     output_field=DecimalField(max_digits=15, decimal_places=2),
-                    default=0
-                )
+                    filter=Q(
+                        date_reception__gte=ProductAnalysisService.DATE_BASCULE_PERTES_DATETIME
+                    ),
+                    default=0,
+                ),
             )
         )
 
@@ -483,7 +497,10 @@ class ProductAnalysisService:
         # ============================
         # 🔹 PERTES TOTALES (1 QUERY)
         # ============================
-        pertes = Perte.objects.filter(lot__in=lots).aggregate(
+        pertes = Perte.objects.filter(
+            lot__in=lots,
+            lot__date_reception__gte=ProductAnalysisService.DATE_BASCULE_PERTES_DATETIME,
+        ).aggregate(
             pertes_quantite=Sum("quantite_perdue"),
             pertes_valeur=Sum(
                 F("quantite_perdue") * F("lot__prix_achat_unitaire"),
@@ -522,7 +539,10 @@ class ProductAnalysisService:
         lots_avec_marge = [
             {
                 "lot": lot,
-                "marge": marge_map.get(lot.id, Decimal("0"))
+                "marge": marge_map.get(lot.id, Decimal("0")),
+                "afficher_pertes": lot.pertes_quantite > 0,
+                "pertes_quantite": lot.pertes_quantite,
+                "pertes_valeur": lot.pertes_valeur,
             }
             for lot in lots.order_by("-date_reception")
         ]
