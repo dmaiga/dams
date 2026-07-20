@@ -46,6 +46,7 @@ Les documents sont rangés par responsabilité. Chaque rôle lit **son** dossier
 - [09_Qualite_DoD.md](chef_projet/09_Qualite_DoD.md) — Definition of Done (générique par type de livrable)
 - [PLANNING.md](chef_projet/PLANNING.md) — vue d'ensemble du calendrier 4 semaines
 - [RISQUES.md](chef_projet/RISQUES.md) — registre des risques
+- [QUESTIONS_OUVERTES.md](chef_projet/QUESTIONS_OUVERTES.md) — retours utilisateur à trancher (filtres, agrégations, portée des vues)
 
 ### 📂 [sprints/](sprints/) — Chef de Projet (exécution du MVP)
 - [README.md](sprints/README.md) — cadence, cérémonies, index des 4 sprints
