@@ -7,18 +7,18 @@
 </div>
 
 <div class="bi-panel">
-    <div class="table-responsive">
-        <table class="table table-sm table-hover">
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
             <thead>
                 <tr>
                     <th>Agent</th>
                     <th>Type</th>
-                    <th class="text-end">Kg vendus</th>
-                    <th class="text-end">Jours actifs</th>
-                    <th class="text-end">Kg/jour</th>
+                    <th class="text-right">Kg vendus</th>
+                    <th class="text-right">Jours actifs</th>
+                    <th class="text-right">Kg/jour</th>
                     <th>Statut objectif</th>
-                    <th class="text-end">Rentabilité</th>
-                    <th class="text-end">Ratio incentive/marge</th>
+                    <th class="text-right">Rentabilité</th>
+                    <th class="text-right">Ratio incentive/marge</th>
                 </tr>
             </thead>
             <tbody>
@@ -26,12 +26,12 @@
                 <tr>
                     <td>{{ a.nom_complet }} <span class="bi-badge bi-{{ a.statut_rentabilite }}">&nbsp;</span></td>
                     <td>{{ a.type_agent }}</td>
-                    <td class="text-end">{{ a.kg_vendus|floatformat:1 }}</td>
-                    <td class="text-end">{{ a.jours_actifs }}</td>
-                    <td class="text-end">{{ a.kg_par_jour|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ a.kg_vendus|floatformat:1 }}</td>
+                    <td class="text-right">{{ a.jours_actifs }}</td>
+                    <td class="text-right">{{ a.kg_par_jour|default_if_none:"—" }}</td>
                     <td><span class="bi-badge bi-{{ a.statut_couleur }}">{{ a.statut_label }}</span></td>
-                    <td class="text-end">{{ a.rentabilite_agent|floatformat:0 }}</td>
-                    <td class="text-end"><span class="bi-badge bi-{{ a.statut_ratio }}">{{ a.ratio_incentive_marge_pct|default_if_none:"—" }}</span></td>
+                    <td class="text-right">{{ a.rentabilite_agent|floatformat:0 }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ a.statut_ratio }}">{{ a.ratio_incentive_marge_pct|default_if_none:"—" }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>

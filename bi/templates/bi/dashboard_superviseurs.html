@@ -7,29 +7,29 @@
 </div>
 
 <div class="bi-panel">
-    <div class="table-responsive">
-        <table class="table table-sm table-hover">
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
             <thead>
                 <tr>
                     <th>Superviseur</th>
-                    <th class="text-end">CA</th>
-                    <th class="text-end">Marge brute</th>
-                    <th class="text-end">Coût équipe</th>
-                    <th class="text-end">Rentabilité nette</th>
-                    <th class="text-end">Agents actifs</th>
-                    <th class="text-end">CA moyen / agent</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge brute</th>
+                    <th class="text-right">Coût équipe</th>
+                    <th class="text-right">Rentabilité nette</th>
+                    <th class="text-right">Agents actifs</th>
+                    <th class="text-right">CA moyen / agent</th>
                 </tr>
             </thead>
             <tbody>
                 {% for s in superviseurs %}
                 <tr>
                     <td>{{ s.superviseur_nom }} <span class="bi-badge bi-{{ s.statut }}">&nbsp;</span></td>
-                    <td class="text-end">{{ s.ca|floatformat:0 }}</td>
-                    <td class="text-end">{{ s.marge_brute|floatformat:0 }}</td>
-                    <td class="text-end">{{ s.cout_equipe|floatformat:0 }}</td>
-                    <td class="text-end">{{ s.rentabilite_nette|floatformat:0 }}</td>
-                    <td class="text-end">{{ s.nb_agents_actifs }}</td>
-                    <td class="text-end">{{ s.ca_moyen_par_agent|default_if_none:"—"|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.marge_brute|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.cout_equipe|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.rentabilite_nette|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.nb_agents_actifs }}</td>
+                    <td class="text-right">{{ s.ca_moyen_par_agent|default_if_none:"—"|floatformat:0 }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -39,7 +39,7 @@
 
 <div class="bi-panel">
     <h2>Dépenses par catégorie</h2>
-    <p class="text-muted small mb-0">
+    <p class="text-gray-500 text-sm mb-0">
         Non disponible dans ce sprint : aucune vue <code>bi_</code> n'agrège les dépenses par
         catégorie (seul le total mensuel existe, <code>vw_rentabilite_globale.cout_depenses</code>).
         Ajouter une telle vue dépasse le périmètre dbt autorisé (dbt-1 et dbt-2 uniquement) —

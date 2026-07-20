@@ -15,17 +15,17 @@
 
 <div class="bi-panel">
     <h2>Détail par produit</h2>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover">
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
             <thead>
                 <tr>
                     <th>Produit</th>
-                    <th class="text-end">CA</th>
-                    <th class="text-end">Coût d'achat</th>
-                    <th class="text-end">Marge</th>
-                    <th class="text-end">Marge %</th>
-                    <th class="text-end">Qté vendue (kg)</th>
-                    <th class="text-end">Rotation stock</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Coût d'achat</th>
+                    <th class="text-right">Marge</th>
+                    <th class="text-right">Marge %</th>
+                    <th class="text-right">Qté vendue (kg)</th>
+                    <th class="text-right">Rotation stock</th>
                 </tr>
             </thead>
             <tbody>
@@ -35,12 +35,12 @@
                         {{ p.produit_nom }}
                         <span class="bi-badge bi-{{ p.statut }}">&nbsp;</span>
                     </td>
-                    <td class="text-end">{{ p.ca|floatformat:0 }}</td>
-                    <td class="text-end">{{ p.cout_achat|floatformat:0 }}</td>
-                    <td class="text-end">{{ p.marge|floatformat:0 }}</td>
-                    <td class="text-end">{{ p.marge_pct|default_if_none:"—" }}</td>
-                    <td class="text-end">{{ p.quantite_vendue_kg|floatformat:1 }}</td>
-                    <td class="text-end">{{ p.rotation_stock|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ p.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.cout_achat|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.marge|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.marge_pct|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ p.quantite_vendue_kg|floatformat:1 }}</td>
+                    <td class="text-right">{{ p.rotation_stock|default_if_none:"—" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

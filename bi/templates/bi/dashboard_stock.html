@@ -10,15 +10,15 @@
 
 <div class="bi-panel">
     <h2>Stock par produit / fournisseur</h2>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover">
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
             <thead>
                 <tr>
                     <th>Produit</th>
                     <th>Fournisseur</th>
-                    <th class="text-end">Quantité restante</th>
-                    <th class="text-end">Valeur stock</th>
-                    <th class="text-end">Jours en stock (moy.)</th>
+                    <th class="text-right">Quantité restante</th>
+                    <th class="text-right">Valeur stock</th>
+                    <th class="text-right">Jours en stock (moy.)</th>
                 </tr>
             </thead>
             <tbody>
@@ -26,9 +26,9 @@
                 <tr>
                     <td>{{ s.produit_nom|default:"—" }}</td>
                     <td>{{ s.fournisseur_nom|default:"—" }}</td>
-                    <td class="text-end">{{ s.quantite_restante|floatformat:1 }}</td>
-                    <td class="text-end">{{ s.valeur_stock|floatformat:0 }}</td>
-                    <td class="text-end"><span class="bi-badge bi-{{ s.statut }}">{{ s.jours_en_stock_moyen|default_if_none:"—" }}</span></td>
+                    <td class="text-right">{{ s.quantite_restante|floatformat:1 }}</td>
+                    <td class="text-right">{{ s.valeur_stock|floatformat:0 }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ s.statut }}">{{ s.jours_en_stock_moyen|default_if_none:"—" }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -38,16 +38,16 @@
 
 <div class="bi-panel">
     <h2>Marge par fournisseur (KPI-403 à 405)</h2>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover">
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
             <thead>
                 <tr>
                     <th>Fournisseur</th>
                     <th>Mois</th>
-                    <th class="text-end">CA</th>
-                    <th class="text-end">Marge système</th>
-                    <th class="text-end">Marge calibrée</th>
-                    <th class="text-end">Marge calibrée %</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge système</th>
+                    <th class="text-right">Marge calibrée</th>
+                    <th class="text-right">Marge calibrée %</th>
                     <th>Calibration</th>
                 </tr>
             </thead>
@@ -56,10 +56,10 @@
                 <tr>
                     <td>{{ f.fournisseur_nom|default:"—" }}</td>
                     <td>{{ f.mois|date:"m/Y" }}</td>
-                    <td class="text-end">{{ f.ca|floatformat:0 }}</td>
-                    <td class="text-end">{{ f.marge_systeme|floatformat:0 }}</td>
-                    <td class="text-end">{{ f.marge_calibree|floatformat:0 }}</td>
-                    <td class="text-end"><span class="bi-badge bi-{{ f.statut }}">{{ f.marge_calibree_pct|default_if_none:"—" }}</span></td>
+                    <td class="text-right">{{ f.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ f.marge_systeme|floatformat:0 }}</td>
+                    <td class="text-right">{{ f.marge_calibree|floatformat:0 }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ f.statut }}">{{ f.marge_calibree_pct|default_if_none:"—" }}</span></td>
                     <td>
                         {% if f.calibre %}
                         <span class="bi-badge bi-vert">{{ f.nb_ajustements }} ajustement{{ f.nb_ajustements|pluralize }}</span>
