@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: dams_prod
+    description: >
+      Base de production DAMS (Django), schéma public, tables préfixées core_
+      (confirmé par architecte/REFERENCE_TECHNIQUE_BI.md). Restaurée localement
+      en dev depuis input/dams_2026-07-12.dump.
+    schema: public
+    tables:
+      - name: core_vente
+      - name: core_detaildistribution
+      - name: core_distributionagent
+      - name: core_lotentrepot
+      - name: core_agent
+      - name: auth_user
+      - name: core_salaire
+      - name: core_depense
+      - name: core_produit
+      - name: core_fournisseur
+      - name: core_perte
+      - name: core_paiementfournisseur

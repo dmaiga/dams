@@ -128,7 +128,15 @@ core/migrations/__pycache__/
 # Database backups
 *.dump
 *.sql
+!bi/dbt/**/*.sql
 backup/
+
+# -----------------------------
+# dbt
+# -----------------------------
+bi/dbt/dbt_packages/
+bi/dbt/target/
+bi/dbt/logs/
 
 # -----------------------------
 # Documentation

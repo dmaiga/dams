@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: vw_rentabilite_globale
+    description: >
+      Dashboard 1 (Santé Globale). 1 ligne par mois : CA, coût d'achat, marge brute,
+      coût salaires, coût dépenses, rentabilité nette (KPI-001 à KPI-009).
+    columns:
+      - name: mois
+        tests: [not_null, unique]
+      - name: rentabilite_nette
+        tests: [not_null]
+
+  - name: vw_rentabilite_produit
+    description: "Dashboard 2 (Rentabilité Produit). 1 ligne par produit (KPI-101 à KPI-106)."
+    columns:
+      - name: produit_id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('dim_produit')
+              field: produit_id
+
+  - name: vw_performance_superviseur
+    description: >
+      Dashboard 3 (Performance Superviseur). 1 ligne par superviseur = dim_agent filtrée
+      type_agent='entrepot' (KPI-201 à KPI-206).
+    columns:
+      - name: superviseur_id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('dim_agent')
+              field: agent_id
+
+  - name: vw_performance_agent
+    description: >
+      Dashboard 4 (Performance Agent vs Objectif 50 kg/jour). 1 ligne par agent de type
+      terrain/agent_gros/agent_polivalent (KPI-301 à KPI-306).
+    columns:
+      - name: agent_id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('dim_agent')
+              field: agent_id
+      - name: statut_objectif_50kg
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['atteint', 'proche', 'sous_objectif']
+              config:
+                severity: warn
+
+  - name: vw_analyse_stock
+    description: "Dashboard 5 (Stock & Fournisseur). 1 ligne par couple produit x fournisseur (KPI-401, KPI-402)."
+    columns:
+      - name: valeur_stock
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0

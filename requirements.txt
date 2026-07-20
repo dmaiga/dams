@@ -3,6 +3,8 @@ asgiref==3.11.0
 baron==0.10.1
 certifi==2026.1.4
 charset-normalizer==3.4.4
+dbt-core==1.12.0
+dbt-postgres==1.11.0
 dj-database-url==3.1.0
 dj-email-url==1.0.6
 Django==4.2.27

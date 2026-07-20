@@ -1,0 +1,139 @@
+version: 2
+
+models:
+  - name: dim_agent
+    description: "1 ligne par agent (core_agent + auth_user pour le nom)."
+    columns:
+      - name: agent_id
+        tests: [not_null, unique]
+
+  - name: dim_produit
+    description: "1 ligne par produit. Pas de categorie/fournisseur_id (n'existent pas sur core_produit)."
+    columns:
+      - name: produit_id
+        tests: [not_null, unique]
+
+  - name: dim_fournisseur
+    columns:
+      - name: fournisseur_id
+        tests: [not_null, unique]
+
+  - name: dim_temps
+    columns:
+      - name: date_id
+        tests: [not_null, unique]
+
+  - name: fct_ventes
+    description: >
+      Grain = 1 ligne core_vente. superviseur_id/produit_id/fournisseur_id/prix_achat_unitaire
+      dérivés via detail_distribution -> distribution_agent / lot_entrepot (pas des colonnes
+      directes de core_vente).
+    columns:
+      - name: vente_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_agent')
+              field: agent_id
+      - name: produit_id
+        tests:
+          - relationships:
+              to: ref('dim_produit')
+              field: produit_id
+      - name: fournisseur_id
+        tests:
+          - relationships:
+              to: ref('dim_fournisseur')
+              field: fournisseur_id
+      - name: quantite
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: prix_vente_unitaire
+        tests: [not_null]
+
+  - name: fct_salaires
+    description: >
+      superviseur_id = hiérarchie actuelle de l'agent, à distinguer du superviseur_id de
+      fct_ventes (hiérarchie au moment de la vente).
+    columns:
+      - name: salaire_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_agent')
+              field: agent_id
+      - name: salaire_total
+        tests:
+          - not_null
+          # 2 lignes réelles (agents entrepot/superviseur) ne respectent pas cette égalité
+          # de +15 000 FCFA chacune — cohérent avec R14 (dotation_fonction superviseur
+          # jamais appliquée de façon fiable). Signalé en warn, pas bloquant : le montant
+          # stocké reste la source de vérité pour le coût de paie.
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "= salaire_base + incentive"
+              config:
+                severity: warn
+
+  - name: fct_depenses
+    description: "agent_id = core_depense.effectue_par_id (pas de colonne rot_id, voir R10)."
+    columns:
+      - name: depense_id
+        tests: [not_null, unique]
+      - name: montant
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: type_agent
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['rot', 'entrepot']
+              config:
+                severity: warn
+
+  - name: fct_stocks
+    description: >
+      Grain = 1 ligne par lot, snapshot courant. quantite_vendue recalculée depuis Vente,
+      pas depuis le champ stocké quantite_vendue de DetailDistribution (R13).
+    columns:
+      - name: lot_id
+        tests: [not_null, unique]
+      - name: produit_id
+        tests:
+          - relationships:
+              to: ref('dim_produit')
+              field: produit_id
+      - name: quantite_restante
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "<= quantite_initiale"
+
+  - name: fct_paiements_fournisseur
+    columns:
+      - name: paiement_id
+        tests: [not_null, unique]
+      - name: fournisseur_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fournisseur')
+              field: fournisseur_id
+      - name: montant
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0

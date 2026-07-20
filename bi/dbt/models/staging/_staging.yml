@@ -1,0 +1,82 @@
+version: 2
+
+models:
+  - name: stg_ventes
+    description: "1 ligne = 1 vente comptant/crédit (est_supprime=false uniquement)."
+    columns:
+      - name: vente_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests: [not_null]
+      - name: quantite
+        tests: [not_null]
+      - name: prix_vente_unitaire
+        tests: [not_null]
+
+  - name: stg_detail_distribution
+    columns:
+      - name: detail_distribution_id
+        tests: [not_null, unique]
+      - name: lot_id
+        tests: [not_null]
+
+  - name: stg_distribution_agent
+    columns:
+      - name: distribution_id
+        tests: [not_null, unique]
+
+  - name: stg_lots
+    columns:
+      - name: lot_id
+        tests: [not_null, unique]
+      - name: prix_achat_unitaire
+        tests: [not_null]
+
+  - name: stg_agents
+    columns:
+      - name: agent_id
+        tests: [not_null, unique]
+      - name: type_agent
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['direction', 'rot', 'entrepot', 'terrain', 'agent_gros', 'agent_polivalent', 'stagiaire', 'gestionnaire_stock']
+
+  - name: stg_utilisateurs
+    columns:
+      - name: user_id
+        tests: [not_null, unique]
+
+  - name: stg_salaires
+    columns:
+      - name: salaire_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests: [not_null]
+
+  - name: stg_depenses
+    columns:
+      - name: depense_id
+        tests: [not_null, unique]
+      - name: montant
+        tests: [not_null]
+
+  - name: stg_produits
+    columns:
+      - name: produit_id
+        tests: [not_null, unique]
+
+  - name: stg_fournisseurs
+    columns:
+      - name: fournisseur_id
+        tests: [not_null, unique]
+
+  - name: stg_pertes
+    columns:
+      - name: perte_id
+        tests: [not_null, unique]
+
+  - name: stg_paiements_fournisseur
+    columns:
+      - name: paiement_id
+        tests: [not_null, unique]
