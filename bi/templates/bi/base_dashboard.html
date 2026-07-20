@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block page_title %}BI{% if dashboard_titre %} › {{ dashboard_titre }} › {{ periode_libelle }}{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+    .bi-breadcrumb { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem; }
+    .bi-onglets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.75rem; }
+    .bi-onglet { padding: 0.5rem 1rem; border-radius: 0.5rem; text-decoration: none; color: #2c3e50; font-weight: 500; }
+    .bi-onglet:hover { background: #f1f3f5; }
+    .bi-onglet.active { background: #2c3e50; color: #fff; }
+
+    .bi-periode-form { display: flex; gap: 0.5rem; align-items: end; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .bi-periode-form label { font-size: 0.8rem; color: #7f8c8d; display: block; margin-bottom: 0.2rem; }
+
+    .bi-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .bi-kpi { background: #fff; border-radius: 0.75rem; padding: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 5px solid #bdc3c7; }
+    .bi-kpi.bi-vert { border-left-color: #27ae60; }
+    .bi-kpi.bi-jaune { border-left-color: #f39c12; }
+    .bi-kpi.bi-rouge { border-left-color: #e74c3c; }
+    .bi-kpi.bi-neutre { border-left-color: #95a5a6; }
+    .bi-kpi.bi-principal { grid-column: span 2; }
+    .bi-kpi-label { font-size: 0.8rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.03em; }
+    .bi-kpi-valeur { font-size: 1.8rem; font-weight: 700; color: #2c3e50; }
+    .bi-kpi.bi-principal .bi-kpi-valeur { font-size: 2.4rem; }
+    .bi-kpi-unite { font-size: 0.9rem; color: #95a5a6; font-weight: 400; }
+
+    .bi-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 600; }
+    .bi-badge.bi-vert { background: #d4efdf; color: #1e8449; }
+    .bi-badge.bi-jaune { background: #fdebd0; color: #b9770e; }
+    .bi-badge.bi-rouge { background: #fadbd8; color: #c0392b; }
+    .bi-badge.bi-neutre { background: #eaecee; color: #7f8c8d; }
+
+    .bi-panel { background: #fff; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+    .bi-panel h2 { font-size: 1.1rem; color: #2c3e50; margin-bottom: 1rem; }
+    .bi-vide { text-align: center; padding: 3rem 1rem; color: #95a5a6; }
+</style>
+
+<div class="bi-breadcrumb">BI &rsaquo; {{ dashboard_titre }} &rsaquo; {{ periode_libelle }}</div>
+
+<nav class="bi-onglets">
+    {% for onglet in dashboards %}
+    <a class="bi-onglet {% if onglet.slug == dashboard_slug %}active{% endif %}"
+       href="{{ onglet.url }}{% if annee %}?annee={{ annee }}{% if mois %}&mois={{ mois }}{% endif %}{% endif %}">
+        {{ onglet.titre }}
+    </a>
+    {% endfor %}
+</nav>
+
+<form method="get" class="bi-periode-form">
+    <div>
+        <label for="bi-annee">Année</label>
+        <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="form-control form-control-sm" min="2000" max="2100" placeholder="2026">
+    </div>
+    <div>
+        <label for="bi-mois">Mois</label>
+        <select id="bi-mois" name="mois" class="form-select form-select-sm">
+            <option value="">—</option>
+            {% for valeur, libelle in mois_options %}
+            <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-sm btn-primary">Filtrer</button>
+    {% if annee or mois %}<a href="{{ request.path }}" class="btn btn-sm btn-outline-secondary">Réinitialiser</a>{% endif %}
+</form>
+
+{% if est_vide %}
+<div class="bi-vide">
+    <i class="fas fa-inbox fa-2x mb-3"></i>
+    <p>Aucune donnée disponible pour cette période.</p>
+</div>
+{% else %}
+{% block dashboard_content %}{% endblock %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% block dashboard_scripts %}{% endblock %}
+{% endblock %}
