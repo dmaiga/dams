@@ -84,6 +84,13 @@
 | **Propriétaire** | Finance |
 | **Source** | `fct_salaires` |
 
+> **Correction (dbt-1, 20/07/2026)** : `fct_salaires` excluait auparavant toute logique de
+> prorata au démarrage — un agent entré en cours de période générait un coût salarial sur
+> des mois antérieurs à son entrée en fonction. Corrigé en filtrant `fct_salaires` sur
+> `date_debut >= agent.date_debut_fonction` (ligne exclue si antérieure). Cascade automatique
+> sur KPI-006, KPI-009 (Dashboard 1) et KPI-203/204 (Dashboard 3, coût équipe et rentabilité
+> superviseur). Test dbt associé : `assert_salaire_apres_date_debut_fonction`.
+
 ---
 
 ### KPI-006 : Coût Salaires %
@@ -418,7 +425,9 @@
 
 ## 📦 KPI STOCK & FOURNISSEUR (Dashboard 5)
 
-> **Implémentation (17/07/2026)** : KPI-401/402 disponibles par couple produit×fournisseur dans `bi_.vw_analyse_stock` (grain = snapshot lot agrégé). KPI-403 à KPI-405 (marge par fournisseur) restent à construire directement sur `fct_ventes` + `dim_fournisseur` côté Metabase — grain différent (vente vs lot en stock), pas de vue dédiée nécessaire.
+> **Implémentation (17/07/2026)** : KPI-401/402 disponibles par couple produit×fournisseur dans `bi_.vw_analyse_stock` (grain = snapshot lot agrégé).
+>
+> **Implémentation (dbt-2, 20/07/2026)** : KPI-403 à KPI-405 disponibles agrégés par fournisseur×mois dans `bi_.vw_marge_fournisseur` (`fct_ventes` + `dim_fournisseur`, grain différent de `vw_analyse_stock` — vente vs lot en stock). Metabase étant abandonné (voir `architecte/04_ADR.md`), la vue est directement consommée par l'app Django `bi`. Calibration prix d'achat : la vue expose `marge_systeme` (prix d'achat brut de `fct_ventes`) ET `marge_calibree` (corrigée par `bi.AjustementPrixAchat`, saisie admin Direction, moyenne pondérée par quantité à la clé fournisseur×mois — `fct_ventes` n'exposant pas `lot_id`, la correction ne peut pas être rattachée au lot précis malgré la saisie d'un `reference_lot` à titre de traçabilité).
 
 ### KPI-401 : Valeur Stock Total
 
