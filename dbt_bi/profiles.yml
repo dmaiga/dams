@@ -3,10 +3,13 @@ dams_bi:
   outputs:
     dev:
       type: postgres
-      host: "{{ env_var('DBT_POSTGRES_HOST') }}"
-      port: "{{ env_var('DBT_POSTGRES_PORT') | as_number }}"
-      user: "{{ env_var('DBT_POSTGRES_USER') }}"
-      password: "{{ env_var('DBT_POSTGRES_PASSWORD') }}"
-      dbname: "{{ env_var('DBT_POSTGRES_DBNAME') }}"
+      # Réutilise les variables Postgres du .env racine (DB_*, déjà lues par dams/settings.py)
+      # plutôt qu'un doublon DBT_POSTGRES_* : même base, mêmes credentials des deux côtés.
+      # Seul DBT_POSTGRES_SCHEMA reste propre à dbt (pas d'équivalent Django).
+      host: "{{ env_var('DB_HOST') }}"
+      port: "{{ env_var('DB_PORT') | as_number }}"
+      user: "{{ env_var('DB_USER') }}"
+      password: "{{ env_var('DB_PASSWORD') }}"
+      dbname: "{{ env_var('DB_NAME') }}"
       schema: "{{ env_var('DBT_POSTGRES_SCHEMA') }}"
       threads: 4
