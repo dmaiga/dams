@@ -16,7 +16,7 @@ Guide de lecture des 7 documents. Explique :
 - Qui doit lire quoi et quand
 - Calendrier juillet (4 semaines)
 - Checklist avant démarrage
-- Stack technologique (PostgreSQL + dbt + Metabase = 0€)
+- Stack technologique (PostgreSQL + dbt + app Django `bi` = 0€ — Metabase abandonné, voir ADR-009)
 
 ---
 
@@ -37,13 +37,16 @@ Résume :
 ### 3. **04_ADR.md** (7.2 KB)
 **Architecte → Décisions Techniques**
 
-6 Architecture Decision Records :
+9 Architecture Decision Records :
 - **ADR-001** : PostgreSQL comme DW (zéro coût, suffit pour MVP)
 - **ADR-002** : dbt pour ETL (SQL-first, tests intégrés)
-- **ADR-003** : Metabase pour BI (30 min setup)
+- **ADR-003** : Metabase pour BI (30 min setup) — **remplacée par ADR-009**
 - **ADR-004** : Période figée 01/01 – 30/06 (non flexible)
 - **ADR-005** : Schéma `bi_` isolé (zéro impact DAMS prod)
 - **ADR-006** : Refresh nuit batch (23h00 Mali)
+- **ADR-007** : Conformité Twelve-Factor App
+- **ADR-008** : Conteneurisation Docker Compose (scaffolding Metabase obsolète depuis ADR-009)
+- **ADR-009** : Metabase abandonné — restitution Django SSR + Chart.js
 
 **Statut** : ✅ Tous acceptés
 
@@ -141,7 +144,7 @@ DAMS génère des ventes mais ne sait pas :
 - Où dorment nos millions en stock ?
 
 ### La Solution
-5 dashboards analytiques (Metabase) sur PostgreSQL, rafraîchis chaque nuit via dbt.
+5 dashboards analytiques (app Django `bi`, SSR + Chart.js — Metabase abandonné, voir ADR-009) sur PostgreSQL, rafraîchis chaque nuit via dbt.
 
 **Exemple** : 
 ```
@@ -159,7 +162,7 @@ Rentabilité Nette : 3,400,000 ✅
 ### Le Stack (0€)
 - PostgreSQL (schéma `bi_`)
 - dbt Core (orchestrateur ETL)
-- Metabase (dashboards)
+- App Django `bi` (dashboards SSR + Chart.js CDN — Metabase abandonné, ADR-009)
 - cron nuit (refresh automatique)
 
 ### Le Timeline

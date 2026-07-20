@@ -4,7 +4,7 @@ Plateforme **Business Intelligence** pour les opérations de distribution **DAMS
 
 **Owner** : Mahamane Daouda Maïga
 **Scope MVP** : période 01/01 – 30/06 2026 — 5 dashboards, ~25 KPI
-**Stack** : PostgreSQL + dbt + Metabase (coût 0 €)
+**Stack** : PostgreSQL + dbt + app Django `bi` (SSR + Chart.js) — Metabase abandonné, voir [architecte/04_ADR.md](architecte/04_ADR.md#adr-009--metabase-abandonné--restitution-django-ssr--chartjs) (coût 0 €)
 
 > **Le problème** : beaucoup de données sur ce qu'on vend, mais aucune vue claire sur ce que ça **rapporte réellement** après tous les coûts (salaires + dépenses). Le KPI centre du projet est la **rentabilité nette**.
 
@@ -30,11 +30,12 @@ Les documents sont rangés par responsabilité. Chaque rôle lit **son** dossier
 - [03_Roadmap.md](owner/03_Roadmap.md) — quand et dans quel ordre (jalons)
 
 ### 📂 [architecte/](architecte/) — Data Architect (comment on le construit)
-- [04_ADR.md](architecte/04_ADR.md) — décisions techniques (PostgreSQL + dbt + Metabase)
+- [04_ADR.md](architecte/04_ADR.md) — décisions techniques (PostgreSQL + dbt + app Django `bi`, Metabase abandonné ADR-009)
 - [05_Architecture.md](architecte/05_Architecture.md) — stack, flux, lineage, schéma en étoile
 - [FLUX_PAIEMENT.md](architecte/FLUX_PAIEMENT.md) — diagrammes du circuit financier
 - [REFERENCE_TECHNIQUE_BI.md](architecte/REFERENCE_TECHNIQUE_BI.md) — référence technique DAMS (modèles, propriétés calculées, workflows réels, écarts) produite par audit de code+base, source de vérité pour la construction dbt
 - [AMELIORATIONS_DAMS.md](architecte/AMELIORATIONS_DAMS.md) — journal des améliorations à apporter à l'ERP DAMS (rempli en continu)
+- [setup.md](architecte/setup.md) — rôles PostgreSQL (dbt_user, bi_reader) et ordre de mise en route
 
 ### 📂 [bi/](bi/) — BI Developer (dashboards + KPI)
 - [07_Dictionnaire_KPI_Technique.md](bi/07_Dictionnaire_KPI_Technique.md) — version **technique** (formules SQL, sources dbt) → pour l'implémentation

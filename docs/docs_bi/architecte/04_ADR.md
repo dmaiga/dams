@@ -305,6 +305,41 @@ Le setup natif Sprint 1 (venv + PostgreSQL Windows) reste documenté comme fallb
 
 ---
 
+## ADR-009 : Metabase abandonné — restitution Django SSR + Chart.js
+
+**Date** : 20 juillet 2026
+**Status** : ✅ ACCEPTÉE (remplace ADR-003)
+**Décideur** : Mahamane (Architect / Product Owner)
+
+### Problème
+ADR-003 laissait Metabase « flexible », à évaluer contre Superset. Au moment d'implémenter la restitution des 5 dashboards, se pose la question : faut-il réellement déployer/opérer un service BI dédié (Metabase, conteneurisé — scaffold ADR-008) pour ce périmètre ?
+
+### Constat
+- Le scope est **figé** : exactement 5 dashboards (`bi/08_Dashboard_Catalog.md`), pas de self-service, pas d'exploration ad hoc attendue de la Direction.
+- Aucun besoin de créer de nouveaux graphiques à la volée, de croiser librement les données, ni de gérer des utilisateurs/permissions Metabase séparés.
+- Le projet DAMS est déjà une application Django servie ; ajouter Metabase revient à opérer un **second service** (conteneur, DB interne, auth, sauvegarde — cf. ADR-007 facteur VI, déjà noté comme stateful/à surveiller) pour un gain d'UX marginal sur un périmètre entièrement connu à l'avance.
+
+### Décision
+**Abandon de Metabase.** Restitution des 5 dashboards directement dans l'app Django `bi` : templates SSR (Django Template Language), graphiques via **Chart.js** chargé en CDN (aucune dépendance Python/npm supplémentaire), cartes KPI en HTML/CSS pur (code couleur 🟢/🟡/🔴 piloté par `bi/constants.py`, pas de valeurs en dur dans les templates).
+
+### Justification
+1. **Un service de moins à opérer** : plus de conteneur Metabase, plus de DB interne à sauvegarder, plus d'auth séparée à maintenir — la seule surface d'exploitation reste PostgreSQL + dbt (déjà en place) + Django (déjà en place).
+2. **Zéro besoin self-service** : les 5 dashboards sont entièrement spécifiés (`08_Dashboard_Catalog.md`), aucune valeur ajoutée à payer le coût d'un outil BI généraliste pour les afficher.
+3. **Réutilise l'existant** : Django sert déjà toutes les autres interfaces DAMS (auth, permissions, sidebar) — la Direction se connecte au même endroit, pas de second portail/second mot de passe.
+4. **Modèles managed=False** : les vues `bi_.vw_*` restent la seule source de vérité des KPI (aucune agrégation métier en Python), Django ne fait que les lire et les mettre en forme — le changement de restitution ne touche pas au contrat dbt.
+
+### Conséquences
+- ✅ Un service de moins (conteneur, DB, auth) à opérer et sauvegarder
+- ✅ Portail unique Direction (même session Django que le reste de DAMS)
+- ✅ Coût toujours 0 € (Chart.js CDN gratuit, aucune nouvelle dépendance Python)
+- ❌ Pas d'exploration ad hoc / self-service — si ce besoin apparaît en V2, il faudra soit réintroduire un outil BI, soit étendre les templates Django (filtre supplémentaire = code à écrire, pas un simple glisser-déposer Metabase)
+- ❌ ADR-008 (Docker Compose Metabase) devient obsolète pour son scaffolding Metabase — le reste (Postgres + dbt conteneurisés) reste valide
+
+### Documents mis à jour en conséquence
+`README.md` (stack), `shared/INDEX.md` (stack), `bi/07_Dictionnaire_KPI_Technique.md` (encadrés KPI-403/405).
+
+---
+
 ## Résumé Stack
 
 ```
@@ -315,7 +350,7 @@ DAMS (Django, PostgreSQL)
 PostgreSQL schéma `bi_`
 (facts + dimensions)
         ↓
-Metabase (dashboards)
+App Django `bi` (SSR + Chart.js CDN) — Metabase abandonné, voir ADR-009
         ↓
 PDF exports Excel (rapports)
 ```
@@ -323,7 +358,7 @@ PDF exports Excel (rapports)
 **Infrastructure** :
 - PostgreSQL (LWS cPanel) – 0€
 - dbt Core (local ou VM) – 0€
-- Metabase Docker – 0€
+- App Django `bi` (déjà servie par l'app DAMS existante) – 0€
 - **Total : 0€ (MVP)**
 
 **Timing**:
