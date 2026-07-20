@@ -31,13 +31,24 @@ from bi.models import (
 
 @pytest.fixture
 def utilisateur_connecte(client, django_user_model):
-    user = django_user_model.objects.create_user(username="direction.test", password="test-pass-123")
+    """Accès BI restreint à username='mdmaiga' (bi.views.bi_access_required, garde-fou
+    temporaire par username, pas un rôle Django)."""
+    user = django_user_model.objects.create_user(username="mdmaiga", password="test-pass-123")
     client.force_login(user)
     return user
 
 
 @pytest.mark.django_db
 def test_sommaire_redirige_si_non_connecte(client):
+    response = client.get(reverse("bi:sommaire"))
+    assert response.status_code == 302
+    assert response.url.startswith(reverse("login"))
+
+
+@pytest.mark.django_db
+def test_sommaire_redirige_si_utilisateur_non_autorise(client, django_user_model):
+    user = django_user_model.objects.create_user(username="autre.utilisateur", password="test-pass-123")
+    client.force_login(user)
     response = client.get(reverse("bi:sommaire"))
     assert response.status_code == 302
     assert response.url.startswith(reverse("login"))

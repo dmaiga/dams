@@ -1,6 +1,6 @@
 import json
 
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, Sum
 from django.shortcuts import render
@@ -17,6 +17,17 @@ from bi.models import (
     VwRentabiliteGlobale,
     VwRentabiliteProduit,
 )
+
+# Accès BI restreint à un seul compte le temps de la mise au point (rendu à affiner, cf.
+# session en cours) — pas un rôle Django, un simple garde-fou temporaire par username.
+BI_USERNAME_AUTORISE = "mdmaiga"
+
+
+def _est_utilisateur_autorise(user):
+    return user.is_authenticated and user.username == BI_USERNAME_AUTORISE
+
+
+bi_access_required = user_passes_test(_est_utilisateur_autorise, login_url="login")
 
 MOIS_FR = [
     "",
@@ -80,13 +91,13 @@ def _chart_json(data):
     return json.dumps(data, cls=DjangoJSONEncoder)
 
 
-@login_required
+@bi_access_required
 def sommaire(request):
     context = _base_context(request, None, "Sommaire")
     return render(request, "bi/sommaire.html", context)
 
 
-@login_required
+@bi_access_required
 def dashboard_sante(request):
     titre = dict(constants.DASHBOARDS)["sante"]
     context = _base_context(request, "sante", titre)
@@ -195,7 +206,7 @@ def dashboard_sante(request):
     return render(request, "bi/dashboard_sante.html", context)
 
 
-@login_required
+@bi_access_required
 def dashboard_produits(request):
     titre = dict(constants.DASHBOARDS)["produits"]
     context = _base_context(request, "produits", titre)
@@ -227,7 +238,7 @@ def dashboard_produits(request):
     return render(request, "bi/dashboard_produits.html", context)
 
 
-@login_required
+@bi_access_required
 def dashboard_superviseurs(request):
     titre = dict(constants.DASHBOARDS)["superviseurs"]
     context = _base_context(request, "superviseurs", titre)
@@ -273,7 +284,7 @@ def dashboard_superviseurs(request):
     return render(request, "bi/dashboard_superviseurs.html", context)
 
 
-@login_required
+@bi_access_required
 def dashboard_agents(request):
     titre = dict(constants.DASHBOARDS)["agents"]
     context = _base_context(request, "agents", titre)
@@ -301,7 +312,7 @@ def dashboard_agents(request):
     return render(request, "bi/dashboard_agents.html", context)
 
 
-@login_required
+@bi_access_required
 def dashboard_stock(request):
     titre = dict(constants.DASHBOARDS)["stock"]
     context = _base_context(request, "stock", titre)

@@ -171,6 +171,7 @@
                     <span>Surveillance</span>
                 </a>
             </li>
+            {% if request.user.username == "mdmaiga" %}
             <li>
                 <a href="{% url 'bi:sommaire' %}"
                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
@@ -179,6 +180,7 @@
                     <span>BI</span>
                 </a>
             </li>
+            {% endif %}
 
         </ul>
 
