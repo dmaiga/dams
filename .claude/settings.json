@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python manage.py shell -c ' *)"
+      "Bash(python manage.py shell -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(xargs wc -l)",
+      "Bash(python -m dbt --version)",
+      "Bash(\"c:/Users/Admin/By_me/dams_bi/.venv/Scripts/python.exe\" -m pip show dbt-postgres)",
+      "Bash(\"c:/Users/Admin/By_me/dams_bi/.venv/Scripts/python.exe\" -m pip show dbt-core)",
+      "Bash(pip show *)",
+      "Bash(pip list *)",
+      "Bash(rm -f \"/c/Users/Admin/.local/bin/dbt.exe\" *)",
+      "Bash(\"c:/Users/Admin/By_me/dams/venv/Scripts/python.exe\" -m pip install \"dbt-core==1.12.0\" \"dbt-postgres==1.11.0\")",
+      "Bash(git reset *)",
+      "Bash(grep -E \"\\\\.sql$|macros\")",
+      "Bash(grep -E \"\\\\.sql$\")",
+      "Bash(c:/Users/Admin/By_me/dams/venv/Scripts/python.exe -c ' *)",
+      "Bash(DBT_PROFILES_DIR=. c:/Users/Admin/By_me/dams/venv/Scripts/python.exe -c ' *)",
+      "Bash(\"c:/Users/Admin/By_me/dams/venv/Scripts/python.exe\" run_dbt.py debug)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Admin\\.local\\bin"
     ]
   }
 }

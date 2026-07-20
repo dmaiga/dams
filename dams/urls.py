@@ -37,14 +37,9 @@ urlpatterns = [
     path('champs/', include('analyse_champ.urls')),
     path('surveillance/', include('surveillance.urls')),
     path("app/", include("mobile.urls")),
-      path(
-        "marchandise/",
-        include(("marchandise.urls", "marchandise"), namespace="marchandise"),
-    ),
-      path(
-        "vente/",
-        include(("vente.urls", "vente"), namespace="vente"),
-    )
+    path( "marchandise/", include(("marchandise.urls", "marchandise"), namespace="marchandise"),),
+    path("vente/",include(("vente.urls", "vente"), namespace="vente"),),
+    path('bi/', include('bi.urls')),
 
 
 ]

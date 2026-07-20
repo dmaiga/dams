@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     'surveillance',
     'marchandise',
     'vente',
+    'bi',
 
 
 ]

@@ -134,9 +134,9 @@ backup/
 # -----------------------------
 # dbt
 # -----------------------------
-bi/dbt/dbt_packages/
-bi/dbt/target/
-bi/dbt/logs/
+dbt_bi/dbt_packages/
+dbt_bi/target/
+dbt_bi/logs/
 
 # -----------------------------
 # Documentation
