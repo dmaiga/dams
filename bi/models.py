@@ -76,7 +76,9 @@ class VwRentabiliteGlobale(models.Model):
     marge_brute = models.DecimalField(max_digits=15, decimal_places=2)
     marge_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True)
     cout_salaires = models.DecimalField(max_digits=15, decimal_places=2)
+    salaires_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True)
     cout_depenses = models.DecimalField(max_digits=15, decimal_places=2)
+    depenses_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True)
     rentabilite_nette = models.DecimalField(max_digits=15, decimal_places=2)
 
     class Meta:

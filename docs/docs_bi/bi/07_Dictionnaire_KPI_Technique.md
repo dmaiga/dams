@@ -5,6 +5,8 @@
 ## 🎯 KPI CRITIQUES (Dashboard 1 : Santé Globale)
 
 > **Implémentation (17/07/2026)** : KPI-001 à KPI-009 disponibles agrégés par mois dans `bi_.vw_rentabilite_globale` (`dbt/models/marts/aggregates/vw_rentabilite_globale.sql`). Testé en local (dbt build, hors Docker) — voir [sprints/SPRINT_2_Modeles_Dashboards.md](../sprints/SPRINT_2_Modeles_Dashboards.md).
+>
+> **Complément (20/07/2026)** : `vw_rentabilite_globale` expose désormais aussi `salaires_pct` (KPI-006) et `depenses_pct` (KPI-008), calculés en SQL (`100.0 * cout_salaires / ca`, `100.0 * cout_depenses / ca`, `null` si `ca = 0`) — l'app Django `bi` n'a plus besoin de s'en passer, ces deux KPI sont désormais affichés sur le Dashboard 1.
 
 ### KPI-001 : Chiffre d'Affaires Total (CA)
 

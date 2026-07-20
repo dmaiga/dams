@@ -56,7 +56,9 @@ def test_dashboard_sante_avec_donnees(client, utilisateur_connecte):
         marge_brute=Decimal("7500000"),
         marge_pct=Decimal("50.00"),
         cout_salaires=Decimal("1200000"),
+        salaires_pct=Decimal("8.00"),
         cout_depenses=Decimal("400000"),
+        depenses_pct=Decimal("2.67"),
         rentabilite_nette=Decimal("2500000"),
     )
     with patch.object(VwRentabiliteGlobale, "objects") as mock_globale, patch.object(

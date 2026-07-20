@@ -143,11 +143,25 @@ def dashboard_sante(request):
             "statut": constants.NEUTRE,
         },
         {
+            "code": "KPI-006",
+            "label": "Coût salaires %",
+            "valeur": courante.salaires_pct,
+            "unite": "%",
+            "statut": constants.statut_salaires_pct(courante.salaires_pct),
+        },
+        {
             "code": "KPI-007",
             "label": "Dépenses ROT",
             "valeur": courante.cout_depenses,
             "unite": "FCFA",
             "statut": constants.NEUTRE,
+        },
+        {
+            "code": "KPI-008",
+            "label": "Dépenses %",
+            "valeur": courante.depenses_pct,
+            "unite": "%",
+            "statut": constants.statut_depenses_pct(courante.depenses_pct),
         },
     ]
 

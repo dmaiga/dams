@@ -5,17 +5,13 @@
     {% for kpi in kpis %}
     <div class="bi-kpi bi-{{ kpi.statut }} {% if kpi.principal %}bi-principal{% endif %}">
         <div class="bi-kpi-label">{{ kpi.code }} — {{ kpi.label }}</div>
-        <div class="bi-kpi-valeur">{{ kpi.valeur|floatformat:0 }} <span class="bi-kpi-unite">{{ kpi.unite }}</span></div>
+        <div class="bi-kpi-valeur">
+            {% if kpi.unite == "%" %}{{ kpi.valeur|default_if_none:"—"|floatformat:2 }}{% else %}{{ kpi.valeur|floatformat:0 }}{% endif %}
+            <span class="bi-kpi-unite">{{ kpi.unite }}</span>
+        </div>
     </div>
     {% endfor %}
 </div>
-
-<p class="text-gray-500 text-sm">
-    KPI-006 (coût salaires %) et KPI-008 (dépenses %) ne sont pas encore affichés :
-    <code>bi_.vw_rentabilite_globale</code> n'expose pas ces colonnes en pourcentage
-    (seuls les montants FCFA le sont) — les recalculer côté Django violerait la règle
-    « aucun ratio recalculé en Python ». À ajouter dans une prochaine itération dbt.
-</p>
 
 <div class="bi-panel">
     <h2>Évolution mensuelle — CA, marge brute, rentabilité nette</h2>
