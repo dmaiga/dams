@@ -138,6 +138,13 @@ WSGI_APPLICATION = 'dams.wsgi.application'
 
 
 
+# Connexion unique 'default' pour toutes les apps, y compris `bi` (pas de router bi_reader).
+# Justification (docs/docs_bi/architecte/setup.md) : l'app `bi` lit les vues bi_.vw_* ET écrit
+# bi_ajustementprixachat (schéma public) — un router imposerait une deuxième connexion
+# (credentials, pool) pour un seul modèle managé, sans second serveur PostgreSQL réel derrière
+# (PostgreSQL unique, cf. CLAUDE.md). Le rôle `bi_reader` existe côté PostgreSQL (setup.md)
+# pour un usage externe futur (SQL ad hoc, analyste) — DB_USER (Django) garde un accès complet
+# public + SELECT sur bi_, comme documenté dans le GRANT de setup.md.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',

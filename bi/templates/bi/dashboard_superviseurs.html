@@ -1,0 +1,98 @@
+{% extends "bi/base_dashboard.html" %}
+
+{% block dashboard_content %}
+<div class="bi-panel">
+    <h2>Performance superviseur</h2>
+    <canvas id="chart-superviseurs-rentabilite" height="90"></canvas>
+</div>
+
+<div class="bi-panel">
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Superviseur</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge brute</th>
+                    <th class="text-right">Coût équipe</th>
+                    <th class="text-right">Rentabilité nette</th>
+                    <th class="text-right">Agents actifs</th>
+                    <th class="text-right">CA moyen / agent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in superviseurs %}
+                <tr>
+                    <td>{{ s.superviseur_nom }} <span class="bi-badge bi-{{ s.statut }}">&nbsp;</span></td>
+                    <td class="text-right">{{ s.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.marge_brute|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.cout_equipe|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.rentabilite_nette|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.nb_agents_actifs }}</td>
+                    <td class="text-right">{{ s.ca_moyen_par_agent|default_if_none:"—"|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="bi-panel">
+    <h2>Dépenses par catégorie</h2>
+    {% if depenses %}
+    <canvas id="chart-superviseurs-depenses" height="90"></canvas>
+    <div class="overflow-x-auto mt-4">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Mois</th>
+                    <th>Catégorie</th>
+                    <th class="text-right">Montant</th>
+                    <th class="text-right">% du total du mois</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in depenses %}
+                <tr>
+                    <td>{{ d.mois|date:"m/Y" }}</td>
+                    <td>{{ d.categorie|default:"Non catégorisé" }}</td>
+                    <td class="text-right">{{ d.montant|floatformat:0 }}</td>
+                    <td class="text-right">{{ d.montant_pct|default_if_none:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-sm mb-0">Aucune dépense pour cette période.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    const donneesSuperviseurs = {{ chart_data|safe }};
+    new Chart(document.getElementById('chart-superviseurs-rentabilite'), {
+        type: 'bar',
+        data: {
+            labels: donneesSuperviseurs.labels,
+            datasets: [{
+                label: 'Rentabilité nette',
+                data: donneesSuperviseurs.rentabilite_nette,
+                backgroundColor: donneesSuperviseurs.rentabilite_nette.map(v => v < 0 ? '#e74c3c' : '#27ae60'),
+            }],
+        },
+    });
+
+    {% if depenses %}
+    const donneesDepenses = {{ depenses_chart|safe }};
+    new Chart(document.getElementById('chart-superviseurs-depenses'), {
+        type: 'pie',
+        data: {
+            labels: donneesDepenses.labels,
+            datasets: [{ data: donneesDepenses.montant }],
+        },
+    });
+    {% endif %}
+</script>
+{% endblock %}

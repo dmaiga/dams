@@ -20,3 +20,15 @@ sources:
       - name: core_fournisseur
       - name: core_perte
       - name: core_paiementfournisseur
+
+  - name: dams_bi_app
+    description: >
+      Tables applicatives de l'app Django `bi` (écriture humaine via l'admin, pas générées
+      par dbt) — schéma `public`, comme les tables `core_*`. dbt-2 (2026-07-20) :
+      AjustementPrixAchat est la seule donnée saisie côté BI, calibration des prix d'achat
+      fournisseur pour vw_marge_fournisseur. Volontairement PAS dans le schéma `bi_`
+      (réservé aux objets générés par dbt, `clean-targets`/`--full-refresh` ne doivent
+      jamais pouvoir toucher une table saisie à la main).
+    schema: public
+    tables:
+      - name: bi_ajustementprixachat

@@ -1,0 +1,68 @@
+{% extends "bi/base_dashboard.html" %}
+
+{% block dashboard_content %}
+<div class="bi-kpis">
+    <div class="bi-kpi bi-{% if nb_deficitaires > 0 %}rouge{% else %}vert{% endif %}">
+        <div class="bi-kpi-label">KPI-106 — Produits déficitaires</div>
+        <div class="bi-kpi-valeur">{{ nb_deficitaires }}</div>
+    </div>
+</div>
+
+<div class="bi-panel">
+    <h2>Classement des produits par marge</h2>
+    <canvas id="chart-produits-marge" height="100"></canvas>
+</div>
+
+<div class="bi-panel">
+    <h2>Détail par produit</h2>
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Coût d'achat</th>
+                    <th class="text-right">Marge</th>
+                    <th class="text-right">Marge %</th>
+                    <th class="text-right">Qté vendue (kg)</th>
+                    <th class="text-right">Rotation stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produits %}
+                <tr>
+                    <td>
+                        {{ p.produit_nom }}
+                        <span class="bi-badge bi-{{ p.statut }}">&nbsp;</span>
+                    </td>
+                    <td class="text-right">{{ p.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.cout_achat|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.marge|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.marge_pct|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ p.quantite_vendue_kg|floatformat:1 }}</td>
+                    <td class="text-right">{{ p.rotation_stock|default_if_none:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    const donneesProduits = {{ chart_data|safe }};
+    new Chart(document.getElementById('chart-produits-marge'), {
+        type: 'bar',
+        data: {
+            labels: donneesProduits.labels,
+            datasets: [{
+                label: 'Marge par produit',
+                data: donneesProduits.marge,
+                backgroundColor: donneesProduits.marge.map(v => v < 0 ? '#e74c3c' : '#27ae60'),
+            }],
+        },
+        options: { indexAxis: 'y' },
+    });
+</script>
+{% endblock %}

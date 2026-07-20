@@ -2,6 +2,13 @@
 
 ---
 
+> **Implémentation (20/07/2026)** : les 5 dashboards sont rendus par l'app Django `bi`
+> (templates SSR + Chart.js CDN, Metabase abandonné — `architecte/04_ADR.md` ADR-009), pas
+> par un outil BI externe. Les deux écarts notés dans une première itération sont comblés :
+> KPI-006/008 (coût salaires %, dépenses % du CA) exposés par `vw_rentabilite_globale`, et
+> KPI-701/702 (répartition des dépenses par catégorie, Dashboard 3) par la nouvelle vue
+> `vw_depenses_categorie` — voir `07_Dictionnaire_KPI_Technique.md`.
+
 ## Dashboard 1 : 📊 Santé Globale 
 
 **Audience** : La Direction  

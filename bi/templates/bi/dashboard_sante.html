@@ -1,0 +1,52 @@
+{% extends "bi/base_dashboard.html" %}
+
+{% block dashboard_content %}
+<div class="bi-kpis">
+    {% for kpi in kpis %}
+    <div class="bi-kpi bi-{{ kpi.statut }} {% if kpi.principal %}bi-principal{% endif %}">
+        <div class="bi-kpi-label">{{ kpi.code }} — {{ kpi.label }}</div>
+        <div class="bi-kpi-valeur">
+            {% if kpi.unite == "%" %}{{ kpi.valeur|default_if_none:"—"|floatformat:2 }}{% else %}{{ kpi.valeur|floatformat:0 }}{% endif %}
+            <span class="bi-kpi-unite">{{ kpi.unite }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="bi-panel">
+    <h2>Évolution mensuelle — CA, marge brute, rentabilité nette</h2>
+    <canvas id="chart-sante-tendance" height="90"></canvas>
+</div>
+
+<div class="bi-panel">
+    <h2>Répartition du CA par superviseur</h2>
+    <canvas id="chart-sante-repartition" height="90"></canvas>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    const donneesTendance = {{ chart_data|safe }};
+    new Chart(document.getElementById('chart-sante-tendance'), {
+        type: 'line',
+        data: {
+            labels: donneesTendance.labels,
+            datasets: [
+                { label: 'CA', data: donneesTendance.ca, borderColor: '#3498db', tension: 0.2 },
+                { label: 'Marge brute', data: donneesTendance.marge_brute, borderColor: '#27ae60', tension: 0.2 },
+                { label: 'Rentabilité nette', data: donneesTendance.rentabilite_nette, borderColor: '#2c3e50', tension: 0.2 },
+            ],
+        },
+    });
+
+    const donneesRepartition = {{ repartition_chart|safe }};
+    new Chart(document.getElementById('chart-sante-repartition'), {
+        type: 'bar',
+        data: {
+            labels: donneesRepartition.labels,
+            datasets: [{ label: 'CA par superviseur', data: donneesRepartition.ca, backgroundColor: '#3498db' }],
+        },
+        options: { indexAxis: 'y' },
+    });
+</script>
+{% endblock %}

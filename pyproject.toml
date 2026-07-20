@@ -1,0 +1,6 @@
+[tool.ruff]
+line-length = 110
+exclude = ["venv", "migrations", "dbt_bi", "staticfiles", "media"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

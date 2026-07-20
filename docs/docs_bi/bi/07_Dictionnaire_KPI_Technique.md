@@ -5,6 +5,8 @@
 ## 🎯 KPI CRITIQUES (Dashboard 1 : Santé Globale)
 
 > **Implémentation (17/07/2026)** : KPI-001 à KPI-009 disponibles agrégés par mois dans `bi_.vw_rentabilite_globale` (`dbt/models/marts/aggregates/vw_rentabilite_globale.sql`). Testé en local (dbt build, hors Docker) — voir [sprints/SPRINT_2_Modeles_Dashboards.md](../sprints/SPRINT_2_Modeles_Dashboards.md).
+>
+> **Complément (20/07/2026)** : `vw_rentabilite_globale` expose désormais aussi `salaires_pct` (KPI-006) et `depenses_pct` (KPI-008), calculés en SQL (`100.0 * cout_salaires / ca`, `100.0 * cout_depenses / ca`, `null` si `ca = 0`) — l'app Django `bi` n'a plus besoin de s'en passer, ces deux KPI sont désormais affichés sur le Dashboard 1.
 
 ### KPI-001 : Chiffre d'Affaires Total (CA)
 
@@ -83,6 +85,13 @@
 | **Cible** | < 1,500,000 FCFA/mois |
 | **Propriétaire** | Finance |
 | **Source** | `fct_salaires` |
+
+> **Correction (dbt-1, 20/07/2026)** : `fct_salaires` excluait auparavant toute logique de
+> prorata au démarrage — un agent entré en cours de période générait un coût salarial sur
+> des mois antérieurs à son entrée en fonction. Corrigé en filtrant `fct_salaires` sur
+> `date_debut >= agent.date_debut_fonction` (ligne exclue si antérieure). Cascade automatique
+> sur KPI-006, KPI-009 (Dashboard 1) et KPI-203/204 (Dashboard 3, coût équipe et rentabilité
+> superviseur). Test dbt associé : `assert_salaire_apres_date_debut_fonction`.
 
 ---
 
@@ -245,6 +254,8 @@
 ## 👥 KPI PERFORMANCE SUPERVISEUR (Dashboard 3)
 
 > **Implémentation (17/07/2026)** : KPI-201 à KPI-206 disponibles agrégés par superviseur (`dim_agent` filtrée `type_agent='entrepot'`) dans `bi_.vw_performance_superviseur`. CA/marge via `fct_ventes.superviseur_id` (hiérarchie au moment de la vente) ; coût équipe via `fct_salaires.superviseur_id` (hiérarchie actuelle) — divergence volontaire, voir commentaire du modèle.
+>
+> **Complément (20/07/2026)** : KPI-701 (répartition des dépenses par catégorie) et KPI-702 (dépenses % du CA, déjà couvert par `depenses_pct` sur `vw_rentabilite_globale`) disponibles via la nouvelle vue `bi_.vw_depenses_categorie`, grain catégorie×mois — `montant_pct` = part de la catégorie dans le total des dépenses du mois (calculé en SQL). `categorie` peut être `NULL` (21 lignes `core_depense` sans catégorie en base, écart DAMS déjà documenté dans `architecte/REFERENCE_TECHNIQUE_BI.md` §6.3.22) — affiché tel quel côté BI (« Non catégorisé »), pas masqué.
 
 ### KPI-201 : CA par Superviseur
 
@@ -418,7 +429,9 @@
 
 ## 📦 KPI STOCK & FOURNISSEUR (Dashboard 5)
 
-> **Implémentation (17/07/2026)** : KPI-401/402 disponibles par couple produit×fournisseur dans `bi_.vw_analyse_stock` (grain = snapshot lot agrégé). KPI-403 à KPI-405 (marge par fournisseur) restent à construire directement sur `fct_ventes` + `dim_fournisseur` côté Metabase — grain différent (vente vs lot en stock), pas de vue dédiée nécessaire.
+> **Implémentation (17/07/2026)** : KPI-401/402 disponibles par couple produit×fournisseur dans `bi_.vw_analyse_stock` (grain = snapshot lot agrégé).
+>
+> **Implémentation (dbt-2, 20/07/2026)** : KPI-403 à KPI-405 disponibles agrégés par fournisseur×mois dans `bi_.vw_marge_fournisseur` (`fct_ventes` + `dim_fournisseur`, grain différent de `vw_analyse_stock` — vente vs lot en stock). Metabase étant abandonné (voir `architecte/04_ADR.md`), la vue est directement consommée par l'app Django `bi`. Calibration prix d'achat : la vue expose `marge_systeme` (prix d'achat brut de `fct_ventes`) ET `marge_calibree` (corrigée par `bi.AjustementPrixAchat`, saisie admin Direction, moyenne pondérée par quantité à la clé fournisseur×mois — `fct_ventes` n'exposant pas `lot_id`, la correction ne peut pas être rattachée au lot précis malgré la saisie d'un `reference_lot` à titre de traçabilité).
 
 ### KPI-401 : Valeur Stock Total
 
