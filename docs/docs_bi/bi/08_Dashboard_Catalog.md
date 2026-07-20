@@ -4,13 +4,10 @@
 
 > **Implémentation (20/07/2026)** : les 5 dashboards sont rendus par l'app Django `bi`
 > (templates SSR + Chart.js CDN, Metabase abandonné — `architecte/04_ADR.md` ADR-009), pas
-> par un outil BI externe.
->
-> Écart connu restant : **Dashboard 3, partie 2** — le graphique « répartition des dépenses
-> par catégorie » n'est pas affiché : aucune vue `bi_` n'agrège `fct_depenses` par catégorie
-> (seul le total mensuel existe, `vw_rentabilite_globale.cout_depenses`). KPI-006/008 (coût
-> salaires % et dépenses % du CA, Dashboard 1) sont en revanche disponibles depuis le
-> complément du 20/07/2026 à `vw_rentabilite_globale` (`07_Dictionnaire_KPI_Technique.md`).
+> par un outil BI externe. Les deux écarts notés dans une première itération sont comblés :
+> KPI-006/008 (coût salaires %, dépenses % du CA) exposés par `vw_rentabilite_globale`, et
+> KPI-701/702 (répartition des dépenses par catégorie, Dashboard 3) par la nouvelle vue
+> `vw_depenses_categorie` — voir `07_Dictionnaire_KPI_Technique.md`.
 
 ## Dashboard 1 : 📊 Santé Globale 
 

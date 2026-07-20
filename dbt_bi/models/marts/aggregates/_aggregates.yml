@@ -81,3 +81,19 @@ models:
               field: fournisseur_id
       - name: ca
         tests: [not_null]
+
+  - name: vw_depenses_categorie
+    description: >
+      Dashboard 3, partie 2 (20/07/2026). 1 ligne par catégorie x mois (KPI-701/702).
+      montant_pct = part de la catégorie dans le total des dépenses du mois (categorie peut
+      être NULL - 21 lignes core_depense sans catégorie en base, écart DAMS documenté dans
+      architecte/REFERENCE_TECHNIQUE_BI.md #6.3.22, non masqué ici).
+    columns:
+      - name: depense_categorie_id
+        tests: [not_null, unique]
+      - name: montant
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0

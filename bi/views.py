@@ -10,6 +10,7 @@ from bi import constants
 from bi.models import (
     AjustementPrixAchat,
     VwAnalyseStock,
+    VwDepensesCategorie,
     VwMargeFournisseur,
     VwPerformanceAgent,
     VwPerformanceSuperviseur,
@@ -230,9 +231,18 @@ def dashboard_produits(request):
 def dashboard_superviseurs(request):
     titre = dict(constants.DASHBOARDS)["superviseurs"]
     context = _base_context(request, "superviseurs", titre)
+    annee, mois = context["annee"], context["mois"]
 
     superviseurs = list(VwPerformanceSuperviseur.objects.order_by("-rentabilite_nette"))
-    if not superviseurs:
+
+    depenses_qs = VwDepensesCategorie.objects.order_by("-montant")
+    if annee:
+        depenses_qs = depenses_qs.filter(mois__year=annee)
+    if mois:
+        depenses_qs = depenses_qs.filter(mois__month=mois)
+    depenses = list(depenses_qs)
+
+    if not superviseurs and not depenses:
         context["est_vide"] = True
         return render(request, "bi/dashboard_superviseurs.html", context)
 
@@ -245,8 +255,21 @@ def dashboard_superviseurs(request):
             "rentabilite_nette": [s.rentabilite_nette for s in superviseurs],
         }
     )
+    depenses_chart = _chart_json(
+        {
+            "labels": [d.categorie or "Non catégorisé" for d in depenses],
+            "montant": [d.montant for d in depenses],
+        }
+    )
 
-    context.update({"superviseurs": superviseurs, "chart_data": chart_data})
+    context.update(
+        {
+            "superviseurs": superviseurs,
+            "chart_data": chart_data,
+            "depenses": depenses,
+            "depenses_chart": depenses_chart,
+        }
+    )
     return render(request, "bi/dashboard_superviseurs.html", context)
 
 

@@ -254,6 +254,8 @@
 ## 👥 KPI PERFORMANCE SUPERVISEUR (Dashboard 3)
 
 > **Implémentation (17/07/2026)** : KPI-201 à KPI-206 disponibles agrégés par superviseur (`dim_agent` filtrée `type_agent='entrepot'`) dans `bi_.vw_performance_superviseur`. CA/marge via `fct_ventes.superviseur_id` (hiérarchie au moment de la vente) ; coût équipe via `fct_salaires.superviseur_id` (hiérarchie actuelle) — divergence volontaire, voir commentaire du modèle.
+>
+> **Complément (20/07/2026)** : KPI-701 (répartition des dépenses par catégorie) et KPI-702 (dépenses % du CA, déjà couvert par `depenses_pct` sur `vw_rentabilite_globale`) disponibles via la nouvelle vue `bi_.vw_depenses_categorie`, grain catégorie×mois — `montant_pct` = part de la catégorie dans le total des dépenses du mois (calculé en SQL). `categorie` peut être `NULL` (21 lignes `core_depense` sans catégorie en base, écart DAMS déjà documenté dans `architecte/REFERENCE_TECHNIQUE_BI.md` §6.3.22) — affiché tel quel côté BI (« Non catégorisé »), pas masqué.
 
 ### KPI-201 : CA par Superviseur
 

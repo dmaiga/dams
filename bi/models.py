@@ -190,3 +190,19 @@ class VwMargeFournisseur(models.Model):
     class Meta:
         managed = False
         db_table = 'bi_"."vw_marge_fournisseur'
+
+
+class VwDepensesCategorie(models.Model):
+    """Dashboard 3, partie 2 (KPI-701/702, 20/07/2026). Grain = catégorie x mois.
+    PK désignée : depense_categorie_id (surrogate ajouté dans la vue, modèle créé par ce
+    sprint — cf. dbt_bi/models/marts/aggregates/vw_depenses_categorie.sql)."""
+
+    depense_categorie_id = models.IntegerField(primary_key=True)
+    mois = models.DateField()
+    categorie = models.CharField(max_length=40, null=True)
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    montant_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."vw_depenses_categorie'

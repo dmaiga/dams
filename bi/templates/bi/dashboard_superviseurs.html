@@ -39,12 +39,33 @@
 
 <div class="bi-panel">
     <h2>Dépenses par catégorie</h2>
-    <p class="text-gray-500 text-sm mb-0">
-        Non disponible dans ce sprint : aucune vue <code>bi_</code> n'agrège les dépenses par
-        catégorie (seul le total mensuel existe, <code>vw_rentabilite_globale.cout_depenses</code>).
-        Ajouter une telle vue dépasse le périmètre dbt autorisé (dbt-1 et dbt-2 uniquement) —
-        à planifier pour une prochaine itération.
-    </p>
+    {% if depenses %}
+    <canvas id="chart-superviseurs-depenses" height="90"></canvas>
+    <div class="overflow-x-auto mt-4">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Mois</th>
+                    <th>Catégorie</th>
+                    <th class="text-right">Montant</th>
+                    <th class="text-right">% du total du mois</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in depenses %}
+                <tr>
+                    <td>{{ d.mois|date:"m/Y" }}</td>
+                    <td>{{ d.categorie|default:"Non catégorisé" }}</td>
+                    <td class="text-right">{{ d.montant|floatformat:0 }}</td>
+                    <td class="text-right">{{ d.montant_pct|default_if_none:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-sm mb-0">Aucune dépense pour cette période.</p>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -62,5 +83,16 @@
             }],
         },
     });
+
+    {% if depenses %}
+    const donneesDepenses = {{ depenses_chart|safe }};
+    new Chart(document.getElementById('chart-superviseurs-depenses'), {
+        type: 'pie',
+        data: {
+            labels: donneesDepenses.labels,
+            datasets: [{ data: donneesDepenses.montant }],
+        },
+    });
+    {% endif %}
 </script>
 {% endblock %}

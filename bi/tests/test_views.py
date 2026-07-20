@@ -1,13 +1,14 @@
 """Tests des vues bi.
 
-Les 6 modèles managed=False (VwRentabiliteGlobale, VwRentabiliteProduit,
-VwPerformanceSuperviseur, VwPerformanceAgent, VwAnalyseStock, VwMargeFournisseur) lisent des
-vues PostgreSQL créées par dbt (bi_.vw_*) — Django ne les crée jamais dans la base de test
-(managed=False n'est pas migré). Approche retenue : mocker le manager `objects` de chaque
-modèle managed=False (unittest.mock, `patch.object(Modele, "objects", ...)`) plutôt que de
-provisionner les vues bi_ dans la base de test (ce qui dupliquerait le SQL dbt et se
-désynchroniserait de la source de vérité dbt_bi/models/marts/aggregates/*.sql). Seul
-AjustementPrixAchat (managed=True) utilise la vraie base de test via @pytest.mark.django_db.
+Les 7 modèles managed=False (VwRentabiliteGlobale, VwRentabiliteProduit,
+VwPerformanceSuperviseur, VwPerformanceAgent, VwAnalyseStock, VwMargeFournisseur,
+VwDepensesCategorie) lisent des vues PostgreSQL créées par dbt (bi_.vw_*) — Django ne les
+crée jamais dans la base de test (managed=False n'est pas migré). Approche retenue : mocker
+le manager `objects` de chaque modèle managed=False (unittest.mock,
+`patch.object(Modele, "objects", ...)`) plutôt que de provisionner les vues bi_ dans la base
+de test (ce qui dupliquerait le SQL dbt et se désynchroniserait de la source de vérité
+dbt_bi/models/marts/aggregates/*.sql). Seul AjustementPrixAchat (managed=True) utilise la
+vraie base de test via @pytest.mark.django_db.
 """
 
 from decimal import Decimal
@@ -19,6 +20,7 @@ from django.urls import reverse
 
 from bi.models import (
     VwAnalyseStock,
+    VwDepensesCategorie,
     VwMargeFournisseur,
     VwPerformanceAgent,
     VwPerformanceSuperviseur,
@@ -121,12 +123,23 @@ def test_dashboard_superviseurs_ok(client, utilisateur_connecte):
         nb_agents_actifs=5,
         ca_moyen_par_agent=Decimal("600000"),
     )
-    with patch.object(VwPerformanceSuperviseur, "objects") as mock_sup:
+    depense = SimpleNamespace(
+        depense_categorie_id=1,
+        mois=__import__("datetime").date(2026, 6, 1),
+        categorie="TRANSPORT_MARCHANDISE",
+        montant=Decimal("850000"),
+        montant_pct=Decimal("42.00"),
+    )
+    with patch.object(VwPerformanceSuperviseur, "objects") as mock_sup, patch.object(
+        VwDepensesCategorie, "objects"
+    ) as mock_dep:
         mock_sup.order_by.return_value = [superviseur]
+        mock_dep.order_by.return_value = [depense]
         response = client.get(reverse("bi:superviseurs"))
 
     assert response.status_code == 200
     assert response.context["superviseurs"][0].statut == "vert"
+    assert response.context["depenses"][0].categorie == "TRANSPORT_MARCHANDISE"
 
 
 @pytest.mark.django_db
