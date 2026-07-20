@@ -80,3 +80,19 @@ models:
     columns:
       - name: paiement_id
         tests: [not_null, unique]
+
+  - name: stg_ajustements_prix_achat
+    description: "dbt-2 (2026-07-20). Calibration prix d'achat fournisseur, saisie admin Django."
+    columns:
+      - name: ajustement_id
+        tests: [not_null, unique]
+      - name: fournisseur_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fournisseur')
+              field: fournisseur_id
+      - name: quantite_concernee
+        tests: [not_null]
+      - name: prix_achat_corrige
+        tests: [not_null]

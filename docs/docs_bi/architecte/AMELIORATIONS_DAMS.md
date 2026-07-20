@@ -55,7 +55,7 @@ Ce fichier est le **journal vivant** de ces observations. Il alimente la *« feu
 
 | # | Observation | Impact | Effort | Statut | Date |
 |---|-------------|--------|--------|--------|------|
-| DM-01 | | | | | |
+| DM-01 | Renégociations fournisseur post-réception non capturables dans DAMS : le prix d'achat négocié réellement (ex. 300 cartons saisis à 12 000, réalité 150 à 11 000 + 150 à 10 500) peut diverger du `prix_achat_unitaire` figé sur `core_lotentrepot` à la réception, sans mécanisme de correction dans DAMS. Contournement BI : `bi.AjustementPrixAchat` (saisie admin Direction), agrégé en moyenne pondérée dans `vw_marge_fournisseur` (dbt-2, 20/07/2026) — corrige uniquement le reporting, pas la donnée source `core_lotentrepot`. | 🟡 | M | ✅ | 2026-07-20 |
 | | | | | | |
 
 ---

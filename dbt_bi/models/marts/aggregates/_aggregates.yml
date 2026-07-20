@@ -64,3 +64,20 @@ models:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
+
+  - name: vw_marge_fournisseur
+    description: >
+      Dashboard 5, volet fournisseur (dbt-2, 2026-07-20). 1 ligne par fournisseur x mois
+      (KPI-403 à KPI-405). marge_calibree applique la correction bi.AjustementPrixAchat
+      quand elle existe pour ce fournisseur x mois (sinon = marge_systeme).
+    columns:
+      - name: fournisseur_mois_id
+        tests: [not_null, unique]
+      - name: fournisseur_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fournisseur')
+              field: fournisseur_id
+      - name: ca
+        tests: [not_null]
