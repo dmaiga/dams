@@ -3,7 +3,7 @@
 **Propriétaire** : Product Owner (Mahamane Daouda Maïga)
 **Audience** : Toute l'équipe (Architecte, BI Dev, Chef Projet)
 **Fréquence mise à jour** : Chaque sprint
-**Dernière modification** : 2 juillet 2026
+**Dernière modification** : 22 juillet 2026 (+ EPIC 7 — retours revue utilisateur + UI/UX/perf/orchestration)
 **Version** : 1.0
 
 ---
@@ -106,6 +106,32 @@ Chaque story est rattachée à une **question métier** (Q1–Q10 de [01_Vision_
 | S-602 | En tant que **Directeur**, je veux un **export Excel mensuel**, afin de partager les chiffres hors outil. | 🟡 SHOULD |
 | S-603 | En tant que **Direction**, je veux une **formation (30 min)** + guide de lecture, afin d'être autonome sur les dashboards. | 🔴 MUST |
 | S-604 | En tant que **Direction**, je veux une **feuille de route d'amélioration de DAMS** (données manquantes, règles, contrôles), afin de tirer une valeur durable au-delà des dashboards. → journal à tenir en continu dans [../architecte/AMELIORATIONS_DAMS.md](../architecte/AMELIORATIONS_DAMS.md) | 🟡 SHOULD |
+
+---
+
+## EPIC 7 — Retours revue utilisateur (20/07) + qualité de service
+
+> Issu de [../chef_projet/QUESTIONS_OUVERTES.md](../chef_projet/QUESTIONS_OUVERTES.md) et du
+> plan de charge [../chef_projet/SUIVI_MISSION_BI.md](../chef_projet/SUIVI_MISSION_BI.md)
+> (22/07/2026). Couvre le fonctionnel remonté par la Direction **et** quatre axes qui n'étaient
+> couverts par aucun sprint jusqu'ici : UI/UX, performance, optimisation, orchestration.
+
+| # | Story | Priorité | Rattachement |
+|---|-------|----------|--------------|
+| S-701 | En tant que **Directeur**, je veux des **agrégations paramétrables** (group by produit/agent/catégorie), afin d'aller au-delà du détail ligne à ligne déjà visible dans DAMS. | 🟢 COULD (v1.5) | Q1, tous dashboards |
+| S-702 | En tant que **Directeur**, je veux le **filtre période opérant sur Dashboard 4** et l'**objectif 50kg lu en série temporelle** (semaine/mois), afin de voir la progression d'un agent, pas une photo unique. | 🟡 SHOULD | Q2, Dashboard 4 |
+| S-702b | En tant que **Superviseur**, je veux filtrer Dashboard 4 par **superviseur** et **type_agent**, afin de cibler mon équipe. | 🟡 SHOULD | Q2, Dashboard 4 |
+| S-703 | En tant que **Manager Produit**, je veux une **vision globale par fournisseur** (fournisseur → liste produits) sur Dashboard 5, afin de ne plus lire un tableau trop détaillé. | 🟢 COULD (v1.5) | Q3, Dashboard 5 |
+| S-703b | En tant que **Manager Produit**, je veux filtrer Dashboard 5 par **fournisseur** et **produit**. | 🟢 COULD (v1.5) | Q3, Dashboard 5 |
+| S-704 | En tant que **Chef Projet**, je veux un **vrai contrôle d'accès par rôle** (`type_agent == 'direction'`) à la place du garde-fou `username == 'mdmaiga'`, afin de permettre l'accès à plusieurs personnes de la Direction sans trou de sécurité. | 🔴 MUST | Sécurité, tous dashboards |
+| S-705 | En tant que **Directeur**, je veux une **comparaison M-1 et une tendance 6 mois**, afin de situer un chiffre dans le temps plutôt qu'en valeur isolée. | 🟡 SHOULD | Suggestion, Dashboard 1/3 (rejoint S-702) |
+| S-706 | En tant que **Directeur**, je veux **exporter les tableaux en Excel/CSV**, afin de partager les chiffres hors outil (cohérent avec le reste de DAMS). | 🟢 COULD (v1.5) | Suggestion, tous dashboards |
+| S-707 | En tant que **Manager Produit**, je veux que les **dépenses « Non catégorisé »** soient signalées à la Direction, afin de forcer la catégorisation à la source dans DAMS. | 🟢 COULD (v1.5) | Suggestion, Dashboard 3 — hors dev BI, décision côté saisie DAMS |
+| S-708 | En tant que **Directeur**, je veux **rechercher/trier** dans les tableaux (produits, agents, stock), afin de rester utilisable quand le volume de lignes grandit. | 🟢 COULD (v1.5) | Suggestion, tous dashboards |
+| S-709 | En tant que **Chef Projet**, je veux une **passe de cohérence UI/UX** sur les 5 dashboards (couleurs, titres, espacement, responsive, états vides/erreur), afin que l'ensemble se lise comme un seul produit, pas 5 pages assemblées. | 🔴 MUST | Qualité — tous dashboards |
+| S-710 | En tant qu'**Architecte**, je veux **reconfirmer les temps de requête < 2s sur une volumétrie proche prod** (pas seulement `dams_dev`) et ajouter les **index PostgreSQL** manquants sur les `vw_*` (R4), afin d'éviter la dégradation en production. | 🔴 MUST | Performance/optimisation, tous dashboards |
+| S-711 | En tant qu'**Architecte**, je veux le **cron `dbt run` nightly (23h00 Mali, ADR-006)** en production avec **logs + alerte email en cas d'échec** (ADR-007 facteur XI), afin que les dashboards reflètent des données à jour chaque matin, comme promis par le DoD. | 🔴 MUST | Orchestration — reprend S-005 |
+| S-712 | En tant que **Chef Projet**, je veux **re-scoper le Sprint 4** pour retirer les tâches Metabase devenues obsolètes ([ADR-009](../architecte/04_ADR.md)), afin de ne pas planifier du travail qui ne sera jamais fait. | 🔴 MUST | Sprint 4, à faire en premier |
 
 ---
 
