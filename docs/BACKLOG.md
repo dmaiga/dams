@@ -26,9 +26,9 @@ Ne pas dupliquer le détail ici — ce chantier a déjà son propre backlog prod
 
 ---
 
-## Chantier 2 — App `surveillance` : suivi durée de vie du stock + alertes
+## Chantier 2 — App `surveillance` : suivi durée de vie du stock + alertes + refonte navigation
 
-**Statut** : 🆕 nouvelle demande (22/07/2026) — 📋 à cadrer avant développement
+**Statut** : 🟡 en cours — cadré et fusionné avec la refonte de navigation dans [docs/sprints/sprint-04.md](sprints/sprint-04.md)
 **Priorité** : 🟡 Normal
 **Périmètre** : app `surveillance` (lecture seule, cohérent avec son rôle actuel de tour de contrôle/alertes — voir [surveillance/APP_SURVEILLANCE.md](../surveillance/APP_SURVEILLANCE.md)).
 
@@ -55,8 +55,15 @@ sortie. Délai raisonnable fixé à **2 jours**. Deux alertes distinctes à prod
   `LotEntrepot.date_reception`.
 - **« Date de sortie »** = date de distribution du lot par le gestionnaire de stock
   (`DistributionAgent.date_distribution`), pas la date de vente ni l'épuisement du lot.
-- **Emplacement** : dans `DashboardSurveillanceView` existant, à côté des ventes rouges déjà
-  affichées — pas de vue dédiée séparée.
+- **Emplacement** (révisé le 22/07/2026, à la suite d'une revue UX de l'app) : **vue dédiée**
+  `stock_rotation/` (nouveau thème « Stock & Rotation », au même rang que Kg vendus et
+  Anomalies prix), pas d'ajout de tableaux dans `DashboardSurveillanceView`. Seul un résumé
+  chiffré (compteur agrégé) apparaît sur le dashboard global, sur le modèle de la carte
+  "Anomalies prix" actuelle. Motif : la navigation de l'app était devenue dispersée
+  (liens inter-pages dupliqués et incohérents d'une vue à l'autre) ; entasser deux tableaux
+  de plus dans le dashboard aurait aggravé le problème plutôt que de le corriger. La refonte
+  de la navigation (nav thématique commune, breadcrumbs contextuels) est intégrée au même
+  sprint — voir [docs/sprints/sprint-04.md](sprints/sprint-04.md).
 
 ### Pistes techniques
 
@@ -76,8 +83,9 @@ sortie. Délai raisonnable fixé à **2 jours**. Deux alertes distinctes à prod
 
 ### Prochaine étape
 
-Rédiger un sprint dans `docs/features/sprint-XX.md` en suivant le pattern habituel
-(modèles → services → views → templates) avant de coder.
+Sprint rédigé : [docs/sprints/sprint-04.md](sprints/sprint-04.md), découpé en 4 volets
+(service d'alertes → vue dédiée → nav thématique commune → breadcrumbs contextuels),
+chacun avec son propre Definition of Done. Prêt à démarrer le Volet 1.
 
 ---
 
