@@ -1281,8 +1281,8 @@ class VersementForm(forms.ModelForm):
         - Affecte le ROT (source de vérité)
         - Gère les reçus multiples
         """
-        if rot is None or not rot.est_rot:
-            raise ValueError("Le versement doit être effectué par un ROT")
+        if rot is None or not (rot.est_rot or rot.est_direction):
+            raise ValueError("Le versement doit être effectué par un ROT ou la Direction")
 
         versement = super().save(commit=False)
         versement.effectue_par = rot

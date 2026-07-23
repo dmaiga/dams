@@ -1,0 +1,44 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+{% block title %}Historique des versements{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6">
+
+    <h1 class="text-2xl font-bold flex items-center gap-2 mb-4">
+        <i class="fas fa-money-check-alt"></i> Historique des versements
+    </h1>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body p-4 overflow-x-auto">
+            <table class="table table-zebra w-full text-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Effectué par</th>
+                        <th class="text-right">Vente</th>
+                        <th class="text-right">Hors vente</th>
+                        <th>Reçus</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in versements %}
+                    <tr>
+                        <td>{{ v.date_versement_reelle|date:"d/m/Y" }}</td>
+                        <td>{{ v.effectue_par.full_name|default:"—" }}</td>
+                        <td class="text-right">{{ v.montant_vente|fcfa }}</td>
+                        <td class="text-right text-gray-500">{{ v.montant_hors_vente|fcfa }}</td>
+                        <td>{{ v.recus_count }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-6 text-gray-400">Aucun versement enregistré</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
