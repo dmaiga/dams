@@ -16,7 +16,11 @@
       "Bash(grep -E \"\\\\.sql$\")",
       "Bash(c:/Users/Admin/By_me/dams/venv/Scripts/python.exe -c ' *)",
       "Bash(DBT_PROFILES_DIR=. c:/Users/Admin/By_me/dams/venv/Scripts/python.exe -c ' *)",
-      "Bash(\"c:/Users/Admin/By_me/dams/venv/Scripts/python.exe\" run_dbt.py debug)"
+      "Bash(\"c:/Users/Admin/By_me/dams/venv/Scripts/python.exe\" run_dbt.py debug)",
+      "Bash(python manage.py makemigrations core -n \"extend_finance_permissions_and_peut_faire_depense\")",
+      "Bash(python manage.py migrate core)",
+      "Bash(python manage.py startapp finance)",
+      "Bash(git merge *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

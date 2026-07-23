@@ -187,6 +187,7 @@
         <!-- ================= FINANCE ================= -->
         <p class="text-xs font-semibold text-gray-500 px-3 mb-2">FINANCE</p>
         <ul class="space-y-1 mb-4">
+            {% if request.user.username == "mdmaiga" %}
             <li>
                 <a href="{% url 'finance:dashboard_finance' %}"
                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
@@ -195,6 +196,7 @@
                     <span>Solde superviseurs</span>
                 </a>
             </li>
+            {% endif %}
             <li>
                 <a href="{% url 'versements_direction' %}"
                    class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
