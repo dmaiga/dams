@@ -1,0 +1,56 @@
+{% extends 'base_admin.html' %}
+{% block title %}Nouvelle dépense{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6 max-w-xl">
+
+    <div class="flex items-center gap-3 mb-4">
+        <a href="{% url 'finance:historique_depenses' %}" class="btn btn-sm btn-outline">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h1 class="text-2xl font-bold">Nouvelle dépense</h1>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-error mb-3">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                {% if form.agent_cible %}
+                <div class="form-control mb-3">
+                    <label class="label"><span class="label-text font-semibold">{{ form.agent_cible.label }}</span></label>
+                    {{ form.agent_cible }}
+                </div>
+                {% endif %}
+
+                <div class="form-control mb-3">
+                    <label class="label"><span class="label-text font-semibold">Date de la dépense</span></label>
+                    {{ form.date_depense }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label"><span class="label-text font-semibold">Montant</span></label>
+                    {{ form.montant }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label"><span class="label-text font-semibold">Catégorie</span></label>
+                    {{ form.categorie }}
+                </div>
+
+                <div class="form-control mb-4">
+                    <label class="label"><span class="label-text font-semibold">Note</span></label>
+                    {{ form.note }}
+                </div>
+
+                <button type="submit" class="btn btn-primary w-full">Enregistrer la dépense</button>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -273,6 +273,11 @@ class Agent(models.Model):
         default=True,
         help_text="Agent actif sur la plateforme"
     )
+    peut_faire_depense = models.BooleanField(
+        default=False,
+        verbose_name="Peut effectuer des dépenses",
+        help_text="Autorise la saisie de dépenses indépendamment du rôle (ROT ou superviseur)."
+    )
     # 🕒 champs pour la gestion automatique de l’expiration
     date_creation = models.DateTimeField(auto_now_add=True)
     date_expiration = models.DateTimeField(
@@ -1916,7 +1921,7 @@ class RecouvrementSuperviseur(models.Model):
     rot = models.ForeignKey(
         Agent,
         on_delete=models.CASCADE,
-        limit_choices_to={'type_agent': 'rot'},
+        limit_choices_to={'type_agent__in': ['rot', 'direction']},
         related_name='recouvrements_superviseurs'
     )
 
@@ -1969,7 +1974,28 @@ class RecouvrementSuperviseur(models.Model):
         verbose_name_plural = "Recouvrements superviseurs"
 
 class VersementBancaire(models.Model):
-    # ⛔ À déprécier
+    """
+    ⚠️ PIÈGE HISTORIQUE — `superviseur` et `effectue_par` jouent LE MÊME RÔLE
+    ("qui a effectué ce versement"). Ce ne sont PAS deux attributions
+    différentes (l'un ne désigne pas "la source du cash" et l'autre "l'acteur
+    physique") : `superviseur` est simplement l'ancien champ, datant d'une
+    époque où seul un agent de type 'entrepot' pouvait effectuer un versement.
+    Quand le rôle ROT (puis Direction) a été introduit, `effectue_par` a été
+    ajouté à côté plutôt que de migrer `superviseur` (migration jugée trop
+    lourde à l'époque) — mais le champ garde le même sens, il est juste
+    restreint aux nouveaux rôles.
+
+    Conséquence pour tout calcul de solde : une fois qu'un superviseur a remis
+    sa recette (`RecouvrementSuperviseur`), l'argent est MUTUALISÉ — ce
+    versement bancaire n'appartient plus à un superviseur en particulier,
+    c'est un mouvement de la caisse globale (ROT/Direction). Ne JAMAIS filtrer
+    `VersementBancaire` par `superviseur` pour en déduire "le solde de tel
+    superviseur" (erreur commise puis corrigée dans `finance/` — voir
+    docs/sprints/sprint-03.md, décision n°13). Seul `effectue_par` doit être
+    utilisé, et uniquement pour savoir qui a agi, jamais pour attribuer le
+    versement à un superviseur source.
+    """
+    # ⛔ À déprécier — même rôle que `effectue_par`, pas une attribution de source (voir docstring de la classe)
     superviseur = models.ForeignKey(
         'Agent',
         on_delete=models.SET_NULL,
@@ -1977,7 +2003,7 @@ class VersementBancaire(models.Model):
         blank=True,
         limit_choices_to={'type_agent': 'entrepot'},
         related_name='versements_bancaires',
-        help_text="(OBSOLÈTE) Superviseur source du cash"
+        help_text="(OBSOLÈTE) Ancien champ 'qui a effectué ce versement', remplacé par effectue_par — PAS une attribution de source du cash"
     )
     # ✅ NOUVELLE SOURCE DE VÉRITÉ
     effectue_par = models.ForeignKey(
@@ -1986,8 +2012,8 @@ class VersementBancaire(models.Model):
         null=True,
         blank=True,
         related_name="versements_effectues",
-        limit_choices_to={'type_agent': 'rot'},
-        help_text="ROT ayant réellement effectué le versement"
+        limit_choices_to={'type_agent__in': ['rot', 'direction']},
+        help_text="ROT ou Direction ayant réellement effectué le versement"
     )
 
     montant_vente = models.DecimalField(

@@ -1,0 +1,130 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+{% block title %}Solde — {{ superviseur.full_name }}{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6">
+
+    <div class="flex items-center gap-3 mb-4">
+        <a href="{% url 'finance:dashboard_finance' %}" class="btn btn-sm btn-outline">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h1 class="text-2xl font-bold">{{ superviseur.full_name }}</h1>
+    </div>
+
+    <!-- SOLDE À LA DATE DU -->
+    <div class="card bg-base-100 shadow mb-4">
+        <div class="card-body p-4">
+            <form method="get" class="flex flex-wrap gap-3 items-end">
+                <label class="form-control">
+                    <div class="label"><span class="label-text">Solde à la date du</span></div>
+                    <input type="date" name="date_fin" value="{{ date_fin|date:'Y-m-d' }}"
+                           class="input input-bordered input-sm">
+                </label>
+                <button class="btn btn-primary btn-sm"><i class="fas fa-filter"></i> Voir</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats shadow mb-4 w-full">
+        <div class="stat">
+            <div class="stat-title">Encaissements</div>
+            <div class="stat-value text-success text-base">{{ solde.encaissements|fcfa }}</div>
+            <div class="stat-desc">Depuis toujours (calcul dynamique, pas de solde d'ouverture)</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Dépenses (perso)</div>
+            <div class="stat-value text-error text-base">{{ solde.depenses|fcfa }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Déjà remis</div>
+            <div class="stat-value text-error text-base">{{ solde.deja_remis|fcfa }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Reste à remettre</div>
+            <div class="stat-value text-primary">{{ solde.solde|fcfa }} FCFA</div>
+            {% if solde.alerte %}
+                <div class="stat-desc text-error">Au-dessus du seuil d'alerte</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- MOUVEMENTS -->
+    <h2 class="text-lg font-semibold mb-2">Historique des mouvements</h2>
+    <div class="card bg-base-100 shadow mb-4">
+        <div class="card-body p-4">
+            <form method="get" class="flex flex-wrap gap-3 items-end">
+                <input type="hidden" name="date_fin" value="{{ date_fin|date:'Y-m-d' }}">
+                <label class="form-control">
+                    <div class="label"><span class="label-text">Du</span></div>
+                    <input type="date" name="mvt_debut" value="{{ mvt_debut|date:'Y-m-d' }}"
+                           class="input input-bordered input-sm">
+                </label>
+                <label class="form-control">
+                    <div class="label"><span class="label-text">Au</span></div>
+                    <input type="date" name="mvt_fin" value="{{ mvt_fin|date:'Y-m-d' }}"
+                           class="input input-bordered input-sm">
+                </label>
+                <button class="btn btn-outline btn-sm"><i class="fas fa-filter"></i> Filtrer</button>
+            </form>
+            <p class="text-xs text-gray-500 mt-2">
+                Cette liste est un historique consultable librement — elle n'affecte jamais le calcul du solde ci-dessus.
+            </p>
+        </div>
+    </div>
+    <div class="card bg-base-100 shadow">
+        <div class="card-body p-4 overflow-x-auto">
+            <table class="table table-zebra w-full text-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th class="text-right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in mouvements %}
+                    <tr>
+                        <td>{{ m.date|date:"d/m/Y" }}</td>
+                        <td>
+                            {% if m.type == 'encaissement' %}
+                                <span class="badge badge-success badge-outline">Encaissement</span>
+                            {% elif m.type == 'depense' %}
+                                <span class="badge badge-error badge-outline">Dépense</span>
+                            {% else %}
+                                <span class="badge badge-warning badge-outline">Remise</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right {% if m.montant < 0 %}text-error{% else %}text-success{% endif %}">
+                            {{ m.montant|fcfa }} FCFA
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center py-6 text-gray-400">Aucun mouvement sur la période</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if mouvements.has_other_pages %}
+            <div class="join mt-4 flex justify-center">
+                {% if mouvements.has_previous %}
+                    <a href="?date_fin={{ date_fin|date:'Y-m-d' }}&mvt_debut={{ mvt_debut|date:'Y-m-d' }}&mvt_fin={{ mvt_fin|date:'Y-m-d' }}&page={{ mouvements.previous_page_number }}"
+                       class="join-item btn btn-sm">«</a>
+                {% endif %}
+                <button class="join-item btn btn-sm btn-active">
+                    Page {{ mouvements.number }} / {{ mouvements.paginator.num_pages }}
+                </button>
+                {% if mouvements.has_next %}
+                    <a href="?date_fin={{ date_fin|date:'Y-m-d' }}&mvt_debut={{ mvt_debut|date:'Y-m-d' }}&mvt_fin={{ mvt_fin|date:'Y-m-d' }}&page={{ mouvements.next_page_number }}"
+                       class="join-item btn btn-sm">»</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

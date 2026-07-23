@@ -1,0 +1,88 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+{% block title %}Recouvrement + versement groupé{% endblock %}
+
+{% block content %}
+<div class="p-4 md:p-6">
+
+    <div class="flex items-center gap-3 mb-4">
+        <a href="{% url 'finance:dashboard_finance' %}" class="btn btn-sm btn-outline">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h1 class="text-2xl font-bold">Recouvrement + versement groupé</h1>
+    </div>
+
+    <div class="alert alert-info mb-4 text-sm">
+        <i class="fas fa-circle-info"></i>
+        Une seule action pour tous les superviseurs : ajustez le montant recouvré (prérempli avec le solde actuel),
+        ajoutez un apport hors vente si besoin, joignez le reçu — puis validez une fois.
+        Une ligne laissée à <strong>0</strong> n'est simplement pas traitée (superviseur sans recette sur la période).
+    </div>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ formset.management_form }}
+
+        {% if formset.non_form_errors %}
+            <div class="alert alert-error mb-3">{{ formset.non_form_errors }}</div>
+        {% endif %}
+
+        <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 overflow-x-auto">
+                <table class="table w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th>Superviseur</th>
+                            <th class="text-right">Solde actuel</th>
+                            <th>Montant recouvré / versé</th>
+                            <th>Apport hors vente</th>
+                            <th>Reçu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form, solde in lignes %}
+                        <tr>
+                            <td>
+                                {{ solde.superviseur.full_name }}
+                                {% if solde.alerte %}
+                                    <span class="badge badge-error badge-sm ml-1">Alerte</span>
+                                {% endif %}
+                                {{ form.superviseur }}
+                            </td>
+                            <td class="text-right font-semibold">{{ solde.solde|fcfa }} FCFA</td>
+                            <td>
+                                {{ form.montant }}
+                                {% if form.montant.errors %}
+                                    <div class="text-error text-xs">{{ form.montant.errors|striptags }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ form.montant_hors_vente }}
+                                {% if form.montant_hors_vente.errors %}
+                                    <div class="text-error text-xs">{{ form.montant_hors_vente.errors|striptags }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ form.recu }}
+                                {% if form.recu.errors %}
+                                    <div class="text-error text-xs">{{ form.recu.errors|striptags }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-6 text-gray-400">Aucun superviseur actif</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-4">
+            <i class="fas fa-check"></i> Enregistrer les recouvrements et versements
+        </button>
+    </form>
+
+</div>
+{% endblock %}

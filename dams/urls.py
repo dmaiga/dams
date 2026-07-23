@@ -39,6 +39,7 @@ urlpatterns = [
     path("app/", include("mobile.urls")),
     path( "marchandise/", include(("marchandise.urls", "marchandise"), namespace="marchandise"),),
     path("vente/",include(("vente.urls", "vente"), namespace="vente"),),
+    path("finance/", include(("finance.urls", "finance"), namespace="finance"),),
     path('bi/', include('bi.urls')),
 
 
