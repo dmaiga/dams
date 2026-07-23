@@ -32,6 +32,10 @@
     .bi-panel { background: #fff; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
     .bi-panel h2 { font-size: 1.1rem; color: #1f2937; margin-bottom: 1rem; }
     .bi-vide { text-align: center; padding: 3rem 1rem; color: #9ca3af; }
+
+    .bi-chart-wrap { position: relative; width: 100%; height: 320px; }
+    .bi-chart-wrap canvas { width: 100% !important; height: 100% !important; }
+    @media (max-width: 640px) { .bi-chart-wrap { height: 240px; } }
 </style>
 
 <div class="bi-breadcrumb">BI &rsaquo; {{ dashboard_titre }} &rsaquo; {{ periode_libelle }}</div>
@@ -59,8 +63,13 @@
             {% endfor %}
         </select>
     </div>
+    {% block extra_filtres %}{% endblock %}
     <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
-    {% if annee or mois %}<a href="{{ request.path }}" class="btn btn-outline btn-sm">Réinitialiser</a>{% endif %}
+    {% if annee or mois %}
+    <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline btn-sm">Toutes périodes</a>
+    {% else %}
+    <a href="{{ request.path }}" class="btn btn-outline btn-sm">Dernier mois</a>
+    {% endif %}
 </form>
 
 {% if est_vide %}

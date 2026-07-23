@@ -1,0 +1,50 @@
+{% extends "bi/base_dashboard.html" %}
+
+{% block dashboard_content %}
+<div class="bi-panel">
+    <h2>Dépenses par catégorie</h2>
+    {% if depenses %}
+    <div class="bi-chart-wrap"><canvas id="chart-depenses-categorie"></canvas></div>
+    <div class="overflow-x-auto mt-4">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Mois</th>
+                    <th>Catégorie</th>
+                    <th class="text-right">Montant</th>
+                    <th class="text-right">% du total du mois</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in depenses %}
+                <tr>
+                    <td>{{ d.mois|date:"m/Y" }}</td>
+                    <td>{{ d.categorie|default:"Non catégorisé" }}</td>
+                    <td class="text-right">{{ d.montant|floatformat:0 }}</td>
+                    <td class="text-right">{{ d.montant_pct|default_if_none:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500 text-sm mb-0">Aucune dépense pour cette période.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    {% if depenses %}
+    const donneesDepenses = {{ depenses_chart|safe }};
+    new Chart(document.getElementById('chart-depenses-categorie'), {
+        type: 'pie',
+        data: {
+            labels: donneesDepenses.labels,
+            datasets: [{ data: donneesDepenses.montant }],
+        },
+        options: { responsive: true, maintainAspectRatio: false },
+    });
+    {% endif %}
+</script>
+{% endblock %}

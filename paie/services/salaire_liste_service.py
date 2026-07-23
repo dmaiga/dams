@@ -1,5 +1,5 @@
 from decimal import Decimal
-from core.models import Agent
+from paie.services.agent_eligibilite import agents_eligibles_periode
 from paie.services.salaire_calculator import CalculatorSalaire
 
 from django.utils import timezone
@@ -20,13 +20,9 @@ class SalaireListeService:
     @staticmethod
     def get_salaires(date_debut, date_fin, type_agent_filter=""):
 
-        agents = Agent.objects.filter(
-            est_actif=True,
-            type_agent__in=["terrain", "agent_gros", "entrepot"]
-        ).select_related("superviseur", "user")
-
-        if type_agent_filter:
-            agents = agents.filter(type_agent=type_agent_filter)
+        agents = agents_eligibles_periode(date_debut, date_fin, type_agent_filter).select_related(
+            "superviseur", "user"
+        )
 
         mamies = []
         gros = []

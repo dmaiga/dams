@@ -1,45 +1,32 @@
 from django.conf import settings
 from django.db import models
 
-from core.models import Fournisseur, Produit
+from core.models import LotEntrepot
 
 
 class AjustementPrixAchat(models.Model):
-    """Calibration du prix d'achat fournisseur (dbt-2). Saisie admin Direction uniquement.
+    """Calibration du prix d'achat fournisseur (dbt-2 ; refonte 23/07/2026, dbt-7). Saisie
+    admin Direction uniquement.
 
     Append-only : pas de suppression ni de modification une fois enregistré (voir
     BiAjustementPrixAchatAdmin) — un ajustement erroné s'annule par un contre-ajustement
     (nouvelle ligne, quantite_concernee négative ou prix corrigé mis à jour).
 
-    fournisseur/annee/mois sont requis (pas de simple "fallback") : dbt_bi.fct_ventes
-    n'expose pas lot_id (dérivation vente -> lot -> fournisseur uniquement, cf.
-    dbt_bi/models/marts/fct_ventes.sql), donc la clé de jointure effective côté
-    vw_marge_fournisseur est fournisseur x mois, pas le lot précis. reference_lot et
-    produit ne servent qu'à la traçabilité de la saisie, pas à la vue dbt.
+    Rattaché directement à un LotEntrepot (au lieu de fournisseur/année/mois/produit saisis à
+    la main) : fournisseur, produit, année et mois sont dérivés du lot côté dbt
+    (dbt_bi/models/staging/stg_ajustements_prix_achat.sql, jointure sur core_lotentrepot) —
+    ni dupliqués ni resaisis ici. Un même lot renégocié à plusieurs prix (ex. 150 unités à
+    11000 puis 150 à 10000) se saisit en plusieurs lignes distinctes pointant sur le même lot.
     """
 
-    reference_lot = models.CharField(
-        max_length=100,
-        blank=True,
-        default="",
-        help_text="Traçabilité optionnelle vers core_lotentrepot.reference_lot (texte libre, "
-        "pas de FK — le lot peut être introuvable ou mal identifié au moment de la saisie).",
-    )
-    produit = models.ForeignKey(
-        Produit,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="ajustements_prix_achat",
-        help_text="Traçabilité optionnelle, non utilisé par vw_marge_fournisseur (grain fournisseur x mois).",
-    )
-    fournisseur = models.ForeignKey(
-        Fournisseur,
+    lot = models.ForeignKey(
+        LotEntrepot,
         on_delete=models.PROTECT,
         related_name="ajustements_prix_achat",
+        verbose_name="Lot",
+        help_text="Lot dont le prix d'achat a été renégocié après réception — fournisseur, "
+        "produit, année et mois en sont dérivés automatiquement, rien d'autre à ressaisir.",
     )
-    annee = models.PositiveSmallIntegerField()
-    mois = models.PositiveSmallIntegerField()
     quantite_concernee = models.DecimalField(max_digits=10, decimal_places=2)
     prix_achat_corrige = models.DecimalField(max_digits=10, decimal_places=2)
     justification = models.TextField()
@@ -56,7 +43,7 @@ class AjustementPrixAchat(models.Model):
         ordering = ["-date_saisie"]
 
     def __str__(self):
-        return f"{self.fournisseur} — {self.mois:02d}/{self.annee} — {self.prix_achat_corrige} FCFA"
+        return f"{self.lot.reference_lot or self.lot_id} — {self.prix_achat_corrige} FCFA"
 
 
 # --- Modèles managed=False : lecture des vues bi_ générées par dbt (dbt_bi/models/marts/aggregates).
@@ -80,17 +67,40 @@ class VwRentabiliteGlobale(models.Model):
     cout_depenses = models.DecimalField(max_digits=15, decimal_places=2)
     depenses_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True)
     rentabilite_nette = models.DecimalField(max_digits=15, decimal_places=2)
+    rentabilite_nette_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True)
 
     class Meta:
         managed = False
         db_table = 'bi_"."vw_rentabilite_globale'
 
 
-class VwRentabiliteProduit(models.Model):
-    """Dashboard 2. Grain = produit. PK désignée : produit_id (unique en base)."""
+class VwRentabiliteJournaliere(models.Model):
+    """Dashboard 1 (Santé Globale), graphique de tendance uniquement. Grain = jour. PK
+    désignée : jour (unique en base). Pas de salaires à ce grain (cf.
+    dbt_bi/models/marts/aggregates/vw_rentabilite_journaliere.sql) — ne sert que le graphique
+    CA/dépenses/marge brute quand un mois précis est filtré (vw_rentabilite_globale réduirait
+    alors la série à un seul point)."""
 
-    produit_id = models.IntegerField(primary_key=True)
-    produit_nom = models.CharField(max_length=100)
+    jour = models.DateField(primary_key=True)
+    ca = models.DecimalField(max_digits=15, decimal_places=2)
+    cout_achat = models.DecimalField(max_digits=15, decimal_places=2)
+    marge_brute = models.DecimalField(max_digits=15, decimal_places=2)
+    cout_depenses = models.DecimalField(max_digits=15, decimal_places=2)
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."vw_rentabilite_journaliere'
+
+
+class VwRentabiliteProduit(models.Model):
+    """Dashboard 2. Grain = produit x mois. PK désignée : produit_mois_id (surrogate ajouté
+    dans la vue, cf. dbt_bi/models/marts/aggregates/vw_rentabilite_produit.sql) — un produit
+    sans vente sur un mois donné n'a pas de ligne pour ce mois."""
+
+    produit_mois_id = models.IntegerField(primary_key=True)
+    produit_id = models.IntegerField()
+    produit_nom = models.CharField(max_length=100, null=True)
+    mois = models.DateField()
     ca = models.DecimalField(max_digits=15, decimal_places=2)
     cout_achat = models.DecimalField(max_digits=15, decimal_places=2)
     marge = models.DecimalField(max_digits=15, decimal_places=2)
@@ -105,11 +115,15 @@ class VwRentabiliteProduit(models.Model):
 
 
 class VwPerformanceSuperviseur(models.Model):
-    """Dashboard 3, partie 1. Grain = superviseur (dim_agent type_agent='entrepot').
-    PK désignée : superviseur_id (unique en base)."""
+    """Dashboard "Performance Agent & Équipes", volet équipes. Grain = superviseur
+    (dim_agent type_agent='entrepot') x mois. PK désignée : superviseur_mois_id (surrogate
+    ajouté dans la vue, cf. dbt_bi/models/marts/aggregates/vw_performance_superviseur.sql) —
+    un superviseur sans vente sur un mois donné a quand même une ligne (valeurs à 0)."""
 
-    superviseur_id = models.IntegerField(primary_key=True)
+    superviseur_mois_id = models.IntegerField(primary_key=True)
+    superviseur_id = models.IntegerField()
     superviseur_nom = models.CharField(max_length=200)
+    mois = models.DateField()
     ca = models.DecimalField(max_digits=15, decimal_places=2)
     marge_brute = models.DecimalField(max_digits=15, decimal_places=2)
     cout_equipe = models.DecimalField(max_digits=15, decimal_places=2)
@@ -123,18 +137,25 @@ class VwPerformanceSuperviseur(models.Model):
 
 
 class VwPerformanceAgent(models.Model):
-    """Dashboard 4. Grain = agent (type terrain/agent_gros/agent_polivalent).
-    PK désignée : agent_id (unique en base)."""
+    """Dashboard "Performance Agent & Équipes". Grain = agent (terrain/agent_gros/
+    agent_polivalent) x mois. PK désignée : agent_mois_id (surrogate ajouté dans la vue, cf.
+    dbt_bi/models/marts/aggregates/vw_performance_agent.sql) — un agent actif sans vente sur
+    un mois donné a quand même une ligne (kg_par_jour=0, statut 'sous_objectif')."""
 
     STATUT_ATTEINT = "atteint"
     STATUT_PROCHE = "proche"
     STATUT_SOUS_OBJECTIF = "sous_objectif"
 
-    agent_id = models.IntegerField(primary_key=True)
+    agent_mois_id = models.IntegerField(primary_key=True)
+    agent_id = models.IntegerField()
     nom_complet = models.CharField(max_length=200)
     type_agent = models.CharField(max_length=50)
+    superviseur_id = models.IntegerField(null=True)
+    superviseur_nom = models.CharField(max_length=200, null=True)
+    mois = models.DateField()
     kg_vendus = models.DecimalField(max_digits=12, decimal_places=2)
     jours_actifs = models.IntegerField()
+    jours_ouvres = models.IntegerField(null=True)
     kg_par_jour = models.DecimalField(max_digits=8, decimal_places=2, null=True)
     statut_objectif_50kg = models.CharField(max_length=20, null=True)
     marge = models.DecimalField(max_digits=15, decimal_places=2)
@@ -168,14 +189,16 @@ class VwAnalyseStock(models.Model):
 
 
 class VwMargeFournisseur(models.Model):
-    """Dashboard 5, volet fournisseur (dbt-2). Grain = fournisseur x mois.
-    PK désignée : fournisseur_mois_id (surrogate ajouté dans la vue, cf.
-    dbt_bi/models/marts/aggregates/vw_marge_fournisseur.sql — modèle créé par ce sprint,
-    pas de contrainte "ne pas renommer" contrairement aux 5 vues historiques)."""
+    """Dashboard 5, volet fournisseur (dbt-2 ; produit ajouté le 23/07/2026). Grain =
+    fournisseur x produit x mois. PK désignée : fournisseur_mois_id (surrogate ajouté dans la
+    vue, cf. dbt_bi/models/marts/aggregates/vw_marge_fournisseur.sql — modèle créé par ce
+    sprint, pas de contrainte "ne pas renommer" contrairement aux 5 vues historiques)."""
 
     fournisseur_mois_id = models.IntegerField(primary_key=True)
     fournisseur_id = models.IntegerField()
     fournisseur_nom = models.CharField(max_length=100, null=True)
+    produit_id = models.IntegerField(null=True)
+    produit_nom = models.CharField(max_length=100, null=True)
     mois = models.DateField()
     ca = models.DecimalField(max_digits=15, decimal_places=2)
     cout_achat_systeme = models.DecimalField(max_digits=15, decimal_places=2)

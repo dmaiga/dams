@@ -17,17 +17,25 @@ class AjustementPrixAchatAdmin(admin.ModelAdmin):
     ligne), jamais par une modification de l'historique."""
 
     list_display = (
-        "fournisseur",
-        "annee",
-        "mois",
+        "lot",
+        "fournisseur_lot",
+        "produit_lot",
         "quantite_concernee",
         "prix_achat_corrige",
-        "reference_lot",
         "saisi_par",
         "date_saisie",
     )
-    list_filter = ("fournisseur", "annee", "mois")
+    list_filter = ("lot__fournisseur", "lot__produit")
+    autocomplete_fields = ("lot",)
     readonly_fields = ("saisi_par", "date_saisie")
+
+    @admin.display(description="Fournisseur")
+    def fournisseur_lot(self, obj):
+        return obj.lot.fournisseur
+
+    @admin.display(description="Produit")
+    def produit_lot(self, obj):
+        return obj.lot.produit
 
     def has_module_permission(self, request):
         return _est_direction(request)

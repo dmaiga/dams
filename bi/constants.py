@@ -11,8 +11,8 @@ Dashboard_Catalog. `None` (donnée absente, ex. division par zéro dans une vue 
 DASHBOARDS = [
     ("sante", "Santé Globale"),
     ("produits", "Rentabilité Produit"),
-    ("superviseurs", "Performance Superviseur & Dépenses"),
-    ("agents", "Performance Agent vs Objectif"),
+    ("agents", "Performance Agent & Équipes"),
+    ("depenses", "Dépenses"),
     ("stock", "Stock & Fournisseur"),
 ]
 
@@ -37,11 +37,11 @@ MARGE_PCT_PRODUIT_MAX = 60
 ROTATION_STOCK_RAPIDE = 2
 ROTATION_STOCK_MORT = 0.5
 
-# --- Dashboard 3 : Performance Superviseur (KPI-201 à 206) ---
+# --- Dashboard "Performance Agent & Équipes", volet équipes/superviseurs (KPI-201 à 206) ---
 RENTABILITE_SUPERVISEUR_CIBLE = 500_000
 CA_MOYEN_AGENT_CIBLE = 500_000
 
-# --- Dashboard 4 : Performance Agent (KPI-301 à 306) ---
+# --- Dashboard "Performance Agent & Équipes", volet agents (KPI-301 à 306) ---
 RENTABILITE_AGENT_CIBLE = 100_000
 RATIO_INCENTIVE_MARGE_CIBLE = 5
 RATIO_INCENTIVE_MARGE_ALERTE = 10

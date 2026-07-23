@@ -1,16 +1,21 @@
--- Dashboard 2 (Rentabilité Produit). Grain = produit (KPI-101 à KPI-106).
+-- Dashboard 2 (Rentabilité Produit). Grain = produit x mois (KPI-101 à KPI-106) — aligné sur
+-- le pattern vw_marge_fournisseur (clé surrogate row_number, base = CTE de ventes) pour
+-- permettre le filtre mois côté Django. Conséquence acceptée : un produit sans vente sur un
+-- mois donné n'a pas de ligne pour ce mois (comme les fournisseurs dans vw_marge_fournisseur).
 -- rotation_stock = CA produit / stock moyen (valeur) — approxime KPI-105, stock moyen calculé
--- sur le snapshot courant de fct_stocks faute d'historique quotidien (limite actée Sprint 1).
+-- sur le snapshot courant de fct_stocks faute d'historique quotidien (limite actée Sprint 1,
+-- donc identique pour tous les mois d'un même produit).
 with ventes_produit as (
     select
         produit_id,
+        date_trunc('month', date_vente)::date as mois,
         sum(total_vente) as ca,
         sum(total_cout_achat) as cout_achat,
         sum(total_vente - total_cout_achat) as marge,
         sum(quantite_en_kg) as quantite_vendue_kg
     from {{ ref('fct_ventes') }}
     where produit_id is not null
-    group by produit_id
+    group by produit_id, date_trunc('month', date_vente)::date
 ),
 
 stock_moyen_produit as (
@@ -22,22 +27,24 @@ stock_moyen_produit as (
 )
 
 select
-    p.produit_id,
+    row_number() over (order by vp.produit_id, vp.mois) as produit_mois_id,
+    vp.produit_id,
     p.nom as produit_nom,
-    coalesce(vp.ca, 0) as ca,
-    coalesce(vp.cout_achat, 0) as cout_achat,
-    coalesce(vp.marge, 0) as marge,
+    vp.mois,
+    vp.ca,
+    vp.cout_achat,
+    vp.marge,
     case
-        when coalesce(vp.ca, 0) = 0 then null
+        when vp.ca = 0 then null
         else round(100.0 * vp.marge / vp.ca, 2)
     end as marge_pct,
-    coalesce(vp.quantite_vendue_kg, 0) as quantite_vendue_kg,
+    vp.quantite_vendue_kg,
     sm.stock_moyen,
     case
         when coalesce(sm.stock_moyen, 0) = 0 then null
-        else round(coalesce(vp.ca, 0) / sm.stock_moyen, 2)
+        else round(vp.ca / sm.stock_moyen, 2)
     end as rotation_stock
-from {{ ref('dim_produit') }} p
-left join ventes_produit vp on p.produit_id = vp.produit_id
+from ventes_produit vp
+left join {{ ref('dim_produit') }} p on p.produit_id = vp.produit_id
 left join stock_moyen_produit sm on p.produit_id = sm.produit_id
-order by marge desc nulls last
+order by vp.mois, marge desc nulls last

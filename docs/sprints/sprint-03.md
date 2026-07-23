@@ -1,5 +1,5 @@
 # Sprint 03 — App `finance` : solde superviseur, versements, dépenses
-
+> **Statut : ✅ implémenté.**
 ## Contexte
 
 Le calcul du solde d'un superviseur (combien il détient réellement en cash à un instant donné) est aujourd'hui **dispersé** sur au moins quatre endroits, avec des formules incohérentes entre elles :

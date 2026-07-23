@@ -20,6 +20,7 @@ select
     s.salaire_id,
     s.agent_id,
     a.superviseur_id,
+    a.type_agent,
     s.date_debut,
     s.date_fin,
     s.salaire_base,

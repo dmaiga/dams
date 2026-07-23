@@ -23,5 +23,7 @@ models:
       +materialized: view
     marts:
       +materialized: table
-      aggregates:
-        +materialized: view
+      # aggregates matérialisées en table (23/07/2026) : lues à chaque chargement des dashboards
+      # bi/, recalculer la requête complète (jointures + cross join mois x agents/superviseurs)
+      # à chaque requête Django était le principal goulot d'étranglement de performance —
+      # une table se contente d'être relue, recalculée uniquement au prochain `dbt run`.

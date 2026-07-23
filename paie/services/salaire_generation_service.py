@@ -1,6 +1,7 @@
 from django.db import transaction
 from decimal import Decimal
-from core.models import Agent, Salaire
+from core.models import Salaire
+from paie.services.agent_eligibilite import agents_eligibles_periode
 from paie.services.salaire_calculator import CalculatorSalaire
 
 
@@ -20,10 +21,7 @@ class SalaireGenerationService:
         ).exists():
             raise ValueError("Les salaires de cette période sont déjà générés.")
 
-        agents = Agent.objects.filter(
-            est_actif=True,
-            type_agent__in=["terrain", "agent_gros", "entrepot"]
-        )
+        agents = agents_eligibles_periode(date_debut, date_fin)
 
         salaires_crees = []
 

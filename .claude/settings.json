@@ -20,7 +20,17 @@
       "Bash(python manage.py makemigrations core -n \"extend_finance_permissions_and_peut_faire_depense\")",
       "Bash(python manage.py migrate core)",
       "Bash(python manage.py startapp finance)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(python -m pytest bi/tests/ -q)",
+      "Bash(python manage.py generer_salaires_mensuel --help)",
+      "Bash(python manage.py generer_salaires_mensuel --mois 2026-01)",
+      "Bash(python manage.py generer_salaires_mensuel)",
+      "Bash(python -m pytest bi/tests/ paie/ -q)",
+      "Bash(python3 -)",
+      "Bash(python manage.py dbshell -c \"DROP VIEW IF EXISTS bi_.stg_ajustements_prix_achat CASCADE;\")",
+      "Bash(python -m pytest bi/tests/test_views.py::test_dashboard_sante_graph_journalier_si_mois_precis -q)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

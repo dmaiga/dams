@@ -82,7 +82,9 @@ models:
         tests: [not_null, unique]
 
   - name: stg_ajustements_prix_achat
-    description: "dbt-2 (2026-07-20). Calibration prix d'achat fournisseur, saisie admin Django."
+    description: >
+      dbt-2 (2026-07-20) ; refonte dbt-7 (23/07/2026) : fournisseur_id/produit_id/annee/mois
+      dérivés par jointure sur stg_lots (via lot_id), plus saisis à la main côté Django.
     columns:
       - name: ajustement_id
         tests: [not_null, unique]
@@ -90,8 +92,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fournisseur')
-              field: fournisseur_id
+              arguments:
+                to: ref('dim_fournisseur')
+                field: fournisseur_id
       - name: quantite_concernee
         tests: [not_null]
       - name: prix_achat_corrige

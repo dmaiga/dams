@@ -1,5 +1,26 @@
 {% extends "bi/base_dashboard.html" %}
 
+{% block extra_filtres %}
+<div>
+    <label for="bi-produit">Produit</label>
+    <select id="bi-produit" name="produit" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <option value="">Tous les produits</option>
+        {% for id, nom in produit_options %}
+        <option value="{{ id }}" {% if produit_filtre == id %}selected{% endif %}>{{ nom|default:"—" }}</option>
+        {% endfor %}
+    </select>
+</div>
+<div>
+    <label for="bi-fournisseur">Fournisseur</label>
+    <select id="bi-fournisseur" name="fournisseur" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <option value="">Tous les fournisseurs</option>
+        {% for id, nom in fournisseur_options %}
+        <option value="{{ id }}" {% if fournisseur_filtre == id %}selected{% endif %}>{{ nom|default:"—" }}</option>
+        {% endfor %}
+    </select>
+</div>
+{% endblock %}
+
 {% block dashboard_content %}
 <div class="bi-kpis">
     <div class="bi-kpi bi-{{ total_stock_statut }} bi-principal">
@@ -43,6 +64,7 @@
             <thead>
                 <tr>
                     <th>Fournisseur</th>
+                    <th>Produit</th>
                     <th>Mois</th>
                     <th class="text-right">CA</th>
                     <th class="text-right">Marge système</th>
@@ -55,6 +77,7 @@
                 {% for f in fournisseurs %}
                 <tr>
                     <td>{{ f.fournisseur_nom|default:"—" }}</td>
+                    <td>{{ f.produit_nom|default:"—" }}</td>
                     <td>{{ f.mois|date:"m/Y" }}</td>
                     <td class="text-right">{{ f.ca|floatformat:0 }}</td>
                     <td class="text-right">{{ f.marge_systeme|floatformat:0 }}</td>

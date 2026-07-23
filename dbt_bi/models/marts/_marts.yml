@@ -35,18 +35,21 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_agent')
-              field: agent_id
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
       - name: produit_id
         tests:
           - relationships:
-              to: ref('dim_produit')
-              field: produit_id
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
       - name: fournisseur_id
         tests:
           - relationships:
-              to: ref('dim_fournisseur')
-              field: fournisseur_id
+              arguments:
+                to: ref('dim_fournisseur')
+                field: fournisseur_id
       - name: quantite
         tests:
           - not_null
@@ -68,8 +71,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_agent')
-              field: agent_id
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
       - name: salaire_total
         tests:
           - not_null
@@ -112,8 +116,9 @@ models:
       - name: produit_id
         tests:
           - relationships:
-              to: ref('dim_produit')
-              field: produit_id
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
       - name: quantite_restante
         tests:
           - not_null
@@ -129,8 +134,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fournisseur')
-              field: fournisseur_id
+              arguments:
+                to: ref('dim_fournisseur')
+                field: fournisseur_id
       - name: montant
         tests:
           - not_null

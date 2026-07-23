@@ -11,42 +11,61 @@ models:
       - name: rentabilite_nette
         tests: [not_null]
 
-  - name: vw_rentabilite_produit
-    description: "Dashboard 2 (Rentabilité Produit). 1 ligne par produit (KPI-101 à KPI-106)."
+  - name: vw_rentabilite_journaliere
+    description: >
+      Dashboard 1 (Santé Globale), graphique de tendance uniquement (23/07/2026). 1 ligne par
+      jour : CA, coût d'achat, marge brute, coût dépenses — pas de salaires (non pertinent à ce
+      grain, cf. commentaire du modèle).
     columns:
+      - name: jour
+        tests: [not_null, unique]
+
+  - name: vw_rentabilite_produit
+    description: >
+      Dashboard 2 (Rentabilité Produit). 1 ligne par produit x mois (KPI-101 à KPI-106) —
+      un produit sans vente sur un mois donné n'a pas de ligne pour ce mois.
+    columns:
+      - name: produit_mois_id
+        tests: [not_null, unique]
       - name: produit_id
         tests:
           - not_null
-          - unique
           - relationships:
-              to: ref('dim_produit')
-              field: produit_id
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
 
   - name: vw_performance_superviseur
     description: >
-      Dashboard 3 (Performance Superviseur). 1 ligne par superviseur = dim_agent filtrée
-      type_agent='entrepot' (KPI-201 à KPI-206).
+      Dashboard "Performance Agent & Équipes", volet équipes (KPI-201 à KPI-206). 1 ligne par
+      superviseur (= dim_agent filtrée type_agent='entrepot') x mois — un superviseur sans
+      vente sur un mois apparaît quand même (valeurs à 0), cf. commentaire du modèle.
     columns:
+      - name: superviseur_mois_id
+        tests: [not_null, unique]
       - name: superviseur_id
         tests:
           - not_null
-          - unique
           - relationships:
-              to: ref('dim_agent')
-              field: agent_id
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
 
   - name: vw_performance_agent
     description: >
-      Dashboard 4 (Performance Agent vs Objectif 50 kg/jour). 1 ligne par agent de type
-      terrain/agent_gros/agent_polivalent (KPI-301 à KPI-306).
+      Dashboard "Performance Agent & Équipes" (KPI-301 à KPI-306). 1 ligne par agent
+      terrain/agent_gros/agent_polivalent x mois — un agent actif sans vente sur un mois
+      apparaît quand même (kg_par_jour=0, statut 'sous_objectif'), cf. commentaire du modèle.
     columns:
+      - name: agent_mois_id
+        tests: [not_null, unique]
       - name: agent_id
         tests:
           - not_null
-          - unique
           - relationships:
-              to: ref('dim_agent')
-              field: agent_id
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
       - name: statut_objectif_50kg
         tests:
           - accepted_values:
@@ -67,9 +86,10 @@ models:
 
   - name: vw_marge_fournisseur
     description: >
-      Dashboard 5, volet fournisseur (dbt-2, 2026-07-20). 1 ligne par fournisseur x mois
-      (KPI-403 à KPI-405). marge_calibree applique la correction bi.AjustementPrixAchat
-      quand elle existe pour ce fournisseur x mois (sinon = marge_systeme).
+      Dashboard 5, volet fournisseur (dbt-2, 2026-07-20 ; produit ajouté le 23/07/2026).
+      1 ligne par fournisseur x produit x mois (KPI-403 à KPI-405). marge_calibree applique la
+      correction bi.AjustementPrixAchat (grain fournisseur x mois, diffusée à tous les produits
+      du fournisseur pour ce mois) quand elle existe, sinon = marge_systeme.
     columns:
       - name: fournisseur_mois_id
         tests: [not_null, unique]
@@ -77,8 +97,15 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fournisseur')
-              field: fournisseur_id
+              arguments:
+                to: ref('dim_fournisseur')
+                field: fournisseur_id
+      - name: produit_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
       - name: ca
         tests: [not_null]
 

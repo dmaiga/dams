@@ -1,9 +1,53 @@
 {% extends "bi/base_dashboard.html" %}
 
+{% block extra_filtres %}
+<div>
+    <label for="bi-superviseur">Superviseur</label>
+    <select id="bi-superviseur" name="superviseur" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <option value="">Tous les superviseurs</option>
+        {% for s in superviseurs %}
+        <option value="{{ s.superviseur_id }}" {% if superviseur_filtre == s.superviseur_id %}selected{% endif %}>{{ s.superviseur_nom }}</option>
+        {% endfor %}
+    </select>
+</div>
+{% endblock %}
+
 {% block dashboard_content %}
 <div class="bi-panel">
+    <h2>Performance équipes / superviseurs</h2>
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Superviseur</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge brute</th>
+                    <th class="text-right">Coût équipe</th>
+                    <th class="text-right">Rentabilité nette</th>
+                    <th class="text-right">Agents actifs</th>
+                    <th class="text-right">CA moyen / agent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in superviseurs %}
+                <tr>
+                    <td>{{ s.superviseur_nom }} <span class="bi-badge bi-{{ s.statut }}">&nbsp;</span></td>
+                    <td class="text-right">{{ s.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.marge_brute|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.cout_equipe|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.rentabilite_nette|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.nb_agents_actifs }}</td>
+                    <td class="text-right">{{ s.ca_moyen_par_agent|default_if_none:"—"|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="bi-panel">
     <h2>Kg/jour vs objectif (50 kg/jour)</h2>
-    <canvas id="chart-agents-kgjour" height="100"></canvas>
+    <div class="bi-chart-wrap"><canvas id="chart-agents-kgjour"></canvas></div>
 </div>
 
 <div class="bi-panel">
@@ -12,9 +56,11 @@
             <thead>
                 <tr>
                     <th>Agent</th>
+                    <th>Superviseur</th>
                     <th>Type</th>
                     <th class="text-right">Kg vendus</th>
                     <th class="text-right">Jours actifs</th>
+                    <th class="text-right">Jours ouvrés (mois)</th>
                     <th class="text-right">Kg/jour</th>
                     <th>Statut objectif</th>
                     <th class="text-right">Rentabilité</th>
@@ -25,9 +71,11 @@
                 {% for a in agents %}
                 <tr>
                     <td>{{ a.nom_complet }} <span class="bi-badge bi-{{ a.statut_rentabilite }}">&nbsp;</span></td>
+                    <td>{{ a.superviseur_nom|default:"—" }}</td>
                     <td>{{ a.type_agent }}</td>
                     <td class="text-right">{{ a.kg_vendus|floatformat:1 }}</td>
                     <td class="text-right">{{ a.jours_actifs }}</td>
+                    <td class="text-right">{{ a.jours_ouvres|default_if_none:"—" }}</td>
                     <td class="text-right">{{ a.kg_par_jour|default_if_none:"—" }}</td>
                     <td><span class="bi-badge bi-{{ a.statut_couleur }}">{{ a.statut_label }}</span></td>
                     <td class="text-right">{{ a.rentabilite_agent|floatformat:0 }}</td>
@@ -38,10 +86,29 @@
         </table>
     </div>
 </div>
+
+<div class="bi-panel">
+    <h2>Rentabilité nette par superviseur</h2>
+    <div class="bi-chart-wrap"><canvas id="chart-agents-superviseurs"></canvas></div>
+</div>
 {% endblock %}
 
 {% block dashboard_scripts %}
 <script>
+    const donneesSuperviseurs = {{ superviseurs_chart|safe }};
+    new Chart(document.getElementById('chart-agents-superviseurs'), {
+        type: 'bar',
+        data: {
+            labels: donneesSuperviseurs.labels,
+            datasets: [{
+                label: 'Rentabilité nette',
+                data: donneesSuperviseurs.rentabilite_nette,
+                backgroundColor: donneesSuperviseurs.rentabilite_nette.map(v => v < 0 ? '#e74c3c' : '#27ae60'),
+            }],
+        },
+        options: { responsive: true, maintainAspectRatio: false },
+    });
+
     const donneesAgents = {{ chart_data|safe }};
     new Chart(document.getElementById('chart-agents-kgjour'), {
         data: {
@@ -63,7 +130,7 @@
                 },
             ],
         },
-        options: { indexAxis: 'y' },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false },
     });
 </script>
 {% endblock %}

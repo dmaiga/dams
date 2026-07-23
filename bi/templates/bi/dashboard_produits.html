@@ -10,7 +10,7 @@
 
 <div class="bi-panel">
     <h2>Classement des produits par marge</h2>
-    <canvas id="chart-produits-marge" height="100"></canvas>
+    <div class="bi-chart-wrap"><canvas id="chart-produits-marge"></canvas></div>
 </div>
 
 <div class="bi-panel">
@@ -20,6 +20,7 @@
             <thead>
                 <tr>
                     <th>Produit</th>
+                    <th>Mois</th>
                     <th class="text-right">CA</th>
                     <th class="text-right">Coût d'achat</th>
                     <th class="text-right">Marge</th>
@@ -35,6 +36,7 @@
                         {{ p.produit_nom }}
                         <span class="bi-badge bi-{{ p.statut }}">&nbsp;</span>
                     </td>
+                    <td>{{ p.mois|date:"m/Y" }}</td>
                     <td class="text-right">{{ p.ca|floatformat:0 }}</td>
                     <td class="text-right">{{ p.cout_achat|floatformat:0 }}</td>
                     <td class="text-right">{{ p.marge|floatformat:0 }}</td>
@@ -62,7 +64,7 @@
                 backgroundColor: donneesProduits.marge.map(v => v < 0 ? '#e74c3c' : '#27ae60'),
             }],
         },
-        options: { indexAxis: 'y' },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false },
     });
 </script>
 {% endblock %}
