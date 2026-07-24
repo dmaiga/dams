@@ -33,11 +33,14 @@ Détail complet dans [owner/02_Backlog.md](../owner/02_Backlog.md).
 
 ## Décisions à prendre en tout début de sprint (pas en cours de route)
 
-1. **Charts** : la maquette remplace les graphiques Chart.js par des composants CSS/SVG légers
-   (listes à barres horizontales, split-bar pour les dépenses) — sauf la courbe multi-séries de
-   Santé Globale, restée en SVG natif dans la maquette elle-même. Décision à prendre : réécrire
-   tous les graphiques en SVG/CSS natif (supprime la dépendance CDN Chart.js) ou ne remplacer que
-   les classements simples et garder Chart.js pour les courbes/combos. Trancher avant de coder.
+1. **Charts** — **Tranché (début de sprint)** : hybride. Passage en CSS/SVG natif (listes à
+   barres horizontales `.bi-barlist`, split-bar `.bi-splitbar`) pour les classements simples —
+   Produits (marge), Agents (kilo vendu par équipe, kg/jour vs objectif 50), Dépenses (répartition
+   par catégorie). Chart.js conservé uniquement pour la courbe multi-séries de Santé Globale
+   (CA/dépenses ROT/marge brute) : reproduire à la main un axe Y dynamique et le scaling pour une
+   série temporelle à N points représentait le seul vrai risque d'ingénierie du lot, pour un gain
+   surtout esthétique. 4 des 5 usages de Chart.js supprimés ; la dépendance CDN reste pour 1 seul
+   graphique.
 2. **Thème sombre** : l'app DAMS tourne sur DaisyUI `data-theme="corporate"` figé, sans bascule
    clair/sombre existante. Décision actée : scope limité au thème clair de la maquette ; le mode
    sombre présent dans la maquette (exigé par l'outil de prévisualisation) **n'est pas à porter**
@@ -75,19 +78,26 @@ Détail complet dans [owner/02_Backlog.md](../owner/02_Backlog.md).
 
 Sous-ensemble de [chef_projet/09_Qualite_DoD.md](../chef_projet/09_Qualite_DoD.md) applicable :
 
-- [ ] Les 5 dashboards utilisent le nouveau système visuel — plus aucun `.bi-kpi`/`.bi-panel` à
+- [x] Les 5 dashboards utilisent le nouveau système visuel — plus aucun `.bi-kpi`/`.bi-panel` à
   ombre portée ou bordure gauche colorée de l'ancien style
-- [ ] Aucun dégradé, glassmorphism, ombre > 1px, ni animation superflue (conforme au brief)
-- [ ] `python -m pytest bi/` toujours vert
-- [ ] Vérification manuelle des 5 pages en conditions réelles
-- [ ] `bi/08_Dashboard_Catalog.md` mis à jour si un libellé ou une structure visuelle change de
-  façon notable
+- [x] Aucun dégradé, glassmorphism, ombre > 1px, ni animation superflue (conforme au brief)
+- [x] `python -m pytest bi/` toujours vert (19 passed)
+- [x] Rendu programmatique des 5 pages réelles vérifié (Django test client, utilisateur
+  `mdmaiga`, `?toutes_periodes=1`) : 5/5 en HTTP 200, pas d'erreur de template. Un bug
+  bloquant trouvé et corrigé au passage — `d.montant_pct` localisé en `fr-fr` (virgule
+  décimale) cassait l'attribut CSS `width:100,00%` de la split-bar Dépenses (`{% load l10n %}`
+  + `|unlocalize`, cf. `dashboard_depenses.html`).
+  **Reste à faire** : vérification visuelle dans un vrai navigateur (mise en page, responsive,
+  interaction avec DaisyUI/Tailwind) — pas d'outil de rendu navigateur disponible dans cette
+  session, donc non couvert par cette passe.
+- [x] `bi/08_Dashboard_Catalog.md` mis à jour (note "Sprint 5 appliqué")
 
 ## Gate de sortie
 
 - [ ] Direction valide visuellement les 5 dashboards **réels** (pas seulement la maquette)
 - [ ] Aucune régression fonctionnelle (filtres, tri, bascule semaine/mois, comparaisons de
-  période toujours opérants)
+  période toujours opérants) — à confirmer en navigateur ; non régressée côté logique serveur
+  (tests verts, mêmes noms de champs GET conservés dans tous les formulaires de filtre)
 
 **Décision** : à valider en fin de sprint.
 
@@ -95,8 +105,19 @@ Sous-ensemble de [chef_projet/09_Qualite_DoD.md](../chef_projet/09_Qualite_DoD.m
 
 ## Rétrospective
 
-*(à remplir en fin de sprint)*
+*(volet Direction — validation visuelle — à compléter en fin de sprint)*
 
-- Qu'est-ce qui a bien marché ?
-- Qu'est-ce qui s'est mal passé ?
-- Écart entre la maquette et le rendu final, s'il y en a un ?
+Notes dev (implémentation) :
+
+- Ce qui a bien marché : les tags natifs Django (`{% widthratio %}`, `{% cycle %}`) ont suffi à
+  calculer les largeurs des `.bi-barlist`/`.bi-splitbar` sans toucher à `views.py` — la contrainte
+  de périmètre (templates + CSS uniquement) a tenu sans compromis.
+- Ce qui s'est mal passé : bug de localisation FR (virgule décimale) qui cassait un `width:` CSS
+  sur le split-bar Dépenses — repéré uniquement en rendant réellement la page (pas visible à la
+  seule lecture du template). Corrigé via `|unlocalize`.
+- Écart avec la maquette : la courbe Santé Globale reste en Chart.js (décision actée, cf. section
+  Décisions) — seul écart volontaire. Le shell topbar/brand de la maquette n'a pas été reproduit :
+  `base_admin.html` fournit déjà sa propre chrome (sidebar + en-tête), un second bandeau de marque
+  aurait dupliqué l'information.
+- Non couvert : validation visuelle navigateur réelle (pas d'outil de rendu/screenshot dans cette
+  session) — à faire manuellement avant la Gate de sortie.

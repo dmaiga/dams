@@ -26,6 +26,12 @@
 > `sprints/SPRINT_5_UIUX_Executif.md`. Ce fichier décrit le contenu/la structure de chaque
 > dashboard (toujours à jour) ; la maquette fixe le langage visuel (couleurs, typo, densité) qui
 > sera appliqué par-dessus sans changer ce contenu.
+>
+> **Sprint 5 appliqué** : système visuel de la maquette porté sur les 5 dashboards réels
+> (`bi/static/bi/dashboard.css`). Les classements/graphiques simples (produits, kilo vendu par
+> équipe, kg/jour vs objectif, répartition des dépenses) sont passés en listes à barres/split-bar
+> CSS natif ; seule la courbe multi-séries de Santé Globale reste en Chart.js (décision actée,
+> cf. sprint). Contenu et libellés inchangés.
 
 ## Dashboard 1 : 📊 Santé Globale
 

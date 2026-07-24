@@ -3,13 +3,9 @@
 {% block dashboard_content %}
 <div class="bi-panel">
     <h2>Dashboards BI</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div class="bi-sommaire-grid">
         {% for onglet in dashboards %}
-        <a href="{{ onglet.url }}" class="no-underline">
-            <div class="bi-panel h-full mb-0">
-                <h2 class="mb-0">{{ onglet.titre }}</h2>
-            </div>
-        </a>
+        <a href="{{ onglet.url }}" class="bi-sommaire-carte">{{ onglet.titre }}</a>
         {% endfor %}
     </div>
 </div>

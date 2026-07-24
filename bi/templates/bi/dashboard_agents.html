@@ -1,16 +1,16 @@
 {% extends "bi/base_dashboard.html" %}
 
 {% block filtre_periode %}
-<div class="bi-granularite-toggle" style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
-    <a href="?granularite=mois" class="btn btn-sm {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
-    <a href="?granularite=semaine" class="btn btn-sm {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
+<div class="bi-granularite-toggle">
+    <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
+    <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
 </div>
 <form method="get" class="bi-periode-form">
     <input type="hidden" name="granularite" value="{{ granularite }}">
     {% if granularite == "semaine" %}
     <div>
         <label for="bi-semaine">Semaine</label>
-        <select id="bi-semaine" name="semaine" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
             {% for s in semaines_disponibles %}
             <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
             {% endfor %}
@@ -19,11 +19,11 @@
     {% else %}
     <div>
         <label for="bi-annee">Année</label>
-        <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input input-bordered input-sm" min="2000" max="2100" placeholder="2026">
+        <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
     </div>
     <div>
         <label for="bi-mois">Mois</label>
-        <select id="bi-mois" name="mois" class="select select-bordered select-sm">
+        <select id="bi-mois" name="mois" class="select">
             <option value="">—</option>
             {% for valeur, libelle in mois_options %}
             <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
@@ -33,7 +33,7 @@
     {% endif %}
     <div>
         <label for="bi-superviseur">Superviseur</label>
-        <select id="bi-superviseur" name="superviseur" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <select id="bi-superviseur" name="superviseur" class="select" onchange="this.form.submit()">
             <option value="">Tous les superviseurs</option>
             {% for s in superviseurs %}
             <option value="{{ s.superviseur_id }}" {% if superviseur_filtre == s.superviseur_id %}selected{% endif %}>{{ s.superviseur_nom }}</option>
@@ -42,14 +42,14 @@
     </div>
     <div>
         <label for="bi-type-agent">Type d'agent</label>
-        <select id="bi-type-agent" name="type_agent" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <select id="bi-type-agent" name="type_agent" class="select" onchange="this.form.submit()">
             <option value="">Tous les types</option>
             {% for valeur, libelle in type_agent_options %}
             <option value="{{ valeur }}" {% if type_agent_filtre == valeur %}selected{% endif %}>{{ libelle }}</option>
             {% endfor %}
         </select>
     </div>
-    <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+    <button type="submit" class="btn btn-primary">Filtrer</button>
 </form>
 {% endblock %}
 
@@ -57,7 +57,7 @@
 <div class="bi-panel">
     <h2>Performance équipes / superviseurs</h2>
     <div class="overflow-x-auto">
-        <table class="table table-sm table-zebra">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Équipe</th>
@@ -95,12 +95,24 @@
 
 <div class="bi-panel">
     <h2>Kg/jour vs objectif (50 kg/jour)</h2>
-    <div class="bi-chart-wrap"><canvas id="chart-agents-kgjour"></canvas></div>
+    <div class="bi-barlist">
+        {% for a in agents %}
+        <div class="bi-barrow">
+            <div class="bi-rlabel">{{ a.nom_complet }}</div>
+            <div class="bi-track">
+                <div class="bi-fill {% if a.statut_couleur == "rouge" %}bi-rouge{% elif a.statut_couleur == "jaune" %}bi-jaune{% endif %}"
+                     style="width:{% if a.kg_par_jour %}{% widthratio a.kg_par_jour 50 100 %}{% else %}0{% endif %}%"></div>
+                <div class="bi-refline" style="left:100%" data-label="Obj. 50"></div>
+            </div>
+            <div class="bi-rvalue">{{ a.kg_par_jour|default_if_none:"—" }} kg/j</div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
 <div class="bi-panel">
     <div class="overflow-x-auto">
-        <table class="table table-sm table-zebra">
+        <table class="table">
             <thead>
                 <tr>
                     <th>Agent</th>
@@ -135,48 +147,16 @@
 
 <div class="bi-panel">
     <h2>Kilo vendu par équipe / superviseur</h2>
-    <div class="bi-chart-wrap"><canvas id="chart-agents-superviseurs"></canvas></div>
+    <div class="bi-barlist">
+        {% for s in superviseurs %}
+        <div class="bi-barrow">
+            <div class="bi-rlabel">{{ s.superviseur_nom }}</div>
+            <div class="bi-track">
+                <div class="bi-fill" style="width:{% widthratio s.kg_vendus superviseurs.0.kg_vendus 100 %}%"></div>
+            </div>
+            <div class="bi-rvalue">{{ s.kg_vendus|floatformat:1 }} kg</div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
-{% endblock %}
-
-{% block dashboard_scripts %}
-<script>
-    const donneesSuperviseurs = {{ superviseurs_chart|safe }};
-    new Chart(document.getElementById('chart-agents-superviseurs'), {
-        type: 'bar',
-        data: {
-            labels: donneesSuperviseurs.labels,
-            datasets: [{
-                label: 'Kilo vendu',
-                data: donneesSuperviseurs.kg_vendus,
-                backgroundColor: '#3498db',
-            }],
-        },
-        options: { responsive: true, maintainAspectRatio: false },
-    });
-
-    const donneesAgents = {{ chart_data|safe }};
-    new Chart(document.getElementById('chart-agents-kgjour'), {
-        data: {
-            labels: donneesAgents.labels,
-            datasets: [
-                {
-                    type: 'bar',
-                    label: 'Kg/jour',
-                    data: donneesAgents.kg_par_jour,
-                    backgroundColor: donneesAgents.kg_par_jour.map(v => v >= 50 ? '#27ae60' : (v >= 40 ? '#f39c12' : '#e74c3c')),
-                },
-                {
-                    type: 'line',
-                    label: 'Objectif (50 kg/jour)',
-                    data: donneesAgents.objectif,
-                    borderColor: '#2c3e50',
-                    borderDash: [6, 4],
-                    pointRadius: 0,
-                },
-            ],
-        },
-        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false },
-    });
-</script>
 {% endblock %}

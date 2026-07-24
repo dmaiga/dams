@@ -1,44 +1,10 @@
 {% extends "base_admin.html" %}
+{% load static %}
 
 {% block content %}
-<style>
-    .bi-breadcrumb { color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem; }
-    .bi-onglets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.75rem; }
-    .bi-onglet { padding: 0.5rem 1rem; border-radius: 0.5rem; text-decoration: none; color: #1f2937; font-weight: 500; }
-    .bi-onglet:hover { background: #f3f4f6; }
-    .bi-onglet.active { background: #1f2937; color: #fff; }
+<link rel="stylesheet" href="{% static 'bi/dashboard.css' %}">
 
-    .bi-periode-form { display: flex; gap: 0.5rem; align-items: end; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .bi-periode-form label { font-size: 0.8rem; color: #6b7280; display: block; margin-bottom: 0.2rem; }
-
-    .bi-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .bi-kpi { background: #fff; border-radius: 0.75rem; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border-left: 5px solid #d1d5db; }
-    .bi-kpi.bi-vert { border-left-color: #16a34a; }
-    .bi-kpi.bi-jaune { border-left-color: #d97706; }
-    .bi-kpi.bi-rouge { border-left-color: #dc2626; }
-    .bi-kpi.bi-neutre { border-left-color: #9ca3af; }
-    .bi-kpi.bi-principal { grid-column: span 2; }
-    .bi-kpi-label { font-size: 0.8rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.03em; }
-    .bi-kpi-valeur { font-size: 1.8rem; font-weight: 700; color: #1f2937; }
-    .bi-kpi.bi-principal .bi-kpi-valeur { font-size: 2.4rem; }
-    .bi-kpi-unite { font-size: 0.9rem; color: #9ca3af; font-weight: 400; }
-
-    .bi-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 600; }
-    .bi-badge.bi-vert { background: #dcfce7; color: #15803d; }
-    .bi-badge.bi-jaune { background: #fef3c7; color: #b45309; }
-    .bi-badge.bi-rouge { background: #fee2e2; color: #b91c1c; }
-    .bi-badge.bi-neutre { background: #f3f4f6; color: #6b7280; }
-
-    .bi-comparaison { margin: -1rem 0 1.5rem; font-size: 0.95rem; color: #374151; }
-
-    .bi-panel { background: #fff; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
-    .bi-panel h2 { font-size: 1.1rem; color: #1f2937; margin-bottom: 1rem; }
-    .bi-vide { text-align: center; padding: 3rem 1rem; color: #9ca3af; }
-
-    .bi-chart-wrap { position: relative; width: 100%; height: 320px; }
-    .bi-chart-wrap canvas { width: 100% !important; height: 100% !important; }
-    @media (max-width: 640px) { .bi-chart-wrap { height: 240px; } }
-</style>
+<div class="bi-scope">
 
 <div class="bi-breadcrumb">BI &rsaquo; {{ dashboard_titre }} &rsaquo; {{ periode_libelle }}</div>
 
@@ -55,11 +21,11 @@
 <form method="get" class="bi-periode-form">
     <div>
         <label for="bi-annee">Année</label>
-        <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input input-bordered input-sm" min="2000" max="2100" placeholder="2026">
+        <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
     </div>
     <div>
         <label for="bi-mois">Mois</label>
-        <select id="bi-mois" name="mois" class="select select-bordered select-sm">
+        <select id="bi-mois" name="mois" class="select">
             <option value="">—</option>
             {% for valeur, libelle in mois_options %}
             <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
@@ -67,11 +33,11 @@
         </select>
     </div>
     {% block extra_filtres %}{% endblock %}
-    <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+    <button type="submit" class="btn btn-primary">Filtrer</button>
     {% if annee or mois %}
-    <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline btn-sm">Toutes périodes</a>
+    <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline">Toutes périodes</a>
     {% else %}
-    <a href="{{ request.path }}" class="btn btn-outline btn-sm">Dernier mois</a>
+    <a href="{{ request.path }}" class="btn btn-outline">Dernier mois</a>
     {% endif %}
 </form>
 {% endblock %}
@@ -86,4 +52,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 {% block dashboard_scripts %}{% endblock %}
 {% endif %}
+
+</div>
 {% endblock %}
