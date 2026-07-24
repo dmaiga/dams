@@ -126,6 +126,7 @@ class VwPerformanceSuperviseur(models.Model):
     mois = models.DateField()
     ca = models.DecimalField(max_digits=15, decimal_places=2)
     marge_brute = models.DecimalField(max_digits=15, decimal_places=2)
+    kg_vendus = models.DecimalField(max_digits=12, decimal_places=2)
     cout_equipe = models.DecimalField(max_digits=15, decimal_places=2)
     rentabilite_nette = models.DecimalField(max_digits=15, decimal_places=2)
     nb_agents_actifs = models.IntegerField()
@@ -166,6 +167,50 @@ class VwPerformanceAgent(models.Model):
     class Meta:
         managed = False
         db_table = 'bi_"."vw_performance_agent'
+
+
+class VwPerformanceSuperviseurSemaine(models.Model):
+    """Dashboard "Agents", volet équipes hebdomadaire (24/07/2026, S-702). Miroir hebdomadaire
+    (semaine ISO lundi-dimanche) de VwPerformanceSuperviseur — pas de cout_equipe/
+    rentabilite_nette/ca_moyen_par_agent ici, cf.
+    dbt_bi/models/marts/aggregates/vw_performance_superviseur_semaine.sql."""
+
+    superviseur_semaine_id = models.IntegerField(primary_key=True)
+    superviseur_id = models.IntegerField()
+    superviseur_nom = models.CharField(max_length=200)
+    semaine = models.DateField()
+    ca = models.DecimalField(max_digits=15, decimal_places=2)
+    marge_brute = models.DecimalField(max_digits=15, decimal_places=2)
+    kg_vendus = models.DecimalField(max_digits=12, decimal_places=2)
+    nb_agents_actifs = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."vw_performance_superviseur_semaine'
+
+
+class VwPerformanceAgentSemaine(models.Model):
+    """Dashboard "Agents", volet hebdomadaire (24/07/2026, S-702). Miroir hebdomadaire (semaine
+    ISO lundi-dimanche) de VwPerformanceAgent — pas d'incentive/ratio ici (fct_salaires est
+    mensuel), cf. dbt_bi/models/marts/aggregates/vw_performance_agent_semaine.sql."""
+
+    agent_semaine_id = models.IntegerField(primary_key=True)
+    agent_id = models.IntegerField()
+    nom_complet = models.CharField(max_length=200)
+    type_agent = models.CharField(max_length=50)
+    superviseur_id = models.IntegerField(null=True)
+    superviseur_nom = models.CharField(max_length=200, null=True)
+    semaine = models.DateField()
+    kg_vendus = models.DecimalField(max_digits=12, decimal_places=2)
+    jours_actifs = models.IntegerField()
+    jours_ouvres = models.IntegerField(null=True)
+    kg_par_jour = models.DecimalField(max_digits=8, decimal_places=2, null=True)
+    statut_objectif_50kg = models.CharField(max_length=20, null=True)
+    marge = models.DecimalField(max_digits=15, decimal_places=2)
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."vw_performance_agent_semaine'
 
 
 class VwAnalyseStock(models.Model):

@@ -1,4 +1,6 @@
 import json
+from datetime import timedelta
+from types import SimpleNamespace
 
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
@@ -6,6 +8,7 @@ from django.db.models import Count, Max, Sum
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from bi import constants
 from bi.models import (
@@ -14,7 +17,9 @@ from bi.models import (
     VwDepensesCategorie,
     VwMargeFournisseur,
     VwPerformanceAgent,
+    VwPerformanceAgentSemaine,
     VwPerformanceSuperviseur,
+    VwPerformanceSuperviseurSemaine,
     VwRentabiliteGlobale,
     VwRentabiliteJournaliere,
     VwRentabiliteProduit,
@@ -114,6 +119,30 @@ def _chart_json(data):
     return json.dumps(data, cls=DjangoJSONEncoder)
 
 
+def _agreger_rentabilite(lignes):
+    """Agrège plusieurs lignes mensuelles de vw_rentabilite_globale en une seule (somme des
+    montants, pourcentages recalculés sur les totaux) — utilisé par le filtre temporel custom
+    du Dashboard Santé Globale, qui peut couvrir plusieurs mois."""
+    ca = sum(l.ca for l in lignes)
+    cout_achat = sum(l.cout_achat for l in lignes)
+    marge_brute = sum(l.marge_brute for l in lignes)
+    cout_salaires = sum(l.cout_salaires for l in lignes)
+    cout_depenses = sum(l.cout_depenses for l in lignes)
+    rentabilite_nette = sum(l.rentabilite_nette for l in lignes)
+    return SimpleNamespace(
+        ca=ca,
+        cout_achat=cout_achat,
+        marge_brute=marge_brute,
+        marge_pct=(marge_brute / ca * 100) if ca else None,
+        cout_salaires=cout_salaires,
+        salaires_pct=(cout_salaires / ca * 100) if ca else None,
+        cout_depenses=cout_depenses,
+        depenses_pct=(cout_depenses / ca * 100) if ca else None,
+        rentabilite_nette=rentabilite_nette,
+        rentabilite_nette_pct=(rentabilite_nette / ca * 100) if ca else None,
+    )
+
+
 @bi_access_required
 def sommaire(request):
     context = _base_context(request, None, "Sommaire")
@@ -126,18 +155,50 @@ def dashboard_sante(request):
     context = _base_context(request, "sante", titre)
     annee, mois = context["annee"], context["mois"]
 
+    # Filtre temporel custom (date_debut/date_fin), propre au Dashboard Santé Globale — permet
+    # une plage à cheval sur plusieurs mois, en plus du sélecteur année/mois du base_dashboard.
+    date_debut = parse_date(request.GET.get("date_debut") or "")
+    date_fin = parse_date(request.GET.get("date_fin") or "")
+    periode_custom = bool(date_debut and date_fin)
+    context.update({"date_debut": date_debut, "date_fin": date_fin})
+
     qs = VwRentabiliteGlobale.objects.order_by("mois")
-    if annee:
-        qs = qs.filter(mois__year=annee)
-    if mois:
-        qs = qs.filter(mois__month=mois)
+    if periode_custom:
+        qs = qs.filter(mois__gte=date_debut, mois__lte=date_fin)
+        context["periode_libelle"] = f"{date_debut:%d/%m/%Y} – {date_fin:%d/%m/%Y}"
+    else:
+        if annee:
+            qs = qs.filter(mois__year=annee)
+        if mois:
+            qs = qs.filter(mois__month=mois)
     lignes = list(qs)
 
     if not lignes:
         context["est_vide"] = True
         return render(request, "bi/dashboard_sante.html", context)
 
-    courante = lignes[-1]
+    courante = _agreger_rentabilite(lignes) if periode_custom else lignes[-1]
+
+    # Comparaison de la marge brute du mois/de la période sélectionnée (courante.marge_brute —
+    # la valeur réellement affichée dans le KPI, agrégée si filtre custom multi-mois) face au
+    # mois qui précède immédiatement cette sélection dans les données (pas "aujourd'hui - 1
+    # mois" : le mois de référence suit le filtre actif, par défaut le dernier mois disponible).
+    mois_reference = lignes[-1].mois
+    mois_precedent = (
+        VwRentabiliteGlobale.objects.filter(mois__lt=mois_reference)
+        .order_by("-mois")
+        .first()
+    )
+    comparaison_marge_brute = None
+    if mois_precedent:
+        marge_brute_precedente = mois_precedent.marge_brute
+        delta = courante.marge_brute - marge_brute_precedente
+        comparaison_marge_brute = {
+            "mois_precedent_libelle": f"{MOIS_FR[mois_precedent.mois.month]} {mois_precedent.mois.year}",
+            "delta": delta,
+            "delta_pct": (delta / marge_brute_precedente * 100) if marge_brute_precedente else None,
+        }
+    context["comparaison_marge_brute"] = comparaison_marge_brute
     # Priorité de cette phase (23/07/2026) : déterminer la marge BRUTE (a-t-on de la marge sur
     # nos ventes ?), la marge nette (qui englobe salaires + dépenses ROT) est une vue
     # complémentaire, secondaire pour l'instant — d'où les deux groupes distincts.
@@ -205,16 +266,20 @@ def dashboard_sante(request):
         },
     ]
 
-    # Graphique en journalier quand un mois précis est filtré (le cas par défaut désormais,
-    # cf. _dernier_mois_disponible) : le grain mensuel de vw_rentabilite_globale réduirait sinon
-    # la série à un seul point. En "Toutes périodes", on garde la tendance mensuelle multi-mois.
-    chart_est_journalier = bool(annee and mois)
+    # Graphique en journalier quand un mois précis (ou une plage custom) est filtré : le grain
+    # mensuel de vw_rentabilite_globale réduirait sinon la série à un seul point par mois. En
+    # "Toutes périodes", on garde la tendance mensuelle multi-mois.
+    chart_est_journalier = periode_custom or bool(annee and mois)
+    if periode_custom:
+        jours_qs = VwRentabiliteJournaliere.objects.filter(
+            jour__gte=date_debut, jour__lte=date_fin
+        ).order_by("jour")
+    elif chart_est_journalier:
+        jours_qs = VwRentabiliteJournaliere.objects.filter(
+            jour__year=annee, jour__month=mois
+        ).order_by("jour")
     if chart_est_journalier:
-        jours = list(
-            VwRentabiliteJournaliere.objects.filter(
-                jour__year=annee, jour__month=mois
-            ).order_by("jour")
-        )
+        jours = list(jours_qs)
         chart_data = _chart_json(
             {
                 "labels": [j.jour.strftime("%d/%m") for j in jours],
@@ -282,29 +347,99 @@ def dashboard_produits(request):
     return render(request, "bi/dashboard_produits.html", context)
 
 
+def _mois_precedent(annee, mois):
+    if mois == 1:
+        return annee - 1, 12
+    return annee, mois - 1
+
+
 @bi_access_required
 def dashboard_agents(request):
-    """Performance Agent & Équipes : bloc superviseurs/équipes (KPI-201 à 206) suivi du détail
-    agents vs objectif 50 kg/jour (KPI-301 à 306) — les deux filtrés par mois."""
+    """Dashboard Agents : bloc superviseurs/équipes (KPI-201 à 206, tri par kilo vendu — priorité
+    produit du 24/07/2026, cf. chef_projet/BILAN_LIVRAISON_VS_VISION.md) suivi du détail agents
+    vs objectif 50 kg/jour (KPI-301 à 306). Bascule semaine/mois (S-702, 24/07/2026) : pas de
+    "Toutes périodes" ici (UX jugée illisible sur ce dashboard, cf. filtre_periode surchargé
+    dans dashboard_agents.html) — toujours une période concrète, semaine ISO ou mois calendaire.
+    """
     titre = dict(constants.DASHBOARDS)["agents"]
     context = _base_context(request, "agents", titre)
-    annee, mois = context["annee"], context["mois"]
 
-    superviseurs_qs = VwPerformanceSuperviseur.objects.order_by("-rentabilite_nette")
-    if annee:
-        superviseurs_qs = superviseurs_qs.filter(mois__year=annee)
-    if mois:
-        superviseurs_qs = superviseurs_qs.filter(mois__month=mois)
-    superviseurs = list(superviseurs_qs)
+    granularite = request.GET.get("granularite")
+    if granularite not in ("semaine", "mois"):
+        granularite = "mois"
+    context["granularite"] = granularite
 
-    agents_qs = VwPerformanceAgent.objects.order_by("-kg_par_jour")
-    if annee:
-        agents_qs = agents_qs.filter(mois__year=annee)
-    if mois:
-        agents_qs = agents_qs.filter(mois__month=mois)
+    if granularite == "semaine":
+        semaines_disponibles = list(
+            VwPerformanceAgentSemaine.objects.order_by("-semaine")
+            .values_list("semaine", flat=True)
+            .distinct()[:12]
+        )
+        semaine_demandee = parse_date(request.GET.get("semaine") or "")
+        semaine_selectionnee = (
+            semaine_demandee
+            if semaine_demandee in semaines_disponibles
+            else (semaines_disponibles[0] if semaines_disponibles else None)
+        )
+        context.update(
+            {
+                "semaines_disponibles": semaines_disponibles,
+                "semaine_selectionnee": semaine_selectionnee,
+            }
+        )
+        if semaine_selectionnee:
+            context["periode_libelle"] = (
+                f"Semaine du {semaine_selectionnee:%d/%m/%Y} "
+                f"au {(semaine_selectionnee + timedelta(days=6)):%d/%m/%Y}"
+            )
+            superviseurs_qs = VwPerformanceSuperviseurSemaine.objects.filter(
+                semaine=semaine_selectionnee
+            ).order_by("-kg_vendus")
+            agents_qs = VwPerformanceAgentSemaine.objects.filter(
+                semaine=semaine_selectionnee
+            ).order_by("-kg_par_jour")
+            semaine_precedente = semaine_selectionnee - timedelta(days=7)
+            kg_vendus_precedents = dict(
+                VwPerformanceSuperviseurSemaine.objects.filter(
+                    semaine=semaine_precedente
+                ).values_list("superviseur_id", "kg_vendus")
+            )
+            periode_precedente_libelle = f"la semaine du {semaine_precedente:%d/%m/%Y}"
+        else:
+            superviseurs_qs = VwPerformanceSuperviseurSemaine.objects.none()
+            agents_qs = VwPerformanceAgentSemaine.objects.none()
+            kg_vendus_precedents = {}
+            periode_precedente_libelle = None
+    else:
+        annee, mois = context["annee"], context["mois"]
+        if not annee or not mois:
+            annee, mois = _dernier_mois_disponible()
+            context["annee"], context["mois"] = annee, mois
+        context["periode_libelle"] = f"{MOIS_FR[mois]} {annee}"
+
+        superviseurs_qs = VwPerformanceSuperviseur.objects.filter(
+            mois__year=annee, mois__month=mois
+        ).order_by("-kg_vendus")
+        agents_qs = VwPerformanceAgent.objects.filter(
+            mois__year=annee, mois__month=mois
+        ).order_by("-kg_par_jour")
+        annee_prec, mois_prec = _mois_precedent(annee, mois)
+        kg_vendus_precedents = dict(
+            VwPerformanceSuperviseur.objects.filter(
+                mois__year=annee_prec, mois__month=mois_prec
+            ).values_list("superviseur_id", "kg_vendus")
+        )
+        periode_precedente_libelle = f"{MOIS_FR[mois_prec]} {annee_prec}"
+
+    type_agent_filtre = request.GET.get("type_agent")
+    if type_agent_filtre:
+        agents_qs = agents_qs.filter(type_agent=type_agent_filtre)
+
     superviseur_filtre = request.GET.get("superviseur")
     if superviseur_filtre:
         agents_qs = agents_qs.filter(superviseur_id=superviseur_filtre)
+
+    superviseurs = list(superviseurs_qs)
     agents = list(agents_qs)
 
     if not superviseurs and not agents:
@@ -312,18 +447,22 @@ def dashboard_agents(request):
         return render(request, "bi/dashboard_agents.html", context)
 
     for s in superviseurs:
-        s.statut = constants.statut_rentabilite_superviseur(s.rentabilite_nette)
+        kg_precedent = kg_vendus_precedents.get(s.superviseur_id)
+        s.kg_vendus_precedent = kg_precedent
+        s.kg_vendus_delta = (s.kg_vendus - kg_precedent) if kg_precedent is not None else None
 
     for a in agents:
         a.statut_couleur = constants.statut_objectif_agent(a.statut_objectif_50kg)
         a.statut_label = constants.STATUT_OBJECTIF_LABELS.get(a.statut_objectif_50kg, "—")
-        a.statut_rentabilite = constants.statut_rentabilite_agent(a.rentabilite_agent)
-        a.statut_ratio = constants.statut_ratio_incentive_marge(a.ratio_incentive_marge_pct)
+        # Grain semaine (VwPerformanceAgentSemaine) n'a pas d'incentive (fct_salaires est
+        # mensuel, cf. commentaire dbt) : rentabilité affichée = marge brute dans ce cas.
+        a.rentabilite_affichee = getattr(a, "rentabilite_agent", a.marge)
+        a.statut_rentabilite = constants.statut_rentabilite_agent(a.rentabilite_affichee)
 
     superviseurs_chart = _chart_json(
         {
             "labels": [s.superviseur_nom for s in superviseurs],
-            "rentabilite_nette": [s.rentabilite_nette for s in superviseurs],
+            "kg_vendus": [s.kg_vendus for s in superviseurs],
         }
     )
     chart_data = _chart_json(
@@ -338,9 +477,12 @@ def dashboard_agents(request):
         {
             "superviseurs": superviseurs,
             "superviseurs_chart": superviseurs_chart,
+            "periode_precedente_libelle": periode_precedente_libelle,
             "agents": agents,
             "chart_data": chart_data,
             "superviseur_filtre": int(superviseur_filtre) if superviseur_filtre else None,
+            "type_agent_filtre": type_agent_filtre or None,
+            "type_agent_options": constants.TYPE_AGENT_CHOICES,
         }
     )
     return render(request, "bi/dashboard_agents.html", context)
@@ -411,28 +553,41 @@ def dashboard_stock(request):
     stock = list(stock_qs.order_by("-valeur_stock"))
     total_stock = stock_qs.aggregate(total=Sum("valeur_stock"))["total"]
 
-    fournisseurs_qs = VwMargeFournisseur.objects.order_by("-marge_calibree")
+    marge_qs = VwMargeFournisseur.objects.all()
     if annee:
-        fournisseurs_qs = fournisseurs_qs.filter(mois__year=annee)
+        marge_qs = marge_qs.filter(mois__year=annee)
     if mois:
-        fournisseurs_qs = fournisseurs_qs.filter(mois__month=mois)
+        marge_qs = marge_qs.filter(mois__month=mois)
     if fournisseur_filtre:
-        fournisseurs_qs = fournisseurs_qs.filter(fournisseur_id=fournisseur_filtre)
+        marge_qs = marge_qs.filter(fournisseur_id=fournisseur_filtre)
     if produit_filtre:
-        fournisseurs_qs = fournisseurs_qs.filter(produit_id=produit_filtre)
-    fournisseurs = list(fournisseurs_qs)
+        marge_qs = marge_qs.filter(produit_id=produit_filtre)
 
-    ajustements_counts = {
-        (c["lot__fournisseur_id"], c["lot__produit_id"], c["lot__date_reception__year"], c["lot__date_reception__month"]): c["n"]
-        for c in AjustementPrixAchat.objects.values(
-            "lot__fournisseur_id",
-            "lot__produit_id",
-            "lot__date_reception__year",
-            "lot__date_reception__month",
-        ).annotate(n=Count("id"))
+    # Une marge par fournisseur x produit x mois est illisible en un coup d'œil (24/07/2026,
+    # décision produit) : deux vues agrégées à la place — marge par fournisseur (tous produits
+    # confondus) et marge par produit (tous fournisseurs confondus), toutes deux réactives aux
+    # filtres produit/fournisseur/période déjà en place sur la page.
+    marge_par_fournisseur = list(
+        marge_qs.values("fournisseur_id", "fournisseur_nom")
+        .annotate(ca=Sum("ca"), marge=Sum("marge_calibree"))
+        .order_by("-marge")
+    )
+    marge_par_produit = list(
+        marge_qs.values("produit_id", "produit_nom")
+        .annotate(ca=Sum("ca"), marge=Sum("marge_calibree"))
+        .order_by("-marge")
+    )
+
+    ajustements_par_fournisseur = {
+        c["lot__fournisseur_id"]: c["n"]
+        for c in AjustementPrixAchat.objects.values("lot__fournisseur_id").annotate(n=Count("id"))
+    }
+    ajustements_par_produit = {
+        c["lot__produit_id"]: c["n"]
+        for c in AjustementPrixAchat.objects.values("lot__produit_id").annotate(n=Count("id"))
     }
 
-    if not stock and not fournisseurs:
+    if not stock and not marge_par_fournisseur:
         context["est_vide"] = True
         context.update(
             {
@@ -447,18 +602,23 @@ def dashboard_stock(request):
     for s in stock:
         s.statut = constants.statut_jours_stock(s.jours_en_stock_moyen)
 
-    for f in fournisseurs:
-        f.statut = constants.statut_marge_fournisseur(f.marge_calibree, f.marge_calibree_pct)
-        f.nb_ajustements = ajustements_counts.get(
-            (f.fournisseur_id, f.produit_id, f.mois.year, f.mois.month), 0
-        )
+    for f in marge_par_fournisseur:
+        f["marge_pct"] = (f["marge"] / f["ca"] * 100) if f["ca"] else None
+        f["statut"] = constants.statut_marge(f["marge"], f["marge_pct"])
+        f["nb_ajustements"] = ajustements_par_fournisseur.get(f["fournisseur_id"], 0)
+
+    for p in marge_par_produit:
+        p["marge_pct"] = (p["marge"] / p["ca"] * 100) if p["ca"] else None
+        p["statut"] = constants.statut_marge(p["marge"], p["marge_pct"])
+        p["nb_ajustements"] = ajustements_par_produit.get(p["produit_id"], 0)
 
     context.update(
         {
             "stock": stock,
             "total_stock": total_stock,
             "total_stock_statut": constants.statut_valeur_stock(total_stock),
-            "fournisseurs": fournisseurs,
+            "marge_par_fournisseur": marge_par_fournisseur,
+            "marge_par_produit": marge_par_produit,
             "produit_options": produit_options,
             "fournisseur_options": fournisseur_options,
             "produit_filtre": int(produit_filtre) if produit_filtre else None,

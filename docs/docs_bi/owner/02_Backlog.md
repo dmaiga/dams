@@ -133,6 +133,19 @@ Chaque story est rattachée à une **question métier** (Q1–Q10 de [01_Vision_
 | S-711 | En tant qu'**Architecte**, je veux le **cron `dbt run` nightly (23h00 Mali, ADR-006)** en production avec **logs + alerte email en cas d'échec** (ADR-007 facteur XI), afin que les dashboards reflètent des données à jour chaque matin, comme promis par le DoD. | 🔴 MUST | Orchestration — reprend S-005 |
 | S-712 | En tant que **Chef Projet**, je veux **re-scoper le Sprint 4** pour retirer les tâches Metabase devenues obsolètes ([ADR-009](../architecte/04_ADR.md)), afin de ne pas planifier du travail qui ne sera jamais fait. | 🔴 MUST | Sprint 4, à faire en premier |
 
+> **Statut à la clôture v1 (24/07/2026)** — détail complet dans
+> [../chef_projet/BILAN_LIVRAISON_VS_VISION.md](../chef_projet/BILAN_LIVRAISON_VS_VISION.md) §2/§8 :
+> - ✅ **Livrées** : S-702 (bascule semaine/mois), S-702b (filtres superviseur + type_agent),
+>   S-703b (filtres produit/fournisseur), S-703 traitée différemment (deux cards agrégées
+>   marge fournisseur/produit plutôt que le regroupement visuel demandé — Direction encore en
+>   réflexion sur cette page).
+> - 🟡 **Partielles** : S-705 (comparaison M-1 sur marge brute et kilo vendu, pas de tendance 6
+>   mois), S-709 (graphiques responsives, pas de passe systématique), S-710 (matérialisation en
+>   table faite, pas de mesure grande volumétrie / index dédiés).
+> - ❌ **Volontairement différées**, actées comme décisions et non comme dette : S-704 (contrôle
+>   d'accès par rôle), S-711 (cron dbt nightly), S-712 (re-scope planning).
+> - 🟢 **Repoussées v1.5, inchangées** : S-701, S-706, S-707, S-708.
+
 ---
 
 ## Hors périmètre MVP (⚪ WON'T now)

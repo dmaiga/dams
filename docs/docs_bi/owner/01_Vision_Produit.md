@@ -40,6 +40,17 @@ Il verse le reste à la banque
 
 ---
 
+> **Priorité de phase (24/07/2026, clôture v1)** : cette Vision Produit pose la rentabilité nette
+> comme le chiffre le plus important à suivre à terme — cela reste l'objectif. Mais pour la v1
+> livrée, la Direction a choisi de mettre en avant la **marge brute** (carte principale du
+> dashboard Santé Globale, `KPI-003`), la rentabilité nette (`KPI-009`) restant affichée en
+> section secondaire. C'est une décision assumée pour cette phase du projet (déterminer d'abord
+> si l'activité dégage de la marge, avant de juger la rentabilité complète), pas un changement
+> durable de ce que ce document définit comme objectif final. Détail dans
+> `chef_projet/BILAN_LIVRAISON_VS_VISION.md` §3.4/§5bis.
+
+---
+
 ## Le Vrai Problème
 
 Tu dois décider chaque mois :

@@ -30,7 +30,9 @@ from bi.models import (
     VwDepensesCategorie,
     VwMargeFournisseur,
     VwPerformanceAgent,
+    VwPerformanceAgentSemaine,
     VwPerformanceSuperviseur,
+    VwPerformanceSuperviseurSemaine,
     VwRentabiliteGlobale,
     VwRentabiliteJournaliere,
     VwRentabiliteProduit,
@@ -106,6 +108,7 @@ def test_dashboard_sante_avec_donnees(client, utilisateur_connecte):
     )
     with patch.object(VwRentabiliteGlobale, "objects") as mock_globale:
         mock_globale.order_by.return_value = [ligne]
+        mock_globale.filter.return_value.order_by.return_value.first.return_value = None
         response = client.get(reverse("bi:sante"), TOUTES_PERIODES)
 
     assert response.status_code == 200
@@ -146,6 +149,7 @@ def test_dashboard_sante_graph_journalier_si_mois_precis(client, utilisateur_con
         VwRentabiliteJournaliere, "objects"
     ) as mock_journaliere:
         mock_globale.order_by.return_value.filter.return_value.filter.return_value = [ligne]
+        mock_globale.filter.return_value.order_by.return_value.first.return_value = None
         mock_journaliere.filter.return_value.order_by.return_value = [jour]
         response = client.get(reverse("bi:sante"), {"annee": "2026", "mois": "6"})
 
@@ -219,6 +223,7 @@ def test_dashboard_agents_ok(client, utilisateur_connecte):
         mois=datetime.date(2026, 6, 1),
         ca=Decimal("3000000"),
         marge_brute=Decimal("1500000"),
+        kg_vendus=Decimal("1200"),
         cout_equipe=Decimal("500000"),
         rentabilite_nette=Decimal("1000000"),
         nb_agents_actifs=5,
@@ -244,12 +249,13 @@ def test_dashboard_agents_ok(client, utilisateur_connecte):
     with patch.object(VwPerformanceSuperviseur, "objects") as mock_sup, patch.object(
         VwPerformanceAgent, "objects"
     ) as mock_agent:
-        mock_sup.order_by.return_value = [superviseur]
-        mock_agent.order_by.return_value = [agent]
-        response = client.get(reverse("bi:agents"), TOUTES_PERIODES)
+        mock_sup.filter.return_value.order_by.return_value = [superviseur]
+        mock_sup.filter.return_value.values_list.return_value = []
+        mock_agent.filter.return_value.order_by.return_value = [agent]
+        response = client.get(reverse("bi:agents"), {"annee": "2026", "mois": "6"})
 
     assert response.status_code == 200
-    assert response.context["superviseurs"][0].statut == "vert"
+    assert response.context["superviseurs"][0].kg_vendus == Decimal("1200")
     assert response.context["agents"][0].statut_couleur == "vert"
     assert response.context["agents"][0].statut_label == "✅ Atteint"
 
@@ -278,15 +284,106 @@ def test_dashboard_agents_filtre_superviseur(client, utilisateur_connecte):
     with patch.object(VwPerformanceSuperviseur, "objects") as mock_sup, patch.object(
         VwPerformanceAgent, "objects"
     ) as mock_agent:
-        mock_sup.order_by.return_value = []
-        mock_agent.order_by.return_value.filter.return_value = [agent]
+        mock_sup.filter.return_value.order_by.return_value = []
+        mock_sup.filter.return_value.values_list.return_value = []
+        mock_agent.filter.return_value.order_by.return_value.filter.return_value = [agent]
         response = client.get(
-            reverse("bi:agents"), {**TOUTES_PERIODES, "superviseur": "1"}
+            reverse("bi:agents"), {"annee": "2026", "mois": "6", "superviseur": "1"}
         )
 
     assert response.status_code == 200
-    mock_agent.order_by.return_value.filter.assert_called_once_with(superviseur_id="1")
+    mock_agent.filter.return_value.order_by.return_value.filter.assert_called_once_with(
+        superviseur_id="1"
+    )
     assert response.context["superviseur_filtre"] == 1
+
+
+@pytest.mark.django_db
+def test_dashboard_agents_filtre_type_agent(client, utilisateur_connecte):
+    import datetime
+
+    agent = SimpleNamespace(
+        agent_id=1,
+        nom_complet="Aminata Traoré",
+        type_agent="agent_gros",
+        superviseur_id=1,
+        superviseur_nom="Ismael",
+        mois=datetime.date(2026, 6, 1),
+        kg_vendus=Decimal("250"),
+        jours_actifs=5,
+        jours_ouvres=26,
+        kg_par_jour=Decimal("50.00"),
+        statut_objectif_50kg="atteint",
+        marge=Decimal("100000"),
+        incentive=Decimal("6250"),
+        rentabilite_agent=Decimal("93750"),
+        ratio_incentive_marge_pct=Decimal("6.25"),
+    )
+    with patch.object(VwPerformanceSuperviseur, "objects") as mock_sup, patch.object(
+        VwPerformanceAgent, "objects"
+    ) as mock_agent:
+        mock_sup.filter.return_value.order_by.return_value = []
+        mock_sup.filter.return_value.values_list.return_value = []
+        mock_agent.filter.return_value.order_by.return_value.filter.return_value = [agent]
+        response = client.get(
+            reverse("bi:agents"), {"annee": "2026", "mois": "6", "type_agent": "agent_gros"}
+        )
+
+    assert response.status_code == 200
+    mock_agent.filter.return_value.order_by.return_value.filter.assert_called_once_with(
+        type_agent="agent_gros"
+    )
+    assert response.context["type_agent_filtre"] == "agent_gros"
+
+
+@pytest.mark.django_db
+def test_dashboard_agents_granularite_semaine(client, utilisateur_connecte):
+    import datetime
+
+    semaine = datetime.date(2026, 7, 20)
+    superviseur = SimpleNamespace(
+        superviseur_id=1,
+        superviseur_nom="Ismael",
+        semaine=semaine,
+        ca=Decimal("700000"),
+        marge_brute=Decimal("350000"),
+        kg_vendus=Decimal("300"),
+        nb_agents_actifs=5,
+    )
+    agent = SimpleNamespace(
+        agent_id=1,
+        nom_complet="Aminata Traoré",
+        type_agent="terrain",
+        superviseur_id=1,
+        superviseur_nom="Ismael",
+        semaine=semaine,
+        kg_vendus=Decimal("60"),
+        jours_actifs=5,
+        jours_ouvres=6,
+        kg_par_jour=Decimal("10.00"),
+        statut_objectif_50kg="sous_objectif",
+        marge=Decimal("20000"),
+    )
+    with patch.object(VwPerformanceSuperviseurSemaine, "objects") as mock_sup, patch.object(
+        VwPerformanceAgentSemaine, "objects"
+    ) as mock_agent:
+        mock_agent.order_by.return_value.values_list.return_value.distinct.return_value = [
+            semaine
+        ]
+        mock_sup.filter.return_value.order_by.return_value = [superviseur]
+        mock_sup.filter.return_value.values_list.return_value = []
+        mock_agent.filter.return_value.order_by.return_value = [agent]
+        response = client.get(
+            reverse("bi:agents"),
+            {**TOUTES_PERIODES, "granularite": "semaine", "semaine": "2026-07-20"},
+        )
+
+    assert response.status_code == 200
+    assert response.context["granularite"] == "semaine"
+    assert response.context["semaine_selectionnee"] == semaine
+    assert response.context["superviseurs"][0].kg_vendus == Decimal("300")
+    # Pas d'incentive au grain semaine : la "rentabilité" affichée retombe sur la marge brute.
+    assert response.context["agents"][0].rentabilite_affichee == Decimal("20000")
 
 
 @pytest.mark.django_db
@@ -302,23 +399,18 @@ def test_dashboard_stock_ok(client, utilisateur_connecte):
         valeur_stock=Decimal("1000000"),
         jours_en_stock_moyen=Decimal("20.0"),
     )
-    fournisseur_ligne = SimpleNamespace(
-        fournisseur_mois_id=1,
-        fournisseur_id=1,
-        fournisseur_nom="Fournisseur A",
-        produit_id=1,
-        produit_nom="Riz",
-        mois=datetime.date(2026, 6, 1),
-        ca=Decimal("2000000"),
-        cout_achat_systeme=Decimal("1000000"),
-        marge_systeme=Decimal("1000000"),
-        marge_pct_systeme=Decimal("50.00"),
-        prix_achat_corrige_pondere=None,
-        calibre=False,
-        cout_achat_calibre=Decimal("1000000"),
-        marge_calibree=Decimal("1000000"),
-        marge_calibree_pct=Decimal("50.00"),
-    )
+    marge_fournisseur_ligne = {
+        "fournisseur_id": 1,
+        "fournisseur_nom": "Fournisseur A",
+        "ca": Decimal("2000000"),
+        "marge": Decimal("1000000"),
+    }
+    marge_produit_ligne = {
+        "produit_id": 1,
+        "produit_nom": "Riz",
+        "ca": Decimal("2000000"),
+        "marge": Decimal("1000000"),
+    }
     with patch.object(VwAnalyseStock, "objects") as mock_stock, patch.object(
         VwMargeFournisseur, "objects"
     ) as mock_fourn:
@@ -330,10 +422,20 @@ def test_dashboard_stock_ok(client, utilisateur_connecte):
         mock_fourn.exclude.return_value.values_list.return_value.distinct.return_value = [
             (1, "Fournisseur A")
         ]
-        mock_fourn.order_by.return_value = [fournisseur_ligne]
+
+        def values_side_effect(*args, **kwargs):
+            resultat = MagicMock()
+            if args == ("fournisseur_id", "fournisseur_nom"):
+                resultat.annotate.return_value.order_by.return_value = [marge_fournisseur_ligne]
+            else:
+                resultat.annotate.return_value.order_by.return_value = [marge_produit_ligne]
+            return resultat
+
+        mock_fourn.all.return_value.values.side_effect = values_side_effect
         response = client.get(reverse("bi:stock"), TOUTES_PERIODES)
 
     assert response.status_code == 200
     assert response.context["total_stock"] == Decimal("1000000")
-    assert response.context["fournisseurs"][0].nb_ajustements == 0
+    assert response.context["marge_par_fournisseur"][0]["nb_ajustements"] == 0
+    assert response.context["marge_par_produit"][0]["marge_pct"] == 50
     mock_stock.filter.assert_called_with(valeur_stock__gt=0)

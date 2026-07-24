@@ -2,6 +2,14 @@
 
 ---
 
+> **Clôture v1 (24/07/2026)** : dashboards renommés en 5 axes métier — Santé Globale, Vente,
+> Agent (fusion Superviseur + Agent), Dépense, Fournisseur (voir `bi/08_Dashboard_Catalog.md`).
+> Nouveau sur le dashboard Agent : kilo vendu par équipe (priorité de lecture avant la
+> rentabilité nette), comparaison vs la période précédente, bascule semaine/mois. Le ratio
+> incentive/marge (KPI-non numéroté ici, cf. Technique KPI-305) n'est plus affiché. Sur le
+> dashboard Fournisseur : deux vues séparées "Marge par fournisseur" et "Marge par produit"
+> remplacent le tableau détaillé fournisseur x produit.
+
 ## 🎯 KPI CRITIQUES (Dashboard 1 : Santé Globale)
 
 ### KPI-001 : Chiffre d'Affaires Total (CA)
@@ -81,6 +89,16 @@
   - ✅ > 0 = Nous gagnons de l'argent
   - ❌ < 0 = Nous perdons de l'argent
   - ⚠️ Positif mais faible = À investiguer
+
+---
+
+### KPI-010 : Rentabilité Nette %
+- **Nom** : Le vrai bénéfice, en pourcentage du CA
+- **Formule** : (Rentabilité nette / CA) × 100%
+- **Dimension** : Global, par mois
+- **Propriétaire** : Direction / Finance
+- **Ajouté** : 23/07/2026 — section secondaire "marge nette", la marge brute (KPI-003/004) reste
+  le chiffre mis en avant pour cette phase du projet
 
 ---
 
@@ -179,6 +197,15 @@
 - **Formule** : CA superviseur / Nombre agents
 - **Dimension** : Superviseur
 - **Cible** : > 500,000 FCFA/agent/mois
+
+---
+
+### **KPI-207 : Kilo Vendu par Équipe** ⭐ NOUVEAU (24/07/2026)
+- **Nom** : Combien de kilos l'équipe d'un superviseur a-t-elle vendu ?
+- **Formule** : SUM(kg vendus par tous les agents du superviseur)
+- **Dimension** : Superviseur, par mois ou par semaine
+- **Priorité** : c'est le chiffre mis en avant sur le tableau équipe, avant la rentabilité nette
+- **Affichage** : avec comparaison vs la période précédente (mois-1 ou semaine-1)
 
 ---
 
@@ -313,6 +340,21 @@
 
 ---
 
+### **KPI-506 : Marge par Produit (tous fournisseurs confondus)** ⭐ NOUVEAU (24/07/2026)
+- **Nom** : Ce produit est-il rentable, peu importe qui l'a fourni ?
+- **Formule** : SUM(marge) par produit, tous fournisseurs additionnés
+- **Dimension** : Produit
+- **Remplace** : l'ancien tableau détaillé fournisseur x produit, jugé illisible
+
+---
+
+### **KPI-507 : Marge % par Produit (tous fournisseurs confondus)** ⭐ NOUVEAU (24/07/2026)
+- **Nom** : Pourcentage marge par produit
+- **Formule** : (KPI-506 / CA produit tous fournisseurs) × 100%
+- **Dimension** : Produit
+
+---
+
 ## 🚨 KPI VIGILANCE (Alertes)
 
 ### KPI-901 : Produits Déficitaires
@@ -345,25 +387,30 @@
 
 ---
 
-## 📋 Synthèse : Les 28 KPI du MVP
+## 📋 Synthèse : Les 31 KPI de la v1 (clôturée le 24/07/2026)
 
 | Groupe | Nombre | KPI Principaux |
 |--------|--------|---------|
-| **Santé Globale** | 6 | CA, Marge, Salaires, Dépenses, Rentabilité |
+| **Santé Globale** | 7 | CA, Marge, Salaires, Dépenses, Rentabilité (brute + nette) |
 | **Produit** | 4 | CA, Marge, Rotation, Déficitaires |
-| **Superviseur** | 6 + 2 | Performance, Dépenses |
+| **Superviseur** | 7 + 2 | Performance, Kilo vendu par équipe, Dépenses |
 | **Agent** | 4 + 2 | Performance, Objectif |
-| **Stock** | 5 | Valeur, Rotation, Fournisseurs |
+| **Stock / Fournisseur** | 7 | Valeur, Rotation, Marge fournisseur, Marge produit |
 | **Alertes** | 5 | Vigilances |
-| **TOTAL** | **28** | **MVP Complet** |
+| **TOTAL** | **31** | **v1 close** |
 
 ---
 
 ## ✅ Important
 
-**Les KPI en gras ⭐ NOUVEAU** sont les ajouts pour cette révision :
+**Les KPI en gras ⭐ NOUVEAU** sont les ajouts successifs :
 - KPI-701/702 : Dépenses par catégorie
 - KPI-401/402 : Agents vs objectif 50 kg/jour
+- KPI-010 (23/07/2026) : Rentabilité nette %, secondaire à la marge brute pour cette phase
+- KPI-207 (24/07/2026) : Kilo vendu par équipe — priorité de lecture sur le dashboard Agent
+- KPI-506/507 (24/07/2026) : Marge par produit tous fournisseurs confondus
 
-Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui atteint l'objectif fixe de l'entreprise".
+Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
+atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de
+kilos", pas seulement qui dégage la meilleure rentabilité nette.
 

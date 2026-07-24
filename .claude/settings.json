@@ -30,7 +30,12 @@
       "Bash(python manage.py dbshell -c \"DROP VIEW IF EXISTS bi_.stg_ajustements_prix_achat CASCADE;\")",
       "Bash(python -m pytest bi/tests/test_views.py::test_dashboard_sante_graph_journalier_si_mois_precis -q)",
       "Bash(git fetch *)",
-      "Bash(git rev-list *)"
+      "Bash(git rev-list *)",
+      "Bash(python -m pytest bi/tests/test_views.py -q)",
+      "Bash(python -m pytest bi/ -q)",
+      "Bash(dbt --version)",
+      "Bash(dbt run *)",
+      "Bash(dbt test *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

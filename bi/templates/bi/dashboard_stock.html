@@ -64,28 +64,56 @@
             <thead>
                 <tr>
                     <th>Fournisseur</th>
-                    <th>Produit</th>
-                    <th>Mois</th>
                     <th class="text-right">CA</th>
-                    <th class="text-right">Marge système</th>
-                    <th class="text-right">Marge calibrée</th>
-                    <th class="text-right">Marge calibrée %</th>
+                    <th class="text-right">Marge</th>
+                    <th class="text-right">Marge %</th>
                     <th>Calibration</th>
                 </tr>
             </thead>
             <tbody>
-                {% for f in fournisseurs %}
+                {% for f in marge_par_fournisseur %}
                 <tr>
                     <td>{{ f.fournisseur_nom|default:"—" }}</td>
-                    <td>{{ f.produit_nom|default:"—" }}</td>
-                    <td>{{ f.mois|date:"m/Y" }}</td>
                     <td class="text-right">{{ f.ca|floatformat:0 }}</td>
-                    <td class="text-right">{{ f.marge_systeme|floatformat:0 }}</td>
-                    <td class="text-right">{{ f.marge_calibree|floatformat:0 }}</td>
-                    <td class="text-right"><span class="bi-badge bi-{{ f.statut }}">{{ f.marge_calibree_pct|default_if_none:"—" }}</span></td>
+                    <td class="text-right">{{ f.marge|floatformat:0 }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ f.statut }}">{{ f.marge_pct|default_if_none:"—"|floatformat:2 }}</span></td>
                     <td>
-                        {% if f.calibre %}
+                        {% if f.nb_ajustements %}
                         <span class="bi-badge bi-vert">{{ f.nb_ajustements }} ajustement{{ f.nb_ajustements|pluralize }}</span>
+                        {% else %}
+                        <span class="bi-badge bi-neutre">Non calibré</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="bi-panel">
+    <h2>Marge par produit</h2>
+    <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge</th>
+                    <th class="text-right">Marge %</th>
+                    <th>Calibration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in marge_par_produit %}
+                <tr>
+                    <td>{{ p.produit_nom|default:"—" }}</td>
+                    <td class="text-right">{{ p.ca|floatformat:0 }}</td>
+                    <td class="text-right">{{ p.marge|floatformat:0 }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ p.statut }}">{{ p.marge_pct|default_if_none:"—"|floatformat:2 }}</span></td>
+                    <td>
+                        {% if p.nb_ajustements %}
+                        <span class="bi-badge bi-vert">{{ p.nb_ajustements }} ajustement{{ p.nb_ajustements|pluralize }}</span>
                         {% else %}
                         <span class="bi-badge bi-neutre">Non calibré</span>
                         {% endif %}

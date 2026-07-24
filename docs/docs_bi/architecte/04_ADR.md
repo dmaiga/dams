@@ -158,6 +158,21 @@ Faire une analyse "ponctuelle" ou "évolutive" ? Période figée ou glissante ?
 - ❌ Pas de suivi temps réel
 - ℹ️ **Transition V2** : ajouter refresh nuit dès septembre
 
+### Amendement (24/07/2026, clôture v1)
+
+Le système livré ne respecte plus cette période figée : chaque dashboard filtre désormais par
+défaut sur le **dernier mois disponible** (glissant, sans borne de fin — voir
+`bi/views.py:_dernier_mois_disponible`), avec en plus :
+- un filtre temporel personnalisé Du/Au sur le dashboard Santé Globale (peut couvrir plusieurs
+  mois, hors des bornes 01/01–30/06) ;
+- un grain **hebdomadaire** (semaine ISO) en plus du mensuel sur le dashboard Agent.
+
+C'est la capacité "V2 : passer à mensuel/continu" anticipée dans la justification ci-dessus,
+livrée de facto en avance sur la roadmap (`03_Roadmap.md` classe encore le multi-périodes en
+v2.0). Décision actée en session, pas une dérive non maîtrisée — voir
+`chef_projet/BILAN_LIVRAISON_VS_VISION.md` §3.5/§8. Le cron `dbt run` nightly (ADR-006, S-711)
+reste non fait : la fraîcheur des données dépend toujours d'un `dbt run` manuel.
+
 ---
 
 ## ADR-005 : Schéma `bi_` Isolé dans PostgreSQL

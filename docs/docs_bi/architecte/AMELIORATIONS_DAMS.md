@@ -3,8 +3,8 @@
 **Propriétaire** : Architecte Data (avec contributions BI Dev)
 **Audience** : Architecte, BI Dev, Chef Projet, Direction (synthèse)
 **Fréquence mise à jour** : En continu, tout au long du projet
-**Dernière modification** : 2 juillet 2026
-**Version** : 1.0
+**Dernière modification** : 24 juillet 2026 (RM-02, FL-01 — corrections `paie`)
+**Version** : 1.1
 
 ---
 
@@ -34,6 +34,7 @@ Ce fichier est le **journal vivant** de ces observations. Il alimente la *« feu
 | # | Observation | Impact | Effort | Statut | Date |
 |---|-------------|--------|--------|--------|------|
 | RM-01 | *(exemple)* Ventes enregistrées avec prix de vente < prix d'achat sans blocage ni alerte | 🔴 | M | 🆕 | — |
+| RM-02 | Génération de paie : le filtre d'éligibilité agent se basait sur `est_actif` **au moment de la génération**, pas sur la période réellement travaillée — un agent parti depuis produisait des mois d'historique sous-évalués (impact direct sur KPI-005/006/009 côté BI). Corrigé dans `paie/services/agent_eligibilite.py` (23/07/2026, filtre sur la période travaillée). | 🟡 | S | ✅ | 2026-07-23 |
 | | | | | | |
 
 ---
@@ -66,7 +67,7 @@ Ce fichier est le **journal vivant** de ces observations. Il alimente la *« feu
 
 | # | Observation | Impact | Effort | Statut | Date |
 |---|-------------|--------|--------|--------|------|
-| FL-01 | | | | | |
+| FL-01 | Génération des salaires mensuels nécessitait un clic manuel Direction chaque mois. Nouvelle commande `generer_salaires_mensuel` (app `paie`) pour rattraper/générer les salaires sans intervention manuelle — répond au même besoin de fraîcheur des données que le cron `dbt run` nightly (S-711, encore non fait côté BI) ; les deux pourraient être orchestrés ensemble une fois en production. | 🟡 | S | ✅ | 2026-07-23 |
 | | | | | | |
 
 ---

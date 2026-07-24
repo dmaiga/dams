@@ -2,6 +2,16 @@
 
 ---
 
+> **Clôture v1 (24/07/2026)** : les dashboards ont été renommés/réorganisés en 5 axes métier
+> (Santé Globale, Vente, Agent, Dépense, Fournisseur — voir `bi/08_Dashboard_Catalog.md`) ; les
+> numéros "Dashboard 1/2/3/4/5" ci-dessous datent d'avant cette réorganisation et ne
+> correspondent plus 1:1 aux pages réelles ("Dashboard 3" + "Dashboard 4" = Dashboard Agent
+> désormais). KPI-010 ajouté ; KPI-305 (ratio incentive/marge) reste calculé côté dbt mais n'est
+> plus affiché sur le dashboard Agent (décision produit, voir
+> `chef_projet/BILAN_LIVRAISON_VS_VISION.md` §5bis) ; deux nouveaux KPI de kilo vendu par équipe
+> (grain mensuel et hebdomadaire) et deux nouveaux KPI de marge par produit tous fournisseurs
+> confondus — voir en fin de section correspondante.
+
 ## 🎯 KPI CRITIQUES (Dashboard 1 : Santé Globale)
 
 > **Implémentation (17/07/2026)** : KPI-001 à KPI-009 disponibles agrégés par mois dans `bi_.vw_rentabilite_globale` (`dbt/models/marts/aggregates/vw_rentabilite_globale.sql`). Testé en local (dbt build, hors Docker) — voir [sprints/SPRINT_2_Modeles_Dashboards.md](../sprints/SPRINT_2_Modeles_Dashboards.md).
@@ -157,6 +167,22 @@
 | **Propriétaire** | Direction / Finance |
 | **Source** | Synthèse fcts |
 | **Interprétation** | ✅ > 0 = Profitable ; ❌ < 0 = Déficitaire |
+
+---
+
+### KPI-010 : Rentabilité Nette %
+
+| Attribut | Valeur |
+|----------|--------|
+| **Nom** | Pourcentage Rentabilité Nette / CA |
+| **Définition** | Rentabilité nette divisée par CA (en %) |
+| **Formule** | `(KPI-009 / KPI-001) * 100` |
+| **Dimension** | Global, par mois |
+| **Fréquence** | Mensuel |
+| **Unit** | % |
+| **Propriétaire** | Direction / Finance |
+| **Source** | `vw_rentabilite_globale.rentabilite_nette_pct` |
+| **Ajouté** | 23/07/2026 (section "Marge nette", secondaire à la marge brute pour cette phase — §3.4/§5bis du bilan) |
 
 ---
 
@@ -339,6 +365,23 @@
 
 ---
 
+### KPI-207 : Kilo Vendu par Équipe
+
+| Attribut | Valeur |
+|----------|--------|
+| **Nom** | Volume Équipe (kg) |
+| **Définition** | Somme des kg vendus par tous les agents d'un superviseur — priorité de lecture sur ce dashboard, avant la rentabilité nette (§5bis du bilan) |
+| **Formule** | `SUM(fct_ventes.quantite_en_kg) GROUP BY superviseur_id` |
+| **Dimension** | Superviseur, par mois **ou par semaine ISO** |
+| **Fréquence** | Mensuel, hebdomadaire |
+| **Unit** | kg |
+| **Propriétaire** | Direction / Manager Opérations |
+| **Source** | `vw_performance_superviseur.kg_vendus` (mensuel), `vw_performance_superviseur_semaine.kg_vendus` (hebdomadaire, semaine ISO lundi-dimanche) |
+| **Ajouté** | 24/07/2026 |
+| **Comparaison** | Le dashboard affiche aussi le delta en kg vs la période précédente (mois-1 ou semaine-1 selon le grain sélectionné) |
+
+---
+
 ## 👤 KPI PERFORMANCE AGENT (Dashboard 4)
 
 > **Implémentation (17/07/2026)** : KPI-301 à KPI-306 disponibles agrégés par agent dans `bi_.vw_performance_agent`, restreint aux types réellement soumis à l'objectif terrain (`terrain`, `agent_gros`, `agent_polivalent`). Colonne `kg_par_jour` = kg vendus / jours **distincts avec vente** (pas jours calendaires), `statut_objectif_50kg` ∈ {`atteint`, `proche`, `sous_objectif`} selon les seuils de [bi/08_Dashboard_Catalog.md](08_Dashboard_Catalog.md).
@@ -410,6 +453,7 @@
 | **Cible** | < 5% (incentive ne doit pas dépasser 5% de la marge) |
 | **Vigilance** | > 10% = agent non rentable |
 | **Source** | Synthèse |
+| **⚠ Retiré de l'affichage (24/07/2026)** | Toujours calculé dans `vw_performance_agent` (`ratio_incentive_marge_pct`), mais retiré de la table du dashboard Agent — décision produit, voir `chef_projet/BILAN_LIVRAISON_VS_VISION.md` §5bis. Absent de `vw_performance_agent_semaine` (pas d'incentive au grain hebdomadaire, `fct_salaires` reste mensuel). |
 
 ---
 
@@ -503,6 +547,35 @@
 
 ---
 
+### KPI-406 : Marge par Produit (tous fournisseurs confondus)
+
+| Attribut | Valeur |
+|----------|--------|
+| **Nom** | Marge Produit Agrégée |
+| **Définition** | Marge calibrée totale d'un produit, tous fournisseurs confondus — répond à "ce produit est-il rentable, indépendamment de qui l'a fourni ?" (remplace la lecture fournisseur x produit x mois jugée illisible, §2 S-703 du bilan) |
+| **Formule** | `SUM(marge_calibree) GROUP BY produit_id` (sur `vw_marge_fournisseur`, agrégation faite côté vue Django, pas dbt) |
+| **Dimension** | Produit |
+| **Fréquence** | Mensuel |
+| **Unit** | FCFA |
+| **Source** | `vw_marge_fournisseur` (agrégée par `bi.views.dashboard_stock`) |
+| **Ajouté** | 24/07/2026 |
+
+---
+
+### KPI-407 : Marge % par Produit (fournisseurs confondus)
+
+| Attribut | Valeur |
+|----------|--------|
+| **Nom** | Pourcentage Marge Produit Agrégée |
+| **Formule** | `(KPI-406 / SUM(ca) GROUP BY produit_id) * 100` |
+| **Dimension** | Produit |
+| **Fréquence** | Mensuel |
+| **Unit** | % |
+| **Source** | `vw_marge_fournisseur` (agrégée par `bi.views.dashboard_stock`) |
+| **Ajouté** | 24/07/2026 |
+
+---
+
 ## 🚨 KPI VIGILANCE (Monitoring)
 
 ### KPI-601 : Produits Déficitaires (Marge < 0)
@@ -543,9 +616,9 @@
 | Dimension | KPI Applicables |
 |-----------|-----------------|
 | **Temporal** | Tous (par mois, semaine) |
-| **Produit** | 101–106, 404–405 |
+| **Produit** | 101–106, 404–405, 406–407 |
 | **Agent** | 301–306 |
-| **Superviseur** | 201–206 |
+| **Superviseur** | 201–207 |
 | **Fournisseur** | 403–405 |
 | **Type Agent** | 005–006 (par type) |
 

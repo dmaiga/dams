@@ -1,5 +1,16 @@
 {% extends "bi/base_dashboard.html" %}
 
+{% block extra_filtres %}
+<div>
+    <label for="bi-date-debut">Du</label>
+    <input type="date" id="bi-date-debut" name="date_debut" value="{{ date_debut|date:'Y-m-d'|default_if_none:'' }}" class="input input-bordered input-sm">
+</div>
+<div>
+    <label for="bi-date-fin">Au</label>
+    <input type="date" id="bi-date-fin" name="date_fin" value="{{ date_fin|date:'Y-m-d'|default_if_none:'' }}" class="input input-bordered input-sm">
+</div>
+{% endblock %}
+
 {% block dashboard_content %}
 <h2>Marge brute — a-t-on de la marge sur nos ventes ?</h2>
 <div class="bi-kpis">
@@ -13,6 +24,14 @@
     </div>
     {% endfor %}
 </div>
+{% if comparaison_marge_brute %}
+<p class="bi-comparaison">
+    Marge brute vs {{ comparaison_marge_brute.mois_precedent_libelle }} :
+    <span class="bi-badge {% if comparaison_marge_brute.delta >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+        {% if comparaison_marge_brute.delta >= 0 %}+{% endif %}{{ comparaison_marge_brute.delta|floatformat:0 }} FCFA{% if comparaison_marge_brute.delta_pct is not None %} ({% if comparaison_marge_brute.delta_pct >= 0 %}+{% endif %}{{ comparaison_marge_brute.delta_pct|floatformat:1 }}%){% endif %}
+    </span>
+</p>
+{% endif %}
 
 <h2>Marge nette — vue complète (salaires + dépenses)</h2>
 <div class="bi-kpis">

@@ -29,6 +29,8 @@
     .bi-badge.bi-rouge { background: #fee2e2; color: #b91c1c; }
     .bi-badge.bi-neutre { background: #f3f4f6; color: #6b7280; }
 
+    .bi-comparaison { margin: -1rem 0 1.5rem; font-size: 0.95rem; color: #374151; }
+
     .bi-panel { background: #fff; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 1.5rem; }
     .bi-panel h2 { font-size: 1.1rem; color: #1f2937; margin-bottom: 1rem; }
     .bi-vide { text-align: center; padding: 3rem 1rem; color: #9ca3af; }
@@ -49,6 +51,7 @@
     {% endfor %}
 </nav>
 
+{% block filtre_periode %}
 <form method="get" class="bi-periode-form">
     <div>
         <label for="bi-annee">Année</label>
@@ -71,6 +74,7 @@
     <a href="{{ request.path }}" class="btn btn-outline btn-sm">Dernier mois</a>
     {% endif %}
 </form>
+{% endblock %}
 
 {% if est_vide %}
 <div class="bi-vide">

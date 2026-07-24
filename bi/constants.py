@@ -11,9 +11,17 @@ Dashboard_Catalog. `None` (donnée absente, ex. division par zéro dans une vue 
 DASHBOARDS = [
     ("sante", "Santé Globale"),
     ("produits", "Rentabilité Produit"),
-    ("agents", "Performance Agent & Équipes"),
+    ("agents", "Agents"),
     ("depenses", "Dépenses"),
     ("stock", "Stock & Fournisseur"),
+]
+
+# Dashboard Agents : types d'agents réellement soumis à l'objectif terrain/vente (cf.
+# agents_cibles dans vw_performance_agent(_semaine).sql) — sert le filtre type_agent.
+TYPE_AGENT_CHOICES = [
+    ("terrain", "Terrain"),
+    ("agent_gros", "Agent gros"),
+    ("agent_polivalent", "Agent polivalent"),
 ]
 
 VERT = "vert"
@@ -37,14 +45,11 @@ MARGE_PCT_PRODUIT_MAX = 60
 ROTATION_STOCK_RAPIDE = 2
 ROTATION_STOCK_MORT = 0.5
 
-# --- Dashboard "Performance Agent & Équipes", volet équipes/superviseurs (KPI-201 à 206) ---
-RENTABILITE_SUPERVISEUR_CIBLE = 500_000
+# --- Dashboard "Agents", volet équipes/superviseurs (KPI-201 à 206) ---
 CA_MOYEN_AGENT_CIBLE = 500_000
 
-# --- Dashboard "Performance Agent & Équipes", volet agents (KPI-301 à 306) ---
+# --- Dashboard "Agents", volet agents (KPI-301 à 306) ---
 RENTABILITE_AGENT_CIBLE = 100_000
-RATIO_INCENTIVE_MARGE_CIBLE = 5
-RATIO_INCENTIVE_MARGE_ALERTE = 10
 
 STATUT_OBJECTIF_LABELS = {
     "atteint": "✅ Atteint",
@@ -120,28 +125,12 @@ def statut_rotation_stock(valeur):
     return VERT if valeur >= ROTATION_STOCK_RAPIDE else JAUNE
 
 
-def statut_rentabilite_superviseur(valeur):
-    if valeur is None:
-        return NEUTRE
-    if valeur < 0:
-        return ROUGE
-    return VERT if valeur >= RENTABILITE_SUPERVISEUR_CIBLE else JAUNE
-
-
 def statut_rentabilite_agent(valeur):
     if valeur is None:
         return NEUTRE
     if valeur < 0:
         return ROUGE
     return VERT if valeur >= RENTABILITE_AGENT_CIBLE else JAUNE
-
-
-def statut_ratio_incentive_marge(valeur):
-    if valeur is None:
-        return NEUTRE
-    if valeur > RATIO_INCENTIVE_MARGE_ALERTE:
-        return ROUGE
-    return VERT if valeur <= RATIO_INCENTIVE_MARGE_CIBLE else JAUNE
 
 
 def statut_objectif_agent(statut_50kg):
@@ -164,7 +153,7 @@ def statut_jours_stock(valeur):
     return VERT if valeur < JOURS_STOCK_MIN else JAUNE
 
 
-def statut_marge_fournisseur(marge, marge_pct):
+def statut_marge(marge, marge_pct):
     if marge is not None and marge < 0:
         return ROUGE
     if marge_pct is None:

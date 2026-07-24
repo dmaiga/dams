@@ -3,8 +3,8 @@
 **Propriétaire** : Chef de Projet / PO
 **Audience** : Direction, Product Owner, toute l'équipe
 **Fréquence mise à jour** : à chaque session de développement significative
-**Dernière modification** : 23 juillet 2026
-**Version** : 1.0
+**Dernière modification** : 24 juillet 2026 (§5bis, §7, §8 ajoutés — clôture v1)
+**Version** : 1.1
 
 ---
 
@@ -34,12 +34,12 @@ récente sur ce qui est effectivement livré.
 | # | Story | Statut au 22/07 | Statut au 23/07 | Écart |
 |---|-------|------------------|------------------|-------|
 | S-701 | Agrégations paramétrables (group by) | 🆕 non traité | ⚪ non traité | Toujours en attente de clarification Direction — voir §5 |
-| S-702 | Filtre période Dashboard 4 + objectif en série temporelle | 🔎 diagnostiqué | 🟡 **partiel** | Filtre mois opérant (nouveau grain `vw_performance_agent` agent x mois) ; mais série lue **mensuelle**, pas hebdomadaire comme demandé — l'objectif reste une photo par mois, pas une courbe de progression |
-| S-702b | Filtre superviseur + type_agent sur Dashboard 4 | 🆕 non traité | 🟡 **partiel** | Filtre **superviseur** livré ; filtre **type_agent** absent |
-| S-703 | Vision globale par fournisseur (Dashboard 5) | 🆕 non traité | 🟡 **partiel** | Filtres produit/fournisseur livrés ; mais toujours un tableau plat, pas le regroupement visuel "Fournisseur → liste produits" demandé |
+| S-702 | Filtre période Dashboard 4 + objectif en série temporelle | 🔎 diagnostiqué | ✅ **livré (24/07)** | Bascule Semaine/Mois ajoutée (grain hebdomadaire ISO lundi-dimanche, nouveaux `vw_performance_agent_semaine`/`vw_performance_superviseur_semaine`) — la série peut désormais se lire semaine par semaine, pas seulement mensuelle |
+| S-702b | Filtre superviseur + type_agent sur Dashboard 4 | 🆕 non traité | ✅ **livré (24/07)** | Filtre superviseur (déjà livré le 23/07) + filtre **type_agent** ajouté le 24/07 |
+| S-703 | Vision globale par fournisseur (Dashboard 5) | 🆕 non traité | 🟡 **traité différemment (24/07)** | Le tableau plat fournisseur x produit x mois a été retiré, remplacé par deux cards agrégées "Marge par fournisseur" et "Marge par produit" (tous produits/fournisseurs confondus) — répond à l'esprit de la story (vue claire par fournisseur) mais pas littéralement par le regroupement visuel "Fournisseur → liste produits" initialement demandé. Direction en réflexion sur cette page (voir §5bis) |
 | S-703b | Filtres fournisseur/produit (Dashboard 5) | 🆕 non traité | ✅ **livré** | + la calibration prix d'achat (`vw_marge_fournisseur`) est aussi devenue fournisseur x **produit** x mois (non demandé, va au-delà) |
 | S-704 | Contrôle d'accès par rôle (remplacer `username == 'mdmaiga'`) | 🔴 MUST, non traité | ❌ **non traité** | Toujours le garde-fou temporaire par username. Marqué 🔴 bloquant avant go-live dans `SUIVI_MISSION_BI.md` §6 — **risque non réduit** |
-| S-705 | Comparaison M-1 / tendance 6 mois | 🟡 non traité | ❌ **non traité** | — |
+| S-705 | Comparaison M-1 / tendance 6 mois | 🟡 non traité | 🟡 **partiel (24/07)** | Comparaison M vs M-1 ajoutée sur la marge brute (Dashboard Santé Globale) et sur le kilo vendu par équipe (Dashboard Agent) ; pas de tendance sur 6 mois |
 | S-706 | Export Excel/CSV des tableaux | 🟢 non traité | ❌ **non traité** | — |
 | S-707 | Signaler les dépenses "Non catégorisé" à la Direction | 🟢 non traité | 🟡 **traité différemment** | Décision prise : les rattacher silencieusement à `DIVERS` plutôt que les signaler comme demandé. Ce n'est pas ce que demandait la story — voir §4.4 |
 | S-708 | Recherche/tri dans les tableaux | 🟢 non traité | ❌ **non traité** | — |
@@ -134,9 +134,10 @@ Le tri du 22/07 (`SUIVI_MISSION_BI.md` §6) reste largement d'actualité. Mise �
 - **S-712** — re-scoper le Sprint 4 (tâche de planning, 0,5 j, aucune dépendance).
 
 **🟡 Si le temps le permet**
-- Compléter S-702/S-702b (série hebdomadaire, filtre type_agent).
+- ~~Compléter S-702/S-702b (série hebdomadaire, filtre type_agent)~~ — livré le 24/07 (§8).
 - Finir la passe UI/UX (S-709) au-delà des graphiques responsives.
-- Compléter S-703 (vue groupée par fournisseur, pas seulement des filtres).
+- Compléter S-703 si la Direction souhaite le regroupement visuel "Fournisseur → produits"
+  plutôt que les deux cards agrégées livrées le 24/07 (§8) — à trancher, page en réflexion.
 
 **🟢 Toujours repoussable en v1.5**
 - S-701, S-705, S-706, S-708 — inchangés, aucun développement cette session.
@@ -177,14 +178,92 @@ Le tri du 22/07 (`SUIVI_MISSION_BI.md` §6) reste largement d'actualité. Mise �
 
 ---
 
+## 5bis. Décisions Direction (24/07) — arbitrages actés sur ce bilan
+
+Le bilan §2-5 ci-dessus a été rédigé avec un ton d'audit strict ; certains écarts qu'il pointe
+sont en réalité des choix produit assumés, pas des manques à corriger dans l'urgence. La
+Direction tranche ici, pour éviter que ce document ne soit relu plus tard comme une liste de
+fautes :
+
+- **Marge brute avant marge nette (§3.4)** — arbitrage accepté et maintenu pour cette phase du
+  projet. Ce n'est pas un écart à résorber : `01_Vision_Produit.md` sera mis à jour pour refléter
+  ce choix, mais le produit livré (marge brute en avant) est la référence, pas l'inverse.
+- **S-704 — Contrôle d'accès par rôle** — non bloquant et non prioritaire pour l'instant. Le
+  garde-fou `username == 'mdmaiga'` reste en place le temps de la mise en place générale du
+  produit ; passage à un contrôle par rôle prévu, mais pas dans l'immédiat.
+- **S-711 — Cron `dbt run` nightly** — volontairement différé. Le cron sera mis en place une fois
+  le reste du périmètre terminé, au moment du passage en production.
+- **S-710 — Performance / index PostgreSQL** — évaluation et optimisation prévues au moment
+  opportun (post-fonctionnel), pas une urgence actuelle.
+- **S-702b — Filtre `type_agent`** — prévu, sera ajouté au dashboard Performance Agent & Équipes.
+- **§6.1 — Mise à jour de `bi/08_Dashboard_Catalog.md`** — prévue, se fera plus tard une fois la
+  structure des dashboards stabilisée.
+
+Ces points restent visibles dans le tableau §2 et les recommandations §5 pour mémoire, mais ne
+sont plus à traiter en priorité ni à signaler comme risque non maîtrisé — ce sont des décisions,
+pas des dettes oubliées.
+
+---
+
 ## 6. Documents propriétaires à mettre à jour (hors ce fichier)
 
-| Document | Propriétaire | Mise à jour nécessaire |
-|----------|---------------|------------------------|
-| `bi/08_Dashboard_Catalog.md` | BI Dev | Refléter la fusion Superviseur/Agent et le dashboard Dépenses autonome (§3.1) |
-| `bi/07_Dictionnaire_KPI_Technique.md` + `_Metier.md` | BI Dev | Ajouter KPI-002, KPI-010 ; noter le changement de priorité marge brute/nette (§3.3, §3.4) |
-| `owner/01_Vision_Produit.md` | PO | Trancher et documenter marge brute vs rentabilité nette comme chiffre central (§3.4) |
-| `architecte/04_ADR.md` (ADR-004) | Architecte | Amender ou compléter sur la fenêtre d'analyse glissante (§3.5) |
-| `architecte/AMELIORATIONS_DAMS.md` | Architecte/PO | Journaliser les corrections `paie` (§3.6) |
-| `owner/02_Backlog.md` (EPIC 7) | PO | Mettre à jour les statuts S-701 à S-712 selon le tableau §2 |
-| `chef_projet/RISQUES.md` | Chef de Projet | Réévaluer R4 (perf) à la lumière de la matérialisation en table (§2, S-710) |
+**Tous mis à jour le 24/07/2026** (clôture v1, §8) :
+
+| Document | Propriétaire | Mise à jour nécessaire | Statut |
+|----------|---------------|------------------------|--------|
+| `bi/08_Dashboard_Catalog.md` | BI Dev | Refléter la fusion Superviseur/Agent, le dashboard Dépenses autonome (§3.1), et tous les ajouts du 24/07 (semaine/mois, effectif, marge par produit...) | ✅ |
+| `bi/07_Dictionnaire_KPI_Technique.md` + `_Metier.md` | BI Dev | Ajouter KPI-010, KPI-207, KPI-406/407 (KPI-002 était déjà présent) ; noter le changement de priorité marge brute/nette et le retrait du ratio incentive/marge de l'affichage | ✅ |
+| `owner/01_Vision_Produit.md` | PO | Trancher et documenter marge brute vs rentabilité nette comme chiffre central (§3.4) | ✅ |
+| `architecte/04_ADR.md` (ADR-004) | Architecte | Amender ou compléter sur la fenêtre d'analyse glissante (§3.5) | ✅ |
+| `architecte/AMELIORATIONS_DAMS.md` | Architecte/PO | Journaliser les corrections `paie` (§3.6) | ✅ |
+| `owner/02_Backlog.md` (EPIC 7) | PO | Mettre à jour les statuts S-701 à S-712 selon le tableau §2 | ✅ |
+| `chef_projet/RISQUES.md` | Chef de Projet | Réévaluer R4 (perf) à la lumière de la matérialisation en table (§2, S-710) | ✅ |
+
+---
+
+## 7. Prochaine étape — 5 dashboards, un axe de lecture chacun
+
+Décision Direction (24/07) : recentrer toute la BI sur **5 dashboards**, chacun porteur d'un axe
+de lecture complet plutôt qu'un découpage technique. Un dashboard = une question métier :
+
+- **Santé Globale** — fait-on du bénéfice ? (KPI principaux, vue d'ensemble)
+- **Vente** — quel produit arrêter, d'où vient la marge, à quel prix on vend vs on achète
+  (fusionne l'actuel Dashboard 2 "Rentabilité Produit")
+- **Agent** — quel superviseur gère bien, décliné naturellement par agent avec leurs objectifs
+  (fusionne performance superviseur + performance agent, déjà rapproché dans le produit livré —
+  voir §3.1)
+- **Dépense** — vu et su de la Direction, pour analyser les postes de dépenses (dashboard
+  autonome, déjà scindé dans le produit livré — voir §3.1)
+- **Fournisseur** — trouver le meilleur deal, avec qui négocier
+
+Cette réorientation sera cadrée dans un sprint dédié (`docs/features/`) et se traduira par une
+mise à jour de `bi/08_Dashboard_Catalog.md` pour que le catalogue documente ces 5 axes au lieu du
+découpage actuel (Santé Globale / Rentabilité Produit / Performance Superviseur & Dépenses /
+Performance Agent / Stock & Fournisseur).
+
+---
+
+## 8. Clôture v1 (24/07/2026)
+
+Décision Direction : la v1 s'arrête ici. Ce qui a été livré dans la session du 24/07, en plus de
+la réorientation en 5 dashboards (§7) :
+
+- **Dashboard Santé Globale** — filtre temporel personnalisé (Du/Au, peut couvrir plusieurs
+  mois) en plus du sélecteur Année/Mois ; comparaison automatique de la marge brute affichée vs
+  le mois qui la précède immédiatement dans les données.
+- **Dashboard Agent** — renommé (ex-"Performance Agent & Équipes"). Bascule Semaine/Mois (S-702,
+  grain hebdomadaire ISO ajouté via deux nouvelles vues dbt) sans "Toutes périodes" (jugé
+  illisible sur ce dashboard). Tableau équipe/superviseur : effectif, kilo vendu, comparaison
+  vs période précédente en kg — priorité au kilo vendu plutôt qu'à la rentabilité nette pour ce
+  tableau (décision produit, §5bis). Filtre type_agent ajouté (S-702b). Colonne ratio
+  incentive/marge retirée.
+- **Dashboard Fournisseur** — table plate fournisseur x produit x mois remplacée par deux cards
+  agrégées, "Marge par fournisseur" et "Marge par produit" (§2, S-703) ; page encore en
+  réflexion côté Direction, conservée en l'état pour l'instant.
+- `bi/08_Dashboard_Catalog.md` mis à jour pour refléter l'ensemble de ce qui précède.
+
+**Volontairement non traité pour cette version**, actés comme décisions et non comme dette
+(détail §5bis) : contrôle d'accès par rôle (S-704, garde-fou `username == 'mdmaiga'` maintenu),
+cron `dbt run` nightly (S-711), mesure de performance sur volumétrie prod (S-710), mise à jour
+des dictionnaires KPI et de la Vision Produit (§6) — à reprendre au prochain cycle, une fois le
+produit en usage.
