@@ -1,5 +1,5 @@
 {% extends "bi/base_dashboard.html" %}
-{% load l10n %}
+{% load l10n format_fcfa direction_filters %}
 
 {% block dashboard_content %}
 <div class="bi-panel">
@@ -15,8 +15,8 @@
         <div class="bi-legend-row">
             <i style="background:{% cycle 'var(--accent)' '#4c7ea3' '#8fb2c9' 'var(--border-strong)' 'var(--surface-2)' as splitcouleur2 %}"></i>
             <span>{{ d.categorie|default:"Non catégorisé" }}</span>
-            <span class="tabular" style="text-align:right">{{ d.montant|floatformat:0 }}</span>
-            <span class="tabular bi-legend-pct" style="text-align:right">{{ d.montant_pct|default_if_none:"—" }}%</span>
+            <span class="tabular" style="text-align:right">{{ d.montant|fcfa }}</span>
+            <span class="tabular bi-legend-pct" style="text-align:right">{{ d.montant_pct|default_if_none:"—"|format_number }}%</span>
         </div>
         {% endfor %}
     </div>
@@ -36,8 +36,8 @@
                 <tr>
                     <td>{{ d.mois|date:"m/Y" }}</td>
                     <td>{{ d.categorie|default:"Non catégorisé" }}</td>
-                    <td class="text-right">{{ d.montant|floatformat:0 }}</td>
-                    <td class="text-right">{{ d.montant_pct|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ d.montant|fcfa }}</td>
+                    <td class="text-right">{{ d.montant_pct|default_if_none:"—"|format_number }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

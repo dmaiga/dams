@@ -1,4 +1,5 @@
 {% extends "bi/base_dashboard.html" %}
+{% load format_fcfa direction_filters %}
 
 {% block filtre_periode %}
 <div class="bi-granularite-toggle">
@@ -73,16 +74,16 @@
                 <tr>
                     <td>{{ s.superviseur_nom }}</td>
                     <td class="text-right">{{ s.nb_agents_actifs }}</td>
-                    <td class="text-right">{{ s.kg_vendus|floatformat:1 }}</td>
+                    <td class="text-right">{{ s.kg_vendus|format_number }}</td>
                     <td class="text-right">
                         {% if s.kg_vendus_delta is not None %}
                         <span class="bi-badge {% if s.kg_vendus_delta >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
-                            {% if s.kg_vendus_delta >= 0 %}+{% endif %}{{ s.kg_vendus_delta|floatformat:1 }}
+                            {% if s.kg_vendus_delta >= 0 %}+{% endif %}{{ s.kg_vendus_delta|format_number }}
                         </span>
                         {% else %}—{% endif %}
                     </td>
-                    <td class="text-right">{{ s.ca|floatformat:0 }}</td>
-                    <td class="text-right">{{ s.marge_brute|floatformat:0 }}</td>
+                    <td class="text-right">{{ s.ca|fcfa }}</td>
+                    <td class="text-right">{{ s.marge_brute|fcfa }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -104,7 +105,7 @@
                      style="width:{% if a.kg_par_jour %}{% widthratio a.kg_par_jour 50 100 %}{% else %}0{% endif %}%"></div>
                 <div class="bi-refline" style="left:100%" data-label="Obj. 50"></div>
             </div>
-            <div class="bi-rvalue">{{ a.kg_par_jour|default_if_none:"—" }} kg/j</div>
+            <div class="bi-rvalue">{{ a.kg_par_jour|default_if_none:"—"|format_number }} kg/j</div>
         </div>
         {% endfor %}
     </div>
@@ -132,12 +133,12 @@
                     <td>{{ a.nom_complet }} <span class="bi-badge bi-{{ a.statut_rentabilite }}">&nbsp;</span></td>
                     <td>{{ a.superviseur_nom|default:"—" }}</td>
                     <td>{{ a.type_agent }}</td>
-                    <td class="text-right">{{ a.kg_vendus|floatformat:1 }}</td>
+                    <td class="text-right">{{ a.kg_vendus|format_number }}</td>
                     <td class="text-right">{{ a.jours_actifs }}</td>
                     <td class="text-right">{{ a.jours_ouvres|default_if_none:"—" }}</td>
-                    <td class="text-right">{{ a.kg_par_jour|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ a.kg_par_jour|default_if_none:"—"|format_number }}</td>
                     <td><span class="bi-badge bi-{{ a.statut_couleur }}">{{ a.statut_label }}</span></td>
-                    <td class="text-right">{{ a.rentabilite_affichee|floatformat:0 }}</td>
+                    <td class="text-right">{{ a.rentabilite_affichee|fcfa }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -154,7 +155,7 @@
             <div class="bi-track">
                 <div class="bi-fill" style="width:{% widthratio s.kg_vendus superviseurs.0.kg_vendus 100 %}%"></div>
             </div>
-            <div class="bi-rvalue">{{ s.kg_vendus|floatformat:1 }} kg</div>
+            <div class="bi-rvalue">{{ s.kg_vendus|format_number }} kg</div>
         </div>
         {% endfor %}
     </div>

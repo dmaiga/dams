@@ -1,4 +1,5 @@
 {% extends "bi/base_dashboard.html" %}
+{% load format_fcfa direction_filters %}
 
 {% block extra_filtres %}
 <div>
@@ -18,7 +19,7 @@
     <div class="bi-kpi bi-{{ kpi.statut }} {% if kpi.principal %}bi-principal{% endif %}">
         <div class="bi-kpi-label">{{ kpi.code }} — {{ kpi.label }}</div>
         <div class="bi-kpi-valeur">
-            {% if kpi.unite == "%" %}{{ kpi.valeur|default_if_none:"—"|floatformat:2 }}{% else %}{{ kpi.valeur|floatformat:0 }}{% endif %}
+            {% if kpi.unite == "%" %}{{ kpi.valeur|default_if_none:"—"|format_number }}{% else %}{{ kpi.valeur|fcfa }}{% endif %}
             <span class="bi-kpi-unite">{{ kpi.unite }}</span>
         </div>
     </div>
@@ -28,7 +29,7 @@
 <p class="bi-comparaison">
     Marge brute vs {{ comparaison_marge_brute.mois_precedent_libelle }} :
     <span class="bi-badge {% if comparaison_marge_brute.delta >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
-        {% if comparaison_marge_brute.delta >= 0 %}+{% endif %}{{ comparaison_marge_brute.delta|floatformat:0 }} FCFA{% if comparaison_marge_brute.delta_pct is not None %} ({% if comparaison_marge_brute.delta_pct >= 0 %}+{% endif %}{{ comparaison_marge_brute.delta_pct|floatformat:1 }}%){% endif %}
+        {% if comparaison_marge_brute.delta >= 0 %}+{% endif %}{{ comparaison_marge_brute.delta|fcfa }} FCFA{% if comparaison_marge_brute.delta_pct is not None %} ({% if comparaison_marge_brute.delta_pct >= 0 %}+{% endif %}{{ comparaison_marge_brute.delta_pct|format_number }}%){% endif %}
     </span>
 </p>
 {% endif %}
@@ -39,7 +40,7 @@
     <div class="bi-kpi bi-{{ kpi.statut }} {% if kpi.principal %}bi-principal{% endif %}">
         <div class="bi-kpi-label">{{ kpi.code }} — {{ kpi.label }}</div>
         <div class="bi-kpi-valeur">
-            {% if kpi.unite == "%" %}{{ kpi.valeur|default_if_none:"—"|floatformat:2 }}{% else %}{{ kpi.valeur|floatformat:0 }}{% endif %}
+            {% if kpi.unite == "%" %}{{ kpi.valeur|default_if_none:"—"|format_number }}{% else %}{{ kpi.valeur|fcfa }}{% endif %}
             <span class="bi-kpi-unite">{{ kpi.unite }}</span>
         </div>
     </div>

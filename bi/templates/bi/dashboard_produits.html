@@ -1,4 +1,5 @@
 {% extends "bi/base_dashboard.html" %}
+{% load format_fcfa direction_filters %}
 
 {% block dashboard_content %}
 <div class="bi-kpis">
@@ -18,7 +19,7 @@
                 <div class="bi-fill {% if p.marge < 0 %}bi-rouge{% elif p.statut == "jaune" %}bi-jaune{% endif %}"
                      style="width:{% if p.marge > 0 %}{% widthratio p.marge produits.0.marge 100 %}{% else %}2{% endif %}%"></div>
             </div>
-            <div class="bi-rvalue">{{ p.marge|floatformat:0 }}</div>
+            <div class="bi-rvalue">{{ p.marge|fcfa }}</div>
         </div>
         {% endfor %}
     </div>
@@ -48,12 +49,12 @@
                         <span class="bi-badge bi-{{ p.statut }}">&nbsp;</span>
                     </td>
                     <td>{{ p.mois|date:"m/Y" }}</td>
-                    <td class="text-right">{{ p.ca|floatformat:0 }}</td>
-                    <td class="text-right">{{ p.cout_achat|floatformat:0 }}</td>
-                    <td class="text-right">{{ p.marge|floatformat:0 }}</td>
-                    <td class="text-right">{{ p.marge_pct|default_if_none:"—" }}</td>
-                    <td class="text-right">{{ p.quantite_vendue_kg|floatformat:1 }}</td>
-                    <td class="text-right">{{ p.rotation_stock|default_if_none:"—" }}</td>
+                    <td class="text-right">{{ p.ca|fcfa }}</td>
+                    <td class="text-right">{{ p.cout_achat|fcfa }}</td>
+                    <td class="text-right">{{ p.marge|fcfa }}</td>
+                    <td class="text-right">{{ p.marge_pct|default_if_none:"—"|format_number }}</td>
+                    <td class="text-right">{{ p.quantite_vendue_kg|format_number }}</td>
+                    <td class="text-right">{{ p.rotation_stock|default_if_none:"—"|format_number }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

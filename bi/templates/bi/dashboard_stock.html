@@ -1,4 +1,5 @@
 {% extends "bi/base_dashboard.html" %}
+{% load format_fcfa direction_filters %}
 
 {% block extra_filtres %}
 <div>
@@ -25,7 +26,7 @@
 <div class="bi-kpis" style="grid-template-columns:1fr">
     <div class="bi-kpi bi-{{ total_stock_statut }} bi-principal">
         <div class="bi-kpi-label">KPI-401 — Valeur stock total</div>
-        <div class="bi-kpi-valeur">{{ total_stock|default_if_none:0|floatformat:0 }} <span class="bi-kpi-unite">FCFA</span></div>
+        <div class="bi-kpi-valeur">{{ total_stock|default_if_none:0|fcfa }} <span class="bi-kpi-unite">FCFA</span></div>
     </div>
 </div>
 
@@ -47,9 +48,9 @@
                 <tr>
                     <td>{{ s.produit_nom|default:"—" }}</td>
                     <td>{{ s.fournisseur_nom|default:"—" }}</td>
-                    <td class="text-right">{{ s.quantite_restante|floatformat:1 }}</td>
-                    <td class="text-right">{{ s.valeur_stock|floatformat:0 }}</td>
-                    <td class="text-right"><span class="bi-badge bi-{{ s.statut }}">{{ s.jours_en_stock_moyen|default_if_none:"—" }}</span></td>
+                    <td class="text-right">{{ s.quantite_restante|format_number }}</td>
+                    <td class="text-right">{{ s.valeur_stock|fcfa }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ s.statut }}">{{ s.jours_en_stock_moyen|default_if_none:"—"|format_number }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -77,9 +78,9 @@
                         {% for f in marge_par_fournisseur %}
                         <tr>
                             <td>{{ f.fournisseur_nom|default:"—" }}</td>
-                            <td class="text-right">{{ f.ca|floatformat:0 }}</td>
-                            <td class="text-right">{{ f.marge|floatformat:0 }}</td>
-                            <td class="text-right"><span class="bi-badge bi-{{ f.statut }}">{{ f.marge_pct|default_if_none:"—"|floatformat:2 }}</span></td>
+                            <td class="text-right">{{ f.ca|fcfa }}</td>
+                            <td class="text-right">{{ f.marge|fcfa }}</td>
+                            <td class="text-right"><span class="bi-badge bi-{{ f.statut }}">{{ f.marge_pct|default_if_none:"—"|format_number }}</span></td>
                             <td>
                                 {% if f.nb_ajustements %}
                                 <span class="bi-badge bi-vert">{{ f.nb_ajustements }} ajustement{{ f.nb_ajustements|pluralize }}</span>
@@ -110,9 +111,9 @@
                         {% for p in marge_par_produit %}
                         <tr>
                             <td>{{ p.produit_nom|default:"—" }}</td>
-                            <td class="text-right">{{ p.ca|floatformat:0 }}</td>
-                            <td class="text-right">{{ p.marge|floatformat:0 }}</td>
-                            <td class="text-right"><span class="bi-badge bi-{{ p.statut }}">{{ p.marge_pct|default_if_none:"—"|floatformat:2 }}</span></td>
+                            <td class="text-right">{{ p.ca|fcfa }}</td>
+                            <td class="text-right">{{ p.marge|fcfa }}</td>
+                            <td class="text-right"><span class="bi-badge bi-{{ p.statut }}">{{ p.marge_pct|default_if_none:"—"|format_number }}</span></td>
                             <td>
                                 {% if p.nb_ajustements %}
                                 <span class="bi-badge bi-vert">{{ p.nb_ajustements }} ajustement{{ p.nb_ajustements|pluralize }}</span>
