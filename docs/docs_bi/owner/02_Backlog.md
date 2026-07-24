@@ -141,7 +141,10 @@ Chaque story est rattachée à une **question métier** (Q1–Q10 de [01_Vision_
 >   réflexion sur cette page), S-710 (mesuré sur données quasi-prod — 45-95ms/dashboard, aucun
 >   index nécessaire à ce volume, cf. bilan §9).
 > - 🟡 **Partielles** : S-705 (comparaison M-1 sur marge brute et kilo vendu, pas de tendance 6
->   mois), S-709 (graphiques responsives, pas de passe systématique).
+>   mois), S-709 (graphiques responsives livré le 23/07, passe systématique planifiée en
+>   Sprint 5 — direction visuelle validée le 24/07, voir
+>   [../bi/maquettes/DAMS_BI_maquette_v1.html](../bi/maquettes/DAMS_BI_maquette_v1.html) et
+>   [../sprints/SPRINT_5_UIUX_Executif.md](../sprints/SPRINT_5_UIUX_Executif.md)).
 > - ❌ **Volontairement différées**, actées comme décisions et non comme dette : S-704 (contrôle
 >   d'accès par rôle), S-711 (cron dbt nightly), S-712 (re-scope planning).
 > - 🟢 **Repoussées v1.5, inchangées** : S-701, S-706, S-707, S-708.

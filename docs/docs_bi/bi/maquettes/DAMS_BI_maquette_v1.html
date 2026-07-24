@@ -1,0 +1,623 @@
+<title>DAMS BI — Direction, refonte visuelle</title>
+<style>
+  :root{
+    --bg: #ffffff;
+    --surface: #f8f9fb;
+    --surface-2: #f2f4f7;
+    --border: #e2e5ea;
+    --border-strong: #cfd4dc;
+    --ink: #14181f;
+    --ink-muted: #5b6472;
+    --ink-faint: #8891a0;
+    --accent: #163d63;
+    --accent-ink: #ffffff;
+    --accent-soft: #eaf0f6;
+    --good: #1e7a46;
+    --good-soft: #e7f5ec;
+    --warning: #96650a;
+    --warning-soft: #fbf1de;
+    --critical: #b03a2e;
+    --critical-soft: #fbeae8;
+    --font-ui: "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --font-num: "Cascadia Mono", "SF Mono", "Consolas", "Roboto Mono", monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg: #0e1218;
+      --surface: #151a21;
+      --surface-2: #1a212a;
+      --border: #2a3038;
+      --border-strong: #3a4049;
+      --ink: #e7eaee;
+      --ink-muted: #9aa3b0;
+      --ink-faint: #6d7684;
+      --accent: #6f9cc4;
+      --accent-ink: #0e1218;
+      --accent-soft: #1b2733;
+      --good: #4caf7d;
+      --good-soft: #16261e;
+      --warning: #d1a53d;
+      --warning-soft: #2a2214;
+      --critical: #e08277;
+      --critical-soft: #2c1a18;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #0e1218; --surface: #151a21; --surface-2: #1a212a;
+    --border: #2a3038; --border-strong: #3a4049;
+    --ink: #e7eaee; --ink-muted: #9aa3b0; --ink-faint: #6d7684;
+    --accent: #6f9cc4; --accent-ink: #0e1218; --accent-soft: #1b2733;
+    --good: #4caf7d; --good-soft: #16261e;
+    --warning: #d1a53d; --warning-soft: #2a2214;
+    --critical: #e08277; --critical-soft: #2c1a18;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --bg: #ffffff; --surface: #f8f9fb; --surface-2: #f2f4f7;
+    --border: #e2e5ea; --border-strong: #cfd4dc;
+    --ink: #14181f; --ink-muted: #5b6472; --ink-faint: #8891a0;
+    --accent: #163d63; --accent-ink: #ffffff; --accent-soft: #eaf0f6;
+    --good: #1e7a46; --good-soft: #e7f5ec;
+    --warning: #96650a; --warning-soft: #fbf1de;
+    --critical: #b03a2e; --critical-soft: #fbeae8;
+    color-scheme: light;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3{ text-wrap: balance; margin: 0; }
+  .tabular{ font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+  /* ---- App shell ---- */
+  .app{ max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
+
+  .topbar{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding: 22px 0 16px;
+  }
+  .brand{ display:flex; align-items:baseline; gap:10px; }
+  .brand-mark{
+    font-family: var(--font-num); font-weight: 600; font-size: 13px;
+    letter-spacing: 0.06em; color: var(--accent);
+    border: 1px solid var(--border-strong); border-radius: 3px;
+    padding: 2px 6px;
+  }
+  .brand-name{ font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
+  .brand-sub{ color: var(--ink-faint); font-size: 12.5px; }
+  .topbar-right{ text-align:right; color: var(--ink-muted); font-size: 12.5px; }
+  .topbar-right .who{ color: var(--ink); font-weight: 600; }
+
+  .breadcrumb{
+    color: var(--ink-faint); font-size: 12.5px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+  .breadcrumb b{ color: var(--ink-muted); font-weight: 600; }
+
+  /* ---- Tabs (CSS-only via radio inputs) ---- */
+  .tabs-input{ position:absolute; opacity:0; pointer-events:none; }
+  .tabnav{
+    display:flex; gap: 4px; margin-top: 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabnav label{
+    display:inline-block; cursor:pointer; user-select:none;
+    padding: 12px 4px; margin-right: 22px;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+    color: var(--ink-muted);
+    border-bottom: 2px solid transparent;
+    transform: translateY(1px);
+  }
+  .tabnav label:hover{ color: var(--ink); }
+
+  .panel{ display:none; padding-top: 22px; }
+  #t-sante:checked ~ .app .tabnav label[for="t-sante"],
+  #t-vente:checked ~ .app .tabnav label[for="t-vente"],
+  #t-agent:checked ~ .app .tabnav label[for="t-agent"],
+  #t-depense:checked ~ .app .tabnav label[for="t-depense"],
+  #t-fourn:checked ~ .app .tabnav label[for="t-fourn"]{
+    color: var(--ink); border-bottom-color: var(--accent);
+  }
+  #t-sante:checked ~ .app #p-sante,
+  #t-vente:checked ~ .app #p-vente,
+  #t-agent:checked ~ .app #p-agent,
+  #t-depense:checked ~ .app #p-depense,
+  #t-fourn:checked ~ .app #p-fourn{ display:block; }
+
+  /* ---- Filter row ---- */
+  .filters{
+    display:flex; align-items:flex-end; flex-wrap:wrap; gap: 18px;
+    padding: 16px 0 20px;
+  }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  .field select, .field input{
+    font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--border-strong); border-radius: 4px;
+    padding: 6px 9px; min-width: 96px;
+  }
+  .seg{
+    display:flex; border: 1px solid var(--border-strong); border-radius: 4px; overflow:hidden;
+  }
+  .seg span{
+    padding: 7px 14px; font-size: 12.5px; font-weight: 600; color: var(--ink-muted);
+    border-right: 1px solid var(--border-strong); cursor:pointer;
+  }
+  .seg span:last-child{ border-right:none; }
+  .seg span.on{ background: var(--accent); color: var(--accent-ink); }
+  .btn{
+    font: inherit; font-weight: 600; font-size: 12.5px; cursor:pointer;
+    border-radius: 4px; padding: 7px 16px; border: 1px solid var(--border-strong);
+    background: var(--bg); color: var(--ink);
+  }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.ghost{ border-color: transparent; color: var(--ink-muted); }
+  .spacer{ flex: 1; }
+
+  /* ---- Sections ---- */
+  section.block{ padding: 26px 0; border-top: 1px solid var(--border); }
+  section.block:first-of-type{ border-top: none; padding-top: 6px; }
+  .block h2{ font-size: 14px; font-weight: 650; margin-bottom: 4px; }
+  .block .hint{ color: var(--ink-faint); font-size: 12.5px; margin-bottom: 16px; }
+
+  /* ---- KPI tiles ---- */
+  .kpis{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+  .kpi{ background: var(--bg); padding: 18px 20px; }
+  .kpi.principal{ grid-column: span 2; background: var(--surface); }
+  .kpi-label{ font-size: 11px; text-transform:uppercase; letter-spacing:0.06em; color: var(--ink-faint); font-weight:700; }
+  .kpi-value{ font-family: var(--font-num); font-size: 26px; font-weight:600; margin-top:8px; }
+  .kpi.principal .kpi-value{ font-size: 34px; }
+  .kpi-unit{ font-family: var(--font-ui); font-size: 12.5px; color: var(--ink-faint); font-weight:600; margin-left:4px; }
+  .kpi-chip{
+    display:inline-flex; align-items:center; gap:5px; margin-top:10px;
+    font-family: var(--font-num); font-size: 12px; font-weight:600;
+    padding: 3px 8px; border-radius: 3px;
+  }
+  .kpi-chip.good{ background: var(--good-soft); color: var(--good); }
+  .kpi-chip.warning{ background: var(--warning-soft); color: var(--warning); }
+  .kpi-chip.critical{ background: var(--critical-soft); color: var(--critical); }
+  .kpi-chip .vs{ font-family: var(--font-ui); color: var(--ink-faint); font-weight:600; }
+
+  /* ---- status chip ---- */
+  .chip{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:2px 7px; border-radius:3px; }
+  .chip::before{ content:""; width:6px; height:6px; border-radius:50%; }
+  .chip.good{ background: var(--good-soft); color: var(--good); }
+  .chip.good::before{ background: var(--good); }
+  .chip.warning{ background: var(--warning-soft); color: var(--warning); }
+  .chip.warning::before{ background: var(--warning); }
+  .chip.critical{ background: var(--critical-soft); color: var(--critical); }
+  .chip.critical::before{ background: var(--critical); }
+
+  /* ---- Tables ---- */
+  .table-wrap{ border: 1px solid var(--border); border-radius: 4px; overflow-x:auto; }
+  table{ width:100%; border-collapse: collapse; font-size: 13px; }
+  thead th{
+    text-align:left; font-size: 11px; text-transform:uppercase; letter-spacing:0.05em;
+    color: var(--ink-faint); font-weight:700; background: var(--surface);
+    padding: 10px 14px; border-bottom: 1px solid var(--border); white-space:nowrap;
+  }
+  tbody td{ padding: 10px 14px; border-bottom: 1px solid var(--border); white-space:nowrap; }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.num, th.num{ text-align:right; font-family: var(--font-num); }
+  tbody tr:hover{ background: var(--surface); }
+  td.name{ font-weight:600; }
+  td.muted{ color: var(--ink-muted); }
+
+  /* ---- horizontal bar list ---- */
+  .barlist{ display:flex; flex-direction:column; gap:10px; }
+  .barrow{ display:grid; grid-template-columns: 132px 1fr 108px; align-items:center; gap:12px; }
+  .barrow .rlabel{ font-size:12.5px; font-weight:600; }
+  .barrow .track{ position:relative; height: 16px; background: var(--surface-2); border-radius:2px; overflow:visible; }
+  .barrow .fill{ position:absolute; top:0; left:0; bottom:0; border-radius:2px; background: var(--accent); }
+  .barrow .fill.critical{ background: var(--critical); }
+  .barrow .fill.warning{ background: var(--warning); }
+  .barrow .rvalue{ font-family: var(--font-num); font-size:12.5px; text-align:right; }
+  .barrow .refline{ position:absolute; top:-4px; bottom:-4px; width:1px; background: var(--ink-faint); }
+  .barrow .refline::after{
+    content: attr(data-label); position:absolute; top:-16px; left:50%; transform:translateX(-50%);
+    font-size:10px; color: var(--ink-faint); white-space:nowrap;
+  }
+
+  /* ---- trend chart ---- */
+  .chart-wrap{ border:1px solid var(--border); border-radius:4px; padding:20px 20px 10px; }
+  .chart-legend{ display:flex; gap:18px; margin-bottom:12px; font-size:12px; color:var(--ink-muted); }
+  .chart-legend span{ display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+  .chart-legend i{ width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  /* ---- depense split bar ---- */
+  .splitbar{ display:flex; height: 26px; border-radius:3px; overflow:hidden; border:1px solid var(--border); }
+  .splitbar div{ height:100%; }
+  .legend-list{ display:flex; flex-direction:column; gap:8px; margin-top:16px; }
+  .legend-list .row{ display:grid; grid-template-columns: 16px 1fr 110px 64px; align-items:center; gap:10px; font-size:12.5px; }
+  .legend-list i{ width:11px; height:11px; border-radius:2px; }
+
+  /* ---- two-card grid (marge fournisseur / produit) ---- */
+  .cards2{ display:grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 860px){ .cards2{ grid-template-columns: 1fr; } .kpis{ grid-template-columns: repeat(2,1fr);} .kpi.principal{grid-column:span 2;} }
+
+  .comparaison{ font-size:12.5px; color: var(--ink-muted); margin-top:12px; }
+  .comparaison b{ color: var(--ink); font-family: var(--font-num); }
+
+  footer.note{
+    margin-top: 30px; padding-top:16px; border-top:1px solid var(--border);
+    color: var(--ink-faint); font-size:11.5px;
+  }
+</style>
+
+<input class="tabs-input" type="radio" name="tabs" id="t-sante" checked>
+<input class="tabs-input" type="radio" name="tabs" id="t-vente">
+<input class="tabs-input" type="radio" name="tabs" id="t-agent">
+<input class="tabs-input" type="radio" name="tabs" id="t-depense">
+<input class="tabs-input" type="radio" name="tabs" id="t-fourn">
+
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">BI</span>
+      <span class="brand-name">DAMS</span>
+      <span class="brand-sub">Distribution agricole — Bamako</span>
+    </div>
+    <div class="topbar-right">
+      Connecté : <span class="who">mdmaiga</span> · Direction<br>
+      Mercredi 24 juillet 2026
+    </div>
+  </div>
+
+  <nav class="tabnav">
+    <label for="t-sante">Santé Globale</label>
+    <label for="t-vente">Vente</label>
+    <label for="t-agent">Agent</label>
+    <label for="t-depense">Dépense</label>
+    <label for="t-fourn">Fournisseur</label>
+  </nav>
+
+  <!-- ============ SANTÉ GLOBALE ============ -->
+  <section class="panel" id="p-sante">
+    <div class="breadcrumb">BI &rsaquo; <b>Santé Globale</b> &rsaquo; Juin 2026</div>
+
+    <div class="filters">
+      <div class="field"><label>Année</label><select><option>2026</option></select></div>
+      <div class="field"><label>Mois</label><select><option>Juin</option></select></div>
+      <div class="field"><label>Du</label><input type="text" value="" placeholder="jj/mm/aaaa" style="width:110px"></div>
+      <div class="field"><label>Au</label><input type="text" value="" placeholder="jj/mm/aaaa" style="width:110px"></div>
+      <button class="btn primary">Filtrer</button>
+      <button class="btn ghost">Dernier mois</button>
+      <div class="spacer"></div>
+    </div>
+
+    <section class="block">
+      <h2>Marge brute — a-t-on de la marge sur nos ventes ?</h2>
+      <div class="hint">KPI-001 à KPI-004 · priorité de cette phase (voir Marge nette ci-dessous)</div>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">KPI-001 · Chiffre d'affaires</div>
+          <div class="kpi-value">15 000 000<span class="kpi-unit">FCFA</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">KPI-002 · Coût d'achat</div>
+          <div class="kpi-value">7 500 000<span class="kpi-unit">FCFA</span></div>
+        </div>
+        <div class="kpi principal">
+          <div class="kpi-label">KPI-003 · Marge brute</div>
+          <div class="kpi-value">7 500 000<span class="kpi-unit">FCFA</span></div>
+          <div class="kpi-chip good">▲ +610 000 <span class="vs">vs Mai 2026 (+8,9 %)</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">KPI-004 · Marge brute %</div>
+          <div class="kpi-value">50,0<span class="kpi-unit">%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Marge nette — vue complète (salaires + dépenses)</h2>
+      <div class="hint">KPI-005 à KPI-010 · section secondaire pour cette phase du projet</div>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi-label">KPI-007 · Dépenses</div>
+          <div class="kpi-value">400 000<span class="kpi-unit">FCFA</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">KPI-005 · Coût salaires</div>
+          <div class="kpi-value">1 200 000<span class="kpi-unit">FCFA</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">KPI-009 · Marge nette</div>
+          <div class="kpi-value">5 900 000<span class="kpi-unit">FCFA</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">KPI-010 · Marge nette %</div>
+          <div class="kpi-value">39,3<span class="kpi-unit">%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Évolution mensuelle — CA, dépenses ROT, marge brute</h2>
+      <div class="chart-wrap">
+        <div class="chart-legend">
+          <span><i style="background:var(--accent)"></i>CA</span>
+          <span><i style="background:var(--critical)"></i>Dépenses ROT</span>
+          <span><i style="background:var(--good)"></i>Marge brute</span>
+        </div>
+        <svg viewBox="0 0 720 220" width="100%" height="220" preserveAspectRatio="none" role="img" aria-label="Tendance mensuelle CA, dépenses, marge brute">
+          <g stroke="var(--border)" stroke-width="1">
+            <line x1="0" y1="10" x2="720" y2="10"></line>
+            <line x1="0" y1="65" x2="720" y2="65"></line>
+            <line x1="0" y1="120" x2="720" y2="120"></line>
+            <line x1="0" y1="175" x2="720" y2="175"></line>
+          </g>
+          <polyline points="10,150 130,140 250,120 370,95 490,80 610,50" fill="none" stroke="var(--accent)" stroke-width="2.5"></polyline>
+          <polyline points="10,190 130,185 250,188 370,182 490,178 610,172" fill="none" stroke="var(--critical)" stroke-width="2"></polyline>
+          <polyline points="10,110 130,100 250,90 370,75 490,68 610,45" fill="none" stroke="var(--good)" stroke-width="2.5"></polyline>
+          <circle cx="610" cy="45" r="3.5" fill="var(--good)"></circle>
+          <circle cx="610" cy="50" r="3.5" fill="var(--accent)"></circle>
+          <circle cx="610" cy="172" r="3.5" fill="var(--critical)"></circle>
+        </svg>
+        <div style="display:flex;justify-content:space-between;color:var(--ink-faint);font-size:11px;padding:2px 4px 10px">
+          <span>Jan</span><span>Fév</span><span>Mar</span><span>Avr</span><span>Mai</span><span>Juin</span>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ VENTE ============ -->
+  <section class="panel" id="p-vente">
+    <div class="breadcrumb">BI &rsaquo; <b>Vente</b> &rsaquo; Juin 2026</div>
+    <div class="filters">
+      <div class="field"><label>Année</label><select><option>2026</option></select></div>
+      <div class="field"><label>Mois</label><select><option>Juin</option></select></div>
+      <button class="btn primary">Filtrer</button>
+      <button class="btn ghost">Toutes périodes</button>
+    </div>
+
+    <section class="block">
+      <h2>Classement produits par marge</h2>
+      <div class="hint">Quels produits arrêter ? Lesquels développer ?</div>
+      <div class="barlist">
+        <div class="barrow">
+          <div class="rlabel">Produit A</div>
+          <div class="track"><div class="fill" style="width:97%"></div></div>
+          <div class="rvalue">1 500 000</div>
+        </div>
+        <div class="barrow">
+          <div class="rlabel">Produit B</div>
+          <div class="track"><div class="fill" style="width:78%"></div></div>
+          <div class="rvalue">1 200 000</div>
+        </div>
+        <div class="barrow">
+          <div class="rlabel">Produit C</div>
+          <div class="track"><div class="fill warning" style="width:39%"></div></div>
+          <div class="rvalue">600 000</div>
+        </div>
+        <div class="barrow">
+          <div class="rlabel">Produit X</div>
+          <div class="track"><div class="fill critical" style="width:3%"></div></div>
+          <div class="rvalue">−50 000</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Détail par produit</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Produit</th><th class="num">CA</th><th class="num">Coût achat</th>
+            <th class="num">Marge</th><th class="num">Marge %</th><th class="num">Rotation</th><th>Statut</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="name">Produit A</td><td class="num">3 100 000</td><td class="num">1 600 000</td><td class="num">1 500 000</td><td class="num">48,4 %</td><td class="num">2,8</td><td><span class="chip good">Sain</span></td></tr>
+            <tr><td class="name">Produit B</td><td class="num">2 500 000</td><td class="num">1 300 000</td><td class="num">1 200 000</td><td class="num">48,0 %</td><td class="num">2,1</td><td><span class="chip good">Sain</span></td></tr>
+            <tr><td class="name">Produit C</td><td class="num">1 400 000</td><td class="num">800 000</td><td class="num">600 000</td><td class="num">42,9 %</td><td class="num">0,6</td><td><span class="chip warning">Rotation lente</span></td></tr>
+            <tr><td class="name">Produit X</td><td class="num">450 000</td><td class="num">500 000</td><td class="num">−50 000</td><td class="num">−11,1 %</td><td class="num">1,4</td><td><span class="chip critical">Vendu à perte</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ AGENT ============ -->
+  <section class="panel" id="p-agent">
+    <div class="breadcrumb">BI &rsaquo; <b>Agent</b> &rsaquo; Juin 2026</div>
+    <div class="filters">
+      <div class="seg"><span class="on">Mois</span><span>Semaine</span></div>
+      <div class="field"><label>Année</label><select><option>2026</option></select></div>
+      <div class="field"><label>Mois</label><select><option>Juin</option></select></div>
+      <div class="field"><label>Superviseur</label><select><option>Tous les superviseurs</option></select></div>
+      <div class="field"><label>Type d'agent</label><select><option>Tous les types</option></select></div>
+      <button class="btn primary">Filtrer</button>
+    </div>
+
+    <section class="block">
+      <h2>Performance équipes / superviseurs</h2>
+      <div class="hint">Priorité au kilo vendu par l'équipe, pas à la rentabilité nette</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Équipe</th><th class="num">Effectif</th><th class="num">Kilo vendu</th>
+            <th class="num">vs période précédente</th><th class="num">CA</th><th class="num">Marge brute</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="name">Ismael</td><td class="num">5</td><td class="num">1 200,0</td><td class="num"><span class="chip good">+80,0</span></td><td class="num">3 000 000</td><td class="num">1 500 000</td></tr>
+            <tr><td class="name">Superviseur B</td><td class="num">4</td><td class="num">900,0</td><td class="num"><span class="chip warning">−40,0</span></td><td class="num">2 800 000</td><td class="num">1 400 000</td></tr>
+            <tr><td class="name">Superviseur D</td><td class="num">4</td><td class="num">600,0</td><td class="num"><span class="chip critical">−150,0</span></td><td class="num">1 200 000</td><td class="num">600 000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="comparaison">Comparaison par rapport à <b>Mai 2026</b>.</div>
+    </section>
+
+    <section class="block">
+      <h2>Kilo vendu par équipe / superviseur</h2>
+      <div class="barlist">
+        <div class="barrow"><div class="rlabel">Ismael</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="rvalue">1 200,0 kg</div></div>
+        <div class="barrow"><div class="rlabel">Superviseur B</div><div class="track"><div class="fill" style="width:75%"></div></div><div class="rvalue">900,0 kg</div></div>
+        <div class="barrow"><div class="rlabel">Superviseur D</div><div class="track"><div class="fill warning" style="width:50%"></div></div><div class="rvalue">600,0 kg</div></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Kg/jour vs objectif (50 kg/jour)</h2>
+      <div class="barlist">
+        <div class="barrow">
+          <div class="rlabel">Aminata Traoré</div>
+          <div class="track"><div class="fill" style="width:100%"></div><div class="refline" style="left:100%" data-label="Obj. 50"></div></div>
+          <div class="rvalue">50,0 kg/j</div>
+        </div>
+        <div class="barrow">
+          <div class="rlabel">Agent B</div>
+          <div class="track"><div class="fill warning" style="width:90%"></div><div class="refline" style="left:100%" data-label="Obj. 50"></div></div>
+          <div class="rvalue">45,0 kg/j</div>
+        </div>
+        <div class="barrow">
+          <div class="rlabel">Agent C</div>
+          <div class="track"><div class="fill critical" style="width:70%"></div><div class="refline" style="left:100%" data-label="Obj. 50"></div></div>
+          <div class="rvalue">35,0 kg/j</div>
+        </div>
+        <div class="barrow">
+          <div class="rlabel">Agent E</div>
+          <div class="track"><div class="fill critical" style="width:16%"></div><div class="refline" style="left:100%" data-label="Obj. 50"></div></div>
+          <div class="rvalue">8,0 kg/j</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Détail par agent</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Agent</th><th>Superviseur</th><th>Type</th><th class="num">Kg vendus</th>
+            <th class="num">Jours actifs</th><th class="num">Jours ouvrés</th><th class="num">Kg/jour</th>
+            <th>Statut objectif</th><th class="num">Rentabilité</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="name">Aminata Traoré</td><td class="muted">Ismael</td><td class="muted">Terrain</td><td class="num">250,0</td><td class="num">5</td><td class="num">26</td><td class="num">50,0</td><td><span class="chip good">Atteint</span></td><td class="num">93 750</td></tr>
+            <tr><td class="name">Agent B</td><td class="muted">Ismael</td><td class="muted">Terrain</td><td class="num">225,0</td><td class="num">5</td><td class="num">26</td><td class="num">45,0</td><td><span class="chip warning">Proche</span></td><td class="num">80 000</td></tr>
+            <tr><td class="name">Agent C</td><td class="muted">Superviseur B</td><td class="muted">Agent gros</td><td class="num">175,0</td><td class="num">5</td><td class="num">26</td><td class="num">35,0</td><td><span class="chip critical">Sous objectif</span></td><td class="num">20 000</td></tr>
+            <tr><td class="name">Agent E</td><td class="muted">Superviseur D</td><td class="muted">Terrain</td><td class="num">40,0</td><td class="num">5</td><td class="num">26</td><td class="num">8,0</td><td><span class="chip critical">Sous objectif</span></td><td class="num">−15 000</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ DÉPENSE ============ -->
+  <section class="panel" id="p-depense">
+    <div class="breadcrumb">BI &rsaquo; <b>Dépense</b> &rsaquo; Juin 2026</div>
+    <div class="filters">
+      <div class="field"><label>Année</label><select><option>2026</option></select></div>
+      <div class="field"><label>Mois</label><select><option>Juin</option></select></div>
+      <button class="btn primary">Filtrer</button>
+    </div>
+
+    <section class="block">
+      <h2>Où va notre argent en dépenses ?</h2>
+      <div class="hint">Total : <b class="tabular" style="color:var(--ink)">2 050 000 FCFA</b> ce mois — <span class="chip critical">20,5 % du CA (cible &lt; 15 %)</span></div>
+
+      <div class="splitbar">
+        <div style="width:41.5%;background:var(--accent)"></div>
+        <div style="width:31.7%;background:#4c7ea3"></div>
+        <div style="width:14.6%;background:#8fb2c9"></div>
+        <div style="width:9.8%;background:var(--border-strong)"></div>
+        <div style="width:2.4%;background:var(--surface-2)"></div>
+      </div>
+
+      <div class="legend-list">
+        <div class="row"><i style="background:var(--accent)"></i><span>Transport marchandise</span><span class="tabular" style="text-align:right">850 000</span><span class="tabular muted" style="text-align:right">42,0 %</span></div>
+        <div class="row"><i style="background:#4c7ea3"></i><span>Carburant</span><span class="tabular" style="text-align:right">650 000</span><span class="tabular muted" style="text-align:right">31,7 %</span></div>
+        <div class="row"><i style="background:#8fb2c9"></i><span>Maintenance véhicules</span><span class="tabular" style="text-align:right">300 000</span><span class="tabular muted" style="text-align:right">14,6 %</span></div>
+        <div class="row"><i style="background:var(--border-strong)"></i><span>Frais opérationnels</span><span class="tabular" style="text-align:right">200 000</span><span class="tabular muted" style="text-align:right">9,8 %</span></div>
+        <div class="row"><i style="background:var(--surface-2);border:1px solid var(--border)"></i><span>Divers</span><span class="tabular" style="text-align:right">50 000</span><span class="tabular muted" style="text-align:right">2,4 %</span></div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ FOURNISSEUR ============ -->
+  <section class="panel" id="p-fourn">
+    <div class="breadcrumb">BI &rsaquo; <b>Fournisseur</b> &rsaquo; Juin 2026</div>
+    <div class="filters">
+      <div class="field"><label>Produit</label><select><option>Tous les produits</option></select></div>
+      <div class="field"><label>Fournisseur</label><select><option>Tous les fournisseurs</option></select></div>
+      <button class="btn primary">Filtrer</button>
+    </div>
+
+    <section class="block">
+      <div class="kpis" style="grid-template-columns:1fr">
+        <div class="kpi principal">
+          <div class="kpi-label">KPI-401 · Valeur stock total</div>
+          <div class="kpi-value">5 000 000<span class="kpi-unit">FCFA</span></div>
+          <div class="kpi-chip critical">Au-dessus de la cible <span class="vs">(&lt; 3 000 000 FCFA)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Stock par produit / fournisseur</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Produit</th><th>Fournisseur</th><th class="num">Quantité restante</th><th class="num">Valeur stock</th><th class="num">Jours en stock</th></tr></thead>
+          <tbody>
+            <tr><td class="name">Produit A</td><td class="muted">Fournisseur A</td><td class="num">640</td><td class="num">1 800 000</td><td class="num"><span class="chip good">25</span></td></tr>
+            <tr><td class="name">Produit B</td><td class="muted">Fournisseur B</td><td class="num">510</td><td class="num">1 450 000</td><td class="num"><span class="chip good">35</span></td></tr>
+            <tr><td class="name">Produit Z</td><td class="muted">Fournisseur C</td><td class="num">920</td><td class="num">1 750 000</td><td class="num"><span class="chip critical">120 — stock mort</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Marge — par fournisseur et par produit</h2>
+      <div class="hint">Deux lectures agrégées plutôt qu'un tableau croisé fournisseur × produit</div>
+      <div class="cards2">
+        <div>
+          <h3 style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Marge par fournisseur</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Fournisseur</th><th class="num">CA</th><th class="num">Marge</th><th class="num">Marge %</th><th>Calibration</th></tr></thead>
+              <tbody>
+                <tr><td class="name">Fournisseur A</td><td class="num">3 600 000</td><td class="num">1 800 000</td><td class="num"><span class="chip good">50,0 %</span></td><td class="muted">3 ajustements</td></tr>
+                <tr><td class="name">Fournisseur B</td><td class="num">2 900 000</td><td class="num">1 450 000</td><td class="num"><span class="chip good">50,0 %</span></td><td class="muted">Non calibré</td></tr>
+                <tr><td class="name">Fournisseur C</td><td class="num">2 200 000</td><td class="num">880 000</td><td class="num"><span class="chip warning">40,0 %</span></td><td class="muted">1 ajustement</td></tr>
+                <tr><td class="name">Fournisseur D</td><td class="num">1 500 000</td><td class="num">300 000</td><td class="num"><span class="chip critical">20,0 % — à investiguer</span></td><td class="muted">Non calibré</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h3 style="font-size:12.5px;color:var(--ink-muted);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Marge par produit</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Produit</th><th class="num">CA</th><th class="num">Marge</th><th class="num">Marge %</th></tr></thead>
+              <tbody>
+                <tr><td class="name">Produit A</td><td class="num">3 100 000</td><td class="num">1 705 000</td><td class="num"><span class="chip good">55,0 %</span></td></tr>
+                <tr><td class="name">Produit B</td><td class="num">2 500 000</td><td class="num">1 200 000</td><td class="num"><span class="chip good">48,0 %</span></td></tr>
+                <tr><td class="name">Produit C</td><td class="num">1 400 000</td><td class="num">532 000</td><td class="num"><span class="chip warning">38,0 %</span></td></tr>
+                <tr><td class="name">Produit X</td><td class="num">450 000</td><td class="num">−36 000</td><td class="num"><span class="chip critical">−8,0 % — perte</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <footer class="note">
+    Maquette de refonte visuelle (24/07/2026) — contenu et libellés alignés sur les 5 dashboards réels de l'app <code>bi</code>. Pas encore branchée aux données live.
+  </footer>
+
+</div>

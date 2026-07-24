@@ -17,9 +17,15 @@
 
 > **Clôture v1 (24/07/2026)** : ce catalogue décrit l'état réellement livré de la v1, arrêté à
 > cette date (`chef_projet/BILAN_LIVRAISON_VS_VISION.md`). Les compléments identifiés (contrôle
-> d'accès par rôle, cron dbt nightly, perf grande volumétrie, mise à jour des autres documents
-> owner/bi) sont actés comme volontairement différés, pas comme des manques — voir §5bis du
-> bilan.
+> d'accès par rôle, cron dbt nightly, mise à jour des autres documents owner/bi) sont actés comme
+> volontairement différés, pas comme des manques — voir §5bis du bilan. La mesure de performance
+> (S-710) est close, voir §9 du bilan.
+
+> **Refonte UI/UX (24/07/2026, v1.5)** : direction visuelle validée par la Direction — voir la
+> maquette [maquettes/DAMS_BI_maquette_v1.html](maquettes/DAMS_BI_maquette_v1.html) et
+> `sprints/SPRINT_5_UIUX_Executif.md`. Ce fichier décrit le contenu/la structure de chaque
+> dashboard (toujours à jour) ; la maquette fixe le langage visuel (couleurs, typo, densité) qui
+> sera appliqué par-dessus sans changer ce contenu.
 
 ## Dashboard 1 : 📊 Santé Globale
 
