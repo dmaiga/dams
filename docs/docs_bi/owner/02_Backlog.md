@@ -138,10 +138,10 @@ Chaque story est rattachée à une **question métier** (Q1–Q10 de [01_Vision_
 > - ✅ **Livrées** : S-702 (bascule semaine/mois), S-702b (filtres superviseur + type_agent),
 >   S-703b (filtres produit/fournisseur), S-703 traitée différemment (deux cards agrégées
 >   marge fournisseur/produit plutôt que le regroupement visuel demandé — Direction encore en
->   réflexion sur cette page).
+>   réflexion sur cette page), S-710 (mesuré sur données quasi-prod — 45-95ms/dashboard, aucun
+>   index nécessaire à ce volume, cf. bilan §9).
 > - 🟡 **Partielles** : S-705 (comparaison M-1 sur marge brute et kilo vendu, pas de tendance 6
->   mois), S-709 (graphiques responsives, pas de passe systématique), S-710 (matérialisation en
->   table faite, pas de mesure grande volumétrie / index dédiés).
+>   mois), S-709 (graphiques responsives, pas de passe systématique).
 > - ❌ **Volontairement différées**, actées comme décisions et non comme dette : S-704 (contrôle
 >   d'accès par rôle), S-711 (cron dbt nightly), S-712 (re-scope planning).
 > - 🟢 **Repoussées v1.5, inchangées** : S-701, S-706, S-707, S-708.

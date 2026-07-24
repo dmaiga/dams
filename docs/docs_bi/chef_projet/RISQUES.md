@@ -13,7 +13,7 @@
 | **R1** | Données DAMS incohérentes | 🔴 Haut | 🟡 Moyen | **MOYEN** | Audit DAMS S1J1, sample 10k lignes | Architecte | 🟢 OK |
 | **R2** | PostgreSQL plein | 🔴 Haut | 🟢 Faible | **FAIBLE** | Cleanup avant S4, backup quotidien | Architecte | 🟢 OK |
 | **R3** | Mahamane indisponible | 🔴 Haut | 🟡 Moyen | **MOYEN** | Doc complète, support escalade PO | Chef Proj | 🟡 WATCH |
-| **R4** | Requêtes dashboards `bi` trop lentes à l'échelle prod (Metabase abandonné, ADR-009 — le risque porte maintenant sur les vues dbt consommées par l'app Django) | 🟡 Moyen | 🟡 Moyen | **MOYEN** | 24/07/2026 : cause la plus visible corrigée (vues agrégées passées de `materialized: view` à `table`, recalcul au `dbt run` plutôt qu'à chaque requête) — mesure sur volumétrie proche prod et index PostgreSQL dédiés toujours pas faits (S-710, volontairement différé, cf. `chef_projet/BILAN_LIVRAISON_VS_VISION.md` §5bis) | BI Dev | 🟡 WATCH |
+| **R4** | Requêtes dashboards `bi` trop lentes à l'échelle prod (Metabase abandonné, ADR-009 — le risque porte maintenant sur les vues dbt consommées par l'app Django) | 🟡 Moyen | 🟢 Faible | **FAIBLE** | 24/07/2026 : S-710 clos — mesuré sur données quasi-prod (backup à 14 jours/<100 écritures de la prod réelle) : 5 dashboards à 45–95ms en moyenne, `dbt run` complet à 5,76s SQL. Aucun index nécessaire à ce volume (toutes tables `bi_` < 2 100 lignes, dbt agrège sans filtre de plage). Réexamen si `fct_ventes`/`vw_*` dépasse ~10x le volume actuel — voir `chef_projet/BILAN_LIVRAISON_VS_VISION.md` §9 | BI Dev | 🟢 OK |
 | **R5** | Direction rejette KPI objectif 50kg | 🟡 Moyen | 🟢 Faible | **FAIBLE** | Valider S2, ajuster si besoin | PO | 🟢 OK |
 | **R6** | ROT/superviseur confond dual login | 🟡 Moyen | 🟡 Moyen | **MOYEN** | Training clair S4, glossaire distribué | Architecte | 🟡 WATCH |
 | **R7** | Dépenses: données manquent catégorisées | 🟡 Moyen | 🟡 Moyen | **MOYEN** | Audit Depense table S1, valider champs | BI Dev | 🟡 WATCH |
@@ -49,17 +49,24 @@
 
 ---
 
-### **R4 : Requêtes dashboards `bi` lentes à l'échelle prod (> 2s)**
+### **R4 : Requêtes dashboards `bi` lentes à l'échelle prod (> 2s)** — ✅ Clos 24/07/2026
 - **Impact** : Dashboards inutilisables (Metabase abandonné — ADR-009 ; l'app Django `bi` lit
   directement les vues dbt matérialisées en table)
-- **Proba** : Moyen (pas encore mesuré sur volumétrie proche prod)
+- **Proba** : Faible — mesuré sur données quasi-prod (backup à 14 jours / <100 écritures de la
+  prod réelle, donc pas une extrapolation)
 - **Mitigation** :
   - [x] Vues agrégées passées de `materialized: view` à `table` (24/07/2026) — recalcul au
     `dbt run` plutôt qu'à chaque requête dashboard
-  - [ ] Tester index PostgreSQL dédiés (agent_id, superviseur_id, date)
-  - [ ] Mesurer sur une volumétrie proche prod (pas seulement `dams_dev`)
-  - [ ] Fallback : données pré-calculées si nécessaire
-- **Trigger** : Si > 10% requêtes > 2s
+  - [x] Mesuré sur volumétrie quasi-prod (24/07/2026) : 5 dashboards à 45–95ms en moyenne,
+    `dbt run` complet (32 modèles) à 5,76s de SQL réel — largement sous les 2s
+  - [x] Index PostgreSQL évalués (24/07/2026) : **aucun ajouté**, toutes les tables `bi_` font
+    < 2 100 lignes (seq scan sub-ms, un index n'apporterait rien) et les modèles dbt agrègent
+    sans filtre de plage de dates (un index ne les accélérerait pas non plus)
+  - [ ] Fallback (données pré-calculées) : sans objet tant que la mitigation ci-dessus suffit
+- **Trigger de réexamen** : si `fct_ventes` ou une vue `vw_*` dépasse ~10x le volume mesuré
+  (de l'ordre de 30 000+ lignes), ou si un modèle dbt introduit un filtre par plage de dates —
+  ajouter alors les index sur les colonnes de jointure/filtre concernées. Détail des mesures
+  dans `chef_projet/BILAN_LIVRAISON_VS_VISION.md` §9.
 
 ---
 

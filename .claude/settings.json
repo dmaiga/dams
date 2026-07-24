@@ -35,7 +35,8 @@
       "Bash(python -m pytest bi/ -q)",
       "Bash(dbt --version)",
       "Bash(dbt run *)",
-      "Bash(dbt test *)"
+      "Bash(dbt test *)",
+      "Bash(time dbt run)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

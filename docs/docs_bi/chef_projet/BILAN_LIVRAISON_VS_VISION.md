@@ -44,7 +44,7 @@ récente sur ce qui est effectivement livré.
 | S-707 | Signaler les dépenses "Non catégorisé" à la Direction | 🟢 non traité | 🟡 **traité différemment** | Décision prise : les rattacher silencieusement à `DIVERS` plutôt que les signaler comme demandé. Ce n'est pas ce que demandait la story — voir §4.4 |
 | S-708 | Recherche/tri dans les tableaux | 🟢 non traité | ❌ **non traité** | — |
 | S-709 | Passe de cohérence UI/UX | 🔴 MUST, non traité | 🟡 **partiel** | Graphiques rendus responsives (conteneur dimensionné, `maintainAspectRatio:false`) ; filtres repositionnés à côté du filtre temporel. Pas de passe systématique couleurs/titres/espacement/états vides sur les 5 pages |
-| S-710 | Perf sur volumétrie prod + index PostgreSQL (R4) | 🔴 MUST, non traité | 🟡 **partiel** | Cause racine trouvée et corrigée : vues agrégées passées de `materialized: view` à `table` (recalcul à chaque requête → recalcul au `dbt run` seulement). Mesure sur volumétrie proche prod et index PostgreSQL dédiés **toujours pas faits** |
+| S-710 | Perf sur volumétrie prod + index PostgreSQL (R4) | 🔴 MUST, non traité | ✅ **livré (24/07)** | Mesuré sur les vraies données (base de dev = backup prod à 14 jours / <100 écritures près, donc représentatif) : les 5 dashboards répondent en 45–95 ms en moyenne (largement < 2s), `dbt run` complet (32 modèles) en 5,76s de SQL réel. Aucun index ajouté : toutes les tables `bi_.*` font < 2100 lignes (seq scan sub-ms) et les modèles dbt agrègent la table entière sans filtre de date — un index n'apporterait aucun gain mesurable aujourd'hui. Déclencheur de réexamen documenté dans `chef_projet/RISQUES.md` (R4) |
 | S-711 | Cron `dbt run` nightly + logs/alerte email | 🔴 MUST, non traité | ❌ **non traité côté dbt** | Rien fait sur le refresh dbt nocturne. Une automatisation **paie** (`generer_salaires_mensuel`, hors périmètre de cette story) a été livrée pour un besoin connexe — voir §4.5 |
 | S-712 | Re-scoper Sprint 4 (retirer Metabase obsolète) | 🔴 MUST, non traité | ❌ **non traité** | Tâche de planning pure, pas de code — reste à faire par le Chef de Projet |
 
@@ -128,9 +128,8 @@ Le tri du 22/07 (`SUIVI_MISSION_BI.md` §6) reste largement d'actualité. Mise �
 - **S-711 — Cron `dbt run` nightly + alerte.** Sans lui, chaque nouveau chiffre (y compris les
   corrections de cette session) doit être poussé manuellement en base — le DoD promet des
   données à jour chaque matin, ce n'est pas le cas.
-- **S-710 (reste)** — mesurer sur une volumétrie proche prod et ajouter les index PostgreSQL
-  manquants ; la matérialisation en table a traité la cause la plus visible, pas nécessairement
-  toute la question de performance à l'échelle.
+- ~~S-710 — mesurer sur une volumétrie proche prod et ajouter les index PostgreSQL manquants~~ —
+  livré le 24/07 (§8) : mesuré sur données réelles quasi-prod, aucun index nécessaire à ce stade.
 - **S-712** — re-scoper le Sprint 4 (tâche de planning, 0,5 j, aucune dépendance).
 
 **🟡 Si le temps le permet**
@@ -264,6 +263,44 @@ la réorientation en 5 dashboards (§7) :
 
 **Volontairement non traité pour cette version**, actés comme décisions et non comme dette
 (détail §5bis) : contrôle d'accès par rôle (S-704, garde-fou `username == 'mdmaiga'` maintenu),
-cron `dbt run` nightly (S-711), mesure de performance sur volumétrie prod (S-710), mise à jour
-des dictionnaires KPI et de la Vision Produit (§6) — à reprendre au prochain cycle, une fois le
-produit en usage.
+cron `dbt run` nightly (S-711) — à reprendre au prochain cycle, une fois le produit en usage.
+
+---
+
+## 9. Performance — S-710 clos (24/07/2026)
+
+La base de dev utilisée pour cette mesure est un **backup de production** (écart de 14 jours et
+moins de 100 écritures avec la prod réelle) : ce n'est pas une simulation, c'est la mesure sur
+données quasi-prod que S-710 demandait.
+
+**Dashboards** (5 requêtes répétées, temps de réponse Django complet, page par page) :
+
+| Dashboard | Min | Moyenne | Max (1ère requête incluse) |
+|-----------|-----|---------|------------------------------|
+| Santé Globale | 43 ms | 60–310 ms* | 1,3 s* |
+| Vente (produits) | 66 ms | 85 ms | 98 ms |
+| Agent (mensuel) | 60 ms | 68 ms | 85 ms |
+| Agent (hebdomadaire) | 59 ms | 70 ms | 77 ms |
+| Dépense | 46 ms | 51 ms | 59 ms |
+| Fournisseur | 65 ms | 73 ms | 95 ms |
+
+*\* Le pic à 1,3s n'apparaît que sur la toute première requête d'une série (connexion DB /
+compilation template à froid) ; toutes les requêtes suivantes tombent à 45–75 ms — pas un
+problème de requête SQL.*
+
+**`dbt run` complet** (32 modèles, tout le mart `bi_`) : 5,76s de SQL réel (~14s avec le
+démarrage du process dbt) — largement compatible avec un cron nightly (S-711).
+
+**Index PostgreSQL : aucun ajouté**, décision motivée plutôt que par défaut :
+- Toutes les tables du schéma `bi_` font moins de 2 100 lignes (`fct_ventes` = 3 013, la plus
+  grosse ; le reste est sous 600) — à ce volume, Postgres fait un scan séquentiel plus vite qu'un
+  accès par index, et le planificateur ignorerait un index de toute façon.
+- Les modèles dbt agrègent la table entière (`GROUP BY` sans filtre `WHERE` sur une plage de
+  dates) — un index sur une colonne de date n'accélère pas ce type de requête, seul un filtre de
+  plage en bénéficierait.
+
+**Déclencheur de réexamen** (documenté aussi dans `chef_projet/RISQUES.md`, R4) : revisiter si
+`fct_ventes` ou une vue `vw_*` dépasse ~10x le volume actuel (de l'ordre de 30 000+ lignes), ou
+si un filtre par plage de dates apparaît dans un modèle dbt — ajouter alors un index sur les
+colonnes de jointure/filtre concernées (`superviseur_id`, `produit_id`, `fournisseur_id`,
+`mois`/`semaine`).
