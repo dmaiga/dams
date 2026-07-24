@@ -2,7 +2,11 @@
    Même langage visuel que bi/static/bi/dashboard.css (bordures fines, quasi pas
    d'ombre, typographie contrôlée) porté sur base_admin.html. Scope volontairement
    limité au shell (.dams-topbar/.dams-sidebar/.dams-footer) — ne touche jamais
-   <main>/{% block content %}, où chaque app garde son propre rendu. */
+   <main>/{% block content %}, où chaque app garde son propre rendu.
+
+   V2 (retour utilisateur) : la V1 (tout en gris/blanc) était trop terne — remise
+   d'un point de couleur franc sur la marque + teinte accent sur les icônes plutôt
+   que du gris pur, sans revenir aux ombres/dégradés. */
 
 .dams-shell {
     --dams-bg: #ffffff;
@@ -13,7 +17,7 @@
     --dams-ink-muted: #5b6472;
     --dams-ink-faint: #8891a0;
     --dams-accent: #163d63;
-    --dams-accent-soft: #eaf0f6;
+    --dams-accent-soft: #e3ecf5;
     --dams-success: #1e7a46;
     --dams-success-soft: #e7f5ec;
     --dams-font-ui: "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
@@ -29,14 +33,13 @@
 .dams-shell .dams-topbar h1 { color: var(--dams-ink); letter-spacing: 0.01em; }
 .dams-shell .dams-topbar p { color: var(--dams-ink-faint); }
 
-/* ---- Marque (logo) : carré bordé plutôt que rempli/ombré ---- */
+/* ---- Marque (logo) : bloc plein accent, seul aplat de couleur franc du shell ---- */
 .dams-shell .dams-brand-mark {
-    background: var(--dams-bg) !important;
-    border: 1px solid var(--dams-border-strong);
-    border-radius: 3px;
+    background: var(--dams-accent) !important;
+    border: none;
     box-shadow: none;
 }
-.dams-shell .dams-brand-mark i { color: var(--dams-accent) !important; }
+.dams-shell .dams-brand-mark i { color: #ffffff !important; }
 
 /* ---- Sidebar ---- */
 .dams-shell .dams-sidebar {
@@ -50,11 +53,21 @@
 .dams-shell .dams-sidebar .dams-brand-sub { color: var(--dams-ink-faint); }
 
 .dams-shell .dams-nav-section {
+    position: relative;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
-    color: var(--dams-ink-faint) !important;
+    color: var(--dams-ink-muted) !important;
     margin-top: 4px;
+}
+.dams-shell .dams-nav-section::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--dams-accent);
+    opacity: 0.55;
+    transform: translateY(-50%);
 }
 
 .dams-shell .dams-nav-link {
@@ -64,6 +77,16 @@
     transition: background-color 0.1s ease, color 0.1s ease;
 }
 .dams-shell .dams-nav-link:hover { background: var(--dams-surface) !important; color: var(--dams-ink); }
+
+/* Icônes teintées accent (à faible opacité) plutôt que gris pur — c'est ce qui
+   manquait le plus : un système tout en gris/blanc lit comme éteint. Exclut le
+   lien de déconnexion (dams-nav-link-danger), qui reste neutre puis rouge au survol. */
+.dams-shell .dams-nav-link:not(.dams-nav-link-danger) i {
+    color: var(--dams-accent);
+    opacity: 0.5;
+    transition: opacity 0.15s ease, color 0.15s ease;
+}
+.dams-shell .dams-nav-link:not(.dams-nav-link-danger):hover i { opacity: 0.85; }
 
 /* Marqueurs d'état actif générés par les conditions Tailwind du template
    (bg-blue-50/text-primary, border-r-2 border-primary, bg-green-50/text-success) —
@@ -75,12 +98,14 @@
     font-weight: 600;
     border-right-color: var(--dams-accent);
 }
+.dams-shell .dams-nav-link.text-primary i { opacity: 1; }
 .dams-shell .dams-nav-link.text-success {
     background: var(--dams-success-soft) !important;
     color: var(--dams-success) !important;
     font-weight: 600;
     border-right-color: var(--dams-success);
 }
+.dams-shell .dams-nav-link.text-success i { color: var(--dams-success); opacity: 1; }
 
 .dams-shell .dams-sidebar nav > ul { border-top: 1px solid var(--dams-border); }
 
