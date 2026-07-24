@@ -36,7 +36,14 @@
       "Bash(dbt --version)",
       "Bash(dbt run *)",
       "Bash(dbt test *)",
-      "Bash(time dbt run)"
+      "Bash(time dbt run)",
+      "Bash(find / -maxdepth 4 -iname \"bi_render\" 2>/dev/null; echo \"---windows temp---\"; find /c/Users/Admin/AppData/Local/Temp -maxdepth 1 -iname \"bi_render\" 2>/dev/null)",
+      "Read(//c//**)",
+      "Bash(netstat -ano)",
+      "Bash(powershell -Command \"Stop-Process -Id 4876 -Force\")",
+      "Bash(taskkill //PID 4876 //F)",
+      "Bash(python manage.py collectstatic --noinput)",
+      "Bash(python -m pytest bi/ direction/ -q)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"
