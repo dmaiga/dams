@@ -12,21 +12,23 @@
 
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'direction/admin_shell.css' %}">
 </head>
 
-<body class="bg-gray-50">
+<body class="bg-gray-50 dams-shell">
 
     <div class="drawer lg:drawer-open">
         <input id="drawer-toggle" type="checkbox" class="drawer-toggle" />
 
         <!-- CONTENU PRINCIPAL -->
         <div class="drawer-content flex flex-col min-h-screen">
-           
+
             <!-- HEADER MOBILE -->
-            <header class="lg:hidden bg-white border-b shadow-sm sticky top-0 z-10">
+            <header class="dams-topbar lg:hidden bg-white border-b shadow-sm sticky top-0 z-10">
                 <div class="flex items-center justify-between p-4">
                     <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                        <div class="dams-brand-mark w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                             <i class="fas fa-warehouse text-white text-sm"></i>
                         </div>
                         <div>
@@ -34,7 +36,7 @@
                             <p class="text-xs text-gray-500">Backoffice</p>
                         </div>
                     </div>
-                    
+
                     <!-- Bouton hamburger pour mobile -->
                     <label for="drawer-toggle" class="drawer-button btn btn-ghost btn-circle">
                         <i class="fas fa-bars text-lg"></i>
@@ -49,7 +51,7 @@
             </main>
 
             <!-- Pied de page -->
-            <footer class="p-4 text-center text-sm text-gray-500 border-t">
+            <footer class="dams-footer p-4 text-center text-sm text-gray-500 border-t">
                 <p>DAM'S v0.0.1 • © 2025</p>
             </footer>
         </div>
@@ -57,11 +59,11 @@
         <!-- SIDEBAR -->
         <div class="drawer-side z-20">
             <label for="drawer-toggle" class="drawer-overlay"></label>
-            <aside class="bg-white min-h-full w-72 border-r shadow-sm">
+            <aside class="dams-sidebar bg-white min-h-full w-72 border-r shadow-sm">
                 <!-- Logo desktop (masqué sur mobile) -->
                 <div class="p-5 border-b hidden lg:block">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                        <div class="dams-brand-mark w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                             <i class="fas fa-warehouse text-white text-lg"></i>
                         </div>
                         <div>
@@ -81,11 +83,11 @@
 <nav class="p-4 space-y-1">
     <div class="mb-3">
         <!-- ================= VUE D'ENSEMBLE ================= -->
-        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">VUE D'ENSEMBLE</p>
+        <p class="dams-nav-section text-xs font-semibold text-gray-500 px-3 mb-2">VUE D'ENSEMBLE</p>
         <ul class="space-y-1 mb-4">
             <li>
                 <a href="{% url 'dashboard' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if request.resolver_match.url_name == 'dashboard' %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-tachometer-alt w-5"></i>
                     <span>Tableau de Bord</span>
@@ -94,19 +96,19 @@
         </ul>
 
         <!-- ================= RÉFÉRENTIELS ================= -->
-        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">RÉFÉRENTIELS</p>
+        <p class="dams-nav-section text-xs font-semibold text-gray-500 px-3 mb-2">RÉFÉRENTIELS</p>
         <ul class="space-y-1 mb-4">
             <li>
                 <a href="{% url 'agent_dashboard' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
-                          {% if 'agent' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                          {% if 'agent' in request.resolver_match.url_name and request.resolver_match.namespace != 'bi' %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-user-tie w-5"></i>
                     <span>Agents</span>
                 </a>
             </li>
             <li>
                 <a href="{% url 'product_list' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if 'product' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-cube w-5"></i>
                     <span>Produits</span>
@@ -114,7 +116,7 @@
             </li>
             <li>
                 <a href="{% url 'suivi_distributions' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if 'suivi_distributions' in request.resolver_match.url_name %}
                               bg-blue-50 text-primary
                           {% endif %}">
@@ -127,7 +129,7 @@
             </li>
             <li>
                 <a href="{% url 'liste_fournisseurs_direction' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if request.resolver_match.url_name == 'liste_fournisseurs_direction' %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-truck w-5"></i>
                     <span>Fournisseurs</span>
@@ -136,11 +138,11 @@
         </ul>
 
         <!-- ================= PILOTAGE & ANALYSES ================= -->
-        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">PILOTAGE & ANALYSES</p>
+        <p class="dams-nav-section text-xs font-semibold text-gray-500 px-3 mb-2">PILOTAGE & ANALYSES</p>
         <ul class="space-y-1 mb-4">
             <li>
                 <a href="{% url 'toutes_les_ventes' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if 'vente' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-shopping-cart w-5"></i>
                     <span>Ventes</span>
@@ -148,7 +150,7 @@
             </li>
             <li>
                 <a href="{% url 'analyse_operationnelle' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
                           {% if 'analyse_operationnelle' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
                     <i class="fas fa-magnifying-glass-chart w-5"></i>
                     <span>Analyse Opérationnelle</span>
@@ -156,7 +158,7 @@
             </li>
             <li>
                 <a href="{% url 'salaire_lecture' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
                           {% if 'salaire_lecture' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
                     <i class="fas fa-file-invoice-dollar w-5"></i>
                     <span>Rémunération</span>
@@ -165,7 +167,7 @@
        
             <li>
                 <a href="{% url 'dashboard_surveillance' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
                           {% if 'dashboard_surveillance' in request.resolver_match.url_name %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
                     <i class="fas fa-bell w-5"></i>
                     <span>Surveillance</span>
@@ -174,7 +176,7 @@
             {% if request.user.username == "mdmaiga" %}
             <li>
                 <a href="{% url 'bi:sommaire' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200
                           {% if request.resolver_match.namespace == 'bi' %}bg-blue-50 text-primary border-r-2 border-primary{% else %}hover:bg-gray-100 text-gray-700{% endif %}">
                     <i class="fas fa-chart-line w-5"></i>
                     <span>BI</span>
@@ -185,12 +187,12 @@
         </ul>
 
         <!-- ================= FINANCE ================= -->
-        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">FINANCE</p>
+        <p class="dams-nav-section text-xs font-semibold text-gray-500 px-3 mb-2">FINANCE</p>
         <ul class="space-y-1 mb-4">
             {% if request.user.username == "mdmaiga" %}
             <li>
                 <a href="{% url 'finance:dashboard_finance' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if request.resolver_match.namespace == 'finance' %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-wallet w-5"></i>
                     <span>Solde superviseurs</span>
@@ -199,7 +201,7 @@
             {% endif %}
             <li>
                 <a href="{% url 'versements_direction' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if request.resolver_match.namespace != 'finance' and 'versement' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-money-check-alt w-5"></i>
                     <span>Versements</span>
@@ -207,7 +209,7 @@
             </li>
             <li>
                 <a href="{% url 'liste_depense_direction' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if 'liste_depense_direction' in request.resolver_match.url_name %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-money-bill-wave w-5"></i>
                     <span>Dépenses</span>
@@ -215,7 +217,7 @@
             </li>
             <li>
                 <a href="{% url 'factures_fournisseurs_direction' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if request.resolver_match.url_name == 'factures_fournisseurs_direction' or request.resolver_match.url_name == 'detail_facture_fournisseur_direction' %}bg-blue-50 text-primary{% endif %}">
                     <i class="fas fa-file-invoice-dollar w-5"></i>
                     <span>Factures Fournisseurs</span>
@@ -223,7 +225,7 @@
             </li>
         </ul>
         <!-- ================= CHAMPS ================= -->
-        <p class="text-xs font-semibold text-gray-500 px-3 mb-2">
+        <p class="dams-nav-section text-xs font-semibold text-gray-500 px-3 mb-2">
             CHAMPS
         </p>
 
@@ -234,7 +236,7 @@
             <li>
             
                 <a href="{% url 'agro_dashboard' %}"
-                   class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
+                   class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-100
                           {% if request.resolver_match.url_name == 'agro_dashboard' %}bg-green-50 text-success{% endif %}">
             
                     <i class="fas fa-seedling w-5"></i>
@@ -255,7 +257,7 @@
     <ul class="pt-4 border-t">
         <li>
             <a href="{% url 'logout' %}"
-               class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 text-gray-700">
+               class="dams-nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 text-gray-700">
                 <i class="fas fa-sign-out-alt w-5"></i>
                 <span>Déconnexion</span>
             </a>

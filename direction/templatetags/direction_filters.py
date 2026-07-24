@@ -1,7 +1,7 @@
 # direction/templatetags/custom_filters.py
 from django import template
 from django.utils.formats import number_format
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 
 register = template.Library()
@@ -111,28 +111,34 @@ def format_number(value):
     - 8825.00 -> 8 825
     - 8825.50 -> 8 825,5
     - 8825.75 -> 8 825,75
+
+    Arrondi à 2 décimales avant affichage : une division Decimal (ex. calcul de
+    marge_pct) n'a aucune raison de se terminer proprement et peut produire jusqu'à
+    28 chiffres significatifs (précision par défaut du module decimal) — sans cet
+    arrondi, on affiche des valeurs du type "-79,17110617056084567305675574".
     """
     if value is None:
         return ""
 
     try:
-        val = Decimal(value).normalize()
+        val = Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        signe = "-" if val < 0 else ""
+        val = abs(val)
 
         # Séparer partie entière / décimale
         int_part = int(val)
-        decimal_part = abs(val - int_part)
+        decimal_part = val - int_part
 
         # Format milliers avec espace
         int_str = f"{int_part:,}".replace(",", " ")
 
         if decimal_part == 0:
-            return int_str
+            return f"{signe}{int_str}"
 
         # Supprimer les zéros inutiles
-        decimal_str = str(decimal_part).lstrip("0").rstrip("0").rstrip(".")
-        decimal_str = decimal_str.replace(".", ",")
+        decimal_str = f"{decimal_part:.2f}".split(".")[1].rstrip("0")
 
-        return f"{int_str}{decimal_str}"
+        return f"{signe}{int_str},{decimal_str}"
 
     except Exception:
         return value

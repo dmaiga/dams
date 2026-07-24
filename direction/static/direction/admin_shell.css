@@ -1,0 +1,93 @@
+/* DAMS — chrome du backoffice (header mobile, sidebar, pied de page).
+   Même langage visuel que bi/static/bi/dashboard.css (bordures fines, quasi pas
+   d'ombre, typographie contrôlée) porté sur base_admin.html. Scope volontairement
+   limité au shell (.dams-topbar/.dams-sidebar/.dams-footer) — ne touche jamais
+   <main>/{% block content %}, où chaque app garde son propre rendu. */
+
+.dams-shell {
+    --dams-bg: #ffffff;
+    --dams-surface: #f8f9fb;
+    --dams-border: #e2e5ea;
+    --dams-border-strong: #cfd4dc;
+    --dams-ink: #14181f;
+    --dams-ink-muted: #5b6472;
+    --dams-ink-faint: #8891a0;
+    --dams-accent: #163d63;
+    --dams-accent-soft: #eaf0f6;
+    --dams-success: #1e7a46;
+    --dams-success-soft: #e7f5ec;
+    --dams-font-ui: "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---- Topbar mobile ---- */
+.dams-shell .dams-topbar {
+    background: var(--dams-bg);
+    border-bottom: 1px solid var(--dams-border);
+    box-shadow: none;
+    font-family: var(--dams-font-ui);
+}
+.dams-shell .dams-topbar h1 { color: var(--dams-ink); letter-spacing: 0.01em; }
+.dams-shell .dams-topbar p { color: var(--dams-ink-faint); }
+
+/* ---- Marque (logo) : carré bordé plutôt que rempli/ombré ---- */
+.dams-shell .dams-brand-mark {
+    background: var(--dams-bg) !important;
+    border: 1px solid var(--dams-border-strong);
+    border-radius: 3px;
+    box-shadow: none;
+}
+.dams-shell .dams-brand-mark i { color: var(--dams-accent) !important; }
+
+/* ---- Sidebar ---- */
+.dams-shell .dams-sidebar {
+    background: var(--dams-bg);
+    border-right: 1px solid var(--dams-border);
+    box-shadow: none;
+    font-family: var(--dams-font-ui);
+}
+.dams-shell .dams-sidebar h1 { color: var(--dams-ink); letter-spacing: 0.01em; }
+.dams-shell .dams-sidebar > div > p,
+.dams-shell .dams-sidebar .dams-brand-sub { color: var(--dams-ink-faint); }
+
+.dams-shell .dams-nav-section {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--dams-ink-faint) !important;
+    margin-top: 4px;
+}
+
+.dams-shell .dams-nav-link {
+    border-radius: 3px;
+    color: var(--dams-ink-muted);
+    border-right: 2px solid transparent;
+    transition: background-color 0.1s ease, color 0.1s ease;
+}
+.dams-shell .dams-nav-link:hover { background: var(--dams-surface) !important; color: var(--dams-ink); }
+
+/* Marqueurs d'état actif générés par les conditions Tailwind du template
+   (bg-blue-50/text-primary, border-r-2 border-primary, bg-green-50/text-success) —
+   ré-habillés ici plutôt que réécrits côté template, pour ne pas toucher à la
+   logique de highlighting de chaque lien. */
+.dams-shell .dams-nav-link.text-primary {
+    background: var(--dams-accent-soft) !important;
+    color: var(--dams-accent) !important;
+    font-weight: 600;
+    border-right-color: var(--dams-accent);
+}
+.dams-shell .dams-nav-link.text-success {
+    background: var(--dams-success-soft) !important;
+    color: var(--dams-success) !important;
+    font-weight: 600;
+    border-right-color: var(--dams-success);
+}
+
+.dams-shell .dams-sidebar nav > ul { border-top: 1px solid var(--dams-border); }
+
+/* ---- Footer ---- */
+.dams-shell .dams-footer {
+    color: var(--dams-ink-faint);
+    border-top: 1px solid var(--dams-border);
+    font-family: var(--dams-font-ui);
+    font-size: 11.5px;
+}
