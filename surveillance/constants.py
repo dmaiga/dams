@@ -17,8 +17,8 @@ DATE_PLANCHER_PRIX   = date(2026, 7, 1)
 DATE_PLANCHER_STOCK  = date(2026, 7, 1)
 
 # Rotation lente : nombre de jours sans vente sur un lot distribué avant alerte.
-DELAI_ROTATION_JOURS = 2
+DELAI_ROTATION_JOURS = 3
 
 # Stock dormant : nombre de jours en entrepôt/chez le superviseur sans distribution
 # avant alerte.
-DELAI_STOCK_DORMANT_JOURS = 14
+DELAI_STOCK_DORMANT_JOURS = 15

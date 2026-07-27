@@ -27,22 +27,26 @@ from core.models import Alerte
 admin.site.register(Perte)
 
 @admin.register(Alerte)
-class AlerteSoldeAdmin(admin.ModelAdmin):
+class AlerteAdmin(admin.ModelAdmin):
 
     list_display = (
         "id",
         "type_alerte",
         "niveau",
+        "statut",
         "superviseur",
         "agent",
         "produit",
         "est_vue",
+        "date_dernier_envoi",
+        "nombre_envois",
         "date_creation",
     )
 
     list_filter = (
         "type_alerte",
         "niveau",
+        "statut",
         "est_vue",
         "date_creation",
     )

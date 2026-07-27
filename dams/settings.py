@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'vente',
     'finance',
     'bi',
+    'monitoring',
 
 
 ]

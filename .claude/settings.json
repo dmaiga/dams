@@ -46,7 +46,18 @@
       "Bash(python -m pytest bi/ direction/ -q)",
       "Bash(git status *)",
       "Bash(python manage.py test surveillance -v 2)",
-      "Bash(python manage.py test surveillance -v 1)"
+      "Bash(python manage.py test surveillance -v 1)",
+      "Bash(python manage.py makemigrations core)",
+      "Bash(python manage.py migrate core 0109 --fake)",
+      "Bash(python -c \"from datetime import datetime; print\\(datetime.now\\(\\)\\)\")",
+      "Bash(python manage.py test monitoring -v 2)",
+      "Bash(python manage.py evaluer_alertes)",
+      "Bash(python manage.py test)",
+      "Bash(python manage.py test -v 2)",
+      "Bash(python -c \"import requests; print\\(requests.__version__\\)\")",
+      "Bash(python manage.py test monitoring -v 1)",
+      "Bash(awk '/^class LotEntrepot/,/^class [A-Z]/' core/models.py)",
+      "Bash(grep -v \"^\\\\./\\\\.env$\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

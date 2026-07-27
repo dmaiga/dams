@@ -1,6 +1,6 @@
 # Sprint 05 — Chantier 3 : Moteur de surveillance métier (Business Monitoring Engine)
 
-**Statut** : 📋 Rédigé — prêt à démarrer le Volet 1.
+**Statut** : ✅ Terminé — les 5 volets sont livrés (app `monitoring`, modèle `Alerte` étendu, moteur d'évaluation, commande `evaluer_alertes`, 15 tests).
 
 ## Contexte
 
@@ -142,9 +142,9 @@ class Alerte(models.Model):
 `core/admin.py::AlerteSoldeAdmin` : ajouter `statut`, `date_dernier_envoi`, `nombre_envois` à `list_display`/`list_filter` (renommer la classe en `AlerteAdmin`, le nom actuel date de l'ancien système supprimé).
 
 **DoD Volet 2** :
-- [ ] Migration appliquée sans erreur (`manage.py migrate`), aucune donnée existante perdue (table déjà vidée, cf. Contexte).
-- [ ] `statut` par défaut `ACTIVE` pour toute nouvelle `Alerte`.
-- [ ] Admin Django à jour (filtre par `statut`, tri par `date_dernier_envoi`).
+- [x] Migration appliquée sans erreur (`manage.py migrate`), aucune donnée existante perdue (table déjà vidée, cf. Contexte).
+- [x] `statut` par défaut `ACTIVE` pour toute nouvelle `Alerte`.
+- [x] Admin Django à jour (filtre par `statut`, tri par `date_dernier_envoi`).
 
 ---
 
@@ -183,11 +183,11 @@ class AlerteDeduplicationService:
 ```
 
 **DoD Volet 3** :
-- [ ] Pas de nouvelle `Alerte` créée si une `ACTIVE` existe déjà pour la même situation logique.
-- [ ] Renvoi (`nombre_envois` incrémenté, `date_dernier_envoi` mis à jour) uniquement si `reenvoi_heures` écoulées depuis le dernier envoi.
-- [ ] `stock`/`prix` : aucun renvoi tant qu'ACTIVE (`reenvoi_heures=None`).
-- [ ] Une situation qui disparaît clôture automatiquement l'`Alerte` correspondante (`RESOLUE`, `date_resolution` renseignée).
-- [ ] Tests unitaires (`monitoring/tests.py`) : création initiale, pas de doublon immédiat, renvoi après délai, silence avant délai, clôture automatique.
+- [x] Pas de nouvelle `Alerte` créée si une `ACTIVE` existe déjà pour la même situation logique.
+- [x] Renvoi (`nombre_envois` incrémenté, `date_dernier_envoi` mis à jour) uniquement si `reenvoi_heures` écoulées depuis le dernier envoi.
+- [x] `stock`/`prix` : aucun renvoi tant qu'ACTIVE (`reenvoi_heures=None`).
+- [x] Une situation qui disparaît clôture automatiquement l'`Alerte` correspondante (`RESOLUE`, `date_resolution` renseignée).
+- [x] Tests unitaires (`monitoring/tests.py`) : création initiale, pas de doublon immédiat, renvoi après délai, silence avant délai, clôture automatique.
 
 ---
 
@@ -219,9 +219,9 @@ class TelegramProvider:
 ```
 
 **DoD Volet 4** :
-- [ ] `TelegramProvider.send()` ne lève jamais d'exception (try/except large, log seulement).
-- [ ] Format de message cohérent (niveau + message), facile à remplacer par un vrai appel API sans changer sa signature.
-- [ ] `.env`/`STACK.md` **non modifiés** ce sprint (pas de variable Telegram tant qu'aucun bot n'existe) — à faire quand les credentials arrivent.
+- [x] `TelegramProvider.send()` ne lève jamais d'exception (try/except large, log seulement).
+- [x] Format de message cohérent (niveau + message), facile à remplacer par un vrai appel API sans changer sa signature.
+- [x] `.env`/`STACK.md` **non modifiés** ce sprint (pas de variable Telegram tant qu'aucun bot n'existe) — à faire quand les credentials arrivent.
 
 ---
 
@@ -298,12 +298,12 @@ class Command(BaseCommand):
 ```
 
 **DoD Volet 5** :
-- [ ] `manage.py evaluer_alertes` exécute les 5 règles (1a, 1b, 2, 3, 4) sans erreur sur une base vide comme sur une base peuplée.
-- [ ] Chaque règle appelle le service source existant tel quel (`lister_soldes_superviseurs`, `solde_superviseur`, `StockAgeService`, `PrixSurveillanceService`) — aucune requête ORM dupliquée dans `monitoring`.
-- [ ] `1b` (solde persistant) ne se déclenche que si le superviseur a bien 3 `RecouvrementSuperviseur` historisés, tous avec un solde résiduel `> 0` à leur date respective — un superviseur avec moins de 3 cycles n'est jamais faussement alerté.
-- [ ] Un échec `TelegramProvider.send()` n'interrompt pas l'évaluation des règles suivantes (US-05).
-- [ ] Tests (`monitoring/tests.py`) : au moins un cas par règle (création d'alerte), le scénario "situation résolue" (agent qui recommence à vendre, solde qui repasse sous le seuil) → `Alerte` clôturée, et le cas `1b` (3 cycles avec solde résiduel vs 2 cycles seulement → pas d'alerte).
-- [ ] `STACK.md` mis à jour : `manage.py evaluer_alertes` documentée dans "Commandes de gestion courantes", avec la même remarque que `generer_salaires_mensuel` sur la tâche planifiée OS (pas d'infra Celery/APScheduler) — préciser l'horaire matinal requis pour `1a`.
+- [x] `manage.py evaluer_alertes` exécute les 5 règles (1a, 1b, 2, 3, 4) sans erreur sur une base vide comme sur une base peuplée.
+- [x] Chaque règle appelle le service source existant tel quel (`lister_soldes_superviseurs`, `solde_superviseur`, `StockAgeService`, `PrixSurveillanceService`) — aucune requête ORM dupliquée dans `monitoring`.
+- [x] `1b` (solde persistant) ne se déclenche que si le superviseur a bien 3 `RecouvrementSuperviseur` historisés, tous avec un solde résiduel `> 0` à leur date respective — un superviseur avec moins de 3 cycles n'est jamais faussement alerté.
+- [x] Un échec `TelegramProvider.send()` n'interrompt pas l'évaluation des règles suivantes (US-05).
+- [x] Tests (`monitoring/tests.py`) : au moins un cas par règle (création d'alerte), le scénario "situation résolue" (agent qui recommence à vendre, solde qui repasse sous le seuil) → `Alerte` clôturée, et le cas `1b` (3 cycles avec solde résiduel vs 2 cycles seulement → pas d'alerte).
+- [x] `STACK.md` mis à jour : `manage.py evaluer_alertes` documentée dans "Commandes de gestion courantes", avec la même remarque que `generer_salaires_mensuel` sur la tâche planifiée OS (pas d'infra Celery/APScheduler) — préciser l'horaire matinal requis pour `1a`.
 
 ---
 
@@ -320,10 +320,10 @@ class Command(BaseCommand):
 ## Critères de validation globaux (Definition of Done du sprint)
 
 - [ ] Les 5 volets ci-dessus sont chacun individuellement validés (DoD par volet).
-- [ ] `manage.py check` propre, migration `core` appliquée.
-- [ ] `manage.py evaluer_alertes` exécutable manuellement sans erreur, log Telegram (stub) visible en sortie.
-- [ ] `docs/BACKLOG.md` (Chantier 3) mis à jour : statut → 🟡 en cours ou ✅ terminée selon l'avancement, lien vers ce sprint.
-- [ ] `monitoring/APP_MONITORING.md` créé, sur le modèle des autres `APP_*.md` du repo (rôle, architecture, points de vigilance — notamment le TODO Telegram réel).
+- [x] `manage.py check` propre, migration `core` appliquée.
+- [x] `manage.py evaluer_alertes` exécutable manuellement sans erreur, log Telegram (stub) visible en sortie.
+- [x] `docs/BACKLOG.md` (Chantier 3) mis à jour : statut → 🟡 en cours ou ✅ terminée selon l'avancement, lien vers ce sprint.
+- [x] `monitoring/APP_MONITORING.md` créé, sur le modèle des autres `APP_*.md` du repo (rôle, architecture, points de vigilance — notamment le TODO Telegram réel).
 
 ---
 

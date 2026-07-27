@@ -56,8 +56,15 @@ class Alerte(models.Model):
         ("critique", "Critique"),
     ]
 
+    STATUTS = [
+        ("ACTIVE", "Active"),
+        ("RESOLUE", "Résolue"),
+        ("IGNOREE", "Ignorée"),
+    ]
+
     TYPES = [
         ("solde", "Solde superviseur"),
+        ("solde_persistant", "Solde persistant"),
         ("stock", "Stock ancien"),
         ("prix", "Variation prix"),
         ("activite", "Baisse activité"),
@@ -90,6 +97,27 @@ class Alerte(models.Model):
         blank=True,
         on_delete=models.SET_NULL
     )
+
+    lot = models.ForeignKey(
+        "LotEntrepot",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="alertes"
+    )
+
+    distribution = models.ForeignKey(
+        "DetailDistribution",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="alertes"
+    )
+
+    statut = models.CharField(max_length=20, choices=STATUTS, default="ACTIVE")
+    date_resolution = models.DateTimeField(null=True, blank=True)
+    date_dernier_envoi = models.DateTimeField(null=True, blank=True)
+    nombre_envois = models.PositiveIntegerField(default=0)
 
     est_vue = models.BooleanField(default=False)
 

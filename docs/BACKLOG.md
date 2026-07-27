@@ -93,7 +93,7 @@ clôture définitive du sprint.
 
 ## Chantier 3 — Moteur de surveillance métier (Business Monitoring Engine)
 
-**Statut** : 🟡 en cours — cadré dans [docs/sprints/sprint-05.md](sprints/sprint-05.md), prêt à démarrer le Volet 1
+**Statut** : ✅ terminée — les 5 volets de [docs/sprints/sprint-05.md](sprints/sprint-05.md) sont livrés (app `monitoring`, modèle `Alerte` étendu, moteur + commande `evaluer_alertes`, tests). Reste hors MVP : vrai bot Telegram (`TelegramProvider` en stub log) et exploitation UI.
 **Priorité** : 🟡 Normal
 **Périmètre** : transverse — concerne l'ensemble des modules DAMS (`vente`, `finance`, `stock`, `surveillance`, `direction`).
 
