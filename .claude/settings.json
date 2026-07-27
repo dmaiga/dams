@@ -43,7 +43,8 @@
       "Bash(powershell -Command \"Stop-Process -Id 4876 -Force\")",
       "Bash(taskkill //PID 4876 //F)",
       "Bash(python manage.py collectstatic --noinput)",
-      "Bash(python -m pytest bi/ direction/ -q)"
+      "Bash(python -m pytest bi/ direction/ -q)",
+      "Bash(git status *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"
