@@ -55,6 +55,13 @@
 {% endblock %}
 
 {% block dashboard_content %}
+<div class="bi-toggle-sensible">
+    <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
+        <i class="fas fa-eye-slash"></i>
+        <span>Masquer CA / marge / rentabilité</span>
+    </button>
+</div>
+
 <div class="bi-panel">
     <h2>Performance équipes / superviseurs</h2>
     <div class="overflow-x-auto">
@@ -82,8 +89,8 @@
                         </span>
                         {% else %}—{% endif %}
                     </td>
-                    <td class="text-right">{{ s.ca|fcfa }}</td>
-                    <td class="text-right">{{ s.marge_brute|fcfa }}</td>
+                    <td class="text-right bi-sensible">{{ s.ca|fcfa }}</td>
+                    <td class="text-right bi-sensible">{{ s.marge_brute|fcfa }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -137,8 +144,10 @@
                     <td class="text-right">{{ a.jours_actifs }}</td>
                     <td class="text-right">{{ a.jours_ouvres|default_if_none:"—" }}</td>
                     <td class="text-right">{{ a.kg_par_jour|default_if_none:"—"|format_number }}</td>
-                    <td><span class="bi-badge bi-{{ a.statut_couleur }}">{{ a.statut_label }}</span></td>
-                    <td class="text-right">{{ a.rentabilite_affichee|fcfa }}</td>
+                    <td class="text-center">
+                        <span class="bi-badge bi-{{ a.statut_couleur }}" title="{{ a.statut_label }}">&nbsp;</span>
+                    </td>
+                    <td class="text-right bi-sensible">{{ a.rentabilite_affichee|fcfa }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -160,4 +169,42 @@
         {% endfor %}
     </div>
 </div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    (function () {
+        var STORAGE_KEY = "bi-donnees-sensibles-masquees";
+        var toggleBtn = document.getElementById("bi-toggle-donnees-sensibles");
+        var cellules = document.querySelectorAll(".bi-sensible");
+        if (!toggleBtn || !cellules.length) return;
+
+        var MASQUE = "••••••";
+
+        function appliquer(masque) {
+            cellules.forEach(function (cellule) {
+                if (masque) {
+                    if (cellule.dataset.valeurReelle === undefined) {
+                        cellule.dataset.valeurReelle = cellule.textContent;
+                    }
+                    cellule.textContent = MASQUE;
+                } else if (cellule.dataset.valeurReelle !== undefined) {
+                    cellule.textContent = cellule.dataset.valeurReelle;
+                }
+            });
+            toggleBtn.innerHTML = masque
+                ? '<i class="fas fa-eye"></i><span>Afficher CA / marge / rentabilité</span>'
+                : '<i class="fas fa-eye-slash"></i><span>Masquer CA / marge / rentabilité</span>';
+        }
+
+        var masqueInitial = localStorage.getItem(STORAGE_KEY) === "1";
+        appliquer(masqueInitial);
+
+        toggleBtn.addEventListener("click", function () {
+            var masque = toggleBtn.textContent.indexOf("Afficher") === -1;
+            appliquer(masque);
+            localStorage.setItem(STORAGE_KEY, masque ? "1" : "0");
+        });
+    })();
+</script>
 {% endblock %}
