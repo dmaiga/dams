@@ -14,7 +14,7 @@ SEUIL_ALERTE_SOLDE = Decimal("25000")
 # introduction tardive du rôle ROT) — mdmaiga a choisi de ne pas le reprendre
 # plutôt que de composer avec des données peu fiables. Tout Recouvrement/
 # RecouvrementSuperviseur/Depense/VersementBancaire antérieur est ignoré.
-DATE_DEBUT_FINANCE = date(2026, 7, 1)
+DATE_DEBUT_FINANCE = date(2026, 8, 1)
 
 
 def solde_superviseur(superviseur, date_fin=None):
