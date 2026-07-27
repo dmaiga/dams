@@ -43,7 +43,22 @@
       </h2>
       
       <form method="get" class="flex flex-wrap gap-4 items-end">
-        
+
+        <!-- Recherche nom / prénom -->
+        <div class="flex-1 min-w-[220px]">
+          <label class="label text-sm font-medium text-gray-700 pb-1">
+            Recherche
+          </label>
+          <div class="relative">
+            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+            <input type="text"
+                   name="q"
+                   value="{{ current_q|default:'' }}"
+                   placeholder="Nom ou prénom de l'agent..."
+                   class="input input-bordered input-sm w-full pl-8 focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
+          </div>
+        </div>
+
         <!-- Type agent -->
         <div class="flex-1 min-w-[180px]">
           <label class="label text-sm font-medium text-gray-700 pb-1">

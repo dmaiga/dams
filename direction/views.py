@@ -211,6 +211,7 @@ class AgentTerrainListView(LoginRequiredMixin, TemplateView):
         # ----------------------------
         type_agent = self.request.GET.get("type_agent")  # terrain | agent_gros | None
         superviseur_id = self.request.GET.get("superviseur")
+        recherche = self.request.GET.get("q", "").strip()
 
         superviseur = None
         if superviseur_id:
@@ -224,6 +225,7 @@ class AgentTerrainListView(LoginRequiredMixin, TemplateView):
             date_fin=date_fin,
             superviseur=superviseur,
             type_agent=type_agent,
+            recherche=recherche,
         )
 
         # ----------------------------
@@ -240,6 +242,7 @@ class AgentTerrainListView(LoginRequiredMixin, TemplateView):
             # filtres
             "current_type_agent": type_agent,
             "current_superviseur": superviseur_id,
+            "current_q": recherche,
 
             # listes
             "superviseurs": Agent.objects.filter(
@@ -950,9 +953,20 @@ def liste_depenses(request):
         'effectue_par', 'effectue_par__user', 'versement'
     )
 
-    # 🔹 Total GLOBAL (sans aucun filtre)
-    total_global = (
-        base_qs.aggregate(total=Sum('montant'))['total']
+    # 🔹 KPI mois en cours
+    aujourd_hui = timezone.now().date()
+    debut_mois = aujourd_hui.replace(day=1)
+    total_mois_courant = (
+        base_qs.filter(date_depense__gte=debut_mois, date_depense__lte=aujourd_hui)
+        .aggregate(total=Sum('montant'))['total']
+        or Decimal('0.00')
+    )
+
+    # 🔹 KPI semaine en cours (lundi → aujourd'hui)
+    debut_semaine = aujourd_hui - timedelta(days=aujourd_hui.weekday())
+    total_semaine_courante = (
+        base_qs.filter(date_depense__gte=debut_semaine, date_depense__lte=aujourd_hui)
+        .aggregate(total=Sum('montant'))['total']
         or Decimal('0.00')
     )
 
@@ -977,20 +991,27 @@ def liste_depenses(request):
     if date_fin:
         depenses = depenses.filter(date_depense__lte=date_fin)
 
-    # 🔹 Total FILTRÉ
+    # 🔹 Total FILTRÉ (s'adapte au filtre catégorie/période actif)
     total_filtre = (
         depenses.aggregate(total=Sum('montant'))['total']
         or Decimal('0.00')
     )
 
+    # 🔹 Pagination
+    paginator = Paginator(depenses, 25)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'depenses': depenses,
+        'depenses': page_obj,
+        'page_obj': page_obj,
         'categories': Depense._meta.get_field('categorie').choices,
         'categorie_active': categorie,
         'date_debut': date_debut_raw,
         'date_fin': date_fin_raw,
-        'total_global': total_global,
         'total_filtre': total_filtre,
+        'total_mois_courant': total_mois_courant,
+        'total_semaine_courante': total_semaine_courante,
     }
 
     return render(

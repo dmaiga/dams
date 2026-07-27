@@ -1,5 +1,5 @@
 from decimal import Decimal
-from django.db.models import Sum, Max, F, DecimalField, ExpressionWrapper
+from django.db.models import Sum, Max, F, DecimalField, ExpressionWrapper, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -18,6 +18,7 @@ class AgentTerrainListeService:
         date_fin,
         superviseur=None,
         type_agent=None,
+        recherche=None,
     ):
 
         agents_qs = Agent.objects.filter(
@@ -30,6 +31,12 @@ class AgentTerrainListeService:
 
         if type_agent:
             agents_qs = agents_qs.filter(type_agent=type_agent)
+
+        if recherche:
+            agents_qs = agents_qs.filter(
+                Q(user__first_name__icontains=recherche)
+                | Q(user__last_name__icontains=recherche)
+            )
 
         now = timezone.now()
         agents_data = []

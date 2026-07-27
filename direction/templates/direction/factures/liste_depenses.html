@@ -50,15 +50,25 @@
     </div>
 </div>
 
-<div class="stats shadow mb-4 w-full">
+<div class="stats shadow mb-4 w-full stats-vertical md:stats-horizontal">
 
     <div class="stat">
-        <div class="stat-title">Total global des dépenses</div>
-        <div class="stat-value text-error">
-            {{ total_global|fcfa }} FCFA
+        <div class="stat-title">Mois en cours</div>
+        <div class="stat-value text-warning">
+            {{ total_mois_courant|fcfa }} FCFA
         </div>
         <div class="stat-desc">
-            Toutes périodes confondues
+            Depuis le 1er du mois
+        </div>
+    </div>
+
+    <div class="stat">
+        <div class="stat-title">Semaine en cours</div>
+        <div class="stat-value text-secondary">
+            {{ total_semaine_courante|fcfa }} FCFA
+        </div>
+        <div class="stat-desc">
+            Depuis lundi
         </div>
     </div>
 
@@ -136,6 +146,32 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="flex items-center justify-between mt-4 pt-3 border-t border-base-200">
+                <span class="text-xs text-gray-500">
+                    Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+                    ({{ page_obj.paginator.count }} dépense{{ page_obj.paginator.count|pluralize }})
+                </span>
+                <div class="join">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+                           class="join-item btn btn-xs">«</a>
+                    {% else %}
+                        <span class="join-item btn btn-xs btn-disabled">«</span>
+                    {% endif %}
+
+                    <span class="join-item btn btn-xs btn-active">{{ page_obj.number }}</span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+                           class="join-item btn btn-xs">»</a>
+                    {% else %}
+                        <span class="join-item btn btn-xs btn-disabled">»</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
