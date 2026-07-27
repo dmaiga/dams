@@ -93,7 +93,7 @@ clôture définitive du sprint.
 
 ## Chantier 3 — Moteur de surveillance métier (Business Monitoring Engine)
 
-**Statut** : 🆕 Nouvelle — à cadrer
+**Statut** : 🟡 en cours — cadré dans [docs/sprints/sprint-05.md](sprints/sprint-05.md), prêt à démarrer le Volet 1
 **Priorité** : 🟡 Normal
 **Périmètre** : transverse — concerne l'ensemble des modules DAMS (`vente`, `finance`, `stock`, `surveillance`, `direction`).
 
@@ -195,7 +195,7 @@ Pour commencer, fokus sur ces 4 cas uniquement :
 
 - **D1** : Règles métier indépendantes des canaux (Telegram n'est qu'un provider)
 - **D2** : Canaux interchangeables (Email, SMS, Webhook possibles demain)
-- **D3** : Anti-spam : une alerte ACTIVE ne se renvoie pas < 30 min
+- **D3** : Anti-spam : une alerte ACTIVE ne se renvoie pas avant un délai configurable par règle — affiné en `reenvoi_heures` par type dans `docs/sprints/sprint-05.md` (pas un global 30 min : `None` par défaut, 24h pour le solde, 12h pour la baisse d'activité)
 - **D4** : Historique complet : toutes les alertes tracées (création, résolution, ignorée)
 - **D5** : Découplage : modules métier ne connaissent pas Telegram
 
@@ -220,6 +220,8 @@ l'option choisie :
   `produit`) — à décider : FK dédiées nullables par type d'alerte (lot, distribution) ou
   `GenericForeignKey` (`content_type`/`object_id`, nouveau pattern dans ce repo).
 
+**Réponse retenue (27/07/2026)** : Option A (étendre `Alerte`) + FK dédiées nullables `lot`/`distribution` (pas de `GenericForeignKey`) + FK `superviseur`/`agent` inchangées vers `User`. Détail dans `docs/sprints/sprint-05.md` (Volet 2).
+
 ---
 
 ### Q2 — Mécanisme de publication d'événements ?
@@ -229,6 +231,8 @@ l'option choisie :
 **Candidats** :
 - **Option A** : Django signals (découplage naturel)
 - **Option B** : Appels directs dans services (explicite)
+
+**Réponse retenue (27/07/2026)** : Option B, via une **commande de management périodique unique** (`monitoring evaluer_alertes`) plutôt qu'un mélange synchrone/périodique — évite de toucher aux points de mutation sensibles de `finance`/`vente`. Détail dans `docs/sprints/sprint-05.md` (Volet 5).
 
 ---
 
@@ -240,13 +244,15 @@ l'option choisie :
 - **Option A** : Par défaut "une fois par 30 min", configurable par alerte
 - **Option B** : Pas de renvoi si déjà ACTIVE (une seule fois)
 
+**Réponse retenue (27/07/2026)** : mixte, configurable par type (`reenvoi_heures` dans `monitoring/constants.py`) — `None` par défaut (Option B), sauf `solde` (24h) et `activite` (12h). Détail dans `docs/sprints/sprint-05.md` (Volet 3).
+
 ---
 
 ## Prochaines étapes
 
-1. ✅ **Trancher Q1, Q2, Q3** avec mdmaiga
-2. **Volet 1** : Ficher les 4 alertes MVP
-3. **Volet 2** : Modèle (Alerte ou BusinessAlert)
+1. ✅ **Trancher Q1, Q2, Q3** avec mdmaiga — voir réponses retenues ci-dessus et `docs/sprints/sprint-05.md`
+2. **Volet 1** (sprint-05) : confirmer les 4 fiches d'alertes MVP
+3. **Volets 2-5** (sprint-05) : modèle, déduplication, TelegramProvider (stub), moteur + commande
 4. **Volets 3-5** : Déployer progressivement
 
 ---

@@ -84,7 +84,15 @@ solde = encaissements(Recouvrement) - depenses_perso(Depense, effectue_par=super
 
 - Calcul dynamique depuis **`DATE_DEBUT_FINANCE`** (`date(2026, 7, 1)`, constante de module) — pas de borne basse arbitraire par requête, pas de "solde d'ouverture", pas de dépendance à `ClotureMensuelle`. L'historique antérieur (jugé incohérent : ancien paradigme superviseur, introduction tardive du rôle ROT) est délibérément ignoré — décision n°14, sprint-03.
 - `date_fin` (paramètre, `aujourd'hui` par défaut) permet uniquement de consulter *"quel était le solde à telle date"* — toujours borné en bas par `DATE_DEBUT_FINANCE`.
-- `alerte` : `solde >= SEUIL_ALERTE_SOLDE` (seuil `100 000 FCFA`, repris de `direction/services/alertes/solde.py::SoldeAlertService`).
+- `alerte` : `solde > SEUIL_ALERTE_SOLDE` (seuil `30 000 FCFA`, décidé le 27/07/2026 ; `direction/services/alertes/solde.py::SoldeAlertService`, qui utilisait un seuil différent — 50 000/100 000 FCFA selon le niveau —, a été supprimé, code mort non lié dans la navigation, voir `docs/sprints/sprint-04.md` § Extensions).
+
+**Nuance métier importante (constat du 27/07/2026)** : il y a un décalage d'un jour entre l'encaissement et sa remise. Un agent qui vend le lundi voit son `Recouvrement` créé le même jour (le superviseur détient le cash) ; mais `RecouvrementSuperviseur` (la remise au ROT/direction) et `VersementBancaire` (le dépôt réel en banque) n'ont lieu que le lendemain matin, mardi, via l'action groupée quotidienne. `solde_superviseur` calculé le mardi matin, avant cette action, représente donc le montant *attendu* à recouvrer ce jour-là — un signal de réconciliation, pas nécessairement une anomalie.
+
+Ce simple seuil a en réalité une valeur limitée pris isolément : la quasi-totalité de la recette d'un superviseur finit toujours par être recouvrée via `RecouvrementSuperviseur` (nette des `Depense` personnelles) dans le cycle quotidien normal — un solde élevé un matin donné est souvent juste "la vente de la veille pas encore remise", pas un problème. Deux mécanismes plus significatifs sont à l'étude pour le Chantier 3 (`docs/sprints/sprint-05.md`) plutôt que ce seul seuil statique :
+1. **Réconciliation matinale** : notifier tôt le matin, avant l'action groupée du jour, le solde de chaque superviseur — pour vérifier rapidement que "ça fitte" avant le recouvrement/versement réel.
+2. **Solde persistant** : si le solde d'un superviseur reste non nul après 3 cycles de remise consécutifs (3 `RecouvrementSuperviseur` successifs pour ce superviseur, pas 3 jours calendaires — une ligne laissée vide dans l'action groupée ne compte pas comme un cycle), c'est le signal réellement anormal (recette qui ne se résorbe pas, contrairement au cas normal).
+
+`finance/services.py` reste un calculateur pur, sans historisation (voir Invariants) — ces deux mécanismes, qui nécessitent de tracer l'historique des cycles, relèvent du moteur du Chantier 3, pas de cette app.
 
 **Historique** : une première version sommait tout l'historique sans borne basse (décision n°13). Constat en usage réel : `deja_remis` dépassait `encaissements` pour les 3 superviseurs de test, un signal jugé plus gênant qu'utile — mdmaiga a préféré couper franchement au 01/07/2026 plutôt que d'investiguer des données de test anciennes (décision n°14).
 

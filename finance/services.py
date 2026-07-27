@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from core.models import Agent, Depense, Recouvrement, RecouvrementSuperviseur, VersementBancaire
 
-SEUIL_ALERTE_SOLDE = Decimal("25000")
+SEUIL_ALERTE_SOLDE = Decimal("30000")
 
 # Point de départ de finance/ comme source de vérité (décision n°14, sprint-03) :
 # l'historique antérieur est jugé incohérent (ancien paradigme superviseur,
@@ -61,7 +61,7 @@ def solde_superviseur(superviseur, date_fin=None):
         "depenses": depenses_perso,
         "deja_remis": deja_remis,
         "solde": solde,
-        "alerte": solde >= SEUIL_ALERTE_SOLDE,
+        "alerte": solde > SEUIL_ALERTE_SOLDE,
     }
 
 
