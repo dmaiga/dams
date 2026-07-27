@@ -1,0 +1,6 @@
+<div class="tabs tabs-boxed bg-base-200 flex-wrap">
+  <a href="{% url 'dashboard_surveillance' %}{{ qs_semaine }}" class="tab {% if theme == 'accueil' %}tab-active font-semibold{% endif %}">Vue d'ensemble</a>
+  <a href="{% url 'liste_kg_vendu' %}{{ qs_semaine }}" class="tab {% if theme == 'kg' %}tab-active font-semibold{% endif %}">Volumes</a>
+  <a href="{% url 'surveillance_prix' %}" class="tab {% if theme == 'prix' %}tab-active font-semibold{% endif %}">Prix</a>
+  <a href="{% url 'stock_rotation' %}" class="tab {% if theme == 'stock' %}tab-active font-semibold{% endif %}">Stock</a>
+</div>

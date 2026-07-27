@@ -13,12 +13,14 @@
   </div>
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+  <div class="space-y-3">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">{{ produit.nom }}</h1>
       <p class="text-sm text-base-content/60 mt-0.5">Détail des ventes et surveillance des prix sur ce lot.</p>
     </div>
-    <a href="{% url 'surveillance_prix' %}" class="btn btn-sm btn-outline self-start sm:self-auto">← Retour</a>
+    <div class="overflow-x-auto">
+      {% include "partials/_nav_themes.html" %}
+    </div>
   </div>
 
   <!-- INFORMATIONS LOT -->
@@ -93,7 +95,7 @@
               <td class="font-semibold">{{ item.agent.full_name }}</td>
               <td class="text-base-content/70">
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}" class="link link-hover">
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}?from=prix" class="link link-hover">
                   {{ item.superviseur.full_name }}
                 </a>
                 {% else %}—{% endif %}

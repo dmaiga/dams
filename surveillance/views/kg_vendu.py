@@ -7,6 +7,7 @@ from surveillance.week_utils import (
     parse_semaine,
     fin_semaine,
     date_to_week_string,
+    qs_semaine,
 )
 from surveillance.services.liste_kg_service import (
     ListeKgVenduService
@@ -54,6 +55,8 @@ class ListeKgVenduView(SurveillanceAccessMixin, TemplateView):
             "selected_produit": produit,
             "semaine_selectionnee": date_to_week_string(debut_date),
             "semaine_max": date_to_week_string(today),
+            "theme": "kg",
+            "qs_semaine": qs_semaine(date_to_week_string(debut_date)),
         })
 
         return context

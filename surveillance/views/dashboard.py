@@ -7,6 +7,7 @@ from surveillance.week_utils import (
     fin_semaine,
     semaine_precedente,
     date_to_week_string,
+    qs_semaine,
 )
 
 from surveillance.services.vente_service import VenteSurveillanceService
@@ -17,6 +18,7 @@ from surveillance.services.comparaison_service import (
 )
 from surveillance.services.superviseur_service import SuperviseurSurveillanceService
 from surveillance.services.produit_service import ProduitSurveillanceService
+from surveillance.services.stock_age_service import StockAgeService
 
 
 class DashboardSurveillanceView(SurveillanceAccessMixin, TemplateView):
@@ -46,6 +48,9 @@ class DashboardSurveillanceView(SurveillanceAccessMixin, TemplateView):
         ventes_rouges = PrixSurveillanceService.ventes_a_perte(limit=10)
         nb_produits_rouges = PrixSurveillanceService.count_anomalies()
 
+        nb_agents_sans_vente = StockAgeService.count_agents_sans_vente_recente()
+        nb_lots_dormants = StockAgeService.count_lots_stock_dormant()
+
         # Variations spécifiques de la semaine sélectionnée
         superviseurs = SuperviseurSurveillanceService.variations_semaine(debut_semaine=debut_date)
         produits = ProduitSurveillanceService.variations_semaine(debut_semaine=debut_date)
@@ -64,11 +69,16 @@ class DashboardSurveillanceView(SurveillanceAccessMixin, TemplateView):
             "nb_produits_rouges": nb_produits_rouges,
             "ventes_rouges": ventes_rouges,
 
+            "nb_agents_sans_vente": nb_agents_sans_vente,
+            "nb_lots_dormants": nb_lots_dormants,
+
             "superviseurs_surveillance": superviseurs[:5],
             "produits_surveillance": produits[:5],
 
             "semaine_selectionnee": date_to_week_string(debut_date),
             "semaine_max": date_to_week_string(today),
+            "theme": "accueil",
+            "qs_semaine": qs_semaine(date_to_week_string(debut_date)),
         })
 
         return context

@@ -13,17 +13,13 @@
   </div>
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-base-200 pb-4">
+  <div class="space-y-3 border-b border-base-200 pb-4">
     <div>
-      <div class="flex flex-wrap items-center gap-2">
-        <h1 class="text-2xl font-bold tracking-tight">Surveillance Prix</h1>
-    
-      </div>
+      <h1 class="text-2xl font-bold tracking-tight">Surveillance Prix</h1>
       <p class="text-sm text-base-content/60 mt-0.5">Lots dont des ventes ont été réalisées sous le prix d'achat.</p>
     </div>
-    <div class="flex gap-2">
-      <a href="{% url 'dashboard_surveillance' %}" class="btn btn-sm btn-outline">Dashboard</a>
-      <a href="{% url 'liste_kg_vendu' %}" class="btn btn-sm btn-outline">Kg vendus</a>
+    <div class="overflow-x-auto">
+      {% include "partials/_nav_themes.html" %}
     </div>
   </div>
 

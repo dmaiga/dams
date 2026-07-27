@@ -6,22 +6,29 @@
   <!-- BREADCRUMB -->
   <div class="breadcrumbs text-sm">
     <ul>
- 
-      <li><a href="{% url 'dashboard_surveillance' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}">Accueil</a></li>
-      <li><a href="{% url 'liste_kg_vendu' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}">Kg vendus</a></li>
+      <li><a href="{% url 'dashboard_surveillance' %}">Accueil</a></li>
+      {% if origine == 'prix' %}
+      <li><a href="{% url 'surveillance_prix' %}">Anomalies prix</a></li>
+      {% elif origine == 'stock' %}
+      <li><a href="{% url 'stock_rotation' %}">Stock &amp; Rotation</a></li>
+      {% else %}
+      <li><a href="{% url 'liste_kg_vendu' %}{{ qs_semaine }}">Kg vendus</a></li>
+      {% endif %}
       <li class="font-semibold">{{ produit.nom }}</li>
     </ul>
   </div>
 
   <!-- HEADER -->
-  <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-base-200 pb-4">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight">{{ produit.nom }}</h1>
-      <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire de performance.</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-3">
+  <div class="space-y-3 border-b border-base-200 pb-4">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">{{ produit.nom }}</h1>
+        <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire de performance.</p>
+      </div>
       {% include "partials/_filtre_semaine.html" %}
-      <a href="{% url 'liste_kg_vendu' %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-sm btn-outline">← Retour</a>
+    </div>
+    <div class="overflow-x-auto">
+      {% include "partials/_nav_themes.html" %}
     </div>
   </div>
 
@@ -76,7 +83,7 @@
               <td class="text-base-content/40 font-mono text-xs w-8">{{ forloop.counter }}</td>
               <td>
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}"
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}?from={{ origine }}{% if semaine_selectionnee %}&semaine={{ semaine_selectionnee }}{% endif %}"
                    class="link link-primary font-semibold">
                   {{ item.superviseur.full_name }}
                 </a>
@@ -87,7 +94,7 @@
               </td>
               <td class="text-right">
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-xs btn-ghost">→</a>
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}?from={{ origine }}{% if semaine_selectionnee %}&semaine={{ semaine_selectionnee }}{% endif %}" class="btn btn-xs btn-ghost">→</a>
                 {% endif %}
               </td>
             </tr>
@@ -132,7 +139,7 @@
               </td>
               <td class="text-base-content/70">
                 {% if item.superviseur %}
-                <a href="{% url 'detail_superviseur' item.superviseur.id %}{% if semaine_selectionnee %}?semaine={{ semaine_selectionnee }}{% endif %}" class="link link-hover">
+                <a href="{% url 'detail_superviseur' item.superviseur.id %}?from={{ origine }}{% if semaine_selectionnee %}&semaine={{ semaine_selectionnee }}{% endif %}" class="link link-hover">
                   {{ item.superviseur.full_name }}
                 </a>
                 {% else %}—{% endif %}

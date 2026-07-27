@@ -1,0 +1,56 @@
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr class="text-xs uppercase text-base-content/50">
+        <th>Référence</th>
+        <th>Produit</th>
+        <th>Localisation</th>
+        <th class="text-right">Depuis le</th>
+        <th class="text-right">Qté restante</th>
+        <th class="text-right">Valeur immobilisée</th>
+        <th class="text-right">Jours écoulés</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in lots_dormants %}
+      <tr class="hover">
+        <td class="font-mono text-xs">
+          {% if item.origine == 'superviseur' %}
+          <a href="{% url 'admin:core_affectationlotsuperviseur_change' item.id %}" class="link link-hover" title="Affectation au superviseur">{{ item.reference_lot|default:"—" }}</a>
+          {% else %}
+          <a href="{% url 'admin:core_lotentrepot_change' item.id %}" class="link link-hover" title="Lot entrepôt">{{ item.reference_lot|default:"—" }}</a>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{% url 'detail_produit' item.produit.id %}?from=stock" class="link link-primary font-bold">
+            {{ item.produit.nom }}
+          </a>
+          <div class="flex flex-wrap gap-1 mt-1">
+            <span class="badge badge-ghost badge-xs">{{ item.fournisseur.nom|default:"Sans fournisseur" }}</span>
+          </div>
+        </td>
+        <td class="text-base-content/70">
+          {% if item.superviseur %}
+          <a href="{% url 'detail_superviseur' item.superviseur.id %}?from=stock" class="link link-hover">{{ item.localisation }}</a>
+          {% else %}
+          {{ item.localisation }}
+          {% endif %}
+        </td>
+        <td class="text-right text-base-content/70">{{ item.date_reference|date:"d/m/Y" }}</td>
+        <td class="text-right font-mono">{{ item.quantite_restante }}</td>
+        <td class="text-right font-mono font-bold">{{ item.valeur_immobilisee|floatformat:0 }}</td>
+        <td class="text-right">
+          <span class="badge badge-error font-bold">{{ item.jours_ecoules }} j</span>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center py-8 text-base-content/40">
+          <div class="text-2xl mb-1">✓</div>
+          Aucun lot en stock dormant
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

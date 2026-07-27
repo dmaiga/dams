@@ -73,6 +73,34 @@ Permettent de zoomer sur un acteur ou une marchandise pour en comprendre l'histo
 * **`DetailProduitView`** : Récupère l'historique et les indicateurs propres à un modèle `Produit` ciblé par sa clé primaire (`pk`) via `DetailProduitService.get_data()`. Template : `surveillance/produits/detail_produit.html`.
 * **`DetailSuperviseurView`** : Récupère les métriques de contrôle d'un superviseur (modèle `Agent`) ciblé par sa clé primaire (`pk`) via `DetailSuperviseurService.get_data()`. Template : `surveillance/superviseur/detail_superviseur.html`.
 
+Ces deux vues sont transverses : atteignables depuis "Kg vendus", "Anomalies prix" et "Stock & Rotation". Le paramètre `?from=kg|prix|stock` porté par chaque lien entrant est lu par la vue (`self.request.GET.get("from", "kg")`) et exposé en contexte sous `origine` — voir section Navigation.
+
+### 5. Suivi Durée de Vie du Stock (`StockRotationView`)
+
+Vue dédiée au thème "Stock & Rotation" (Sprint 04 / Chantier 2 du backlog). Délégation complète au service `StockAgeService` (`surveillance/services/stock_age_service.py`), sur le modèle exact de `SurveillancePrixService`.
+
+* **Template associé** : `surveillance/stock_rotation/dashboard_stock.html`.
+* **Pas de filtre semaine** : les deux alertes se calculent sur une fenêtre glissante depuis `timezone.now()` (constantes `DELAI_ROTATION_JOURS = 2`, `DELAI_STOCK_DORMANT_JOURS = 14` dans `surveillance/constants.py`), pas depuis une semaine calendaire sélectionnée.
+* **Alerte 1 — rotation lente** (`StockAgeService.agents_sans_vente_recente()`) : `DetailDistribution` dont la distribution (`DistributionAgent.date_distribution`) date de plus de 2 jours, et dont la dernière `Vente` non supprimée associée (s'il y en a une) date aussi de plus de 2 jours. Une seule requête SQL (agrégation `Max` + filtre `HAVING` via `Q(OR)`), jamais de boucle Python avec requête par itération. Chaque ligne porte l'ID de la `DistributionAgent` et du `DetailDistribution` (liens directs vers l'admin Django), pour permettre la suppression d'un enregistrement erroné.
+* **Alerte 2 — stock dormant** (`StockAgeService.lots_stock_dormant()`) : deux sources fusionnées, chacune filtrée avec `quantite_restante > 0` et une ancienneté de plus de 14 jours —
+  * `LotEntrepot` encore en entrepôt central (ancienneté sur `date_reception`) ;
+  * `AffectationLotSuperviseur` mis à disposition d'un superviseur mais pas encore redistribué à un agent terrain (ancienneté sur `date_affectation`).
+
+  Chaque ligne porte `reference_lot`, la localisation ("Entrepôt central" ou le superviseur concerné) et l'ID de l'objet source (lien admin direct : `LotEntrepot` ou `AffectationLotSuperviseur` selon l'origine).
+* **Plancher `DATE_PLANCHER_STOCK`** (`date(2026, 5, 15)`, alignée sur `DATE_DEBUT_SUIVI_TERRAIN` dans `direction/views.py`) : les distributions/affectations antérieures sont ignorées par les deux alertes — données historiques non fiables pour ce type de détection.
+* Chaque alerte a sa méthode `count_*` (COUNT SQL pur, pour les badges) et sa méthode de détail avec `limit` appliqué au niveau SQL.
+* Le dashboard global (`DashboardSurveillanceView`) n'affiche qu'un résumé chiffré agrégé (carte "Stock & Rotation", même traitement que la carte "Anomalies prix") — pas de tableau détaillé dupliqué. La vue `StockRotationView` affiche un aperçu (10 premiers par alerte) avec un lien "Voir tout →" vers deux vues dédiées sans limite : `RotationLenteListView` (`/surveillance/stock-rotation/rotation-lente/`) et `StockDormantListView` (`/surveillance/stock-rotation/stock-dormant/`), toutes deux réutilisant les partials `partials/_table_rotation_lente.html` et `partials/_table_stock_dormant.html`.
+
+---
+
+## 🧭 Navigation thématique commune
+
+Un seul partial, `surveillance/templates/partials/_nav_themes.html`, porte les 4 onglets de premier niveau (Vue d'ensemble / Volumes / Prix & Rentabilité / Stock & Rotation), inclus par les 8 templates de l'app (y compris les fiches de détail). Il remplace les blocs de liens ad hoc précédemment dupliqués (tabs sur le dashboard, paires de `btn btn-outline` ailleurs), chacun avec un style différent.
+
+Chaque vue injecte `context["theme"]` (`"accueil"|"kg"|"prix"|"stock"`) pour marquer l'onglet actif. Pour `DetailProduitView`/`DetailSuperviseurView`, `theme` prend la valeur d'`origine` (le thème d'où vient l'utilisateur), puisque ces fiches sont transverses et n'ont pas de thème propre.
+
+Le filtre semaine (`semaine_selectionnee` / `qs_semaine`) est propagé dans les liens de nav partout où il s'applique (dashboard, Kg vendus, fiches produit/superviseur). Les pages Prix et Stock & Rotation n'ont pas de filtre semaine actif ; `SurveillancePrixView` se contente de reporter un `semaine` éventuellement présent dans l'URL entrante, pour ne pas casser le contexte de nav si l'utilisateur y accède depuis une page filtrée.
+
 ---
 
 ## 🧪 Points de Vigilance pour la Maintenance et le Code

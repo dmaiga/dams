@@ -20,7 +20,7 @@ Statut : 🆕 nouvelle · 📋 à cadrer · 🟡 en cours · ⏸️ en attente �
 ## Chantier 1 — Projet BI (dashboards direction)
 
 **Statut** : 🟡 en cours — première revue utilisateur faite le 20/07/2026
-**Suivi détaillé** : [docs/docs_bi/owner/02_Backlog.md](docs_bi/owner/02_Backlog.md) (stories du MVP) et [docs/docs_bi/chef_projet/QUESTIONS_OUVERTES.md](docs_bi/chef_projet/QUESTIONS_OUVERTES.md) (retours à chaud Q1–Q3 à trancher avec la Direction).
+**Suivi détaillé** : [docs/docs_bi/owner/02_Backlog.md](docs_bi/owner/02_Backlog.md) (stories du MVP) et [docs/docs_bi/chef_projet/QUESTIONS_OUVERTES.md](docs_bi/chef_projet/QUESTIONS_OUVERTES.md) (retours à chaud Q1–Q3 à trancher).
 
 Ne pas dupliquer le détail ici — ce chantier a déjà son propre backlog produit. Cette ligne existe pour qu'il apparaisse dans la vue d'ensemble et que sa charge soit visible à côté des autres demandes.
 
@@ -28,7 +28,8 @@ Ne pas dupliquer le détail ici — ce chantier a déjà son propre backlog prod
 
 ## Chantier 2 — App `surveillance` : suivi durée de vie du stock + alertes + refonte navigation
 
-**Statut** : 🟡 en cours — cadré et fusionné avec la refonte de navigation dans [docs/sprints/sprint-04.md](sprints/sprint-04.md)
+**Statut** : ✅ terminée — livré via les 4 volets de [docs/sprints/sprint-04.md](sprints/sprint-04.md) (`StockAgeService`, vue `StockRotationView`, nav thématique commune `_nav_themes.html`, breadcrumbs contextuels `?from=`).
+**Écart assumé** : les deux alertes sont exposées dans un thème dédié "Stock & Rotation" (`stock_rotation/`), pas dans `DashboardSurveillanceView` comme initialement tranché — voir révision du 22/07/2026 ci-dessous. Seul un résumé chiffré agrégé apparaît sur le dashboard global.
 **Priorité** : 🟡 Normal
 **Périmètre** : app `surveillance` (lecture seule, cohérent avec son rôle actuel de tour de contrôle/alertes — voir [surveillance/APP_SURVEILLANCE.md](../surveillance/APP_SURVEILLANCE.md)).
 
@@ -83,86 +84,166 @@ sortie. Délai raisonnable fixé à **2 jours**. Deux alertes distinctes à prod
 
 ### Prochaine étape
 
-Sprint rédigé : [docs/sprints/sprint-04.md](sprints/sprint-04.md), découpé en 4 volets
-(service d'alertes → vue dédiée → nav thématique commune → breadcrumbs contextuels),
-chacun avec son propre Definition of Done. Prêt à démarrer le Volet 1.
+Les 4 volets de [docs/sprints/sprint-04.md](sprints/sprint-04.md) (service d'alertes → vue
+dédiée → nav thématique commune → breadcrumbs contextuels) sont livrés. Reste à faire un
+parcours manuel complet (Dashboard → Stock & Rotation → détail agent/lot → retour) avant
+clôture définitive du sprint.
 
 ---
 
-## Chantier 3 — Notifications Telegram
+## Chantier 3 — Moteur de surveillance métier (Business Monitoring Engine)
 
-**Statut** : 🆕 nouvelle — à cadrer
+**Statut** : 🆕 Nouvelle — à cadrer
 **Priorité** : 🟡 Normal
-**Périmètre pressenti** : transverse — s'appuie sur les événements produits par `surveillance` (Chantier 2), `finance` et le modèle `Alerte` existant (`core`, utilisé aujourd'hui par `direction/services/alertes/`).
+**Périmètre** : transverse — concerne l'ensemble des modules DAMS (`vente`, `finance`, `stock`, `surveillance`, `direction`).
 
-### Besoin exprimé
+---
 
-Mettre en place un système de notifications basé sur Telegram afin d'informer les responsables
-des événements importants de la plateforme DAMS. Temps réel ou différé — peu importe pour
-l'instant, à évaluer au moment venu en fonction de la charge.
+## Vision
 
-### Constat sur l'existant (avant de cadrer)
+**Objectif** : Détecter automatiquement les situations anormales et prévenir le responsable de manière fiable (historisation, anti-spam, diffusion multi-canal).
 
-- Un modèle générique `Alerte` existe déjà dans `core` (`type_alerte`: solde/stock/prix/activite,
-  `niveau`: info/warning/critique, `message`, `superviseur`/`agent`/`produit` optionnels,
-  `est_vue`, `date_creation`).
-- Il n'est alimenté que par `SoldeAlertService.check_superviseur_solde()`
-  (`direction/services/alertes/solde.py`) — les fichiers `stock.py`, `activite.py` et `prix.py`
-  du même dossier sont **vides**, malgré les choix `TYPES` correspondants sur le modèle.
-- Ce service n'est appelé **qu'à la demande**, quand la direction charge
-  `monitoring_alertes_dashboard` (`direction/views.py`) — pas de tâche planifiée, pas de signal.
-  Le repo n'a **ni Celery ni APScheduler ni cron applicatif** ; seules des management commands
-  invoquées manuellement ou par une tâche planifiée OS (`cloturer_mois` par ex.) existent.
-- Le sprint-04 (Chantier 2, `surveillance`) vient de cadrer deux nouvelles alertes (rotation
-  lente, stock dormant) via `StockAgeService`, mais **sans** passer par le modèle `Alerte` — ce
-  sont des requêtes calculées à l'affichage de `StockRotationView`, pas des enregistrements.
-- `finance/services.py::calculer_solde_superviseur` calcule déjà un booléen `alerte` (seuil
-  100 000 FCFA, `SEUIL_ALERTE_SOLDE`) mais ne crée pas non plus de `Alerte` — c'est affiché tel
-  quel dans `dashboard_finance`.
-- `requests` est déjà une dépendance du projet (`requirements.txt`) — suffisant pour appeler
-  l'API Bot HTTP de Telegram sans nouvelle librairie.
+DAMS produit actuellement des alertes dispersées et non historisées :
+- `SurveillancePrixService` → anomalies prix (affichage uniquement)
+- `StockAgeService` (Sprint 04, Chantier 2) → rotation lente / stock dormant (affichage uniquement)
+- `SoldeAlertService` → seuil solde superviseur (pas historisée)
+- `calculer_solde_superviseur` → booléen alerte (affichage brut)
 
-Conséquence : il n'existe aujourd'hui **aucun mécanisme de déclenchement proactif** dans DAMS.
-Toutes les "alertes" actuelles sont passives (calculées quand une page est ouverte). Un vrai
-"temps réel" demanderait soit un déclenchement synchrone au moment de l'écriture (dans les vues/
-services `finance`, `vente`, `surveillance`...), soit un worker dédié. Un mode "différé" peut se
-contenter d'une management command lancée périodiquement, cohérent avec le seul pattern de
-planification déjà en place dans le repo (tâche OS + `manage.py <commande>`), sans dépendance
-nouvelle.
+**Aucune n'est** historisée, dédupliquée, classifiée, ou diffusée au-delà du dashboard.
 
-### Questions à trancher avant d'écrire le moindre code
+Le **Chantier 3** crée le **moteur centralisé** qui unifie et généralise ce processus.
 
-1. **Quels événements notifier en priorité (MVP) ?** Candidats identifiés dans le code existant :
-   - Solde superviseur au-dessus du seuil (`finance`, `SEUIL_ALERTE_SOLDE`) / cash détenu sans
-     versement depuis 24h-48h (`SoldeAlertService`).
-   - Rotation lente / stock dormant (`surveillance`, Chantier 2 / sprint-04).
-   - Anomalies prix (ventes "rouges", déjà détectées par `PrixSurveillanceService` mais jamais
-     écrites en `Alerte` — type `prix` existe sur le modèle mais orphelin).
-   - Autre chose (dette agent, dépense inhabituelle, etc.) ?
-2. **Qui reçoit quoi ?** Un seul chat Telegram (direction), ou un routage par destinataire/rôle
-   (ex. superviseur concerné vs mdmaiga) ? Le modèle `Alerte` a déjà `superviseur`/`agent` — à
-   réutiliser ou pas pour le ciblage.
-3. **Mécanisme de déclenchement** : synchrone (appel Telegram directement dans les services qui
-   créent l'événement, ex. `SoldeAlertService._create_alert`) vs asynchrone via une management
-   command périodique qui balaie les `Alerte` non notifiées. Impacte directement le choix
-   temps réel/différé mentionné dans le besoin — à trancher une fois la charge estimée.
-4. **Réutiliser `Alerte` ou créer un modèle dédié ?** Option A : étendre `Alerte` (ex. champs
-   `notifie_telegram: bool`, `date_notification`) et combler les services vides
-   (`stock.py`, `activite.py`, `prix.py`, plus le futur cas `surveillance`/Chantier 2). Option B :
-   modèle `NotificationTelegram` séparé, découplé de `Alerte`, qui s'abonne aux mêmes
-   événements sans modifier le modèle existant.
-5. **Configuration Telegram** : `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` en variable
-   d'environnement (cohérent avec le pattern `.env` de `rules/STACK.md`) — un seul chat pour
-   commencer, ou un mapping par destinataire dès le MVP ?
-6. **Gestion des échecs d'envoi** : Telegram indisponible ou token invalide ne doit pas faire
-   échouer le flux métier appelant (ex. création d'un versement) — retry, log silencieux, ou
-   file d'attente minimale ?
+---
 
-### Prochaine étape
+## Architecture cible
 
-Trancher les questions ci-dessus avec mdmaiga (en particulier la question 1 — périmètre MVP —
-et la question 3, qui conditionne toute l'architecture) avant de rédiger le sprint correspondant
-dans `docs/sprints/`.
+```
+Événements métier
+    ├─ Surveillance : rotation lente / stock dormant (Chantier 2)
+    ├─ Finance : solde superviseur / baisse activité
+    ├─ Vente : variation prix
+    └─ [autres]
+         │
+         ▼
+Business Monitoring Engine
+    ├─ Règles métier
+    ├─ Création alertes
+    ├─ Déduplication
+    ├─ Historique
+    └─ Dispatcher
+         │
+         ▼
+Telegram / Dashboard / Logs
+```
+
+**Principe clé** : les modules métier ne connaissent jamais Telegram. Ils publient des événements que le moteur consomme.
+
+---
+
+## Lien avec Chantier 2 (Sprint 04)
+
+Chantier 2 produit les **événements bruts** (ex. "Agent X sans vente 2j", "Lot Y dormant 14j"). Chantier 3 les **consomme**, les classe via ses règles, les déduplique, les historise, et les diffuse via Telegram.
+
+---
+
+## MVP — 4 alertes prioritaires
+
+Pour commencer, fokus sur ces 4 cas uniquement :
+
+1. **Solde superviseur élevé** (finance) — seuil dépassé → CRITICAL
+2. **Stock ancien** (surveillance) — lot dormant > 14j → WARNING
+3. **Variation prix** (vente) — prix modifié / vendu à perte → CRITICAL
+4. **Baisse activité** (surveillance) — agent sans vente > 2j → WARNING
+
+---
+
+## Découpage en volets (simplifié)
+
+### Volet 1 — Événements & Règles (cadrage)
+**Livrables** :
+- Fiche de chaque alerte MVP : source, condition, gravité, destinataire
+- Décision : où/comment chaque alerte est détectée (service, signal, management command ?)
+
+### Volet 2 — Modèle & Historique
+**Livrables** :
+- Étendre `Alerte` existant (ou créer `BusinessAlert`) avec champs nécessaires
+- Migration BD
+
+### Volet 3 — Moteur de déduplication
+**Livrables** :
+- Service `AlerteDeduplicationService` : pas d'envoi identique < 30 min
+- Clôture auto quand condition disparaît
+
+### Volet 4 — TelegramProvider
+**Livrables** :
+- `TelegramProvider` envoie alerte formatée
+- Gestion d'erreur (ne fait pas échouer le flux métier)
+
+### Volet 5 — Intégration Chantier 2
+**Livrables** :
+- Connecter `StockAgeService` (Sprint 04) au moteur
+- Alertes "Stock ancien" et "Baisse activité" opérationnelles
+
+---
+
+## Décisions d'architecture (validées)
+
+- **D1** : Règles métier indépendantes des canaux (Telegram n'est qu'un provider)
+- **D2** : Canaux interchangeables (Email, SMS, Webhook possibles demain)
+- **D3** : Anti-spam : une alerte ACTIVE ne se renvoie pas < 30 min
+- **D4** : Historique complet : toutes les alertes tracées (création, résolution, ignorée)
+- **D5** : Découplage : modules métier ne connaissent pas Telegram
+
+---
+
+## Questions critiques (réponses attendues avant Volet 1)
+
+### Q1 — Réutiliser `Alerte` existant ou créer `BusinessAlert` ?
+
+**Impact** : Structure BD + architecture.
+
+**Candidats** :
+- **Option A** : Étendre modèle `Alerte` existant (champs `statut`, `date_creation`, `date_resolution`, `nombre_envois`)
+- **Option B** : Créer `BusinessAlert` séparé, découplé de `Alerte`
+
+---
+
+### Q2 — Mécanisme de publication d'événements ?
+
+**Impact** : Comment les services déclenchent les alertes.
+
+**Candidats** :
+- **Option A** : Django signals (découplage naturel)
+- **Option B** : Appels directs dans services (explicite)
+
+---
+
+### Q3 — Throttling : une alerte par règle ou global ?
+
+**Impact** : Fréquence de renvoi (spam).
+
+**Candidats** :
+- **Option A** : Par défaut "une fois par 30 min", configurable par alerte
+- **Option B** : Pas de renvoi si déjà ACTIVE (une seule fois)
+
+---
+
+## Prochaines étapes
+
+1. ✅ **Trancher Q1, Q2, Q3** avec mdmaiga
+2. **Volet 1** : Ficher les 4 alertes MVP
+3. **Volet 2** : Modèle (Alerte ou BusinessAlert)
+4. **Volets 3-5** : Déployer progressivement
+
+---
+
+## Scope futur (pas MVP)
+
+- Routage par destinataire (aujourd'hui : tout → mdmaiga)
+- Nouvelles règles (versement retard, dette trop élevée, etc.)
+- Nouveaux providers (Email, SMS, Webhook)
+- Analyse dashboards (alertes résolues cette semaine, par type, par agent)
+- Règles configurables (sans redéploiement)
 
 ---
 

@@ -42,3 +42,7 @@ def date_to_week_string(d: date) -> str:
     """Retourne une chaîne au format 'YYYY-Www' pour la date d."""
     iso = d.isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
+
+def qs_semaine(semaine_selectionnee: str | None) -> str:
+    """Querystring '?semaine=...' pour propager le filtre dans les liens de nav, vide si absent."""
+    return f"?semaine={semaine_selectionnee}" if semaine_selectionnee else ""

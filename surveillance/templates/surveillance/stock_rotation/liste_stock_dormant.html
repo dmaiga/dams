@@ -1,0 +1,50 @@
+{% extends "base_admin.html" %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- BREADCRUMB -->
+  <div class="breadcrumbs text-sm">
+    <ul>
+      <li><a href="{% url 'dashboard_surveillance' %}">Accueil</a></li>
+      <li><a href="{% url 'stock_rotation' %}">Stock &amp; Rotation</a></li>
+      <li class="font-semibold">Stock dormant</li>
+    </ul>
+  </div>
+
+  <!-- HEADER -->
+  <div class="space-y-3 border-b border-base-200 pb-4">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Stock dormant</h1>
+      <p class="text-sm text-base-content/60 mt-0.5">Liste complète des lots en entrepôt ou chez un superviseur, non ou partiellement distribués, depuis plus de 14 jours.</p>
+    </div>
+    <div class="overflow-x-auto">
+      {% include "partials/_nav_themes.html" %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="stat bg-base-100 shadow rounded-box border-l-4 border-error border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Lots en stock dormant</div>
+      <div class="stat-value text-2xl text-error">{{ nb_lots_dormants }}</div>
+    </div>
+    <div class="stat bg-base-100 shadow rounded-box border-l-4 border-info border border-base-200">
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">Valeur immobilisée</div>
+      <div class="stat-value text-2xl text-info">{{ valeur_stock_dormant|floatformat:0 }}</div>
+      <div class="stat-desc">FCFA — entrepôt central + superviseurs</div>
+    </div>
+  </div>
+
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="card-title text-base">Lots en stock dormant</h2>
+        <span class="badge badge-error badge-outline">{{ nb_lots_dormants }}</span>
+      </div>
+      {% include "partials/_table_stock_dormant.html" %}
+      {% include "partials/_pagination.html" %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
