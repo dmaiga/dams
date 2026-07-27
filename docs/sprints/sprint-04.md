@@ -1,5 +1,7 @@
 # Sprint 04 — App `surveillance` : alertes durée de vie du stock + refonte navigation par thème
 
+**Statut** : ✅ Livré (4 volets + extensions post-revue, voir section dédiée en fin de document).
+
 ## Contexte
 
 Ce sprint fusionne deux besoins liés :
@@ -103,12 +105,12 @@ class StockAgeService:
 
 Suivre exactement le pattern de `SurveillancePrixService.get_resume()` : une requête d'agrégation groupée, puis hydratation des objets (`Agent`, `LotEntrepot`) en une seconde requête `filter(id__in=...)`, jamais de boucle Python avec requête par itération.
 
-**DoD Volet 1** :
-- [ ] `StockAgeService.agents_sans_vente_recente()` retourne, pour chaque agent concerné, le lot, la date de distribution, la date de dernière vente (ou `None`) et le nombre de jours écoulés.
-- [ ] `StockAgeService.lots_stock_dormant()` retourne, pour chaque lot concerné, la quantité restante, la date de réception et le nombre de jours écoulés.
-- [ ] Les deux `count_*` n'exécutent qu'une requête `COUNT` SQL (pas de `len()` sur un queryset chargé).
-- [ ] Aucun lot/agent avec `est_supprime=True` (ventes) n'apparaît dans les résultats.
-- [ ] Tests unitaires (`surveillance/tests.py`) couvrant : agent avec vente récente (absent), agent sans vente > 2j (présent), lot totalement distribué (absent de stock dormant), lot partiel > 14j (présent).
+**DoD Volet 1** : ✅ terminé
+- [x] `StockAgeService.agents_sans_vente_recente()` retourne, pour chaque agent concerné, le lot, la date de distribution, la date de dernière vente (ou `None`) et le nombre de jours écoulés — et, depuis les extensions post-revue, l'ID `DistributionAgent`/`DetailDistribution` pour suppression admin (voir section Extensions).
+- [x] `StockAgeService.lots_stock_dormant()` retourne, pour chaque lot concerné, la quantité restante, la date de réception et le nombre de jours écoulés — étendu aux lots mis à disposition d'un superviseur non redistribués (`AffectationLotSuperviseur`), voir Extensions.
+- [x] Les deux `count_*` n'exécutent qu'une requête `COUNT` SQL (pas de `len()` sur un queryset chargé).
+- [x] Aucun lot/agent avec `est_supprime=True` (ventes) n'apparaît dans les résultats.
+- [x] Tests unitaires (`surveillance/tests.py`) couvrant : agent avec vente récente (absent), agent sans vente > 2j (présent), lot totalement distribué (absent de stock dormant), lot partiel > 14j (présent). 12 tests au total après extensions (plancher de date, affectation superviseur, IDs).
 
 ---
 
@@ -127,11 +129,11 @@ Template : deux tableaux (rotation lente / stock dormant), header + nav thémati
 
 Dashboard global (`dashboard_surveillance.html`) : ajouter une 4e carte "priorité" (à côté de Superviseurs / Produits / Anomalies prix) — badge `count_agents_sans_vente_recente + count_lots_stock_dormant`, lien "Voir tout →" vers `stock_rotation`. Ne pas dupliquer les tableaux détaillés sur le dashboard (c'est précisément ce que ce sprint évite).
 
-**DoD Volet 2** :
-- [ ] `/surveillance/stock-rotation/` affiche les deux listes avec pagination/limite SQL. Pas de filtre semaine ici : la fenêtre glissante (2 jours / 14 jours) se calcule depuis `timezone.now()`, pas depuis une semaine calendaire sélectionnée.
-- [ ] Le dashboard global affiche un compteur agrégé des deux alertes, sans reproduire les tableaux.
-- [ ] Accès restreint via `SurveillanceAccessMixin` (même guard que le reste de l'app).
-- [ ] Aucune requête N+1 (vérifier via `django-debug-toolbar` ou `assertNumQueries` en test).
+**DoD Volet 2** : ✅ terminé
+- [x] `/surveillance/stock-rotation/` affiche un aperçu des deux listes (10 premiers, limite SQL). Pas de filtre semaine ici : la fenêtre glissante (2 jours / 14 jours) se calcule depuis `timezone.now()`, pas depuis une semaine calendaire sélectionnée. La pagination complète a été déplacée sur deux vues dédiées (`rotation-lente/`, `stock-dormant/`), voir Extensions.
+- [x] Le dashboard global affiche un compteur agrégé des deux alertes, sans reproduire les tableaux.
+- [x] Accès restreint via `SurveillanceAccessMixin` (même guard que le reste de l'app).
+- [x] Aucune requête N+1 : chaque alerte reste en 2 requêtes (agrégation + hydratation `id__in`), y compris pour la source `AffectationLotSuperviseur` ajoutée en extension.
 
 ---
 
@@ -153,10 +155,11 @@ Chaque vue passe `context["theme"] = "accueil"|"kg"|"prix"|"stock"` (une ligne p
 
 Les fiches de détail (`detail_prix.html`, `detail_produit.html`, `detail_superviseur.html`) gardent leur breadcrumb (Volet 4) mais reçoivent aussi la nav thématique en tête, pour ne jamais laisser l'utilisateur sans repère de thème même en profondeur.
 
-**DoD Volet 3** :
-- [ ] Un seul fichier (`_nav_themes.html`) définit le style et les libellés des 4 thèmes ; aucun autre template ne redéfinit de tabs/boutons de navigation inter-thème.
-- [ ] L'onglet actif est visuellement marqué sur les 8 pages (7 existantes + `stock_rotation`).
-- [ ] `semaine_selectionnee` reste propagé dans les liens de nav sur toutes les pages où il s'applique (actuellement manquant sur `surveillance_prix.html`).
+**DoD Volet 3** : ✅ terminé
+- [x] Un seul fichier (`_nav_themes.html`) définit le style et les libellés des 4 thèmes (libellé "Prix & Rentabilité" simplifié en "Prix" après revue) ; aucun autre template ne redéfinit de tabs/boutons de navigation inter-thème.
+- [x] L'onglet actif est visuellement marqué sur les 10 pages (7 existantes + `stock_rotation` + les 2 pages de liste complète ajoutées en extension).
+- [x] `semaine_selectionnee` reste propagé dans les liens de nav sur toutes les pages où il s'applique — `surveillance_prix.html` reporte désormais le `semaine` éventuellement présent dans l'URL entrante.
+- [x] *(ajouté après revue)* La nav a été déplacée sur sa propre ligne pleine largeur sous le titre/filtre semaine (au lieu de partager la même ligne flex) : elle entrait en conflit visuel avec le filtre semaine et le titre sur les pages qui combinent les trois.
 
 ---
 
@@ -184,10 +187,10 @@ Principe : chaque lien entrant vers `detail_produit`/`detail_superviseur` ajoute
 
 Défaut `from=kg` si absent (comportement actuel inchangé pour les liens non mis à jour).
 
-**DoD Volet 4** :
-- [ ] Depuis `detail_prix.html` → clic sur un superviseur du tableau "Agents à surveiller" → le breadcrumb de `detail_superviseur` affiche "Anomalies prix" comme parent, pas "Kg vendus".
-- [ ] Depuis `stock_rotation` → clic sur un agent/produit concerné → breadcrumb affiche "Stock & Rotation" comme parent.
-- [ ] Aucun lien existant cassé (tous les appels `{% url 'detail_superviseur' ... %}` / `{% url 'detail_produit' ... %}` recensés et mis à jour avec leur `from` correspondant).
+**DoD Volet 4** : ✅ terminé
+- [x] Depuis `detail_prix.html` → clic sur un superviseur du tableau "Agents à surveiller" → le breadcrumb de `detail_superviseur` affiche "Anomalies prix" comme parent, pas "Kg vendus".
+- [x] Depuis `stock_rotation` (et les 2 pages de liste complète) → clic sur un agent/produit concerné → breadcrumb affiche "Stock & Rotation" comme parent.
+- [x] Aucun lien existant cassé (tous les appels `{% url 'detail_superviseur' ... %}` / `{% url 'detail_produit' ... %}` recensés et mis à jour avec leur `from` correspondant, y compris les liens `detail_produit` ↔ `detail_superviseur` qui propagent désormais `origine` au lieu de la figer).
 
 ---
 
@@ -203,31 +206,55 @@ Défaut `from=kg` si absent (comportement actuel inchangé pour les liens non mi
 
 ## Critères de validation globaux (Definition of Done du sprint)
 
-- [ ] Les 4 volets ci-dessus sont chacun individuellement validés (DoD par volet).
-- [ ] `manage.py check` propre, aucune migration nécessaire (aucun nouveau modèle).
-- [ ] Parcours manuel complet : Dashboard → Stock & Rotation → détail agent/lot → retour, sans perte de contexte ni lien mort.
-- [ ] `APP_SURVEILLANCE.md` mis à jour : nouvelle vue `StockRotationView`, nouveau service `StockAgeService`, section navigation décrivant `_nav_themes.html`.
-- [ ] `docs/BACKLOG.md` (Chantier 2) mis à jour : statut → ✅ terminée, note sur l'écart assumé (thème dédié au lieu d'intégration dashboard).
+- [x] Les 4 volets ci-dessus sont chacun individuellement validés (DoD par volet).
+- [x] `manage.py check` propre, aucune migration nécessaire (aucun nouveau modèle).
+- [ ] Parcours manuel complet : Dashboard → Stock & Rotation → détail agent/lot → retour, sans perte de contexte ni lien mort. *(vérifié uniquement via smoke-tests automatisés — statut HTTP 200 sur toutes les pages — pas de parcours visuel réel dans un navigateur à ce stade)*.
+- [x] `APP_SURVEILLANCE.md` mis à jour : nouvelle vue `StockRotationView`, nouveau service `StockAgeService`, section navigation décrivant `_nav_themes.html`.
+- [x] `docs/BACKLOG.md` (Chantier 2) mis à jour : statut → ✅ terminée, note sur l'écart assumé (thème dédié au lieu d'intégration dashboard).
 
 ---
 
 ## Fichiers à créer / modifier
 
+Tableau mis à jour avec l'état final livré (plan initial + extensions post-revue).
+
 | Fichier | Action |
 |---|---|
-| `surveillance/constants.py` | Modifier — `DELAI_ROTATION_JOURS`, `DELAI_STOCK_DORMANT_JOURS` |
-| `surveillance/services/stock_age_service.py` | Créer |
-| `surveillance/views/stock_rotation.py` | Créer |
-| `surveillance/urls.py` | Modifier — route `stock-rotation/` |
+| `surveillance/constants.py` | Modifier — `DELAI_ROTATION_JOURS`, `DELAI_STOCK_DORMANT_JOURS`, `DATE_PLANCHER_STOCK` |
+| `surveillance/services/stock_age_service.py` | Créer — `StockAgeService` (rotation lente + stock dormant sur 2 sources) |
+| `surveillance/views/stock_rotation.py` | Créer — `StockRotationView`, `RotationLenteListView`, `StockDormantListView` |
+| `surveillance/urls.py` | Modifier — routes `stock-rotation/`, `stock-rotation/rotation-lente/`, `stock-rotation/stock-dormant/` |
 | `surveillance/templates/surveillance/stock_rotation/dashboard_stock.html` | Créer |
+| `surveillance/templates/surveillance/stock_rotation/liste_rotation_lente.html` | Créer *(extension)* |
+| `surveillance/templates/surveillance/stock_rotation/liste_stock_dormant.html` | Créer *(extension)* |
 | `surveillance/templates/partials/_nav_themes.html` | Créer |
-| `surveillance/templates/surveillance/dashboard_surveillance.html` | Modifier — carte résumé + nav commune |
-| `surveillance/templates/surveillance/kg_vendu/liste_kg_vendu.html` | Modifier — nav commune, `from=kg` sur liens sortants |
-| `surveillance/templates/surveillance/prix/surveillance_prix.html` | Modifier — nav commune, propagation `semaine_selectionnee`, `from=prix` |
+| `surveillance/templates/partials/_pagination.html` | Créer *(extension)* — pagination DaisyUI (`join`/`btn`) |
+| `surveillance/templates/partials/_table_rotation_lente.html` | Créer *(extension)* — table réutilisée par l'aperçu et la liste complète |
+| `surveillance/templates/partials/_table_stock_dormant.html` | Créer *(extension)* — idem |
+| `surveillance/templates/surveillance/dashboard_surveillance.html` | Modifier — carte résumé + nav commune + header restructuré |
+| `surveillance/templates/surveillance/kg_vendu/liste_kg_vendu.html` | Modifier — nav commune, `from=kg` sur liens sortants, header restructuré |
+| `surveillance/templates/surveillance/prix/surveillance_prix.html` | Modifier — nav commune, propagation `semaine_selectionnee`, header restructuré |
 | `surveillance/templates/surveillance/prix/detail_prix.html` | Modifier — nav commune, `from=prix` sur lien vers `detail_superviseur` |
-| `surveillance/templates/surveillance/produits/detail_produit.html` | Modifier — breadcrumb contextuel (`origine`), nav commune |
-| `surveillance/templates/surveillance/superviseur/detail_superviseur.html` | Modifier — breadcrumb contextuel (`origine`), nav commune |
-| `surveillance/views/dashboard.py`, `kg_vendu.py`, `prix.py`, `produits.py`, `superviseur.py` | Modifier — injection `context["theme"]` / `context["origine"]` |
-| `surveillance/tests.py` | Modifier — tests `StockAgeService` |
-| `surveillance/APP_SURVEILLANCE.md` | Modifier — documenter Volet 1-4 |
+| `surveillance/templates/surveillance/produits/detail_produit.html` | Modifier — breadcrumb contextuel (`origine`), nav commune, propagation `origine` vers `detail_superviseur` |
+| `surveillance/templates/surveillance/superviseur/detail_superviseur.html` | Modifier — breadcrumb contextuel (`origine`), nav commune, propagation `origine` vers `detail_produit` |
+| `surveillance/views/dashboard.py`, `kg_vendu.py`, `prix.py`, `produits.py`, `superviseur.py` | Modifier — injection `context["theme"]` / `context["origine"]` / `qs_semaine` |
+| `surveillance/week_utils.py` | Modifier — helper `qs_semaine()` |
+| `surveillance/tests.py` | Modifier — 12 tests `StockAgeService` (dont 6 ajoutés en extension) |
+| `surveillance/APP_SURVEILLANCE.md` | Modifier — documenter Volet 1-4 + extensions |
 | `docs/BACKLOG.md` | Modifier — statut Chantier 2 |
+| `direction/urls.py`, `direction/views.py` | Modifier *(hors sprint, nettoyage connexe)* — suppression du code mort `monitoring_alertes_dashboard` |
+| `direction/services/alertes/` (4 fichiers) | Supprimer *(hors sprint, nettoyage connexe)* — `SoldeAlertService` + stubs vides, non utilisés |
+| `direction/templates/direction/monitoring/dashboard.html` | Supprimer *(hors sprint, nettoyage connexe)* |
+
+---
+
+## Extensions post-revue (hors périmètre initial des 4 volets)
+
+Demandées par mdmaiga après la livraison des 4 volets ci-dessus, sur la même app :
+
+1. **Stock dormant étendu aux lots mis à disposition d'un superviseur** — `StockAgeService.lots_stock_dormant()` fusionne désormais deux sources : `LotEntrepot` (entrepôt central, ancienneté sur `date_reception`) et `AffectationLotSuperviseur` non redistribuée (ancienneté sur `date_affectation`). Chaque ligne porte une `localisation` ("Entrepôt central" ou le superviseur) pour distinguer les deux.
+2. **Traçabilité pour suppression admin** — chaque ligne de rotation lente porte l'ID `DistributionAgent` et `DetailDistribution` ; chaque ligne de stock dormant porte `reference_lot` et l'ID de l'objet source (`LotEntrepot` ou `AffectationLotSuperviseur`). Tous en lien direct vers l'admin Django (`admin:core_*_change`), pour identifier et supprimer un enregistrement erroné sans devoir chercher manuellement dans l'admin.
+3. **Plancher `DATE_PLANCHER_STOCK`** — ajouté après coup pour aligner les deux alertes stock sur le même principe que `DATE_PLANCHER_PRIX`/`DATE_PLANCHER_VENTES` : ignorer les données antérieures à une date de référence, jugées peu fiables.
+4. **Pages de liste complète + pagination** — `StockRotationView` ne montre qu'un aperçu (10 premiers par alerte) ; deux vues dédiées (`RotationLenteListView`, `StockDormantListView`) affichent la liste complète, paginée (20/page), pour consulter l'intégralité des alertes au lieu d'être limité à 10.
+5. **Nav thématique affinée** — libellé "Prix & Rentabilité" simplifié en "Prix" ; la nav a été déplacée sur sa propre ligne pleine largeur (au lieu de partager le header avec le titre et le filtre semaine) après constat d'un conflit visuel sur les pages qui combinent les deux.
+6. **Nettoyage connexe (préparation Chantier 3)** — suppression du dashboard `monitoring_alertes_dashboard` (`direction/`) et du service `SoldeAlertService` : code mort (aucun lien dans la navigation), avec un bug de déduplication actif (le filtre de recherche de doublon ne portait pas sur le message réellement stocké), confirmé par 12 lignes `Alerte` dupliquées en base et supprimées à cette occasion. Objectif : ne pas faire cohabiter ce système ad hoc avec le futur moteur du Chantier 3 sur le même modèle `Alerte`.

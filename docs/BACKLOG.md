@@ -106,10 +106,15 @@ clôture définitive du sprint.
 DAMS produit actuellement des alertes dispersées et non historisées :
 - `SurveillancePrixService` → anomalies prix (affichage uniquement)
 - `StockAgeService` (Sprint 04, Chantier 2) → rotation lente / stock dormant (affichage uniquement)
-- `SoldeAlertService` → seuil solde superviseur (pas historisée)
 - `calculer_solde_superviseur` → booléen alerte (affichage brut)
 
 **Aucune n'est** historisée, dédupliquée, classifiée, ou diffusée au-delà du dashboard.
+
+**Mise à jour du 27/07/2026** : `SoldeAlertService` et le dashboard `monitoring_alertes_dashboard`
+(`direction/`) qui l'utilisait ont été supprimés — code mort (aucun lien dans la navigation),
+avec un bug de déduplication actif qui laissait s'accumuler des `Alerte` dupliquées à chaque
+visite. La table `Alerte` a été vidée en conséquence. Chantier 3 repart donc sur un modèle
+`Alerte` propre, sans système concurrent à absorber ou migrer.
 
 Le **Chantier 3** crée le **moteur centralisé** qui unifie et généralise ce processus.
 
@@ -205,6 +210,15 @@ Pour commencer, fokus sur ces 4 cas uniquement :
 **Candidats** :
 - **Option A** : Étendre modèle `Alerte` existant (champs `statut`, `date_creation`, `date_resolution`, `nombre_envois`)
 - **Option B** : Créer `BusinessAlert` séparé, découplé de `Alerte`
+
+**Points à trancher explicitement avant la migration (constatés le 27/07/2026)**, quelle que soit
+l'option choisie :
+- `Alerte.superviseur` et `Alerte.agent` sont des FK vers `User`, pas vers `Agent` — il n'existe
+  pas de modèle `Superviseur` dans ce repo (c'est `Agent.type_agent='entrepot'`). Toute évolution
+  doit rester cohérente avec ce pattern existant (`superviseur=agent.user`).
+- `Alerte` n'a aujourd'hui aucun lien générique vers un objet métier arbitraire (seulement une FK
+  `produit`) — à décider : FK dédiées nullables par type d'alerte (lot, distribution) ou
+  `GenericForeignKey` (`content_type`/`object_id`, nouveau pattern dans ce repo).
 
 ---
 
