@@ -19,7 +19,7 @@ from direction.views import (
                                  api_calcul_salaire_rapide,export_salaires_excel,
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
                                  RotDetailView,analyse_operationnelle ,
-                                 suivi_distributions,monitoring_alertes_dashboard                                  
+                                 suivi_distributions
                               )
 
 
@@ -130,7 +130,6 @@ urlpatterns = [
          suivi_distributions,
          name="suivi_distributions"
      ),
-    path("monitoring/alertes/", monitoring_alertes_dashboard, name="monitoring_alertes"),
 ]
 
 

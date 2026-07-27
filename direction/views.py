@@ -78,7 +78,7 @@ from direction.services.analyse_operationnelle_service import AnalyseOperationne
 
 from direction.services.DashboardSnapshotService import DashboardSnapshotService
 
-DATE_DEBUT_SUIVI_TERRAIN = date(2026, 5, 15)
+DATE_DEBUT_SUIVI_TERRAIN = date(2026, 7, 1)
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/dashboards/dashboard.html'
@@ -1850,45 +1850,3 @@ def suivi_distributions(request):
         "direction/analyses/stock/suivi_distributions.html",
         context
     )
-
-# direction/views.py
-
-from django.shortcuts import render
-from core.models import Agent, Alerte
-from direction.services.alertes.solde import SoldeAlertService
-
-
-def monitoring_alertes_dashboard(request):
-
-    # superviseurs actifs
-    superviseurs = Agent.objects.filter(
-        type_agent="entrepot",
-        est_actif=True
-    ).select_related("user")
-
-    data_superviseurs = []
-
-    for sup in superviseurs:
-
-        # recalcul solde + génération alertes
-        solde = SoldeAlertService.check_superviseur_solde(sup)
-
-        # alertes non vues
-        alertes = Alerte.objects.filter(
-            superviseur=sup.user,
-            est_vue=False
-        ).order_by("-date_creation")[:10]
-
-        data_superviseurs.append({
-            "superviseur": sup,
-            "solde": solde,
-            "alertes": alertes,
-        })
-
-    # alertes globales récentes
-    alertes_globales = Alerte.objects.all().order_by("-date_creation")[:30]
-
-    return render(request, "direction/monitoring/dashboard.html", {
-        "data_superviseurs": data_superviseurs,
-        "alertes_globales": alertes_globales,
-    })
