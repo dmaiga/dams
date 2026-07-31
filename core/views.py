@@ -1520,14 +1520,11 @@ def gestion_factures_lot(request, lot_id):
 def creer_versement(request):
     agent_connecte = request.user.agent
 
-    if not agent_connecte.est_rot:
-        return redirect("access_denied")
-
     if request.method == "POST":
         form = VersementForm(request.POST, request.FILES)
         if form.is_valid():
             form.save(rot=agent_connecte)
-            messages.success(request, "✅ Versement enregistré par le ROT")
+            messages.success(request, "✅ Versement enregistré")
             return redirect("liste_versement")
     else:
         form = VersementForm()
@@ -1553,7 +1550,7 @@ def modifier_versement(request, versement_id):
     agent = request.user.agent
 
     # 🔐 Permissions
-    if agent.est_rot:
+    if agent.est_rot or agent.est_gestionnaire_stock:
         if versement.effectue_par != agent:
             messages.error(request, "Vous ne pouvez modifier que vos propres versements.")
             return redirect("liste_versement")

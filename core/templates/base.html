@@ -468,7 +468,11 @@
                             <i class="fas fa-share-alt"></i>
                             <span>Affectations</span>
                         </a>
-
+                          <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
+                            href="{% url 'liste_versement' %}">
+                             <i class="fas fa-file-invoice"></i>
+                                <span>Versements</span>
+                        </a>
                     </div>
                     {# ===== MENU SUPERVISEUR  ===== #}
                     {% elif request.user.agent.est_superviseur %}

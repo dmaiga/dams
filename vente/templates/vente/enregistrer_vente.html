@@ -114,7 +114,7 @@
     {% endif %}
 
     <div class="d-grid gap-2 action-bar">
-      <button type="submit" class="btn btn-success btn-lg">
+      <button type="submit" class="btn btn-success btn-lg" id="vente-submit-btn">
         <i class="fas fa-check me-1"></i> Enregistrer la vente
       </button>
       <a href="{% url 'vente:historique_ventes' %}" class="btn btn-outline-secondary">
@@ -192,6 +192,13 @@ document.getElementById('{{ form.detail_distribution.id_for_label }}').addEventL
   if (!suggestion) return;
   const typeVenteSelect = document.getElementById('{{ form.type_vente.id_for_label }}');
   if (typeVenteSelect) typeVenteSelect.value = suggestion;
+});
+
+document.getElementById('vente-form').addEventListener('submit', function () {
+  const btn = document.getElementById('vente-submit-btn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Enregistrement…';
 });
 </script>
 {% endblock %}

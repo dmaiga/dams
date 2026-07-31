@@ -2040,7 +2040,7 @@ class VersementBancaire(models.Model):
         null=True,
         blank=True,
         related_name="versements_effectues",
-        limit_choices_to={'type_agent__in': ['rot', 'direction']},
+        limit_choices_to={'type_agent__in': ['rot', 'direction','gestionnaire_stock']},
         help_text="ROT ou Direction ayant réellement effectué le versement"
     )
 
