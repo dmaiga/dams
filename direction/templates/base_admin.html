@@ -191,16 +191,15 @@
                                         <span>Surveillance</span>
                                     </a>
                                 </li>
-                                {% if request.user.username == "mdmaiga" %}
                                 <li>
                                     <a href="{% url 'bi:sommaire' %}"
                                        class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
                                               {% if request.resolver_match.namespace == 'bi' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
                                         <i class="fas fa-chart-line text-sm w-4 text-center"></i>
                                         <span>BI</span>
+                                        <span class="ml-auto text-[9px] font-bold text-white bg-emerald-500 px-1.5 py-0.5 rounded-full">NEWS</span>
                                     </a>
                                 </li>
-                                {% endif %}
                             </ul>
                         </div>
 
