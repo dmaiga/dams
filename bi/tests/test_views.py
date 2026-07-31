@@ -24,6 +24,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.urls import reverse
 
+from core.models import Agent
+
 from bi.views import _dernier_mois_disponible
 from bi.models import (
     VwAnalyseStock,
@@ -43,9 +45,9 @@ TOUTES_PERIODES = {"toutes_periodes": "1"}
 
 @pytest.fixture
 def utilisateur_connecte(client, django_user_model):
-    """Accès BI restreint à username='mdmaiga' (bi.views.bi_access_required, garde-fou
-    temporaire par username, pas un rôle Django)."""
+    """Accès BI restreint aux agents de type 'direction' (bi.views.bi_access_required)."""
     user = django_user_model.objects.create_user(username="mdmaiga", password="test-pass-123")
+    Agent.objects.create(user=user, type_agent="direction")
     client.force_login(user)
     return user
 

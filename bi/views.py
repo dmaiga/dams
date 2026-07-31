@@ -25,13 +25,13 @@ from bi.models import (
     VwRentabiliteProduit,
 )
 
-# Accès BI restreint à un seul compte le temps de la mise au point (rendu à affiner, cf.
-# session en cours) — pas un rôle Django, un simple garde-fou temporaire par username.
-BI_USERNAME_AUTORISE = "mdmaiga"
-
 
 def _est_utilisateur_autorise(user):
-    return user.is_authenticated and user.username == BI_USERNAME_AUTORISE
+    return (
+        user.is_authenticated
+        and hasattr(user, 'agent')
+        and user.agent.est_direction
+    )
 
 
 bi_access_required = user_passes_test(_est_utilisateur_autorise, login_url="login")
