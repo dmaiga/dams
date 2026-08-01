@@ -7,11 +7,17 @@ class TelephoneBackend(ModelBackend):
     Permet la connexion via le numéro de téléphone au lieu du username
     """
     def authenticate(self, request, username=None, password=None, **kwargs):
+        if not username:
+            return None
         try:
             # On suppose que chaque Agent a un user lié
             agent = Agent.objects.select_related('user').get(telephone=username)
             user = agent.user
         except Agent.DoesNotExist:
+            return None
+        except Agent.MultipleObjectsReturned:
+            # Plusieurs agents partagent ce numéro (donnée à corriger) — on refuse plutôt
+            # que de connecter arbitrairement l'un des comptes concernés.
             return None
 
         if user.check_password(password):

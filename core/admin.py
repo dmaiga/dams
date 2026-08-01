@@ -331,10 +331,10 @@ class AgentAdmin(admin.ModelAdmin):
     def statut_actif(self, obj):
         if obj.est_actif:
             return format_html(
-                '<span style="color: green; font-weight: bold;">✔ Actif</span>'
+                '<span style="color: green; font-weight: bold;">{}</span>', "✔ Actif"
             )
         return format_html(
-            '<span style="color: red; font-weight: bold;">✖ Inactif</span>'
+            '<span style="color: red; font-weight: bold;">{}</span>', "✖ Inactif"
         )
     statut_actif.short_description = "Statut"
 
