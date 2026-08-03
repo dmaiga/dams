@@ -31,7 +31,6 @@
         <div class="stat">
             <div class="stat-title">Encaissements</div>
             <div class="stat-value text-success text-base">{{ solde.encaissements|fcfa }}</div>
-            <div class="stat-desc">Depuis toujours (calcul dynamique, pas de solde d'ouverture)</div>
         </div>
         <div class="stat">
             <div class="stat-title">Dépenses (perso)</div>
@@ -40,6 +39,12 @@
         <div class="stat">
             <div class="stat-title">Déjà remis</div>
             <div class="stat-value text-error text-base">{{ solde.deja_remis|fcfa }}</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Ajustement</div>
+            <div class="stat-value text-base {% if solde.ajustement %}text-warning{% else %}text-gray-400{% endif %}">
+                {{ solde.ajustement|fcfa }}
+            </div>
         </div>
         <div class="stat">
             <div class="stat-title">Reste à remettre</div>

@@ -21,15 +21,28 @@ def solde_superviseur(superviseur, date_fin=None):
     """
     Cash actuellement détenu par CE superviseur, pas encore remis à un acteur
     admin (ROT ou direction). Calcul dynamique depuis DATE_DEBUT_FINANCE (pas
-    de "solde d'ouverture" ni de clôture) — l'historique antérieur est ignoré,
-    voir décision n°14. Le calcul mélangeait auparavant ce solde avec des
-    Depense et VersementBancaire qui sont en réalité des événements de la
-    caisse globale une fois l'argent mutualisé, pas des événements du
-    superviseur (décision n°13, docs/sprints/sprint-03.md).
+    de clôture) — l'historique antérieur est ignoré, voir décision n°14. Le
+    calcul mélangeait auparavant ce solde avec des Depense et VersementBancaire
+    qui sont en réalité des événements de la caisse globale une fois l'argent
+    mutualisé, pas des événements du superviseur (décision n°13,
+    docs/sprints/sprint-03.md).
 
     Une Depense faite par CE superviseur lui-même (`peut_faire_depense`,
     avant remise) réduit ce solde ; une Depense faite par un ROT/direction
     (après mutualisation) réduit `solde_caisse_globale`, pas celui-ci.
+
+    `Agent.ajustement_solde` (décision n°16, 2026-08-03) sert de solde
+    d'ouverture manuel à DATE_DEBUT_FINANCE : la coupure nette de la décision
+    n°14 peut créer une incohérence quand un superviseur détenait déjà du cash
+    non remis juste avant la coupure (ex. recouvrement le 31/07 non remis,
+    suivi d'une dépense le 01/08 — le calcul sans ajustement peut alors
+    devenir négatif alors que le superviseur a bien assez de cash en main).
+    `ajustement_solde` est un champ générique de `Agent`, déjà éditable dans
+    l'admin (`list_editable`) et déjà utilisé pour un rôle équivalent côté
+    ROT (`Agent.solde_rot`) — pas de champ dédié créé, réutilisation du
+    mécanisme existant. Poser cette valeur une seule fois par superviseur
+    concerné (montant réellement détenu, non remis, juste avant le
+    01/08/2026) ; ne pas la modifier ensuite au fil de l'eau.
     """
     if date_fin is None:
         date_fin = timezone.localdate()
@@ -52,7 +65,9 @@ def solde_superviseur(superviseur, date_fin=None):
         date_recouvrement__date__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
-    solde = encaissements - depenses_perso - deja_remis
+    ajustement = superviseur.ajustement_solde or Decimal("0.00")
+
+    solde = encaissements - depenses_perso - deja_remis + ajustement
 
     return {
         "superviseur": superviseur,
@@ -60,6 +75,7 @@ def solde_superviseur(superviseur, date_fin=None):
         "encaissements": encaissements,
         "depenses": depenses_perso,
         "deja_remis": deja_remis,
+        "ajustement": ajustement,
         "solde": solde,
         "alerte": solde > SEUIL_ALERTE_SOLDE,
     }

@@ -89,10 +89,11 @@ Migration `core/migrations/0107_extend_finance_permissions_and_peut_faire_depens
 Cash détenu par CE superviseur, pas encore remis :
 
 ```
-solde = encaissements(Recouvrement) - depenses_perso(Depense, effectue_par=superviseur) - deja_remis(RecouvrementSuperviseur)
+solde = encaissements(Recouvrement) - depenses_perso(Depense, effectue_par=superviseur) - deja_remis(RecouvrementSuperviseur) + ajustement(Agent.ajustement_solde)
 ```
 
-- Calcul dynamique depuis **`DATE_DEBUT_FINANCE`** (`date(2026, 7, 1)`, constante de module) — pas de borne basse arbitraire par requête, pas de "solde d'ouverture", pas de dépendance à `ClotureMensuelle`. L'historique antérieur (jugé incohérent : ancien paradigme superviseur, introduction tardive du rôle ROT) est délibérément ignoré — décision n°14, sprint-03.
+- Calcul dynamique depuis **`DATE_DEBUT_FINANCE`** (`date(2026, 8, 1)`, constante de module) — pas de borne basse arbitraire par requête, pas de dépendance à `ClotureMensuelle`. L'historique antérieur (jugé incohérent : ancien paradigme superviseur, introduction tardive du rôle ROT) est délibérément ignoré — décision n°14, sprint-03.
+- **Solde d'ouverture manuel (décision n°16, 2026-08-03)** : `Agent.ajustement_solde` (champ générique déjà existant, éditable dans l'admin Django — `AgentAdmin.list_editable`, déjà utilisé pour le même rôle côté ROT via `Agent.solde_rot`) est ajouté à la formule pour absorber l'incohérence introduite par la coupure nette de la décision n°14 : un superviseur qui détenait déjà du cash non remis juste avant `DATE_DEBUT_FINANCE` peut voir son solde calculé devenir négatif après une dépense, alors qu'il a réellement assez de cash en main. À poser une seule fois par superviseur concerné (montant réellement détenu, non remis, juste avant la coupure), pas au fil de l'eau. **Avant réutilisation de ce champ (2026-08-03)**, deux valeurs héritées de l'ancien système y étaient déjà présentes (Abdoulaye Kone -41250, Kone Abdoulaye/rot -418105) — celle du superviseur a été remise à 0 pour ne pas importer une correction de l'ancien paradigme dans le nouveau calcul ; celle du ROT n'est pas concernée par `finance.services` (reste lue par les propriétés legacy de `core.models.Agent`).
 - `date_fin` (paramètre, `aujourd'hui` par défaut) permet uniquement de consulter *"quel était le solde à telle date"* — toujours borné en bas par `DATE_DEBUT_FINANCE`.
 - `alerte` : `solde > SEUIL_ALERTE_SOLDE` (seuil `30 000 FCFA`, décidé le 27/07/2026 ; `direction/services/alertes/solde.py::SoldeAlertService`, qui utilisait un seuil différent — 50 000/100 000 FCFA selon le niveau —, a été supprimé, code mort non lié dans la navigation, voir `docs/sprints/sprint-04.md` § Extensions).
 
@@ -104,7 +105,7 @@ Ce simple seuil a en réalité une valeur limitée pris isolément : la quasi-to
 
 `finance/services.py` reste un calculateur pur, sans historisation (voir Invariants) — ces deux mécanismes, qui nécessitent de tracer l'historique des cycles, relèvent du moteur du Chantier 3, pas de cette app.
 
-**Historique** : une première version sommait tout l'historique sans borne basse (décision n°13). Constat en usage réel : `deja_remis` dépassait `encaissements` pour les 3 superviseurs de test, un signal jugé plus gênant qu'utile — mdmaiga a préféré couper franchement au 01/07/2026 plutôt que d'investiguer des données de test anciennes (décision n°14).
+**Historique** : une première version sommait tout l'historique sans borne basse (décision n°13). Constat en usage réel : `deja_remis` dépassait `encaissements` pour les 3 superviseurs de test, un signal jugé plus gênant qu'utile — mdmaiga a préféré couper franchement au 01/08/2026 plutôt que d'investiguer des données de test anciennes (décision n°14).
 
 ### `lister_soldes_superviseurs(date_fin=None)`
 
@@ -177,7 +178,7 @@ Lien ajouté dans le menu FINANCE de `direction/templates/base_admin.html` ("Sol
 - `VersementBancaire` et `Depense(effectue_par=ROT/direction)` sont des événements de la **caisse globale**, jamais attribués à un superviseur individuel — ne jamais filtrer `VersementBancaire` par `superviseur` dans du code neuf (champ historique déprécié, voir décision n°13).
 - `Depense(effectue_par=superviseur)` réduit le solde individuel de ce superviseur, pas la caisse globale — ne jamais compter la même dépense dans les deux.
 - Un seul flux d'encaissement (`Recouvrement`), jamais additionné avec `Vente(agent=superviseur)` en parallèle.
-- Aucun solde d'ouverture, aucune clôture : `solde_superviseur`/`solde_caisse_globale` sont calculés depuis `DATE_DEBUT_FINANCE` (`2026-07-01`) jusqu'à `date_fin` — jamais avant cette constante (décision n°14). Toute fenêtre de consultation (mouvements, historiques) doit aussi être bornée par elle.
+- Aucune clôture : `solde_superviseur`/`solde_caisse_globale` sont calculés depuis `DATE_DEBUT_FINANCE` (`2026-08-01`) jusqu'à `date_fin` — jamais avant cette constante (décision n°14). Toute fenêtre de consultation (mouvements, historiques) doit aussi être bornée par elle. Seul `Agent.ajustement_solde` (décision n°16) introduit un solde d'ouverture, et uniquement de façon manuelle/ponctuelle — jamais recalculé automatiquement.
 - Comparaisons de dates sur des `DateTimeField` timezone-aware toujours faites via `__date__gte`/`__date__lte`/`__date__lte` (ou `.date()` côté Python), jamais directement contre un `date` naïf.
 - Accès à `finance/` refusé à tout agent qui n'est pas `est_direction` (403 via `access_denied`) ; `creer_depense` élargi à `peut_faire_depense`.
 
