@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from core.models import (
-    Agent, AffectationLotSuperviseur, DistributionAgent, DetailDistribution, Vente,
+    Agent, AffectationLotSuperviseur, DistributionAgent, DetailDistribution, Vente, Perte,
 )
 
 TYPES_AGENT_TERRAIN = ['terrain', 'agent_gros', 'agent_polivalent', 'stagiaire']
@@ -121,6 +121,21 @@ class VenteForm(forms.Form):
     La date ne demande que le jour : l'heure exacte est source de blocages
     sur téléphone (fuseau/format de l'input datetime-local) et n'apporte pas
     de valeur métier ici — le système la complète avec l'heure courante.
+
+    Déclaration de perte (2026-08-04) : un agent ne remet parfois que le kilo
+    effectivement vendu, sans signaler qu'une partie du stock distribué a
+    péri avant la vente — ce qui gonflait à tort le "reste à vendre"/recouvrer
+    de l'agent. `declaration_perte` (case à cocher, template) ouvre deux
+    champs optionnels saisis EN MÊME TEMPS que la vente, pas dans un flux
+    séparé :
+    - produit vrac (`Produit.poids_unitaire_kg` vide) : `quantite_perdue`
+      (kg) devient obligatoire → crée un `Perte.detail_distribution`, qui
+      réduit `quantite_restante_calculee` (voir core/models.py).
+    - produit à l'unité (conditionné) : seul `commentaire_perte` est
+      obligatoire, aucune quantité déduite nulle part — juste une note
+      attachée à la `Vente` (`Vente.commentaire_perte`), le workflow de
+      vente reste inchangé pour ce type de produit (décision produit :
+      ne pas complexifier un cas qui n'a pas besoin d'un vrai décompte).
     """
 
     agent_terrain = forms.ModelChoiceField(
@@ -140,6 +155,26 @@ class VenteForm(forms.Form):
         decimal_places=2,
         label="Quantité vendue",
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+
+    declaration_perte = forms.BooleanField(
+        required=False,
+        label="Il y a eu une perte sur ce produit",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    quantite_perdue = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        required=False,
+        label="Kg perdus",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+
+    commentaire_perte = forms.CharField(
+        required=False,
+        label="Commentaire",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex : périmé avant vente'})
     )
 
     type_vente = forms.ChoiceField(
@@ -195,6 +230,9 @@ class VenteForm(forms.Form):
         agent_terrain = cleaned_data.get('agent_terrain')
         detail_distribution = cleaned_data.get('detail_distribution')
         quantite = cleaned_data.get('quantite')
+        declaration_perte = cleaned_data.get('declaration_perte')
+        quantite_perdue = cleaned_data.get('quantite_perdue')
+        commentaire_perte = cleaned_data.get('commentaire_perte')
 
         if detail_distribution and agent_terrain and detail_distribution.distribution.agent_terrain_id != agent_terrain.id:
             self.add_error(
@@ -208,6 +246,20 @@ class VenteForm(forms.Form):
                 f"Quantité vendue dépasse ce qu'il reste à distribuer ({detail_distribution.quantite_restante_calculee})"
             )
 
+        if declaration_perte and detail_distribution:
+            is_vrac = detail_distribution.lot.produit.poids_unitaire_kg is None
+
+            if is_vrac:
+                if not quantite_perdue:
+                    self.add_error('quantite_perdue', "Indiquez le nombre de kg perdus.")
+                elif quantite and (quantite + quantite_perdue) > detail_distribution.quantite_restante_calculee:
+                    self.add_error(
+                        'quantite_perdue',
+                        f"Vendu + perdu dépasse ce qu'il reste à distribuer ({detail_distribution.quantite_restante_calculee})"
+                    )
+            elif not commentaire_perte:
+                self.add_error('commentaire_perte', "Indiquez un commentaire pour cette perte.")
+
         return cleaned_data
 
     def save(self):
@@ -216,12 +268,31 @@ class VenteForm(forms.Form):
         jour = self.cleaned_data.get('date_vente') or timezone.localdate()
         date_vente = timezone.make_aware(datetime.combine(jour, timezone.localtime().time()))
 
-        return Vente.objects.create(
-            agent=self.cleaned_data['agent_terrain'],
-            detail_distribution=self.cleaned_data['detail_distribution'],
-            quantite=self.cleaned_data['quantite'],
-            type_vente=self.cleaned_data['type_vente'],
-            prix_vente_unitaire=self.cleaned_data['prix_vente_unitaire'],
-            mode_paiement='comptant',
-            date_vente=date_vente,
-        )
+        detail_distribution = self.cleaned_data['detail_distribution']
+        declaration_perte = self.cleaned_data.get('declaration_perte')
+        is_vrac = detail_distribution.lot.produit.poids_unitaire_kg is None
+
+        with transaction.atomic():
+            vente = Vente.objects.create(
+                agent=self.cleaned_data['agent_terrain'],
+                detail_distribution=detail_distribution,
+                quantite=self.cleaned_data['quantite'],
+                type_vente=self.cleaned_data['type_vente'],
+                prix_vente_unitaire=self.cleaned_data['prix_vente_unitaire'],
+                mode_paiement='comptant',
+                date_vente=date_vente,
+                commentaire_perte=(
+                    self.cleaned_data.get('commentaire_perte', '')
+                    if declaration_perte and not is_vrac else ''
+                ),
+            )
+
+            if declaration_perte and is_vrac:
+                Perte.objects.create(
+                    detail_distribution=detail_distribution,
+                    vente=vente,
+                    quantite_perdue=self.cleaned_data['quantite_perdue'],
+                    description=self.cleaned_data.get('commentaire_perte') or "Perdu (déclaré à la vente)",
+                )
+
+        return vente

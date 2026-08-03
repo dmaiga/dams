@@ -92,6 +92,13 @@ qs.annotate(
 * **`date_recouvrement`** : Injection par `Subquery` de la date précise de la dernière action de recouvrement associée, évitant le chargement ultérieur d'instances de la table `Recouvrement`.
 * **Sécurité d'Accès (`UserPassesTestMixin`)** : Restreint structurellement la visibilité de cette vue aux seuls profils `direction` et `superviseur`.
 
+### KPI CA/Marge et affichage (révisé 2026-08-04)
+
+* **Filtre période par défaut = `mois`** (mois calendaire courant), plus `annee` — les KPI "CA"/"Marge" en haut de page suivent le filtre choisi (comme avant), mais partent du mois en cours tant que direction n'a rien sélectionné, au lieu de l'année entière. `VenteAnalyseService.normalize_period` gère déjà les trois modes (`annee`/`mois`/`perso`), seul le défaut de `periode` a changé dans `get_queryset()`.
+* **Quantité affichée en kg** (`Vente.quantite_en_kg`, `core/models.py`) et non plus la quantité brute : un produit conditionné (ex. l'ail, 1 unité = 10 kg) multiplie `quantite` par `Produit.poids_unitaire_kg` ; un produit vrac garde `quantite` telle quelle — évite de confondre "10" unités avec "10 kg".
+* **Colonne Prix fusionnée** ("Prix (achat / vente)") : prix d'achat et prix de vente dans la même cellule, différenciés par un dégradé de texte (`bg-gradient-to-r` + `bg-clip-text`) plutôt que deux colonnes séparées — plus compact.
+* **Icône de perte** : si une perte a été déclarée en même temps qu'une vente (`Vente.commentaire_perte` pour un produit à l'unité, ou `Vente.pertes_liees` pour un produit vrac — voir `vente/APP_VENTE.md` § Déclaration de perte), une icône ⓘ apparaît à côté du nom du produit, avec le commentaire au survol (`title`). Le queryset est `prefetch_related('pertes_liees')` pour rester à zéro requête en boucle.
+
 ---
 
 ## 5. Module d’Audit des Justificatifs Comptables & Flux Bancaires

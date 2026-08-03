@@ -112,3 +112,16 @@ Le modèle `Alerte` centralise les notifications critiques poussées vers la dir
 * `stock` : Vieillissement ou dépréciation d'un stock ancien en entrepôt.
 * `prix` : Variations suspectes ou forcées des prix de vente constatées sur le terrain.
 * `activite` : Détection de baisses d'activité ou d'enregistrements de ventes sur une période donnée.
+
+---
+
+## 8. Pertes sur stock distribué (`Perte`) — révisé 2026-08-04
+
+`Perte` couvrait jusqu'ici uniquement la perte entrepôt (`Perte.lot`, décrémente `LotEntrepot.quantite_restante`, écran `detail_lot`). Deux champs nullables ajoutés pour couvrir aussi la perte déclarée par un superviseur sur du stock déjà distribué à un agent (produit vrac périmé avant vente, voir `vente/APP_VENTE.md` § Déclaration de perte) :
+
+* **`detail_distribution`** (FK `DetailDistribution`, nullable) : si renseigné, `Perte.save()`/`delete()` ne touchent **jamais** `LotEntrepot.quantite_restante` (déjà décrémenté à la distribution) — seule `DetailDistribution.quantite_restante_calculee` en tient compte (soustrait aussi `Sum(pertes.quantite_perdue)`, en plus des ventes). `lot` reste renseigné automatiquement (déduit de `detail_distribution.lot`) pour ne pas casser les usages existants (reporting, BI) qui filtrent par lot.
+* **`vente`** (FK `Vente`, nullable, `related_name='pertes_liees'`) : relie la perte à la vente déclarée en même temps (même formulaire, même soumission), pour retrouver le commentaire associé depuis l'historique des ventes.
+
+`Vente.commentaire_perte` (nouveau champ) couvre le cas d'un produit vendu à l'unité (conditionné) : aucune quantité n'est déduite nulle part, seulement une note — le workflow de vente reste inchangé pour ce type de produit (décision produit : ne pas complexifier un cas qui n'a pas besoin d'un vrai décompte).
+
+Migrations : `0111_perte_detail_distribution`, `0112_vente_commentaire_perte`, `0113_perte_vente`.

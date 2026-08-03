@@ -47,7 +47,7 @@ from core.models import (
 
 # Project forms
 from core.forms import (
-    FactureLotForm,  DistributionForm, ReceptionLotForm, 
+    FactureLotForm,  DistributionForm, ReceptionLotForm,
     DetteForm, PaiementDetteForm,RecouvrementForm,
     FournisseurForm,VersementForm
 

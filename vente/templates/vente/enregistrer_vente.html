@@ -61,7 +61,7 @@
       </div>
       <div class="card-body">
 
-        <div class="mb-3">
+        <div class="mb-2">
           <label class="form-label fw-semibold">
             Quantité vendue <span class="text-danger">*</span>
           </label>
@@ -69,6 +69,31 @@
           {% for error in form.quantite.errors %}
             <div class="text-danger small mt-1">{{ error }}</div>
           {% endfor %}
+        </div>
+
+        <!-- Perte : repliée sous la quantité, dépliée par la case à cocher -->
+        <div class="form-check mb-2">
+          {{ form.declaration_perte }}
+          <label class="form-check-label small" for="{{ form.declaration_perte.id_for_label }}">
+            {{ form.declaration_perte.label }}
+          </label>
+        </div>
+
+        <div id="perte-block" class="border rounded p-2 mb-3 bg-light d-none">
+          <div class="mb-2 d-none" id="perte-quantite-wrapper">
+            <label class="form-label fw-semibold small">{{ form.quantite_perdue.label }}</label>
+            {{ form.quantite_perdue }}
+            {% for error in form.quantite_perdue.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold small">{{ form.commentaire_perte.label }}</label>
+            {{ form.commentaire_perte }}
+            {% for error in form.commentaire_perte.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
         </div>
 
         <div class="mb-3">
@@ -153,12 +178,33 @@
 </style>
 
 <script>
+const perteCheckbox = document.getElementById('{{ form.declaration_perte.id_for_label }}');
+const perteBlock = document.getElementById('perte-block');
+const perteQuantiteWrapper = document.getElementById('perte-quantite-wrapper');
+const distSelectEl = document.getElementById('{{ form.detail_distribution.id_for_label }}');
+
+function updatePerteBlock() {
+  if (!perteCheckbox.checked) {
+    perteBlock.classList.add('d-none');
+    return;
+  }
+  perteBlock.classList.remove('d-none');
+
+  const selected = distSelectEl.selectedOptions[0];
+  const isVrac = selected && selected.dataset.isVrac;
+  perteQuantiteWrapper.classList.toggle('d-none', !isVrac);
+}
+
+perteCheckbox.addEventListener('change', updatePerteBlock);
+
 document.getElementById('{{ form.agent_terrain.id_for_label }}').addEventListener('change', function () {
   const agentId = this.value;
-  const distSelect = document.getElementById('{{ form.detail_distribution.id_for_label }}');
+  const distSelect = distSelectEl;
 
   distSelect.innerHTML = '<option value="">Chargement…</option>';
   distSelect.disabled = true;
+  perteCheckbox.checked = false;
+  updatePerteBlock();
 
   if (!agentId) {
     distSelect.innerHTML = '<option value="">— sélectionnez d\'abord un agent —</option>';
@@ -178,6 +224,7 @@ document.getElementById('{{ form.agent_terrain.id_for_label }}').addEventListene
         opt.value = d.id;
         opt.textContent = d.label;
         opt.dataset.typeVenteSuggere = d.type_vente_suggere || '';
+        opt.dataset.isVrac = d.is_vrac ? '1' : '';
         distSelect.appendChild(opt);
       });
       distSelect.disabled = false;
@@ -187,11 +234,14 @@ document.getElementById('{{ form.agent_terrain.id_for_label }}').addEventListene
     });
 });
 
-document.getElementById('{{ form.detail_distribution.id_for_label }}').addEventListener('change', function () {
-  const suggestion = this.selectedOptions[0] ? this.selectedOptions[0].dataset.typeVenteSuggere : '';
-  if (!suggestion) return;
-  const typeVenteSelect = document.getElementById('{{ form.type_vente.id_for_label }}');
-  if (typeVenteSelect) typeVenteSelect.value = suggestion;
+distSelectEl.addEventListener('change', function () {
+  const selected = this.selectedOptions[0];
+  const suggestion = selected ? selected.dataset.typeVenteSuggere : '';
+  if (suggestion) {
+    const typeVenteSelect = document.getElementById('{{ form.type_vente.id_for_label }}');
+    if (typeVenteSelect) typeVenteSelect.value = suggestion;
+  }
+  updatePerteBlock();
 });
 
 document.getElementById('vente-form').addEventListener('submit', function () {

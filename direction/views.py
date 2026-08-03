@@ -513,7 +513,11 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
     def get_queryset(self):
         params = self.request.GET
-        periode = params.get("periode", "annee")
+        # Défaut "mois" (mois en cours) : les KPI CA/Marge doivent partir du
+        # mois courant tant qu'aucun filtre n'est appliqué, puis suivre le
+        # filtre choisi (année/perso) — pas de valeur figée indépendante des
+        # filtres (cf. décision produit, 2026-08-04).
+        periode = params.get("periode", "mois")
 
         date_debut, date_fin = VenteAnalyseService.normalize_period(periode, params)
 
@@ -563,6 +567,8 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             )
         )
 
+        qs = qs.prefetch_related('pertes_liees')
+
         self.filtered_queryset = qs
         self.date_debut = date_debut
         self.date_fin = date_fin
@@ -585,6 +591,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             VenteAnalyseService
             .get_superviseurs_list()
         )
+
         current_year = timezone.now().year
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),

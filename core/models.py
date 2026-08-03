@@ -1218,6 +1218,30 @@ class Perte(models.Model):
         on_delete=models.CASCADE,
         related_name="pertes"
     )
+    # Perte déclarée par un superviseur sur un stock déjà distribué à un agent
+    # (produit vrac périmé avant vente) — distincte de la perte entrepôt
+    # ci-dessus. Ne décrémente jamais lot.quantite_restante (déjà décrémenté
+    # à la distribution) : voir save()/delete(). `lot` reste renseigné
+    # (déduit de detail_distribution) pour ne pas casser les usages existants
+    # (reporting, BI) qui filtrent par lot.
+    detail_distribution = models.ForeignKey(
+        "DetailDistribution",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="pertes"
+    )
+    # Vente déclarée en même temps que cette perte (VenteForm, app vente) —
+    # permet de retrouver, depuis la ligne de vente correspondante, le
+    # commentaire de la perte associée (affichage historique des ventes).
+    # Toujours nul pour une perte entrepôt (lot uniquement, sans distribution).
+    vente = models.ForeignKey(
+        "Vente",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pertes_liees"
+    )
     quantite_perdue = models.DecimalField(max_digits=10, decimal_places=2)
     quantite_perdue_originale = models.DecimalField(
         max_digits=10, 
@@ -1236,34 +1260,46 @@ class Perte(models.Model):
     
     def save(self, *args, **kwargs):
         from django.db import transaction
-        
+
         with transaction.atomic():
-            if not self.pk:  # Création
-                # Sauvegarder la quantité originale
-                self.quantite_perdue_originale = self.quantite_perdue
-                # Déduire la quantité du lot
-                self.lot.quantite_restante -= self.quantite_perdue
-                self.lot.save()
-            else:  # Modification
-                ancienne_perte = Perte.objects.get(pk=self.pk)
-                difference = self.quantite_perdue - ancienne_perte.quantite_perdue
-                
-                if difference != 0:
-                    # Ajuster la quantité du lot
-                    self.lot.quantite_restante -= difference
+            if self.detail_distribution_id and not self.lot_id:
+                self.lot = self.detail_distribution.lot
+
+            # Perte sur stock déjà distribué : ne touche jamais
+            # lot.quantite_restante, déjà décrémenté à la distribution.
+            if not self.detail_distribution_id:
+                if not self.pk:  # Création
+                    # Sauvegarder la quantité originale
+                    self.quantite_perdue_originale = self.quantite_perdue
+                    # Déduire la quantité du lot
+                    self.lot.quantite_restante -= self.quantite_perdue
                     self.lot.save()
+                else:  # Modification
+                    ancienne_perte = Perte.objects.get(pk=self.pk)
+                    difference = self.quantite_perdue - ancienne_perte.quantite_perdue
+
+                    if difference != 0:
+                        # Ajuster la quantité du lot
+                        self.lot.quantite_restante -= difference
+                        self.lot.save()
+                        self.est_modifiee = True
+            elif not self.pk:
+                self.quantite_perdue_originale = self.quantite_perdue
+            else:
+                ancienne_perte = Perte.objects.get(pk=self.pk)
+                if self.quantite_perdue != ancienne_perte.quantite_perdue:
                     self.est_modifiee = True
-            
+
             super().save(*args, **kwargs)
-    
+
     def delete(self, using=None, keep_parents=False):
-        """Restituer la quantité au lot lors de la suppression"""
+        """Restituer la quantité au lot lors de la suppression (perte entrepôt uniquement)"""
         from django.db import transaction
-        
+
         with transaction.atomic():
-            # Restituer la quantité perdue au lot
-            self.lot.quantite_restante += self.quantite_perdue
-            self.lot.save()
+            if not self.detail_distribution_id:
+                self.lot.quantite_restante += self.quantite_perdue
+                self.lot.save()
             super().delete(using=using, keep_parents=keep_parents)
     
     @property
@@ -1487,16 +1523,22 @@ class DetailDistribution(models.Model):
     def quantite_restante_calculee(self):
         """
         Calcule la quantité restante en soustrayant les ventes déjà effectuées
+        et les pertes déclarées par le superviseur sur ce détail (produits
+        vrac périmés avant vente, cf. Perte.detail_distribution).
         """
         from django.db.models import Sum
-        
+
         # Quantité totale déjà vendue pour ce détail de distribution
         quantite_vendue = Vente.objects.filter(
             detail_distribution=self,
             est_supprime=False
         ).aggregate(total=Sum('quantite'))['total'] or 0
-        
-        return self.quantite - quantite_vendue
+
+        quantite_perdue = self.pertes.aggregate(
+            total=Sum('quantite_perdue')
+        )['total'] or 0
+
+        return self.quantite - quantite_vendue - quantite_perdue
 
 
     class Meta:
@@ -1618,6 +1660,17 @@ class Vente(models.Model):
     # Soft delete
     est_supprime = models.BooleanField(default=False, verbose_name="Supprimé")
     date_suppression = models.DateTimeField(null=True, blank=True, verbose_name="Date de suppression")
+
+    # Note de perte pour un produit vendu à l'unité (conditionné) : ce type de
+    # produit n'est pas suivi au kg, donc aucune quantité n'est déduite nulle
+    # part — seulement une note informative saisie en même temps que la vente
+    # (cf. VenteForm, vente/forms.py). Pour un produit vrac, la perte réelle
+    # passe par Perte.detail_distribution (core/models.py), pas ce champ.
+    commentaire_perte = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Commentaire de perte (produit à l'unité)"
+    )
 
     def __str__(self):
         return f"Vente #{self.id} ({self.date_vente:%d/%m})"

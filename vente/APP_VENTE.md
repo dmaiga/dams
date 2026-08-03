@@ -46,11 +46,25 @@ Guard local : `_acces_superviseur(agent) = agent.est_superviseur` (pattern de pe
 | `AffectationLotSuperviseur` | Stock que le superviseur détient encore (`agent_terrain_direct__isnull=True`) — cas d'exception uniquement |
 | `DistributionAgent` | Distribution exceptionnelle (agent réel ou auto-distribution — `agent_terrain == superviseur`) |
 | `DetailDistribution` | Détail de la distribution (lot, quantité). `prix_gros`/`prix_detail` restent `None` — aucun prix n'est hérité |
-| `Vente` | Vente enregistrée par le superviseur pour un agent. `prix_vente_unitaire` saisi à chaque vente (obligatoire) ; `type_vente` pré-coché sur `detail` mais modifiable ; `mode_paiement` toujours `'comptant'` (valeur par défaut du modèle, non exposée dans le formulaire) |
+| `Vente` | Vente enregistrée par le superviseur pour un agent. `prix_vente_unitaire` saisi à chaque vente (obligatoire) ; `type_vente` pré-coché sur `detail` mais modifiable ; `mode_paiement` toujours `'comptant'` (valeur par défaut du modèle, non exposée dans le formulaire). `commentaire_perte` (2026-08-04) : note de perte pour un produit à l'unité, voir § Perte ci-dessous |
 | `Recouvrement` | Créé automatiquement à **chaque** vente (toutes comptant pour l'instant) |
 | `Dette` | Non utilisée par cette app — `Vente.save()` (existant, non modifié) ne la crée que si `mode_paiement == 'credit'`, ce que `VenteForm` n'envoie jamais actuellement |
+| `Perte` | (2026-08-04) Perte déclarée en même temps qu'une vente sur un produit vrac — voir § Perte ci-dessous. `Perte.lot`/`quantite_perdue`/`description` existaient déjà (perte entrepôt, `core/views.py`) ; `detail_distribution` et `vente` sont nouveaux |
 
-Aucune migration `core` n'a été nécessaire pour ce sprint — voir `docs/sprints/sprint-02.md`.
+Migrations `core` liées à cette évolution : `0111_perte_detail_distribution`, `0112_vente_commentaire_perte`, `0113_perte_vente`. Aucune migration `core` n'avait été nécessaire pour le sprint 02 d'origine — voir `docs/sprints/sprint-02.md`.
+
+---
+
+## Déclaration de perte à la vente (2026-08-04)
+
+Un agent ne remettait parfois que le kilo effectivement vendu quand une partie du stock distribué avait péri avant la vente, sans le signaler — ce qui gonflait à tort son "reste à vendre"/recouvrer. `VenteForm` permet désormais de déclarer cette perte **dans le même formulaire, à la même soumission** que la vente (pas un flux séparé — décision produit : ne pas complexifier un geste quotidien pour des utilisateurs peu à l'aise avec l'outil) :
+
+- Case à cocher `declaration_perte` (repliée par défaut, sous le champ Quantité de `enregistrer_vente.html`).
+- **Produit vrac** (`Produit.poids_unitaire_kg` vide) : `quantite_perdue` (kg) devient obligatoire. `VenteForm.save()` crée `Vente` + `Perte(detail_distribution=..., vente=..., quantite_perdue=...)` dans le même `transaction.atomic()`. `Perte.save()` ne décrémente **jamais** `LotEntrepot.quantite_restante` quand `detail_distribution` est renseigné (déjà décrémenté à la distribution) — uniquement `DetailDistribution.quantite_restante_calculee` qui soustrait désormais aussi `Sum(pertes.quantite_perdue)` (`core/models.py`), en plus des ventes.
+- **Produit à l'unité** (conditionné) : seul `commentaire_perte` est obligatoire — aucune quantité déduite nulle part, `Vente.commentaire_perte` stocke juste une note. Décision volontaire : ne pas complexifier un cas qui n'a pas besoin d'un vrai décompte.
+- `Perte.vente` (FK, `related_name='pertes_liees'`) relie la perte vrac à la vente déclarée en même temps — utilisé par `direction/templates/direction/analyses/ventes/liste_ventes_admin.html` pour afficher une icône ⓘ au survol (commentaire de perte, quelle que soit la variante vrac/unité).
+- Le contrôle de quantité (`clean()`) vérifie que `quantite` (vendue) + `quantite_perdue` ne dépasse pas `detail_distribution.quantite_restante_calculee` **avant** la soumission — les deux sont retirés du même stock en une seule transaction.
+- AJAX (`ajax_distributions_par_agent`) expose `is_vrac` par distribution pour piloter l'affichage JS (kg+commentaire vs commentaire seul) sans aller-retour serveur.
 
 ---
 
@@ -121,6 +135,7 @@ Mobile-first, cohérent avec les conventions posées dans `marchandise/APP_MARCH
 - Toutes les ventes sont `mode_paiement='comptant'` — recouvrement systématique, aucune `Dette` créée par cette app.
 - `date_vente` : seul le jour est demandé à l'utilisateur ; l'heure est fixée par le serveur (`timezone.localtime().time()`) au moment de l'enregistrement, pour éviter les blocages de saisie observés avec un champ datetime complet sur mobile.
 - Soft delete : `Vente.est_supprime` — jamais de suppression en dur (toutes les requêtes filtrent `est_supprime=False`).
+- Déclaration de perte (2026-08-04) : `quantite` (vendue) + `quantite_perdue` (si vrac) `<= detail_distribution.quantite_restante_calculee` avant soumission — `VenteForm.clean()`. Pour un produit à l'unité, aucune quantité n'est déduite, seul `Vente.commentaire_perte` est renseigné.
 
 ---
 

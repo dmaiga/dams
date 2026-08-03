@@ -177,6 +177,8 @@ def ajax_distributions_par_agent(request):
                 d.distribution.agent_terrain.type_vente_par_defaut()
                 if d.distribution.agent_terrain_id != superviseur.id else None
             ),
+            # Perte déclarable uniquement pour un produit vrac (non conditionné) — cf. PerteDistributionForm.
+            'is_vrac': d.lot.produit.poids_unitaire_kg is None,
         }
         for d in details
         if d.quantite_restante_calculee > 0
