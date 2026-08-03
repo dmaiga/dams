@@ -52,42 +52,29 @@ class CalculatorSalaire:
     # =========================
     @staticmethod
     def calcul_salaire_mamy(agent, date_debut, date_fin):
-    
-        # Salaire de base théorique (ex: 20 000)
-        salaire_base_theorique = CalculatorSalaire.get_salaire_base(agent, "terrain")
-    
+
         # Nombre de jours dans le mois
         total_jours_mois = (date_fin - date_debut).days + 1
-    
+
         # Jours réellement travaillés
         jours_travailles = CalculatorSalaire.get_jours_travailles_mois(
             agent, date_debut, date_fin
         )
-    
-        # 🔹 PRORATISATION SI < 1 MOIS
-        if agent.date_debut_fonction and jours_travailles < total_jours_mois:
-            salaire_base = (
-                salaire_base_theorique
-                * Decimal(jours_travailles)
-                / Decimal(total_jours_mois)
-            ).quantize(Decimal("1"))
-        else:
-            salaire_base = salaire_base_theorique
-    
-        # ===== INCENTIVE (INCHANGÉ) =====
+
+        # ===== VOLUME RÉALISÉ SUR LA PÉRIODE =====
         regle = RegleSalaire.objects.filter(
             type_agent="terrain",
             actif=True
         ).first()
-    
+
         incentive_par_kg = getattr(regle, "incentive_par_kg", Decimal("0.00"))
-    
+
         ventes = Vente.objects.filter(
             agent=agent,
             date_vente__date__range=(date_debut, date_fin),
             est_supprime=False,
         )
-    
+
         kilo_total = ventes.aggregate(
             total=Coalesce(
                 Sum(
@@ -100,9 +87,27 @@ class CalculatorSalaire:
                 Decimal("0.00")
             )
         )["total"]
-    
+
         incentive = kilo_total * incentive_par_kg
-    
+
+        # ===== FIXE VARIABLE SELON LE VOLUME RÉALISÉ =====
+        # >= 750 kg sur la période -> fixe 20 000 ; en dessous -> fixe 10 000.
+        # S'applique à tous les agents terrain (salaire_base_personnel n'est plus lu ici).
+        if kilo_total >= Decimal("750"):
+            salaire_base_theorique = Decimal("20000")
+        else:
+            salaire_base_theorique = Decimal("10000")
+
+        # 🔹 PRORATISATION SI < 1 MOIS
+        if agent.date_debut_fonction and jours_travailles < total_jours_mois:
+            salaire_base = (
+                salaire_base_theorique
+                * Decimal(jours_travailles)
+                / Decimal(total_jours_mois)
+            ).quantize(Decimal("1"))
+        else:
+            salaire_base = salaire_base_theorique
+
         return {
             "salaire_base": salaire_base,
             "salaire_base_theorique": salaire_base_theorique,
