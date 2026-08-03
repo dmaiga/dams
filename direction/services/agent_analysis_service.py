@@ -117,6 +117,11 @@ class AgentAnalysisService:
         }
 
 
+    # DEPRECIE / CODE MORT (2026-08-03) : aucun appelant (seul
+    # DashboardAgentAnalysisService.get_superviseurs_finance est réellement utilisé).
+    # Fait doublon avec finance.services.lister_soldes_superviseurs, désormais source
+    # de vérité. On revient dessus plus tard (suppression ou fusion) — ne pas relier
+    # à un nouveau template en l'état.
     @staticmethod
     def get_superviseurs_finance():
         debut, fin = AgentAnalysisService.get_mois_courant_range()
@@ -157,6 +162,9 @@ class AgentAnalysisService:
 
         return data
 
+    # DEPRECIE / CODE MORT (2026-08-03) : aucun appelant. Duplique le calcul de solde
+    # superviseur/ROT porté par finance.services depuis sprint-03. On revient dessus
+    # plus tard (suppression ou fusion) — ne pas relier à un nouveau template en l'état.
     @staticmethod
     def get_encadrement_financier_mensuel():
         """
@@ -276,6 +284,10 @@ class AgentAnalysisService:
 
 
 
+    # DEPRECIE / CODE MORT (2026-08-03) : aucun appelant. Le flux superviseur (cash_detenu,
+    # remis_rot) qu'il expose fait doublon avec finance.services.solde_superviseur. On
+    # revient dessus plus tard (suppression ou fusion) — ne pas relier à un nouveau
+    # template en l'état.
     @staticmethod
     def get_superviseur_detail(superviseur, debut, fin):
         # ======================

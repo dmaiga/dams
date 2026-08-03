@@ -133,8 +133,9 @@
           <thead>
             <tr>
               <th>Superviseur</th>
-              <th>Ventes</th>
-              <th>Recouvrements</th>
+              <th>Recouvrements agents</th>
+              <th>Dépenses perso</th>
+              <th>Remis au ROT</th>
               <th>Solde</th>
             </tr>
           </thead>
@@ -142,70 +143,23 @@
             {% for sup in data.agents.superviseurs %}
               <tr>
                 <td>{{ sup.superviseur }}</td>
-                <td>{{ sup.ventes_personnelles|fcfa }} F</td>
-                <td>{{ sup.recouvrements_agents|fcfa }} F</td>
+                <td>{{ sup.encaissements|fcfa }} F</td>
+                <td>{{ sup.depenses|fcfa }} F</td>
+                <td>{{ sup.deja_remis|fcfa }} F</td>
                 <td class="font-semibold
-                  {% if sup.solde_mois >= 0 %}
-                    text-success
-                  {% else %}
+                  {% if sup.alerte %}
                     text-error
+                  {% else %}
+                    text-success
                   {% endif %}
                 ">
-                  {{ sup.solde_mois|fcfa }} F
-                </td>
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="4" class="text-center text-gray-400">
-                  Aucun superviseur
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================================================= -->
-  <!-- ROT -->
-  <!-- ================================================= -->
-  <div class="card bg-base-100 shadow">
-    <div class="card-body">
-      <h2 class="card-title">Situation financière – ROT</h2>
-
-      <div class="overflow-x-auto">
-        <table class="table table-bordered">
-          <thead>
-            <tr>
-              <th>ROT</th>
-              <th>Reçu superviseurs</th>
-              <th>Versements banque</th>
-              <th>Dépenses</th>
-              <th>Solde</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in data.agents.rot %}
-              <tr>
-                <td>{{ r.rot }}</td>
-                <td>{{ r.recupere|fcfa }} F</td>
-                <td>{{ r.verse|fcfa }} F</td>
-                <td>{{ r.depenses|fcfa }} F</td>
-                <td class="font-semibold
-                  {% if r.solde_mois >= 0 %}
-                    text-success
-                  {% else %}
-                    text-error
-                  {% endif %}
-                ">
-                  {{ r.solde_mois|fcfa }} F
+                  {{ sup.solde|fcfa }} F
                 </td>
               </tr>
             {% empty %}
               <tr>
                 <td colspan="5" class="text-center text-gray-400">
-                  Aucun ROT
+                  Aucun superviseur
                 </td>
               </tr>
             {% endfor %}

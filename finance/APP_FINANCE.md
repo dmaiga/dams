@@ -6,6 +6,16 @@
 
 Elle devient la **source unique de vérité** du solde superviseur (cash détenu, non encore remis), un calcul qui était jusqu'ici dispersé et incohérent sur au moins quatre endroits (`Agent.solde_*`, `direction/services/cloture_service.py`, `agents/services/rot_dashboard_service.py`). Elle porte aussi le recouvrement de la recette d'un superviseur, l'enregistrement du versement bancaire réel et la saisie des dépenses.
 
+**Alignement 2026-08-03** : trois autres doublons du même calcul, trouvés en creusant le dashboard
+superviseur, ont été migrés pour déléguer à `finance.services` plutôt que recalculer localement :
+`agents/services/superviseur_service.py::get_finances_superviseur` (dashboard superviseur, cash_detenu/
+montant_remis_rot), `direction/services/agent_dashboard_service.py::get_superviseurs_finance` et
+`direction/services/agent_supervisseur_liste_analyse.py::SuperviseurAnalysisService.get_superviseurs_finance`
+(dashboards direction). Les calculs "situation financière ROT" équivalents dans ces deux derniers
+fichiers (`get_rot_finance`/`get_rots_finance`) ont été supprimés (dépréciés, jamais alignés sur
+`finance.services`). `direction/services/agent_analysis_service.py` conserve trois méthodes analogues
+non migrées, marquées code mort en commentaire (aucun appelant) — voir `direction/APP_DIRECTION.MD` § 3.A.
+
 **Contexte métier (modèle à deux niveaux — voir décision n°13, sprint-03) :**
 
 1. Un superviseur récupère l'argent de ses agents (vente comptant → `Recouvrement` automatique, géré par `vente/`). Il détient ce cash **personnellement**, tant qu'il ne l'a pas remis.

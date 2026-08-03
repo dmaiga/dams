@@ -10,6 +10,7 @@ Le module `app_agents` structure l'activité et le cloisonnement des données de
 
 * **Périmètre Restreint** : Limite structurellement l'accès aux seules informations du stock physique attribué à l'entrepôt et aux agents directement rattachés à sa hiérarchie.
 * **Sécurisation** : Si le profil utilisateur ne valide pas les prérequis de supervision, l'accès est révoqué avec redirection vers la page de connexion.
+* **Finances (révisé 2026-08-03)** : `SuperviseurDashboardService.get_finances_superviseur` ne recalcule plus `cash_detenu`/`montant_remis_rot` localement — délègue à `finance.services.solde_superviseur` (app `finance`, source de vérité unique, voir `finance/APP_FINANCE.md`). `montant_a_recouvrer` (argent encore chez les agents, fenêtre mois courant) reste calculé ici, l'app `finance` ne couvrant pas ce concept.
 
 ### B. Le Responsable des Opérations et de la Trésorerie - ROT (`tableau_de_bord_rot`)
 

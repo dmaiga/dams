@@ -6,9 +6,32 @@ Le module `paie` est chargé du calcul, de l'historisation, de l'exportation et 
 
 Le système segmente structurellement les effectifs en trois typologies d'agents possédant leurs propres règles de calcul :
 
-1. **Les Mamies (`mamies` / agents de terrain)** : Rémunérées sur une base de salaire fixe ajustée au prorata des jours travaillés, complétée par un système d'incitation (Incentive) indexé sur les kilogrammes ($Kg$) vendus.
+1. **Les Mamies (`mamies` / agents de terrain)** : Rémunérées sur un **fixe variable indexé sur le volume réalisé** (voir § 1.bis, changement du 2026-08-03), ajusté au prorata des jours travaillés en cas d'entrée en cours de mois, complété par un système d'incitation (Incentive) indexé sur les kilogrammes ($Kg$) vendus.
 2. **Les Agents Gros (`gros`)** : Rémunérés à la performance ou à l'incitation calculée directement sur le volume de cartons vendus.
 3. **Les Superviseurs (`superviseurs`)** : Rémunérés sur une assiette fixe (Salaire de base + Dotations de fonction), à laquelle s'ajoutent des bonus calculés sur le volume total cumulé des kilogrammes vendus par les mamies sous leur responsabilité directe.
+
+---
+
+## 1.bis Fixe variable par palier de kg (Mamies, `calcul_salaire_mamy`) — 2026-08-03
+
+Le fixe mensuel des agents terrain n'est plus une valeur statique (`Agent.salaire_base_personnel` /
+`RegleSalaire`) : il est déterminé par le volume réalisé sur la période de calcul, **pour tous les
+agents `type_agent='terrain'` sans exception individuelle** (les anciens ajustements salariaux
+personnalisés type `salaire_base_personnel` ne sont plus lus par `calcul_salaire_mamy`) :
+
+* **≥ 750 kg réalisés sur la période** → fixe théorique de **20 000 FCFA**.
+* **< 750 kg** → fixe théorique de **10 000 FCFA**.
+
+Le kg réalisé est calculé **avant** la détermination du fixe (même agrégation `Vente`/`quantite_en_kg`
+qu'auparavant pour l'incentive). La proratisation en cas d'entrée en cours de mois (`date_debut_fonction`)
+s'applique ensuite sur ce fixe théorique, inchangée dans son principe. L'incentive par kg et le bonus
+superviseur restent inchangés.
+
+Cette même règle est répliquée côté BI (`dbt_bi/models/marts/fct_salaires.sql`) pour toute ligne de
+salaire dont `date_debut >= 2026-05-01` — les périodes antérieures sont ramenées à 0 dans le BI (jugées
+caduques pour le reporting, cf. `dbt_bi/models/marts/fct_salaires.sql` pour le détail et le
+raisonnement). Le calcul Django (ce module) et le calcul dbt sont deux implémentations séparées de la
+même règle : toute évolution future du seuil/montants doit être répercutée aux deux endroits.
 
 ---
 

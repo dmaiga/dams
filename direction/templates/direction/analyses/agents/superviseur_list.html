@@ -2,7 +2,7 @@
 {% load humanize %}
 {% load format_fcfa %}
 
-{% block title %}Superviseurs & ROT – Situation financière actuelle{% endblock %}
+{% block title %}Superviseurs – Situation financière actuelle{% endblock %}
 
 {% block content %}
 
@@ -11,7 +11,7 @@
     <!-- ================= HEADER ================= -->
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">
-            Superviseurs & ROT – Situation financière actuelle
+            Superviseurs – Situation financière actuelle
         </h1>
 
         <div class="flex space-x-2">
@@ -39,9 +39,8 @@
                     <thead>
                         <tr>
                             <th>Superviseur</th>
-                            <th class="text-right">Ventes perso (post-clôture)</th>
-                            <th class="text-right">Montant recouvré</th>
-                            <th class="text-right">Montant chez agents</th>
+                            <th class="text-right">Recouvrements agents</th>
+                            <th class="text-right">Dépenses perso</th>
                             <th class="text-right">Remis au ROT</th>
                             <th class="text-right">Solde détenu</th>
                             <th></th>
@@ -53,41 +52,22 @@
                     <tr>
                         <td class="font-semibold">
                             {{ s.superviseur.full_name }}
-                            <div class="text-xs text-gray-400">
-                                Période ouverte :
-                                {{ s.periode_debut }} → {{ s.periode_fin }}
-                            </div>
-
-                            {% if s.cloture_reference %}
-                            <div class="text-xs text-gray-500">
-                                Dernière clôture :
-                                {{ s.cloture_reference.date_fin_periode }}
-                            </div>
-                            {% else %}
-                            <div class="text-xs text-warning">
-                                Aucune clôture validée
-                            </div>
-                            {% endif %}
-                        </td>
-
-                        <td class="text-right">
-                            {{ s.ventes_perso|fcfa }}
                         </td>
 
                         <td class="text-right text-success">
-                            {{ s.recouvre_agents|fcfa }}
+                            {{ s.encaissements|fcfa }}
                         </td>
 
-                        <td class="text-right text-warning">
-                            {{ s.montant_chez_agents|fcfa }}
+                        <td class="text-right text-error">
+                            {{ s.depenses|fcfa }}
                         </td>
 
                         <td class="text-right text-info">
-                            {{ s.remis_rot|fcfa }}
+                            {{ s.deja_remis|fcfa }}
                         </td>
 
-                        <td class="text-right font-bold {% if s.solde_superviseur < 0 %}text-error{% endif %}">
-                            {{ s.solde_superviseur|fcfa }}
+                        <td class="text-right font-bold {% if s.alerte %}text-error{% endif %}">
+                            {{ s.solde|fcfa }}
                         </td>
 
                         <td class="text-right">
@@ -99,76 +79,8 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center text-gray-400 py-4">
-                            Aucun superviseur actif
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ================= ROT ================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title mb-4">
-                <i class="fas fa-coins text-warning"></i>
-                ROT – Situation financière actuelle
-            </h2>
-
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>ROT</th>
-                            <th class="text-right">Reçu superviseurs</th>
-                            <th class="text-right">Versé banque</th>
-                            <th class="text-right">Dépenses</th>
-                            <th class="text-right">Re-ajustement</th>
-                            <th class="text-right">Solde ROT</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                    {% for r in rots %}
-                    <tr>
-                        <td class="font-semibold">
-                            {{ r.rot.full_name }}
-                        </td>
-
-                        <td class="text-right text-success">
-                            {{ r.recouvre|fcfa }}
-                        </td>
-
-                        <td class="text-right text-info">
-                            {{ r.verse_banque|fcfa }}
-                        </td>
-
-                        <td class="text-right text-error">
-                            {{ r.depenses|fcfa }}
-                        </td>
-                        <td class="text-right text-error">
-                            {{ r.ajustement|fcfa }}
-                        </td>
-
-                        <td class="text-right font-bold {% if r.solde < 0 %}text-error{% endif %}">
-                            {{ r.solde|fcfa }}
-                        </td>
-
-                        <td class="text-right">
-                            <a href="{% url 'direction_rot_detail' r.rot.id %}"
-                               class="btn btn-xs btn-outline">
-                                Détail
-                            </a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
                         <td colspan="6" class="text-center text-gray-400 py-4">
-                            Aucun ROT actif
+                            Aucun superviseur actif
                         </td>
                     </tr>
                     {% endfor %}

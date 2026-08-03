@@ -145,13 +145,9 @@ class SuperviseurListView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # 📊 Situation financière ACTUELLE (post-clôture)
+        # 📊 Situation financière ACTUELLE (finance.services, source de vérité)
         context["superviseurs"] = (
             SuperviseurAnalysisService.get_superviseurs_finance()
-        )
-
-        context["rots"] = (
-            SuperviseurAnalysisService.get_rots_finance()
         )
 
         return context
@@ -1829,11 +1825,13 @@ def suivi_distributions(request):
         "pagination_query": pagination_params.urlencode(),
 
         "superviseurs": Agent.objects.filter(
-            type_agent='entrepot'
+            type_agent='entrepot',
+            est_actif=True
         ),
 
         "agents": Agent.objects.filter(
-            type_agent__in=['terrain', 'agent_gros','stagiaire','agent_polivalent']
+            type_agent__in=['terrain', 'agent_gros','stagiaire','agent_polivalent'],
+            est_actif=True
         ),
 
         "produits": Produit.objects.all(),

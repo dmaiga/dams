@@ -1,7 +1,7 @@
 #/core/services/
-from core.models import (Agent, Vente, Recouvrement, 
-                         VersementBancaire, Depense, DetailDistribution,
-                         DistributionAgent,RecouvrementSuperviseur,
+from core.models import (Agent, Vente, Recouvrement,
+                         DetailDistribution,
+                         DistributionAgent,
                          AffectationLotSuperviseur )
 
 
@@ -15,6 +15,8 @@ from core.models import Agent, Vente
 from django.db.models.functions import Coalesce
 from django.core.cache import cache
 
+from finance.services import lister_soldes_superviseurs
+
 
 
 
@@ -23,7 +25,7 @@ class DashboardAgentAnalysisService:
 
     @staticmethod
     def get_agents_dashboard_snapshot():
-        cache_key = "agents_dashboard:v2"
+        cache_key = "agents_dashboard:v3"
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -37,15 +39,12 @@ class DashboardAgentAnalysisService:
             # activité terrain récente
             "agents_actifs_48h": DashboardAgentAnalysisService.get_agents_vendu_derniere_48h(),
 
-            # finance superviseurs
+            # finance superviseurs (source de vérité : finance.services, plus de recalcul trimestriel local)
             "superviseurs_finance": DashboardAgentAnalysisService.get_superviseurs_finance(),
-
-            # finance ROT
-            "rots_finance": DashboardAgentAnalysisService.get_rot_finance(),
 
             # stock superviseurs par produit
             "superviseurs_produits": DashboardAgentAnalysisService.get_superviseurs_produits(),
-            
+
             # agents en test
             "agents_en_test": DashboardAgentAnalysisService.get_agents_en_test(),
 
@@ -58,23 +57,6 @@ class DashboardAgentAnalysisService:
     def get_mois_courant_range():
         now = timezone.now()
         debut = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        return debut, now
-
-    @staticmethod
-    def get_trimestre_courant_range():
-        now = timezone.now()
-        trimestre = (now.month - 1) // 3 + 1
-        debut_mois = (trimestre - 1) * 3 + 1
-
-        debut = now.replace(
-            month=debut_mois,
-            day=1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0
-        )
-
         return debut, now
 
     @staticmethod
@@ -274,76 +256,15 @@ class DashboardAgentAnalysisService:
 
     @staticmethod
     def get_superviseurs_finance():
-
-        debut, fin = DashboardAgentAnalysisService.get_trimestre_courant_range()
-
-        superviseurs = (
-            Agent.objects
-            .select_related("user")
-            .filter(type_agent='entrepot', est_actif=True)
-        )
-
-        ventes_map = {
-            x["agent_id"]: x["total"]
-            for x in (
-                Vente.objects
-                .filter(
-                    date_vente__range=(debut, fin),
-                    est_supprime=False
-                )
-                .values("agent_id")
-                .annotate(
-                    total=Coalesce(
-                        Sum(
-                            ExpressionWrapper(
-                                F("quantite") * F("prix_vente_unitaire"),
-                                output_field=DecimalField()
-                            )
-                        ),
-                        Decimal("0.00")
-                    )
-                )
-            )
-        }
-
-        recouvre_map = {
-            x["superviseur_id"]: x["total"]
-            for x in (
-                Recouvrement.objects
-                .filter(date_recouvrement__range=(debut, fin))
-                .values("superviseur_id")
-                .annotate(total=Coalesce(Sum("montant_recouvre"), Decimal("0.00")))
-            )
-        }
-
-        remis_map = {
-            x["superviseur_id"]: x["total"]
-            for x in (
-                RecouvrementSuperviseur.objects
-                .filter(date_recouvrement__range=(debut, fin))
-                .values("superviseur_id")
-                .annotate(total=Coalesce(Sum("montant"), Decimal("0.00")))
-            )
-        }
-
-        data = []
-
-        for sup in superviseurs:
-
-            ventes_perso = ventes_map.get(sup.id, Decimal("0"))
-            recouvre_agents = recouvre_map.get(sup.id, Decimal("0"))
-            remis_rot = remis_map.get(sup.id, Decimal("0"))
-
-            solde = (recouvre_agents + ventes_perso) - remis_rot
-
-            data.append({
-                "superviseur": sup,
-                "ventes_personnelles_trimestre": ventes_perso,
-                "recouvrements_agents_trimestre": recouvre_agents,
-                "solde_trimestre": solde,
-            })
-
-        return data
+        """
+        Situation financière des superviseurs — délègue entièrement à
+        finance.services (source de vérité unique, décisions n°13/14/15,
+        sprint-03). Remplace l'ancien recalcul trimestriel local (2026-08-03) :
+        cash_detenu est un solde courant, pas un flux de fenêtre, une fenêtre
+        trimestrielle donnait un chiffre incohérent avec l'argent réellement
+        détenu par le superviseur.
+        """
+        return lister_soldes_superviseurs()
 
     @staticmethod
     def get_agents_with_stock_cached():
@@ -351,76 +272,9 @@ class DashboardAgentAnalysisService:
         cached = cache.get(key)
         if cached:
             return cached
-    
+
         data = DashboardAgentAnalysisService.get_agents_with_stock()
         cache.set(key, data, 60 * 2)
-        return data
-    
-    @staticmethod
-    def get_rot_finance():
-
-        debut, fin = DashboardAgentAnalysisService.get_trimestre_courant_range()
-
-        rots = Agent.objects.select_related("user").filter(
-            type_agent='rot',
-            est_actif=True
-        )
-
-        recup_map = {
-            x["rot_id"]: x["total"]
-            for x in (
-                RecouvrementSuperviseur.objects
-                .filter(date_recouvrement__range=(debut, fin))
-                .values("rot_id")
-                .annotate(total=Coalesce(Sum("montant"), Decimal("0.00")))
-            )
-        }
-
-        verse_map = {
-            x["effectue_par_id"]: x["total"]
-            for x in (
-                VersementBancaire.objects
-                .filter(date_versement_reelle__range=(debut, fin))
-                .values("effectue_par_id")
-                .annotate(total=Coalesce(Sum("montant_vente"), Decimal("0.00")))
-            )
-        }
-
-        depense_map = {
-            x["effectue_par_id"]: x["total"]
-            for x in (
-                Depense.objects
-                .filter(date_depense__range=(debut, fin))
-                .values("effectue_par_id")
-                .annotate(total=Coalesce(Sum("montant"), Decimal("0.00")))
-            )
-        }
-
-        data = []
-
-        for rot in rots:
-
-            recupere = recup_map.get(rot.id, Decimal("0"))
-            verse = verse_map.get(rot.id, Decimal("0"))
-            depenses = depense_map.get(rot.id, Decimal("0"))
-            ajustement = rot.ajustement_solde or Decimal('0')
-
-            solde_trimestre = (
-                recupere
-                - verse
-                - depenses
-                + ajustement
-            )
-            data.append({
-                "rot": rot,
-                "recupere_trimestre": recupere,
-                "verse_trimestre": verse,
-                "depenses_trimestre": depenses,
-                "solde_trimestre": solde_trimestre,
-                "ajustement": ajustement,
-                
-            })
-
         return data
 
     @staticmethod

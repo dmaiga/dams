@@ -11,8 +11,8 @@ from core.models import (
     DetailDistribution,
     Vente,
     Recouvrement,
-    RecouvrementSuperviseur,
 )
+from finance.services import solde_superviseur
 
 from datetime import timedelta
 from django.utils import timezone
@@ -115,9 +115,10 @@ class SuperviseurDashboardService:
         Dashboard superviseur – MOIS COURANT
 
         Définitions métier :
-        - montant_a_recouvrer : argent encore chez les agents
-        - cash_detenu : argent physiquement détenu par le superviseur
-        (recouvrements + ventes perso – remises ROT)
+        - montant_a_recouvrer : argent encore chez les agents (fenêtre mois courant)
+        - cash_detenu / montant_remis_rot : source de vérité unique = finance.services.
+        solde_superviseur (décisions n°13/14/15, sprint-03) — ne pas recalculer
+        localement, pour éviter la divergence avec le dashboard finance direction.
         """
 
         # 🔹 Références temporelles
@@ -168,39 +169,9 @@ class SuperviseurDashboardService:
         )
 
         # =====================================================
-        # 3️⃣ CASH DÉTENU PAR LE SUPERVISEUR (RÉEL)
+        # 3️⃣ SOLDE RÉEL DU SUPERVISEUR (finance.services, source de vérité)
         # =====================================================
-
-        # a) Recouvrements agents encore en possession du superviseur
-        recouvrements_non_remis = total_recouvre_agents
-
-        # b) Ventes personnelles du superviseur
-        ventes_superviseur = Vente.objects.filter(
-            agent=superviseur,
-            date_vente__gte=date_debut,
-            date_vente__lte=date_fin,
-            est_supprime=False
-        ).aggregate(
-            total=Coalesce(
-                Sum(F("quantite") * F("prix_vente_unitaire")),
-                Decimal("0.00")
-            )
-        )["total"]
-
-        # c) Montant déjà remis au ROT
-        montant_remis_rot = RecouvrementSuperviseur.objects.filter(
-            superviseur=superviseur,
-            date_recouvrement__gte=date_debut,
-            date_recouvrement__lte=date_fin
-        ).aggregate(
-            total=Coalesce(Sum("montant"), Decimal("0.00"))
-        )["total"]
-
-        # d) Cash réellement détenu
-        cash_detenu = max(
-            (recouvrements_non_remis + ventes_superviseur) - montant_remis_rot,
-            Decimal("0.00")
-        )
+        solde = solde_superviseur(superviseur)
 
         # =====================================================
         # 🔚 RÉSULTAT DASHBOARD
@@ -208,8 +179,8 @@ class SuperviseurDashboardService:
         return {
             "nombre_agents": nombre_agents,
             "montant_a_recouvrer": montant_a_recouvrer,
-            "cash_detenu": cash_detenu,
-            "montant_remis_rot": montant_remis_rot,
+            "cash_detenu": solde["solde"],
+            "montant_remis_rot": solde["deja_remis"],
         }
 
     # =====================================================

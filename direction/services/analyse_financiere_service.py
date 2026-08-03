@@ -83,10 +83,10 @@ class AnalyseFinanciereDirectionService:
                 periode["fin"],
             ),
 
-            # 🔹 Agents
+            # 🔹 Agents (superviseurs : finance.services, source de vérité ;
+            # situation financière ROT dépréciée et supprimée le 2026-08-03)
             "agents": {
                 "superviseurs": DashboardAgentAnalysisService.get_superviseurs_finance(),
-                "rot": DashboardAgentAnalysisService.get_rot_finance(),
             },
 
             # 🔹 Fournisseurs

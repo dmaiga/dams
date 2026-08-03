@@ -32,10 +32,26 @@ Formulaire d'interrogation et de simulation des rémunérations sous conditions 
 
 Le pilotage des forces de vente et des gestionnaires physiques est segmenté en sous-services spécialisés, garantissant une séparation claire des responsabilités :
 
-### A. Pilotage de la Chaîne Logistique Amont (`SuperviseurAnalysisService`)
+### A. Pilotage de la Chaîne Logistique Amont (`SuperviseurAnalysisService`) — révisé 2026-08-03
 
-* Fournit une vision instantanée de la **situation financière post-clôture** pour les profils à hautes responsabilités de trésorerie (`entrepot` et `rot`).
-* Isole les capitaux physiques collectés via des méthodes découplées : `get_superviseurs_finance()` et `get_rots_finance()`.
+`get_superviseurs_finance()` ne recalcule plus rien localement : il délègue entièrement à
+`finance.services.lister_soldes_superviseurs()` (app `finance`, source de vérité unique du solde
+superviseur — décisions n°13/14/15, sprint-03). L'ancien calcul "post-clôture" (`ClotureMensuelle`/
+`solde_cloture` comme référence d'ouverture) est abandonné : la référence d'ouverture est désormais
+`finance.services.DATE_DEBUT_FINANCE`, pas une clôture.
+
+`get_rots_finance()` — la "situation financière ROT" — est **supprimée**, dépréciée : elle faisait
+doublon avec `finance.services` sans jamais avoir été alignée dessus. Le même alignement a été
+appliqué aux doublons équivalents ailleurs dans l'app :
+- `direction/services/agent_dashboard_service.py::get_superviseurs_finance` (dashboard `agent_dashboard.html`) — délègue à `finance.services`, `get_rot_finance()` supprimée, la fenêtre "trimestre en cours" disparaît (le solde superviseur est un solde courant, pas un flux de fenêtre).
+- `direction/services/agent_supervisseur_liste_analyse.py::SuperviseurAnalysisService` (template `superviseur_list.html`) — idem.
+- `direction/services/analyse_financiere_service.py::build()` — la clé `agents.rot` est retirée du dict retourné à `analyse_financiere.html`.
+
+`direction/services/agent_analysis_service.py::get_superviseurs_finance` / `get_encadrement_financier_mensuel`
+/ `get_superviseur_detail` restent en place mais sont marquées **code mort / déprécié** en commentaire
+(aucun appelant) — à trancher plus tard (suppression ou fusion), volontairement non touchées.
+
+Cache `agents_dashboard:v3` (bump de version suite au changement de forme des données).
 
 ### B. Audit de Zone de Distribution (`SuperviseurAgentsService`)
 
