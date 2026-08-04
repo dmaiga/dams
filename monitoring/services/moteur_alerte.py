@@ -114,20 +114,29 @@ class AlerteMoteur:
         agents_actifs = []
         for agent_data in StockAgeService.agents_sans_vente_recente():
             agent = agent_data["agent"]
-            if agent.type_agent == "entrepot":
-                # Un superviseur vend occasionnellement, ce n'est pas son activité
-                # principale — cette règle cible les agents dont la vente est le métier.
+            if agent.type_agent != "terrain":
+                # Seuls les agents terrain (mamis) sont concernés par cette règle —
+                # les autres types d'agent (superviseur, gros, stagiaire...) ne vendent
+                # pas au quotidien, ce n'est pas leur activité principale.
                 continue
 
             distribution = DetailDistribution.objects.filter(
                 pk=agent_data["distribution_id"]
             ).first()
             agents_actifs.append({"agent": agent.user})
+            superviseur = agent_data.get("superviseur")
+            if superviseur:
+                message = (
+                    f"Agent {agent} (superviseur : {superviseur.full_name}) "
+                    "sans vente depuis plus de 5 jours."
+                )
+            else:
+                message = f"Agent {agent} sans vente depuis plus de 5 jours."
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
                 type_alerte="activite",
                 defaults={
                     "niveau": "warning",
-                    "message": f"Agent {agent} sans vente depuis plus de 2 jours.",
+                    "message": message,
                     "distribution": distribution,
                 },
                 agent=agent.user,
