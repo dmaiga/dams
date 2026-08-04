@@ -46,7 +46,10 @@ class AlerteDeduplicationService:
         if reenvoi_heures is None:
             return existante, False, False
 
-        delai_ecoule = timezone.now() - existante.date_dernier_envoi >= timedelta(hours=reenvoi_heures)
+        delai_ecoule = (
+            existante.date_dernier_envoi is None
+            or timezone.now() - existante.date_dernier_envoi >= timedelta(hours=reenvoi_heures)
+        )
         if not delai_ecoule:
             return existante, False, False
 
