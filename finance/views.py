@@ -9,14 +9,21 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from core.models import (
-    Agent, Depense, Recouvrement, RecouvrementSuperviseur, RecuVersement, VersementBancaire,
+    Agent, Depense, Recouvrement, RecouvrementSuperviseur, RecuVersement, RemboursementChamp,
+    VersementBancaire,
 )
 
+from analyse_champ.services import DamsAgroAPIError
+
 from finance.forms import (
-    DepenseFinanceForm, RecouvrementSuperviseurForm, RecouvrementVersementFormSet,
-    VersementBancaireForm,
+    DepenseFinanceForm, EngagementChampForm, RecouvrementSuperviseurForm,
+    RecouvrementVersementFormSet, RemboursementChampForm, VersementBancaireForm,
 )
-from finance.services import DATE_DEBUT_FINANCE, lister_soldes_superviseurs, solde_caisse_globale, solde_superviseur
+from finance.services import (
+    DATE_DEBUT_FINANCE, creer_engagement_champ, lister_soldes_superviseurs,
+    rembourser_engagement_champ, solde_caisse_globale, solde_superviseur,
+)
+from django.core.exceptions import ValidationError
 
 
 def _acces_finance(agent):
@@ -25,6 +32,10 @@ def _acces_finance(agent):
 
 def _acces_depense(agent):
     return agent.est_direction or agent.peut_faire_depense
+
+
+def _acces_engagement_champ(agent):
+    return agent.est_superviseur
 
 
 def _get_date_solde(request):
@@ -91,7 +102,11 @@ def detail_solde_superviseur(request, pk):
             )
         ] + [
             {
-                'type': 'depense',
+                # Distingue les engagements champ (avance/dépense pour compte)
+                # des dépenses classiques du superviseur, pour la Direction.
+                'type': 'avance_champ' if d.categorie == 'AVANCE_CHAMP'
+                        else 'depense_champ' if d.categorie == 'DEPENSE_CHAMP'
+                        else 'depense',
                 'date': timezone.make_aware(datetime.combine(d.date_depense, datetime.min.time())),
                 'montant': -d.montant,
                 'objet': d,
@@ -107,6 +122,18 @@ def detail_solde_superviseur(request, pk):
                 superviseur=superviseur,
                 date_recouvrement__date__gte=mvt_debut,
                 date_recouvrement__date__lte=mvt_fin,
+            )
+        ] + [
+            {
+                'type': 'remboursement_champ',
+                'date': timezone.make_aware(datetime.combine(rc.date_remboursement, datetime.min.time())),
+                'montant': rc.montant,
+                'objet': rc,
+            }
+            for rc in RemboursementChamp.objects.filter(
+                depense__effectue_par=superviseur,
+                date_remboursement__gte=mvt_debut,
+                date_remboursement__lte=mvt_fin,
             )
         ],
         key=lambda m: m['date'],
@@ -313,4 +340,77 @@ def historique_depenses(request):
     return render(request, 'finance/historique_depenses.html', {
         'depenses': depenses,
         'page_title': 'Historique des dépenses',
+    })
+
+
+# =========================
+# ENGAGEMENTS SUPERVISEUR ↔ CHAMP (dams_agro)
+# =========================
+
+@login_required
+def creer_engagement_champ_view(request):
+    agent = request.user.agent
+    if not _acces_engagement_champ(agent):
+        return redirect('access_denied')
+
+    if request.method == 'POST':
+        form = EngagementChampForm(request.POST)
+        if form.is_valid():
+            try:
+                creer_engagement_champ(
+                    superviseur=agent,
+                    nature=form.cleaned_data['nature'],
+                    montant=form.cleaned_data['montant'],
+                    commentaire=form.cleaned_data['commentaire'],
+                )
+                messages.success(request, "Engagement enregistré et synchronisé avec dams_agro.")
+                return redirect('tableau_de_bord_superviseur')
+            except DamsAgroAPIError as exc:
+                messages.error(request, f"Échec de synchronisation avec dams_agro : {exc}")
+            except ValidationError as exc:
+                messages.error(request, str(exc))
+    else:
+        form = EngagementChampForm()
+
+    return render(request, 'finance/creer_engagement_champ.html', {
+        'form': form,
+        'page_title': 'Nouvel engagement (champ)',
+    })
+
+
+@login_required
+def rembourser_engagement_champ_view(request, pk):
+    agent = request.user.agent
+    if not _acces_engagement_champ(agent):
+        return redirect('access_denied')
+
+    # Anti-IDOR : un superviseur ne rembourse que ses propres engagements.
+    depense = get_object_or_404(
+        Depense,
+        pk=pk,
+        effectue_par=agent,
+        categorie__in=['AVANCE_CHAMP', 'DEPENSE_CHAMP'],
+    )
+
+    if request.method == 'POST':
+        form = RemboursementChampForm(request.POST)
+        if form.is_valid():
+            try:
+                rembourser_engagement_champ(
+                    depense=depense,
+                    montant=form.cleaned_data['montant'],
+                )
+                messages.success(request, "Remboursement enregistré et synchronisé avec dams_agro.")
+                return redirect('tableau_de_bord_superviseur')
+            except DamsAgroAPIError as exc:
+                messages.error(request, f"Échec de synchronisation avec dams_agro : {exc}")
+            except ValidationError as exc:
+                messages.error(request, str(exc))
+    else:
+        form = RemboursementChampForm()
+
+    return render(request, 'finance/rembourser_engagement_champ.html', {
+        'form': form,
+        'depense': depense,
+        'page_title': 'Rembourser un engagement',
     })

@@ -525,6 +525,11 @@
                             <span>Distribuer (exception)</span>
                         </a>
 
+                        <a class="nav-link {% if request.resolver_match.namespace == 'finance' and request.resolver_match.url_name in 'creer_engagement_champ,rembourser_engagement_champ' %}active{% endif %}"
+                           href="{% url 'finance:creer_engagement_champ' %}">
+                            <i class="fas fa-hand-holding-usd"></i>
+                            <span>Engagements champ</span>
+                        </a>
 
                     </div>
                     {% elif request.user.agent.est_rot %}

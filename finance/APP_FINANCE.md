@@ -52,12 +52,15 @@ Voir `docs/sprints/sprint-03.md` pour le détail des décisions et de la formule
 | `finance:creer_depense` | `/finance/depense/nouvelle/` | direction, ou agent avec `peut_faire_depense` | **Non** — la saisie de dépenses n'est pas suivie pour l'instant |
 | `finance:historique_versements` | `/finance/versements/` | direction | **Non** — plus liée depuis que "Nouveau versement" a été retiré du menu |
 | `finance:historique_depenses` | `/finance/depenses/` | direction | **Non** — idem |
+| `finance:creer_engagement_champ` | `/finance/engagement-champ/nouveau/` | superviseur (`est_superviseur`) | Oui — bouton "Nouvel engagement", dashboard superviseur |
+| `finance:rembourser_engagement_champ` | `/finance/engagement-champ/<pk>/rembourser/` | superviseur, propriétaire uniquement (anti-IDOR) | Oui — bouton "Rembourser" par ligne, dashboard superviseur |
 
 Les vues et templates marqués "Non" restent en place (code, urls.py, templates intacts) — seuls les liens de navigation ont été retirés, sur demande explicite, pour ne pas encombrer l'interface avec des actions redondantes ou non utilisées. Elles restent accessibles par URL directe si besoin d'une correction ponctuelle.
 
 Guards locaux (pattern de permission par capacité, voir `rules/ARCHITECTURE.md`) :
 - `_acces_finance(agent) = agent.est_direction`
 - `_acces_depense(agent) = agent.est_direction or agent.peut_faire_depense`
+- `_acces_engagement_champ(agent) = agent.est_superviseur`
 
 ### Action groupée (`finance:recouvrement_versement_groupe`)
 
@@ -75,6 +78,8 @@ Remplace dans l'usage quotidien les deux actions individuelles `recouvrer_superv
 | `Recouvrement` | Encaissement du superviseur — couvre déjà les ventes des agents **et** les ventes personnelles du superviseur (auto-distribution). Ne jamais additionner `Vente(agent=superviseur)` en plus (source du double comptage dans `cloture_service.py`) |
 | `Depense` | Selon `effectue_par` : si un superviseur (`peut_faire_depense`), réduit **son** solde individuel (dépense faite avant remise) ; si un ROT/direction, réduit la **caisse globale** (dépense faite après mutualisation). Ne jamais compter dans les deux à la fois. |
 | `RecuVersement` | Upload de reçu(s), multiple, attaché au versement |
+| `Depense` (categorie `AVANCE_CHAMP`/`DEPENSE_CHAMP`) | Engagement superviseur ↔ champ — `reference_dams_agro` (id `EngagementFinancier` côté dams_agro) |
+| `RemboursementChamp` (nouveau) | Remboursement d'un engagement champ — `reference_dams_agro` (id `RemboursementEngagement` côté dams_agro) |
 
 Migration `core/migrations/0107_extend_finance_permissions_and_peut_faire_depense.py`.
 
@@ -120,6 +125,85 @@ solde = recouvre(RecouvrementSuperviseur, tous superviseurs) - depenses(Depense,
 ```
 
 Jamais filtré par `superviseur`. Affichée en haut du dashboard, à côté (et non mélangée avec) la liste des soldes individuels. Bornée en bas par `DATE_DEBUT_FINANCE` comme `solde_superviseur`.
+
+---
+
+## Engagements superviseur ↔ champ (dams_agro)
+
+Un superviseur peut désormais avancer du cash au champ (`AVANCE_CHAMP`) ou payer
+directement une dépense pour son compte (`DEPENSE_CHAMP`) — dans les deux cas
+son solde diminue immédiatement, et le champ (dams_agro, repo séparé) lui doit
+cette somme. Quand le champ rembourse, le solde du superviseur augmente
+automatiquement.
+
+**Intégration dans l'existant, pas de système parallèle** :
+- La création est une `Depense` **normale** (`categorie='AVANCE_CHAMP'` ou
+  `'DEPENSE_CHAMP'`) — déjà comptée par `depenses_perso` dans
+  `solde_superviseur()`. **Aucun changement de formule pour la création.**
+- Le remboursement n'a pas d'équivalent parmi les termes existants
+  (`Recouvrement.agent` est un FK obligatoire vers un agent terrain — le
+  rendre nullable pour cet usage aurait risqué une régression sur le calcul
+  de bonus/rapports agents, qui en dépendent). Un nouveau modèle minimal,
+  `RemboursementChamp` (FK `Depense`, `montant`, `date_remboursement`,
+  `reference_dams_agro`), et **un seul nouveau terme** dans la formule :
+  ```
+  solde = encaissements - depenses_perso - deja_remis + ajustement + remboursements_champ
+  ```
+  Effet net sur un engagement en cours : `-montant_initial` (immédiat) `+ remboursé` = `-reste à rembourser`, exactement la règle métier attendue.
+- `solde_caisse_globale()` **exclut** `AVANCE_CHAMP`/`DEPENSE_CHAMP` de son
+  terme `depenses` : ce ne sont pas des dépenses organisationnelles perdues
+  mais des créances destinées à être remboursées ; les compter là surestimerait
+  durablement les dépenses de la caisse globale.
+- `DepenseForm` (core, réutilisé partout ailleurs) **exclut ces deux catégories
+  de son choix `categorie`** (`core/forms.py::DepenseForm.__init__`) : elles ne
+  sont créables que via `finance.services.creer_engagement_champ`, jamais par
+  saisie manuelle libre, pour garantir qu'aucune n'existe sans engagement
+  dams_agro correspondant (`reference_dams_agro`).
+
+**Client dams_agro (`analyse_champ/services.py`)** : `creer_engagement_dams_agro`
+et `rembourser_engagement_dams_agro` (POST authentifié `X-Api-Key`,
+`DAMS_DISTRIBUTION_API_KEY` — même nom de variable que côté dams_agro, secret
+partagé). C'est la **seule exception en écriture** au principe GET-only
+d'`analyse_champ` (voir `analyse_champ/APP_ANALYSE_CHAMP.md`).
+
+**Stratégie "remote-first", sans retry automatique** (aucune infra Celery/
+APScheduler dans ce repo — confirmé) : `finance.services.creer_engagement_champ`
+et `rembourser_engagement_champ` appellent **toujours** dams_agro en premier ;
+la `Depense`/le `RemboursementChamp` local n'est créé qu'en cas de succès. En
+cas d'échec (réseau, timeout, HTTP, refus métier dams_agro), `DamsAgroAPIError`
+est levée, journalisée (`logger.error`), et **rien n'est écrit localement** —
+le superviseur voit un message d'erreur et doit ressaisir manuellement.
+
+**Services** (`finance/services.py`) :
+- `reference_superviseur_dams_agro(superviseur)` → `str(superviseur.pk)`,
+  identifiant stable transmis à dams_agro (champ texte libre côté dams_agro,
+  aucun compte partagé) — ne jamais faire varier cette valeur.
+- `creer_engagement_champ(superviseur, nature, montant, commentaire, date_depense=None)`
+- `rembourser_engagement_champ(depense, montant)` — valide
+  `montant <= depense.reste_a_rembourser_champ` avant l'appel réseau.
+
+**Propriétés calculées sur `Depense`** (`core/models.py`, jamais stockées —
+même logique que `EngagementFinancier` côté dams_agro) : `est_engagement_champ`,
+`montant_rembourse_champ`, `reste_a_rembourser_champ`, `etat_champ`
+(`ouvert`/`partiel`/`solde`).
+
+**Vues/dashboards enrichis, aucun nouvel écran créé** :
+- Dashboard superviseur (`agents/templates/agents/dashboards/superviseur.html` +
+  `SuperviseurDashboardService.get_engagements_champ`) : section "Engagements
+  champ" (liste + bouton "Nouvel engagement" + bouton "Rembourser" par ligne).
+- Dashboard Direction (`finance/dashboard.html`) : colonne "Reste à rembourser
+  (champ)" par superviseur.
+- Détail superviseur (`finance/detail_solde_superviseur.html`) : stats
+  "Engagé/Remboursé/Reste (champ)" + mouvements distingués par badge
+  (`avance_champ`, `depense_champ`, `remboursement_champ`) avec commentaire et
+  reste à rembourser par ligne — c'est ici que la Direction distingue nature/
+  origine/montant initial/déjà remboursé/reste/état, sans nouvel écran.
+
+**Risques connus** : fenêtre résiduelle d'incohérence si l'appel dams_agro
+réussit mais que l'écriture locale échoue juste après (panne DB) — non
+éliminable sans transaction distribuée, mitigée par la journalisation
+systématique. Pas de test automatisé sur ce périmètre (aucun test n'existe
+non plus sur le reste de `finance/services.py`, voir Invariants).
 
 ---
 
@@ -181,6 +265,8 @@ Lien ajouté dans le menu FINANCE de `direction/templates/base_admin.html` ("Sol
 - Aucune clôture : `solde_superviseur`/`solde_caisse_globale` sont calculés depuis `DATE_DEBUT_FINANCE` (`2026-08-01`) jusqu'à `date_fin` — jamais avant cette constante (décision n°14). Toute fenêtre de consultation (mouvements, historiques) doit aussi être bornée par elle. Seul `Agent.ajustement_solde` (décision n°16) introduit un solde d'ouverture, et uniquement de façon manuelle/ponctuelle — jamais recalculé automatiquement.
 - Comparaisons de dates sur des `DateTimeField` timezone-aware toujours faites via `__date__gte`/`__date__lte`/`__date__lte` (ou `.date()` côté Python), jamais directement contre un `date` naïf.
 - Accès à `finance/` refusé à tout agent qui n'est pas `est_direction` (403 via `access_denied`) ; `creer_depense` élargi à `peut_faire_depense`.
+- Engagements champ : `creer_engagement_champ`/`rembourser_engagement_champ` appellent **toujours** dams_agro avant toute écriture locale (`Depense`/`RemboursementChamp`) — jamais l'inverse. Aucun retry automatique (pas de Celery dans ce repo) : un échec doit être ressaisi manuellement.
+- `AVANCE_CHAMP`/`DEPENSE_CHAMP` ne sont jamais sélectionnables dans `DepenseForm` (saisie manuelle) — uniquement créées par `creer_engagement_champ`, pour garantir qu'aucune n'existe sans `reference_dams_agro`.
 
 ---
 

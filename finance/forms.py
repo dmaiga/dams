@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from tinymce.widgets import TinyMCE
 
@@ -6,6 +8,45 @@ from core.models import Agent, RecuVersement, VersementBancaire
 # Réutilisés tels quels — aucune restriction de type_agent au niveau modèle/form :
 from core.forms import DepenseForm  # noqa: F401
 from agents.forms import RecouvrementSuperviseurForm  # noqa: F401
+
+
+class EngagementChampForm(forms.Form):
+    """
+    Création d'une avance de trésorerie ou d'une dépense pour le compte du
+    champ. Formulaire simple (pas un ModelForm) : la création réelle passe
+    par finance.services.creer_engagement_champ, qui synchronise d'abord
+    avec dams_agro avant d'écrire la Depense correspondante.
+    """
+    NATURE_CHOICES = (
+        ('AVANCE_CHAMP', 'Avance de trésorerie — envoyer du cash au champ'),
+        ('DEPENSE_CHAMP', 'Dépense pour le compte du champ — vous payez directement'),
+    )
+
+    nature = forms.ChoiceField(
+        choices=NATURE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        label="Nature de l'engagement",
+    )
+    montant = forms.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal('0.01'),
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        label="Montant",
+    )
+    commentaire = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        label="Commentaire",
+        help_text="Ex : achat pièces détachées, transport, avance carburant...",
+    )
+
+
+class RemboursementChampForm(forms.Form):
+    """Remboursement (partiel ou total) d'une avance/dépense champ."""
+
+    montant = forms.DecimalField(
+        max_digits=12, decimal_places=2, min_value=Decimal('0.01'),
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+        label="Montant remboursé",
+    )
 
 
 class VersementBancaireForm(forms.ModelForm):

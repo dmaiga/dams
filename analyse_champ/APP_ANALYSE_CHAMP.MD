@@ -120,6 +120,28 @@ Visualisation lecture seule des fiches de culture saisies dans dams_agro.
 
 ---
 
+## 7. Exception au principe GET-only : engagements superviseur ↔ champ
+
+Contrairement à tous les modules ci-dessus, `creer_engagement_dams_agro` et
+`rembourser_engagement_dams_agro` font des **POST** vers dams_agro (endpoints
+`/api/engagements/` et `/api/engagements/{id}/remboursements/`, authentifiés
+par header `X-Api-Key` — `DAMS_DISTRIBUTION_API_KEY`, même nom de variable
+d'environnement que côté dams_agro, secret partagé). C'est la **seule**
+mutation déclenchée depuis ce repo vers dams_agro — toujours consommées par
+`finance.services` (jamais appelées directement depuis une vue), qui ne fait
+d'écriture locale (`Depense`/`RemboursementChamp`) qu'après succès confirmé
+(stratégie "remote-first"). Voir `finance/APP_FINANCE.md` § Engagements
+superviseur ↔ champ pour le détail métier.
+
+`_post_json` (équivalent en écriture de `fetch_json`) ne laisse **jamais**
+d'exception `requests` remonter brute : timeout, erreur réseau et erreur HTTP
+sont toutes traduites en `DamsAgroAPIError`, journalisées (`logger.error`),
+pour que l'appelant sache explicitement qu'aucune écriture locale ne doit
+avoir lieu. Pas de retry automatique (aucune infra Celery/APScheduler dans ce
+repo) — un échec doit être ressaisi manuellement par le superviseur.
+
+---
+
 ## 🧪 Points de Vigilance pour le Développement
 
 * **`technicien` est un entier** dans `FicheCultureSerializer` (PK Django, pas un objet imbriqué). Ne pas accéder à `.first_name` ni `.last_name` depuis les templates cultures — afficher directement `{{ fiche.technicien }}`.

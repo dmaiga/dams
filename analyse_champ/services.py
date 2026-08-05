@@ -1,10 +1,30 @@
+import logging
 import os
 
 import requests
 
+logger = logging.getLogger(__name__)
+
 # URL de base pour toutes les requêtes vers l'API Django
 BASE_API = os.getenv('API_URL')
 BASE_URL = f'{BASE_API}/api'
+
+# Clé API dams_agro — uniquement nécessaire pour les endpoints en écriture
+# (/api/engagements/...). Tous les GET de ce fichier restent non authentifiés,
+# cohérent avec le contrat dams_agro (lecture seule ouverte à `dams`). Même
+# nom de variable que côté dams_agro (secret partagé entre les deux repos).
+DAMS_DISTRIBUTION_API_KEY = os.getenv('DAMS_DISTRIBUTION_API_KEY')
+
+
+class DamsAgroAPIError(Exception):
+    """
+    Erreur lors d'un appel à l'API dams_agro : réseau, timeout, HTTP ou
+    métier (validation refusée côté dams_agro). Toujours levée — jamais
+    avalée — car l'appelant (finance.services) ne doit créer aucune écriture
+    locale tant que la synchronisation dams_agro n'est pas confirmée (voir
+    finance/APP_FINANCE.md § Engagements superviseur ↔ champ).
+    """
+
 
 def fetch_json(endpoint, params=None):
     """
@@ -112,3 +132,79 @@ def get_rapports_culture(params=None):
 
 def get_connaissances():
     return fetch_json("cultures/connaissances/")
+
+
+# =========================
+# ENGAGEMENTS SUPERVISEUR ↔ CHAMP (écriture — seule exception au GET-only
+# de ce module, voir analyse_champ/APP_ANALYSE_CHAMP.md)
+# =========================
+
+def _post_json(endpoint, payload):
+    """
+    Équivalent en écriture de fetch_json, avec gestion d'erreurs explicite
+    (réseau, timeout, HTTP) — contrairement à fetch_json, aucune exception
+    n'est laissée remonter brute : tout est traduit en DamsAgroAPIError,
+    avec journalisation, pour que l'appelant sache précisément qu'aucune
+    écriture locale ne doit avoir lieu.
+    """
+    headers = {'X-Api-Key': DAMS_DISTRIBUTION_API_KEY} if DAMS_DISTRIBUTION_API_KEY else {}
+
+    try:
+        response = requests.post(
+            f'{BASE_URL}/{endpoint}',
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+    except requests.exceptions.Timeout as exc:
+        logger.error("Timeout dams_agro sur POST %s (payload=%s)", endpoint, payload)
+        raise DamsAgroAPIError(
+            "dams_agro n'a pas répondu à temps (timeout)."
+        ) from exc
+    except requests.exceptions.ConnectionError as exc:
+        logger.error("Connexion impossible à dams_agro sur POST %s (payload=%s)", endpoint, payload)
+        raise DamsAgroAPIError(
+            "Impossible de joindre dams_agro (problème réseau)."
+        ) from exc
+    except requests.exceptions.RequestException as exc:
+        logger.error("Erreur requête dams_agro sur POST %s : %s", endpoint, exc)
+        raise DamsAgroAPIError(f"Erreur de communication avec dams_agro : {exc}") from exc
+
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except ValueError:
+            detail = response.text[:500]
+        logger.error(
+            "dams_agro a refusé POST %s (code %s) : %s",
+            endpoint, response.status_code, detail
+        )
+        raise DamsAgroAPIError(f"dams_agro a refusé la requête ({response.status_code}) : {detail}")
+
+    return response.json()
+
+
+def creer_engagement_dams_agro(*, nature, montant, commentaire, reference_superviseur):
+    """
+    POST /api/engagements/ — crée l'engagement côté dams_agro (source de
+    vérité pour le champ). `nature` : 'avance_tresorerie' ou 'depense_compte'.
+    Retourne le dict JSON de l'EngagementFinancier créé (dont 'id').
+    """
+    payload = {
+        'nature': nature,
+        'montant_initial': str(montant),
+        'label': (commentaire or nature)[:255],
+        'reference_superviseur': reference_superviseur,
+        'note': commentaire or '',
+    }
+    return _post_json('engagements/', payload)
+
+
+def rembourser_engagement_dams_agro(*, engagement_id, montant):
+    """
+    POST /api/engagements/<engagement_id>/remboursements/ — enregistre le
+    remboursement côté dams_agro. Retourne le dict JSON du
+    RemboursementEngagement créé (dont 'id').
+    """
+    payload = {'montant': str(montant)}
+    return _post_json(f'engagements/{engagement_id}/remboursements/', payload)

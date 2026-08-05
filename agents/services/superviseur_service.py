@@ -9,6 +9,8 @@ from core.models import (
     AffectationLotSuperviseur,
     DistributionAgent,
     DetailDistribution,
+    Depense,
+    Perte,
     Vente,
     Recouvrement,
 )
@@ -71,6 +73,15 @@ class SuperviseurDashboardService:
         la marchandise part désormais directement chez l'agent, ce stock
         ne bouge donc plus). Montre ce qui a été distribué à chaque agent
         et qui n'est pas encore vendu.
+
+        Note perf (constat du 05/08/2026) : ne PAS utiliser
+        `DetailDistribution.quantite_restante_calculee` ici — cette propriété
+        fait 2 requêtes SQL par appel (Sum Vente + Sum Perte), et l'appeler
+        dans une boucle sur tous les DetailDistribution d'un superviseur
+        (potentiellement des milliers) provoque un N+1 massif (observé :
+        ~5000 requêtes sur ce seul dashboard). Les mêmes sommes sont donc
+        recalculées ici en 2 requêtes groupées au total, quel que soit le
+        nombre de lignes.
         """
         details = (
             DetailDistribution.objects
@@ -79,9 +90,29 @@ class SuperviseurDashboardService:
             .order_by('-distribution__date_distribution')
         )
 
+        detail_ids = [d.pk for d in details]
+
+        ventes_par_detail = dict(
+            Vente.objects
+            .filter(detail_distribution_id__in=detail_ids, est_supprime=False)
+            .values('detail_distribution_id')
+            .annotate(total=Sum('quantite'))
+            .values_list('detail_distribution_id', 'total')
+        )
+
+        pertes_par_detail = dict(
+            Perte.objects
+            .filter(detail_distribution_id__in=detail_ids)
+            .values('detail_distribution_id')
+            .annotate(total=Sum('quantite_perdue'))
+            .values_list('detail_distribution_id', 'total')
+        )
+
         circulation = []
         for d in details:
-            restante = d.quantite_restante_calculee
+            vendue = ventes_par_detail.get(d.pk) or 0
+            perdue = pertes_par_detail.get(d.pk) or 0
+            restante = d.quantite - vendue - perdue
             if restante > 0:
                 circulation.append({
                     'agent': d.distribution.agent_terrain,
@@ -181,7 +212,29 @@ class SuperviseurDashboardService:
             "montant_a_recouvrer": montant_a_recouvrer,
             "cash_detenu": solde["solde"],
             "montant_remis_rot": solde["deja_remis"],
+            "remboursements_champ": solde["remboursements_champ"],
         }
+
+    # =====================================================
+    # ENGAGEMENTS CHAMP (avances/dépenses dams_agro) EN COURS
+    # =====================================================
+    @staticmethod
+    def get_engagements_champ(superviseur):
+        """
+        Avances/dépenses champ de CE superviseur, les plus récentes en
+        premier — source de vérité locale (Depense + RemboursementChamp),
+        synchronisée avec dams_agro à la création/au remboursement (voir
+        finance/services.py). Pas d'appel API ici : dashboard consulté
+        fréquemment, ne doit pas dépendre de la disponibilité de dams_agro.
+        """
+        return list(
+            Depense.objects.filter(
+                effectue_par=superviseur,
+                categorie__in=['AVANCE_CHAMP', 'DEPENSE_CHAMP'],
+            )
+            .prefetch_related('remboursements_champ')
+            .order_by('-date_depense')[:20]
+        )
 
     # =====================================================
     # DÉTAIL FINANCIER PAR AGENT (POST-CLÔTURE)
@@ -249,4 +302,7 @@ class SuperviseurDashboardService:
 
             # Détail agents
             'agents_financiers': SuperviseurDashboardService.get_agents_financiers(superviseur),
+
+            # Engagements champ (avances/dépenses dams_agro)
+            'engagements_champ': SuperviseurDashboardService.get_engagements_champ(superviseur),
         }

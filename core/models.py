@@ -2251,9 +2251,24 @@ class Depense(models.Model):
             ('FRAIS_OPERATIONNELS', 'Frais opérationnels'),
             ('TRANSFERT', 'Transfert'),
             ('DIVERS', 'Divers'),
+            # Engagements superviseur ↔ champ (dams_agro), sprint intégration
+            # engagements. Jamais sélectionnables depuis DepenseForm (saisie
+            # manuelle) : créées uniquement par finance.services.creer_engagement_champ,
+            # qui synchronise d'abord avec dams_agro (voir reference_dams_agro).
+            ('AVANCE_CHAMP', 'Avance de trésorerie (champ)'),
+            ('DEPENSE_CHAMP', 'Dépense pour le compte du champ'),
         ],
         default='DIVERS',
         verbose_name="Catégorie"
+    )
+
+    # 🟢 NOUVEAU : lien vers l'EngagementFinancier créé côté dams_agro
+    # (uniquement renseigné pour categorie AVANCE_CHAMP / DEPENSE_CHAMP).
+    reference_dams_agro = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Référence dams_agro",
+        help_text="ID de l'EngagementFinancier créé côté dams_agro via l'API /api/engagements/."
     )
 
     # 🟢 NOUVEAU : note simple (terrain-friendly)
@@ -2297,6 +2312,68 @@ class Depense(models.Model):
         ordering = ['-date_depense']
         verbose_name = "Dépense"
         verbose_name_plural = "Dépenses"
+
+    # ── Engagement superviseur ↔ champ (dams_agro) ──────────────────────
+    # Propriétés calculées, jamais stockées (même logique que
+    # engagements.EngagementFinancier côté dams_agro) : pas de second état
+    # à maintenir en cohérence, source unique = somme des RemboursementChamp.
+    @property
+    def est_engagement_champ(self):
+        return self.categorie in ('AVANCE_CHAMP', 'DEPENSE_CHAMP')
+
+    @property
+    def montant_rembourse_champ(self):
+        return sum(
+            (r.montant for r in self.remboursements_champ.all()),
+            Decimal('0')
+        )
+
+    @property
+    def reste_a_rembourser_champ(self):
+        return self.montant - self.montant_rembourse_champ
+
+    @property
+    def etat_champ(self):
+        if self.montant_rembourse_champ <= 0:
+            return 'ouvert'
+        if self.reste_a_rembourser_champ <= 0:
+            return 'solde'
+        return 'partiel'
+
+
+class RemboursementChamp(models.Model):
+    """
+    Remboursement (partiel ou total), par le champ, d'une Depense de
+    categorie AVANCE_CHAMP/DEPENSE_CHAMP. Chaque remboursement est d'abord
+    synchronisé avec dams_agro (POST /api/engagements/<id>/remboursements/)
+    par finance.services.rembourser_engagement_champ — ce modèle n'est écrit
+    qu'après succès de cet appel, jamais créé directement (voir finance/APP_FINANCE.md).
+    """
+    depense = models.ForeignKey(
+        Depense,
+        on_delete=models.CASCADE,
+        related_name='remboursements_champ'
+    )
+    montant = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))]
+    )
+    date_remboursement = models.DateField(default=timezone.localdate)
+
+    # ID du RemboursementEngagement créé côté dams_agro.
+    reference_dams_agro = models.PositiveIntegerField(null=True, blank=True)
+
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Remboursement champ #{self.id} - {self.montant} FCFA"
+
+    class Meta:
+        ordering = ['-date_remboursement']
+        verbose_name = "Remboursement (champ)"
+        verbose_name_plural = "Remboursements (champ)"
+
 
 class PaiementFournisseur(models.Model):
     """

@@ -1381,6 +1381,13 @@ class DepenseForm(forms.ModelForm):
         if not self.is_bound:
             self.initial['date_depense'] = timezone.now().date()
         self.fields['date_depense'].required = False
+        # AVANCE_CHAMP / DEPENSE_CHAMP ne doivent jamais être saisissables ici :
+        # elles ne sont créées que par finance.services.creer_engagement_champ,
+        # qui synchronise d'abord avec dams_agro (voir core/models.py::Depense).
+        self.fields['categorie'].choices = [
+            choice for choice in self.fields['categorie'].choices
+            if choice[0] not in ('AVANCE_CHAMP', 'DEPENSE_CHAMP')
+        ]
 
     def clean(self):
         cleaned_data = super().clean()

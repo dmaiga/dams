@@ -248,6 +248,39 @@ l'option choisie :
 
 ---
 
+## Chantier 4 — Engagements superviseur ↔ champ (dams_agro) : corrections et arbitrages
+
+**Statut** : 📋 à cadrer — constats de mdmaiga du 05/08/2026, suite à la livraison du même jour (module `finance`/`analyse_champ` consommant l'API figée de dams_agro).
+**Priorité** : 🔴 Urgent (Constat 1 — bug fonctionnel), 🟡 Normal (Constats 2 et 3).
+**Suivi détaillé** : [docs/sprints/sprint-06.md](sprints/sprint-06.md).
+
+### Besoin exprimé (mdmaiga, 05/08/2026, tel quel)
+
+> 1. Après avoir effectué un remboursement côté technicien, le solde du superviseur n'est pas
+> augmenté. À corriger.
+> 2. Dans le dashboard des superviseurs, j'ai remarqué que tu as inscrit un tableau que nous
+> allons soit retirer, soit rendre conditionnel — ce n'est pas pour tous les superviseurs que
+> ceci sera accordé. Il faudrait aussi penser à ajouter un cache, ou même retirer ce calcul que
+> je qualifierais d'inutile : en soi, on ne s'en sert pas dans le dashboard pour savoir combien
+> de produits restent avec un agent, c'est au niveau de la vente que l'on regarde le détail de
+> la distribution.
+> 3. Côté Direction, j'arrive bien à revoir les transactions — mais quand le technicien rembourse
+> le superviseur, le solde du superviseur n'est pas alimenté (même constat que le point 1, vu
+> depuis le dashboard Direction).
+
+### Questions à trancher avant tout code
+
+1. **Synchronisation des remboursements initiés côté dams_agro** : réconciliation périodique
+   (commande planifiée), bouton "Vérifier la synchronisation" à la demande, ou les deux ? Voir
+   options détaillées dans `docs/sprints/sprint-06.md` (Constat 1).
+2. **Tableau "Produits en circulation"** : retiré, rendu conditionnel (selon quel critère ?), ou
+   conservé avec mise en cache ? Voir `docs/sprints/sprint-06.md` (Constat 2).
+3. **Sprint performance dédié** : périmètre à cadrer plus tard (pistes déjà repérées : plusieurs
+   autres appels en boucle à `DetailDistribution.quantite_restante_calculee`, non traités ce
+   jour-là).
+
+---
+
 ## Prochaines étapes
 
 1. ✅ **Trancher Q1, Q2, Q3** avec mdmaiga — voir réponses retenues ci-dessus et `docs/sprints/sprint-05.md`
