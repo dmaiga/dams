@@ -115,6 +115,53 @@ est appelée dans une **boucle** à plusieurs autres endroits, chacun un site N+
 
 ---
 
+## Suggestions complémentaires (Claude, non tranchées) — sujets de discussion
+
+Points remarqués en construisant le module du 05/08/2026, qui n'ont pas été soulevés par mdmaiga
+mais valent la peine d'être posés sur la table. Aucun n'est urgent ni décidé — à garder ou écarter
+librement.
+
+1. **Restriction d'accès à un seul agent nommé, pas à tout `est_superviseur`.**
+   Le brief initial précisait : « un seul agent dams sera habilité pour ces transactions ». Le
+   guard actuel (`_acces_engagement_champ = agent.est_superviseur`) ouvre pourtant la création et
+   le remboursement à **tous** les superviseurs actifs, pas au seul agent désigné. Le repo a déjà
+   un précédent pour ce genre de restriction nominative (`core/templates/base.html` : le lien
+   "Dépenses" n'apparaît que si `request.user.agent.user.username == "abdoulaye.kone"`). À
+   discuter : faut-il un guard équivalent ici, ou l'ouverture à tout superviseur est-elle en fait
+   voulue et le "un seul agent" du brief ne visait que la phase de test ?
+
+2. **Absence de protection contre un double-clic / une double soumission.**
+   Si le superviseur soumet deux fois le formulaire de création (double-clic, ou re-soumission
+   après un timeout où l'appel a en réalité réussi côté dams_agro mais la réponse s'est perdue),
+   rien n'empêche la création de deux engagements identiques. Pas de clé d'idempotence transmise
+   à dams_agro (`reference_externe` existe côté API mais n'est pas exploitée dans ce sens). À
+   discuter : vaut-il le coût d'implémentation vu le volume attendu (un seul agent, faible
+   fréquence) ?
+
+3. **Aucun test automatisé sur ce périmètre.**
+   Cohérent avec l'état du reste de `finance/` (`finance/tests.py` est vide, aucun test n'existe
+   non plus sur `solde_superviseur`/`solde_caisse_globale`) — mais un flux qui déplace de l'argent
+   entre deux systèmes distincts, avec une stratégie remote-first à respecter scrupuleusement, est
+   un candidat naturel pour au moins quelques tests de non-régression (succès, échec réseau →
+   aucune écriture locale, montant excessif refusé). À discuter : à traiter isolément, ou profiter
+   du sprint performance à venir (Constat 3) pour couvrir `finance/` plus largement d'un coup ?
+
+4. **`date_engagement` non exposée côté formulaire dams.**
+   L'API dams_agro accepte une date d'engagement explicite (utile pour antidater une avance déjà
+   remise physiquement avant sa saisie) ; `finance.services.creer_engagement_champ` la supporte
+   déjà en paramètre, mais `EngagementChampForm`/la vue ne l'exposent pas — toujours "aujourd'hui".
+   À discuter : besoin réel de pouvoir antidater, ou pas nécessaire en pratique ?
+
+5. **Pas d'annulation possible d'un engagement créé par erreur.**
+   Ni côté dams, ni côté dams_agro (API figée) il n'existe de suppression/annulation d'un
+   engagement. Une erreur de saisie (mauvais montant, mauvaise nature) ne peut aujourd'hui être
+   corrigée que par un remboursement compensatoire manuel, ce qui laisse une trace peu lisible
+   dans l'historique. À discuter : accepté comme limite du MVP, ou faut-il prévoir un mécanisme de
+   correction (dans le respect de l'invariant "jamais de mutation destructive" déjà en place sur
+   `Operation`/`corrects_operation` côté dams_agro) ?
+
+---
+
 ## Prochaine étape
 
 Trancher les Constats 1 et 2 avec mdmaiga avant d'écrire le moindre code (méthode du projet —
