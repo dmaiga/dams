@@ -35,6 +35,33 @@ même règle : toute évolution future du seuil/montants doit être répercutée
 
 ---
 
+## 1.ter Éligibilité des agents à la paie (`agents_eligibles_periode`) — 05/08/2026
+
+`SalaireGenerationService` et `SalaireListeService` partagent la même fonction
+`paie.services.agent_eligibilite.agents_eligibles_periode(date_debut, date_fin, type_agent_filter="")`
+pour déterminer quels agents (`terrain`, `agent_gros`, `entrepot`) entrent dans le calcul d'une période.
+
+Règle actuelle : un agent est éligible si **`est_actif=True`**, quelles que soient ses dates de
+contrat — `est_actif` est la source de vérité du statut courant. Un agent **désactivé** reste éligible
+en plus pour les périodes passées où sa fenêtre d'emploi connue (`date_debut_fonction` →
+`date_fin_contrat`) chevauche la période demandée (rattrapage historique) ; s'il n'a aucune de ces deux
+dates renseignées, aucun rattrapage n'est possible et il reste exclu une fois désactivé.
+
+Historique de la correction :
+* **23/07/2026** — le filtre reposait uniquement sur `est_actif=True` (statut au moment de l'appel), ce
+  qui excluait à tort un agent désactivé depuis du calcul de ses salaires pour des mois où il était
+  pourtant en poste (rattrapage historique impossible). Premier correctif : bascule sur la fenêtre de
+  dates de contrat, avec repli sur `est_actif` seulement si aucune date n'était renseignée.
+* **05/08/2026** — ce premier correctif s'est révélé plus problématique en pratique : `date_fin_contrat`
+  est renseignée automatiquement à la création (contrat `prestation` → `date_creation` + 1 mois par
+  défaut, cf. `Agent.save()`) mais n'est ensuite quasiment jamais mise à jour dans l'usage réel. Des
+  agents toujours en poste et `est_actif=True` (ex. Safiatou Coulibaly, terrain) se retrouvaient donc
+  exclus de la génération et de l'affichage des salaires dès que cette date figée passait, alors même que
+  rien dans leur statut n'avait changé. Retour à `est_actif=True` comme condition suffisante à elle
+  seule ; les dates de contrat ne servent plus que pour le rattrapage d'un agent désactivé depuis.
+
+---
+
 ## 2. Analyse Analytique & Lecture de la Paie (`SalaireLectureView`)
 
 Cette vue en mode lecture seule (`TemplateView`) centralise la restitution financière mensuelle pour la direction et les gestionnaires RH.

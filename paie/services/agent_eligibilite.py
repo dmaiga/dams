@@ -6,27 +6,26 @@ TYPES_AGENTS_PAIE = ["terrain", "agent_gros", "entrepot"]
 
 
 def agents_eligibles_periode(date_debut, date_fin, type_agent_filter=""):
-    """Agents dont la fenêtre d'emploi (date_debut_fonction -> date_fin_contrat) chevauche
-    [date_debut, date_fin], indépendamment de leur est_actif actuel.
+    """Agents actifs (est_actif=True), plus les agents désactivés dont la fenêtre d'emploi
+    connue (date_debut_fonction -> date_fin_contrat) chevauche [date_debut, date_fin].
 
-    Correction du 23/07/2026 : SalaireGenerationService et SalaireListeService filtraient tous
-    les deux sur est_actif=True (statut au moment de l'appel), ce qui excluait à tort un agent
-    désactivé depuis lors du calcul de ses salaires pour des mois où il était pourtant bien en
-    poste — problème invisible tant que la génération se faisait mois par mois juste après
-    (l'agent était encore actif à ce moment-là), mais faussant tout rattrapage historique.
-
-    Repli sur est_actif=True uniquement quand ni date_debut_fonction ni date_fin_contrat ne sont
-    renseignées : sans ces dates, impossible de déterminer la fenêtre réelle d'emploi, donc on
-    ne peut se fier qu'au statut courant (comportement identique à l'ancien filtre pour ces cas).
+    Correction du 05/08/2026 : date_fin_contrat est renseignée à la création (contrat
+    "prestation" -> +1 mois par défaut, cf. Agent.save()) puis n'est plus jamais mise à jour
+    dans l'usage réel — un agent toujours en poste se retrouvait exclu dès que cette date
+    dépassait, alors que est_actif=True. est_actif est la source de vérité du statut courant ;
+    les dates de contrat ne servent plus qu'au rattrapage d'un agent désactivé depuis, pour les
+    mois où il était encore en poste (cas où ni date n'est renseignée -> pas de rattrapage
+    possible, l'agent désactivé reste exclu).
     """
-    chevauche_periode = (
+    chevauche_periode_connue = (
+        Q(date_debut_fonction__isnull=False) | Q(date_fin_contrat__isnull=False)
+    ) & (
         Q(date_debut_fonction__isnull=True) | Q(date_debut_fonction__lte=date_fin)
     ) & (Q(date_fin_contrat__isnull=True) | Q(date_fin_contrat__gte=date_debut))
-    dates_connues = Q(date_debut_fonction__isnull=False) | Q(date_fin_contrat__isnull=False)
 
     agents = Agent.objects.filter(type_agent__in=TYPES_AGENTS_PAIE).filter(
-        chevauche_periode
-    ).filter(dates_connues | Q(est_actif=True))
+        Q(est_actif=True) | chevauche_periode_connue
+    )
 
     if type_agent_filter:
         agents = agents.filter(type_agent=type_agent_filter)
