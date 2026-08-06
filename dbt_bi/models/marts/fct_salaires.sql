@@ -1,13 +1,20 @@
 -- superviseur_id ici = hiérarchie ACTUELLE (core_agent.superviseur_id), à distinguer du
 -- superviseur_id de fct_ventes qui reflète la hiérarchie au moment de la distribution du lot.
--- Correction (dbt-1, 2026-07-20) : le régime de paie a évolué (prorata au départ, puis
--- fixe+incentive introduits à des mois précis) — un agent entré en mars ne doit générer
--- aucun coût salarial en janvier/février. On exclut donc toute ligne de salaire dont
--- date_debut précède agent.date_debut_fonction (pivot du prorata paie, voir
--- architecte/REFERENCE_TECHNIQUE_BI.md §1.5/§2.10). Si date_debut_fonction est NULL
--- (non renseignée), la ligne est conservée : pas de proratisation possible faute de donnée,
--- cohérent avec le comportement du calculateur de paie actuel. Cascade automatique (ref())
--- dans vw_rentabilite_globale (KPI-005/006/009) et vw_performance_superviseur (KPI-203/204).
+-- Éligibilité (dbt-1, 2026-07-20 ; réalignée 06/08/2026) : la philosophie d'origine (exclure
+-- toute ligne de salaire dont date_debut précède agent.date_debut_fonction, "pivot du prorata
+-- paie") reposait sur l'ancienne règle Django — éligibilité déterminée par la fenêtre de dates
+-- de contrat. Cette règle a été abandonnée côté application (paie/services/agent_eligibilite.py
+-- ::agents_eligibles_periode, correction du 05/08/2026, voir paie/APP_PAIE.md §1.ter) :
+-- date_fin_contrat est renseignée automatiquement à la création (contrat "prestation" -> +1 mois
+-- par défaut) mais quasiment jamais mise à jour dans l'usage réel, ce qui excluait à tort des
+-- agents toujours en poste et est_actif=True. La règle actuelle, reproduite ici à l'identique :
+--   - un agent est_actif=True est TOUJOURS éligible, quelles que soient ses dates de contrat ;
+--   - un agent désactivé (est_actif=False) reste éligible pour les lignes dont la période
+--     [s.date_debut, s.date_fin] chevauche sa fenêtre d'emploi connue (date_debut_fonction ->
+--     date_fin_contrat) — rattrapage historique uniquement ; si aucune des deux dates n'est
+--     renseignée, aucun rattrapage n'est possible et la ligne est exclue.
+-- Cascade automatique (ref()) dans vw_rentabilite_globale (KPI-005/006/009) et
+-- vw_performance_superviseur (KPI-203/204).
 -- Nouveau régime terrain (dbt-7, 2026-08-03) : à partir du 2026-05-01, le fixe agent terrain
 -- n'est plus statique — il dépend du kg réalisé sur la période de la ligne de salaire
 -- (>= 750 kg -> 20000, sinon 10000), cf. paie/services/salaire_calculator.py::calcul_salaire_mamy.
@@ -77,4 +84,9 @@ select
 from salaires s
 left join agents a on s.agent_id = a.agent_id
 left join fixe_recalcule f on f.salaire_id = s.salaire_id
-where a.date_debut_fonction is null or s.date_debut >= a.date_debut_fonction
+where a.est_actif
+   or (
+        (a.date_debut_fonction is not null or a.date_fin_contrat is not null)
+        and (a.date_debut_fonction is null or a.date_debut_fonction <= s.date_fin)
+        and (a.date_fin_contrat is null or a.date_fin_contrat >= s.date_debut)
+   )

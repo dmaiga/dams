@@ -96,12 +96,19 @@
 | **Propriétaire** | Finance |
 | **Source** | `fct_salaires` |
 
-> **Correction (dbt-1, 20/07/2026)** : `fct_salaires` excluait auparavant toute logique de
-> prorata au démarrage — un agent entré en cours de période générait un coût salarial sur
-> des mois antérieurs à son entrée en fonction. Corrigé en filtrant `fct_salaires` sur
-> `date_debut >= agent.date_debut_fonction` (ligne exclue si antérieure). Cascade automatique
-> sur KPI-006, KPI-009 (Dashboard 1) et KPI-203/204 (Dashboard 3, coût équipe et rentabilité
-> superviseur). Test dbt associé : `assert_salaire_apres_date_debut_fonction`.
+> **Correction (dbt-1, 20/07/2026), réalignée le 06/08/2026** : `fct_salaires` filtrait
+> initialement sur `date_debut >= agent.date_debut_fonction` pour éviter qu'un agent entré en
+> cours de période génère un coût salarial sur des mois antérieurs à son entrée en fonction.
+> Cette logique reposait sur l'ancienne philosophie d'éligibilité par dates de contrat,
+> abandonnée côté application le 05/08/2026 (`paie/services/agent_eligibilite.py`
+> `::agents_eligibles_periode`, voir `paie/APP_PAIE.md` §1.ter — `date_fin_contrat` n'étant
+> quasiment jamais mise à jour en usage réel, elle excluait à tort des agents toujours en poste).
+> `fct_salaires` filtre désormais sur la règle actuelle : agent `est_actif=True` toujours retenu,
+> agent désactivé retenu seulement si sa fenêtre d'emploi connue (`date_debut_fonction` →
+> `date_fin_contrat`) chevauche la période de la ligne de salaire (rattrapage historique).
+> Cascade automatique inchangée sur KPI-006, KPI-009 (Dashboard 1) et KPI-203/204 (Dashboard 3,
+> coût équipe et rentabilité superviseur). Test dbt associé : `assert_salaire_agent_eligible`
+> (remplace `assert_salaire_apres_date_debut_fonction`, qui vérifiait l'ancienne règle).
 
 ---
 
