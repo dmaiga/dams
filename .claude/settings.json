@@ -61,7 +61,9 @@
       "Bash(python manage.py reassigner_superviseur --help)",
       "Bash(python manage.py validate_templates)",
       "Bash(python manage.py check --deploy)",
-      "Bash(xargs grep -l \"direction_filters\")"
+      "Bash(xargs grep -l \"direction_filters\")",
+      "Bash(xargs grep -l \"date_debut_fonction\\\\|assert_salaire\")",
+      "Bash(dbt compile *)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"
