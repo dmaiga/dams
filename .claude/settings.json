@@ -60,7 +60,8 @@
       "Bash(grep -v \"^\\\\./\\\\.env$\")",
       "Bash(python manage.py reassigner_superviseur --help)",
       "Bash(python manage.py validate_templates)",
-      "Bash(python manage.py check --deploy)"
+      "Bash(python manage.py check --deploy)",
+      "Bash(xargs grep -l \"direction_filters\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"
