@@ -70,6 +70,29 @@ est possible** (règle actée au sprint précédent).
 **Décision à prendre avec mdmaiga** : option 1, 2, ou 3 — et si retenue, la fréquence de la
 réconciliation périodique.
 
+### Décision finale de mdmaiga (06/08/2026)
+
+> J'irais donc sur le clic, et je le placerais sur le lien dans le gabarit de `core/base.html` —
+> dès qu'il clique sur "Engagements", avant de rendre le template du futur dashboard (celui du
+> Constat 3), on fera la synchronisation à ce moment.
+
+Retenu : **variante de l'option 2** (vérification à la demande), mais sans bouton séparé — le
+déclencheur est la navigation elle-même. Concrètement :
+
+- Le lien "Engagements champ" de `core/templates/base.html:528-532` (actuellement vers
+  `finance:creer_engagement_champ`) pointe désormais vers la nouvelle page dédiée du Constat 3
+  (`finance:mes_engagements_champ`, cf. ci-dessous).
+- Au tout début de la vue `mes_engagements_champ` (avant de construire le contexte et de rendre le
+  template), on appelle la réconciliation — mais **scopée au seul superviseur courant** (pas à
+  tous, contrairement à la commande planifiée de l'option 1 initialement envisagée) : `GET
+  /api/engagements/dashboard/?reference_superviseur=<id>`, comparaison au reste local, création
+  des `RemboursementChamp` manquants avant l'affichage.
+- Aucune modification requise côté dams_agro (contrat figé respecté) — c'est bien `dams` qui
+  interroge, jamais l'inverse.
+
+**Constat 1 entièrement tranché** — prêt à implémenter, en même temps que le Constat 3 (la
+synchronisation vit dans la même vue que la nouvelle page dédiée).
+
 ---
 
 ## Constat 2 (🟡 produit / perf) — Tableau "Produits en circulation" du dashboard superviseur
@@ -101,9 +124,91 @@ l'optimiser davantage.
 3. **Garder, mais mettre en cache** (Django cache framework, TTL à définir) si l'information est
    jugée occasionnellement utile malgré tout.
 
+### Décision finale de mdmaiga (06/08/2026)
+
+Option 3 retenue — **garder + mettre en cache**, TTL **1 heure** (3600s, clé de cache par
+superviseur, ex. `produits_circulation:<superviseur_id>`). Le calcul
+(`SuperviseurDashboardService.get_produits_en_circulation`) reste donc affiché pour tous les
+superviseurs (pas de critère conditionnel à implémenter), simplement recalculé au plus une fois
+par heure et par superviseur au lieu de à chaque chargement du dashboard.
+
+**Constat 2 entièrement tranché** — prêt à implémenter.
+
 ---
 
-## Constat 3 — Amélioration performance, sprint dédié à venir
+## Constat 3 (🟡 produit) — Section "Engagements champ (dams_agro)" du dashboard superviseur
+
+### Remarque de mdmaiga
+
+Même logique que le Constat 2 (à rendre conditionnel, critère à définir, ou à retirer) mais pour
+un autre bloc, oublié dans une première rédaction de ce document : la section « Engagements champ
+(dams_agro) » affichée directement sur le dashboard superviseur (`agents/templates/agents/dashboards/superviseur.html:77-149`)
+— le tableau détaillé des avances/dépenses pour compte, avec bouton "Nouvel engagement" et action
+"Rembourser" par ligne.
+
+**Décision de mdmaiga** : retirer ce bloc du dashboard superviseur — trop dense pour un écran de
+résumé, source de confusion. Mais tout ce qui appartient à ce flux d'engagement doit rester
+accessible : le superviseur (côté `dams`) doit continuer à disposer d'une liste ou d'un
+dashboard dédié pour consulter son statut financier vis-à-vis de dams_agro (engagements en cours,
+montants remboursés, reste à rembourser).
+
+### Constat technique
+
+- La vue Direction `finance:detail_solde_superviseur` (`finance/views.py:83`, réservée au rôle
+  `direction`, `finance/urls.py:8`) affiche déjà un résumé **agrégé** "Engagements champ"
+  (`finance/templates/finance/detail_solde_superviseur.html:58-75` : engagé / remboursé / reste à
+  rembourser, en totaux) — mais pas le détail ligne à ligne, et cette vue n'est pas ouverte au
+  superviseur lui-même.
+- Le seul endroit où le superviseur voit le détail ligne à ligne de ses engagements (nature, date,
+  montant, état, action "Rembourser") est le bloc qu'on retire du dashboard.
+- Retirer le bloc sans rien y substituer ferait perdre au superviseur toute visibilité sur ses
+  engagements en cours (hors le formulaire de création, dont le lien resterait à recaser).
+
+### Options à trancher
+
+1. **Page dédiée superviseur** — nouvelle vue/URL (ex. `finance:mes_engagements_champ`), qui
+   réutilise le même tableau que celui actuellement en ligne dans le dashboard (même contexte,
+   `engagements_champ`), mais sur un écran séparé, accessible via un lien/bouton depuis le
+   dashboard résumé. Conserve la fonctionnalité, retire seulement l'encombrement visuel.
+2. **Ouvrir `finance:detail_solde_superviseur` au superviseur concerné** — ajouter un contrôle
+   d'accès (un superviseur ne peut voir que sa propre fiche, pas celle des autres) et compléter
+   cette vue par le détail ligne à ligne (aujourd'hui elle n'a que les totaux). Évite une nouvelle
+   vue, mais mélange un écran pensé pour la Direction avec un usage superviseur.
+3. **Combiner 1 et 2** — page dédiée superviseur qui reprend la même logique que la vue Direction
+   (totaux + détail), sans toucher à l'accès de `detail_solde_superviseur`.
+
+**Décision à prendre avec mdmaiga** : quelle option, et si retenue l'option 1 ou 3, l'URL/le nom
+de la nouvelle page et son point d'entrée depuis le dashboard.
+
+### Décision finale de mdmaiga (06/08/2026)
+
+> Que ça soit la porte d'entrée du lien vers "Engagement" — qu'il y ait un dashboard, une liste, tu
+> trouves un nom adéquat — qui soit la porte d'entrée : il aura le tableau, et un lien qui le
+> guide vers "Nouvel engagement".
+
+Retenu : **option 1** (page dédiée superviseur), qui devient aussi le point d'entrée unique du
+flux "Engagements champ" (remplace le lien direct vers le formulaire de création dans la nav).
+
+- **Nom retenu** : `finance:mes_engagements_champ`, URL `/finance/mes-engagements-champ/`,
+  template `finance/mes_engagements_champ.html`.
+- Reprend le tableau actuellement en ligne dans `agents/templates/agents/dashboards/superviseur.html:92-149`
+  (même colonnes : nature, date, commentaire, montant initial, remboursé, reste, état, action
+  "Rembourser").
+- Un bouton/lien "Nouvel engagement" en haut de page vers `finance:creer_engagement_champ`
+  (remplace le bouton actuellement dans le header du bloc retiré).
+- `core/templates/base.html:528-532` : le lien "Engagements champ" de la nav pointe désormais vers
+  `finance:mes_engagements_champ` au lieu de `finance:creer_engagement_champ` — c'est ce clic qui
+  déclenche aussi la synchronisation du Constat 1 (même vue, cf. décision finale du Constat 1
+  ci-dessus).
+- Le bloc `agents/templates/agents/dashboards/superviseur.html:77-149` ("Engagements champ") est
+  supprimé du dashboard résumé.
+
+**Constat 3 entièrement tranché** — prêt à implémenter, avec le Constat 1 (synchronisation) dans
+la même vue.
+
+---
+
+## Constat 4 — Amélioration performance, sprint dédié à venir
 
 mdmaiga souhaite consacrer un prochain sprint aux améliorations de performance plus largement,
 au-delà du seul correctif du 05/08/2026. À cadrer précisément le moment venu — piste déjà
@@ -162,8 +267,130 @@ librement.
 
 ---
 
+## Constat 5 (🟢 amélioration) — Date de versement modifiable dans le formulaire groupé, affichée côté Direction
+
+### Demande de mdmaiga (06/08/2026)
+
+Dans `finance/templates/finance/recouvrement_versement_groupe.html`, ajouter pour chaque ligne un
+champ « date de versement » ; que cette date soit la valeur affichée côté Direction sur
+`direction/templates/direction/factures/liste_versements.html`, à la place de la date de création.
+
+### Constat technique
+
+- Le modèle `VersementBancaire` a déjà un champ prévu pour ça : `date_versement_reelle`
+  (`DateTimeField`, `default=timezone.now`) — `core/models.py:2119`.
+- `direction/factures/liste_versements.html:194-195` affiche **déjà** `versement.date_versement_reelle`
+  (pas une date de création) ; le filtre période de la vue (`direction/views.py:809-839`) filtre
+  aussi sur ce champ. Rien à changer côté affichage Direction.
+- Le maillon manquant est en amont : `LigneRecouvrementVersementForm`
+  (`finance/forms.py:140-172`, formset du flux groupé) n'expose pas ce champ, et la vue
+  `recouvrement_versement_groupe` (`finance/views.py:227,239`) écrase systématiquement
+  `date_versement_reelle` avec `timezone.now()` au moment de la création. En pratique, ce champ
+  vaut donc toujours la date de création — jamais une date choisie — ce qui donne l'impression
+  trompeuse que la Direction voit une "date de création" alors qu'elle voit bien
+  `date_versement_reelle`, simplement jamais renseignée autrement.
+- Le pattern existe déjà ailleurs dans le code pour un versement individuel :
+  `VersementBancaireForm` (`finance/forms.py:52-97`) expose `date_versement_reelle` en widget
+  `datetime-local` — à reprendre à l'identique pour le formset groupé.
+
+### Changement proposé
+
+1. Ajouter `date_versement_reelle` à `LigneRecouvrementVersementForm`, même widget
+   `datetime-local` que `VersementBancaireForm`, préaffiché dans
+   `recouvrement_versement_groupe.html`.
+2. Préremplir la valeur initiale à `timezone.now()` (comportement actuel conservé par défaut),
+   mais la rendre modifiable.
+3. Dans `recouvrement_versement_groupe` (`finance/views.py:239`), utiliser
+   `form.cleaned_data['date_versement_reelle']` au lieu de `maintenant` pour
+   `VersementBancaire.objects.create(...)`.
+4. Aucun changement nécessaire côté `liste_versements.html` — il affiche déjà le bon champ, il
+   reflétera automatiquement la date saisie une fois le formulaire corrigé en amont.
+
+### Décision de mdmaiga (06/08/2026) — distinction date système / date business
+
+> Ce sont des recouvrements a posteriori : la date de création est pour le système (logs, audit),
+> la date de versement est la valeur business à voir.
+
+Ça tranche le point resté ouvert sur `RecouvrementSuperviseur.date_recouvrement` : ce modèle a
+déjà exactement cette distinction en place — `date_recouvrement` (`DateTimeField`, éditable,
+c'est la donnée business) **et** `date_creation` (`auto_now_add`, horodatage système immuable) —
+voir `core/models.py:2019-2020`. C'est même déjà exposé ainsi dans
+`RecouvrementSuperviseurForm` (`agents/forms.py:540-549`, label "Date de remise au ROT",
+`datetime-local`) pour le flux de recouvrement individuel — seul le flux groupé
+(`recouvrement_versement_groupe`) ne le reprend pas encore.
+
+**Décision** : dans `recouvrement_versement_groupe` (`finance/views.py:233,239`), le même champ
+« date de versement » saisi par l'utilisateur doit alimenter **à la fois**
+`RecouvrementSuperviseur.date_recouvrement` et `VersementBancaire.date_versement_reelle` (ce sont
+les deux faces business du même événement a posteriori) — `date_creation` de
+`RecouvrementSuperviseur` reste `auto_now_add`, non touché, pour l'audit.
+
+Note en passant : `VersementBancaire` n'a pas d'équivalent de `date_creation` (pas de champ
+`auto_now_add` séparé) — `date_versement_reelle` y joue aujourd'hui les deux rôles. Hors du
+périmètre demandé ici (pas de champ d'audit à ajouter sans demande explicite), mais à garder en
+tête si un futur audit a besoin de distinguer "quand la ligne a été saisie" de "date business" sur
+ce modèle précis.
+
+### Décision de mdmaiga (06/08/2026) — borne de date
+
+> On peut ajouter cette restriction : aujourd'hui ou hier [avant], et empêcher une date future. OK.
+
+**Décision** : la date de versement (et donc `date_recouvrement`/`date_versement_reelle`) ne peut
+pas être postérieure à aujourd'hui — validation côté formulaire (`clean_date_versement_reelle` ou
+équivalent dans `LigneRecouvrementVersementForm`), qui refuse toute date `> timezone.now()`. Pas de
+borne basse (une saisie a posteriori peut remonter arbitrairement dans le passé).
+
+**Constat 5 entièrement tranché** — prêt à implémenter.
+
+---
+
+## Tous les constats sont tranchés — plan d'exécution du sprint
+
+Les 5 constats ont chacun une décision actée par mdmaiga (voir ci-dessus). Découpage en tâches,
+dans l'ordre suggéré (bug d'abord, puis les deux chantiers imbriqués Constat 1 + 3, puis Constat 2
+et 5 indépendants) :
+
+**Tâche A — Constat 1 + Constat 3 (imbriqués : même vue)**
+1. `finance/urls.py` : nouvelle route `mes_engagements_champ`.
+2. `finance/views.py` : nouvelle vue `mes_engagements_champ` — au début, réconciliation scopée au
+   superviseur courant (`GET /api/engagements/dashboard/?reference_superviseur=<id>`, comparaison
+   au reste local, création des `RemboursementChamp` manquants), puis contexte `engagements_champ`
+   identique à celui actuellement construit pour le dashboard superviseur.
+3. `finance/templates/finance/mes_engagements_champ.html` : nouveau template — reprend le tableau
+   de `agents/templates/agents/dashboards/superviseur.html:92-149` + bouton "Nouvel engagement"
+   vers `finance:creer_engagement_champ`.
+4. `agents/templates/agents/dashboards/superviseur.html` : suppression du bloc "Engagements champ"
+   (lignes 77-149).
+5. `core/templates/base.html:528-532` : le lien "Engagements champ" pointe vers
+   `finance:mes_engagements_champ` au lieu de `finance:creer_engagement_champ`.
+6. `finance/APP_FINANCE.md` : documenter la nouvelle vue/URL et le comportement de synchronisation
+   au clic.
+
+**Tâche B — Constat 2**
+1. `agents/services/superviseur_service.py` (`get_produits_en_circulation`) : mise en cache Django
+   (clé `produits_circulation:<superviseur_id>`, TTL 3600s).
+2. Vérifier l'invalidation : identifier les événements qui rendent le cache obsolète (nouvelle
+   distribution, nouvelle vente affectant `quantite_restante_calculee`) — à trancher au moment de
+   coder si une invalidation explicite est nécessaire ou si le TTL d'1h suffit tel quel.
+
+**Tâche C — Constat 5**
+1. `finance/forms.py` (`LigneRecouvrementVersementForm`) : ajouter `date_versement_reelle`
+   (widget `datetime-local`), validation refusant une date future.
+2. `finance/templates/finance/recouvrement_versement_groupe.html` : afficher le nouveau champ par
+   ligne.
+3. `finance/views.py` (`recouvrement_versement_groupe`) : utiliser la date saisie pour
+   `RecouvrementSuperviseur.date_recouvrement` **et** `VersementBancaire.date_versement_reelle`
+   (au lieu de `maintenant` pour les deux) ; `date_creation` reste `auto_now_add`, non touché.
+4. `finance/APP_FINANCE.md` : documenter le nouveau champ et la distinction date système/business.
+
+**Hors périmètre de ce sprint** (sauf demande explicite contraire) : les 5 points de la section
+"Suggestions complémentaires" ci-dessus (restriction d'accès nominative, double-soumission, tests
+automatisés, `date_engagement` non exposée, annulation d'engagement).
+
+---
+
 ## Prochaine étape
 
-Trancher les Constats 1 et 2 avec mdmaiga avant d'écrire le moindre code (méthode du projet —
-voir `CLAUDE.md`/`rules/ARCHITECTURE.md` : ne jamais coder avant d'avoir tranché les questions
-ouvertes).
+Réaliser les tâches A, B, C ci-dessus, puis mettre à jour `finance/APP_FINANCE.md` et
+`agents/APP_AGENTS.md` (ou équivalents) dans la même session, conformément à la règle "Après avoir
+codé" de `CLAUDE.md`.

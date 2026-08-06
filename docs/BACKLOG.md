@@ -251,7 +251,7 @@ l'option choisie :
 ## Chantier 4 — Engagements superviseur ↔ champ (dams_agro) : corrections et arbitrages
 
 **Statut** : 📋 à cadrer — constats de mdmaiga du 05/08/2026, suite à la livraison du même jour (module `finance`/`analyse_champ` consommant l'API figée de dams_agro).
-**Priorité** : 🔴 Urgent (Constat 1 — bug fonctionnel), 🟡 Normal (Constats 2 et 3).
+**Priorité** : 🔴 Urgent (Constat 1 — bug fonctionnel), 🟡 Normal (Constats 2, 3 et 4).
 **Suivi détaillé** : [docs/sprints/sprint-06.md](sprints/sprint-06.md).
 
 ### Besoin exprimé (mdmaiga, 05/08/2026, tel quel)
@@ -267,6 +267,10 @@ l'option choisie :
 > 3. Côté Direction, j'arrive bien à revoir les transactions — mais quand le technicien rembourse
 > le superviseur, le solde du superviseur n'est pas alimenté (même constat que le point 1, vu
 > depuis le dashboard Direction).
+> 4. Toujours sur le dashboard superviseur : la section "Engagements champ (dams_agro)" doit être
+> retirée de ce résumé — trop confuse à cet endroit. Mais tout ce qui appartient à ce flux
+> d'engagement doit rester accessible : le superviseur doit garder une liste ou un dashboard dédié
+> pour son statut financier vis-à-vis de dams_agro.
 
 ### Questions à trancher avant tout code
 
@@ -275,7 +279,11 @@ l'option choisie :
    options détaillées dans `docs/sprints/sprint-06.md` (Constat 1).
 2. **Tableau "Produits en circulation"** : retiré, rendu conditionnel (selon quel critère ?), ou
    conservé avec mise en cache ? Voir `docs/sprints/sprint-06.md` (Constat 2).
-3. **Sprint performance dédié** : périmètre à cadrer plus tard (pistes déjà repérées : plusieurs
+3. **Section "Engagements champ (dams_agro)" du dashboard superviseur** : retirée du résumé
+   (décidé), mais reste à choisir où loger l'accès superviseur à ses propres engagements — page
+   dédiée, ouverture de la vue Direction existante, ou les deux ? Voir
+   `docs/sprints/sprint-06.md` (Constat 3).
+4. **Sprint performance dédié** : périmètre à cadrer plus tard (pistes déjà repérées : plusieurs
    autres appels en boucle à `DetailDistribution.quantite_restante_calculee`, non traités ce
    jour-là).
 

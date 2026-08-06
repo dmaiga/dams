@@ -52,8 +52,9 @@ Voir `docs/sprints/sprint-03.md` pour le détail des décisions et de la formule
 | `finance:creer_depense` | `/finance/depense/nouvelle/` | direction, ou agent avec `peut_faire_depense` | **Non** — la saisie de dépenses n'est pas suivie pour l'instant |
 | `finance:historique_versements` | `/finance/versements/` | direction | **Non** — plus liée depuis que "Nouveau versement" a été retiré du menu |
 | `finance:historique_depenses` | `/finance/depenses/` | direction | **Non** — idem |
-| `finance:creer_engagement_champ` | `/finance/engagement-champ/nouveau/` | superviseur (`est_superviseur`) | Oui — bouton "Nouvel engagement", dashboard superviseur |
-| `finance:rembourser_engagement_champ` | `/finance/engagement-champ/<pk>/rembourser/` | superviseur, propriétaire uniquement (anti-IDOR) | Oui — bouton "Rembourser" par ligne, dashboard superviseur |
+| `finance:mes_engagements_champ` | `/finance/mes-engagements-champ/` | superviseur (`est_superviseur`) | Oui — lien "Engagements champ" de la nav (`core/templates/base.html`), remplace le lien direct vers le formulaire de création |
+| `finance:creer_engagement_champ` | `/finance/engagement-champ/nouveau/` | superviseur (`est_superviseur`) | Oui — bouton "Nouvel engagement" sur `mes_engagements_champ` |
+| `finance:rembourser_engagement_champ` | `/finance/engagement-champ/<pk>/rembourser/` | superviseur, propriétaire uniquement (anti-IDOR) | Oui — bouton "Rembourser" par ligne, sur `mes_engagements_champ` |
 
 Les vues et templates marqués "Non" restent en place (code, urls.py, templates intacts) — seuls les liens de navigation ont été retirés, sur demande explicite, pour ne pas encombrer l'interface avec des actions redondantes ou non utilisées. Elles restent accessibles par URL directe si besoin d'une correction ponctuelle.
 
@@ -181,16 +182,28 @@ le superviseur voit un message d'erreur et doit ressaisir manuellement.
 - `creer_engagement_champ(superviseur, nature, montant, commentaire, date_depense=None)`
 - `rembourser_engagement_champ(depense, montant)` — valide
   `montant <= depense.reste_a_rembourser_champ` avant l'appel réseau.
+- `lister_engagements_champ(superviseur, limite=20)` — **nouveau (sprint-06,
+  Constat 3)** : liste locale (pas d'appel API), utilisée par
+  `finance:mes_engagements_champ`. Reprend la logique qui vivait auparavant
+  dans `SuperviseurDashboardService.get_engagements_champ` (`agents/`,
+  supprimée) — déplacée ici pour que toute la logique métier "engagements
+  champ" reste dans `finance/`, à côté de `creer_engagement_champ`/
+  `rembourser_engagement_champ`.
 
 **Propriétés calculées sur `Depense`** (`core/models.py`, jamais stockées —
 même logique que `EngagementFinancier` côté dams_agro) : `est_engagement_champ`,
 `montant_rembourse_champ`, `reste_a_rembourser_champ`, `etat_champ`
 (`ouvert`/`partiel`/`solde`).
 
-**Vues/dashboards enrichis, aucun nouvel écran créé** :
-- Dashboard superviseur (`agents/templates/agents/dashboards/superviseur.html` +
-  `SuperviseurDashboardService.get_engagements_champ`) : section "Engagements
-  champ" (liste + bouton "Nouvel engagement" + bouton "Rembourser" par ligne).
+**Vues/écrans** :
+- `finance:mes_engagements_champ` (`finance/templates/finance/mes_engagements_champ.html`)
+  — **nouveau (sprint-06, Constat 3)**, porte d'entrée superviseur du flux :
+  liste ses engagements (même tableau qu'auparavant sur le dashboard) + lien
+  "Nouvel engagement". Remplace le bloc "Engagements champ" qui était
+  directement affiché sur le dashboard superviseur — retiré (trop dense pour
+  un écran de résumé, cf. sprint-06). Le lien "Engagements champ" de la nav
+  (`core/templates/base.html`) pointe désormais ici plutôt que vers le
+  formulaire de création.
 - Dashboard Direction (`finance/dashboard.html`) : colonne "Reste à rembourser
   (champ)" par superviseur.
 - Détail superviseur (`finance/detail_solde_superviseur.html`) : stats
@@ -234,6 +247,7 @@ Vues :
 - `recouvrement_versement_groupe` : voir section dédiée ci-dessus — action principale au quotidien.
 - `recouvrer_superviseur` / `creer_versement` / `creer_depense` : conservées, non exposées dans l'UI (voir tableau des URLs).
 - `historique_versements` / `historique_depenses` : listes complètes, non filtrées, triées par date décroissante (colonne "Superviseur" retirée de `historique_versements.html`, ce champ n'ayant plus de sens).
+- `mes_engagements_champ` : porte d'entrée superviseur du flux "Engagements champ" (voir section dédiée ci-dessus).
 
 ---
 

@@ -58,7 +58,9 @@
       "Bash(python manage.py test monitoring -v 1)",
       "Bash(awk '/^class LotEntrepot/,/^class [A-Z]/' core/models.py)",
       "Bash(grep -v \"^\\\\./\\\\.env$\")",
-      "Bash(python manage.py reassigner_superviseur --help)"
+      "Bash(python manage.py reassigner_superviseur --help)",
+      "Bash(python manage.py validate_templates)",
+      "Bash(python manage.py check --deploy)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

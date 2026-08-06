@@ -238,6 +238,24 @@ def creer_engagement_champ(*, superviseur, nature, montant, commentaire, date_de
     )
 
 
+def lister_engagements_champ(superviseur, limite=20):
+    """
+    Avances/dépenses champ de CE superviseur, les plus récentes en premier —
+    source de vérité locale (Depense + RemboursementChamp). Pas d'appel API
+    ici : lecture seule, rapide, indépendante de la disponibilité de
+    dams_agro (voir finance:mes_engagements_champ pour la synchronisation,
+    déclenchée séparément à l'entrée sur cette page).
+    """
+    return list(
+        Depense.objects.filter(
+            effectue_par=superviseur,
+            categorie__in=CATEGORIES_ENGAGEMENT_CHAMP,
+        )
+        .prefetch_related('remboursements_champ')
+        .order_by('-date_depense')[:limite]
+    )
+
+
 def rembourser_engagement_champ(*, depense, montant):
     """
     Enregistre le remboursement (partiel ou total) d'une avance/dépense

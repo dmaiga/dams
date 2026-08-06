@@ -9,7 +9,6 @@ from core.models import (
     AffectationLotSuperviseur,
     DistributionAgent,
     DetailDistribution,
-    Depense,
     Perte,
     Vente,
     Recouvrement,
@@ -216,27 +215,6 @@ class SuperviseurDashboardService:
         }
 
     # =====================================================
-    # ENGAGEMENTS CHAMP (avances/dépenses dams_agro) EN COURS
-    # =====================================================
-    @staticmethod
-    def get_engagements_champ(superviseur):
-        """
-        Avances/dépenses champ de CE superviseur, les plus récentes en
-        premier — source de vérité locale (Depense + RemboursementChamp),
-        synchronisée avec dams_agro à la création/au remboursement (voir
-        finance/services.py). Pas d'appel API ici : dashboard consulté
-        fréquemment, ne doit pas dépendre de la disponibilité de dams_agro.
-        """
-        return list(
-            Depense.objects.filter(
-                effectue_par=superviseur,
-                categorie__in=['AVANCE_CHAMP', 'DEPENSE_CHAMP'],
-            )
-            .prefetch_related('remboursements_champ')
-            .order_by('-date_depense')[:20]
-        )
-
-    # =====================================================
     # DÉTAIL FINANCIER PAR AGENT (POST-CLÔTURE)
     # =====================================================
     @staticmethod
@@ -302,7 +280,4 @@ class SuperviseurDashboardService:
 
             # Détail agents
             'agents_financiers': SuperviseurDashboardService.get_agents_financiers(superviseur),
-
-            # Engagements champ (avances/dépenses dams_agro)
-            'engagements_champ': SuperviseurDashboardService.get_engagements_champ(superviseur),
         }

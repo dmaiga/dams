@@ -12,6 +12,7 @@ urlpatterns = [
     path('depense/nouvelle/', views.creer_depense, name='creer_depense'),
     path('versements/', views.historique_versements, name='historique_versements'),
     path('depenses/', views.historique_depenses, name='historique_depenses'),
+    path('mes-engagements-champ/', views.mes_engagements_champ, name='mes_engagements_champ'),
     path('engagement-champ/nouveau/', views.creer_engagement_champ_view, name='creer_engagement_champ'),
     path('engagement-champ/<int:pk>/rembourser/', views.rembourser_engagement_champ_view, name='rembourser_engagement_champ'),
 ]

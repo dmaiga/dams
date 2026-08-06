@@ -20,8 +20,9 @@ from finance.forms import (
     RecouvrementVersementFormSet, RemboursementChampForm, VersementBancaireForm,
 )
 from finance.services import (
-    DATE_DEBUT_FINANCE, creer_engagement_champ, lister_soldes_superviseurs,
-    rembourser_engagement_champ, solde_caisse_globale, solde_superviseur,
+    DATE_DEBUT_FINANCE, creer_engagement_champ, lister_engagements_champ,
+    lister_soldes_superviseurs, rembourser_engagement_champ, solde_caisse_globale,
+    solde_superviseur,
 )
 from django.core.exceptions import ValidationError
 
@@ -348,6 +349,26 @@ def historique_depenses(request):
 # =========================
 
 @login_required
+def mes_engagements_champ(request):
+    """
+    Porte d'entrée superviseur du flux "Engagements champ" (Constat 3,
+    sprint-06) : liste ses avances/dépenses en cours + lien vers "Nouvel
+    engagement". Remplace le bloc autrefois affiché sur le dashboard
+    superviseur (retiré, trop dense pour un écran de résumé).
+    """
+    agent = request.user.agent
+    if not _acces_engagement_champ(agent):
+        return redirect('access_denied')
+
+    engagements_champ = lister_engagements_champ(agent)
+
+    return render(request, 'finance/mes_engagements_champ.html', {
+        'engagements_champ': engagements_champ,
+        'page_title': 'Mes engagements champ',
+    })
+
+
+@login_required
 def creer_engagement_champ_view(request):
     agent = request.user.agent
     if not _acces_engagement_champ(agent):
@@ -364,7 +385,7 @@ def creer_engagement_champ_view(request):
                     commentaire=form.cleaned_data['commentaire'],
                 )
                 messages.success(request, "Engagement enregistré et synchronisé avec dams_agro.")
-                return redirect('tableau_de_bord_superviseur')
+                return redirect('finance:mes_engagements_champ')
             except DamsAgroAPIError as exc:
                 messages.error(request, f"Échec de synchronisation avec dams_agro : {exc}")
             except ValidationError as exc:
@@ -401,7 +422,7 @@ def rembourser_engagement_champ_view(request, pk):
                     montant=form.cleaned_data['montant'],
                 )
                 messages.success(request, "Remboursement enregistré et synchronisé avec dams_agro.")
-                return redirect('tableau_de_bord_superviseur')
+                return redirect('finance:mes_engagements_champ')
             except DamsAgroAPIError as exc:
                 messages.error(request, f"Échec de synchronisation avec dams_agro : {exc}")
             except ValidationError as exc:
