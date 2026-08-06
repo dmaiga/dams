@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.utils import timezone
 from tinymce.widgets import TinyMCE
 
 from core.models import Agent, RecuVersement, VersementBancaire
@@ -36,16 +37,6 @@ class EngagementChampForm(forms.Form):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         label="Commentaire",
         help_text="Ex : achat pièces détachées, transport, avance carburant...",
-    )
-
-
-class RemboursementChampForm(forms.Form):
-    """Remboursement (partiel ou total) d'une avance/dépense champ."""
-
-    montant = forms.DecimalField(
-        max_digits=12, decimal_places=2, min_value=Decimal('0.01'),
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-        label="Montant remboursé",
     )
 
 
@@ -170,6 +161,22 @@ class LigneRecouvrementVersementForm(forms.Form):
             'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx',
         })
     )
+    date_versement = forms.DateTimeField(
+        required=False,
+        label="Date de versement",
+        initial=timezone.now,
+        widget=forms.DateTimeInput(attrs={
+            'class': 'input input-bordered input-sm',
+            'type': 'datetime-local',
+        }),
+        help_text="Recouvrement a posteriori : ne peut pas être postérieure à aujourd'hui.",
+    )
+
+    def clean_date_versement(self):
+        date_versement = self.cleaned_data.get('date_versement')
+        if date_versement and date_versement > timezone.now():
+            raise forms.ValidationError("La date de versement ne peut pas être dans le futur.")
+        return date_versement
 
 
 RecouvrementVersementFormSet = forms.formset_factory(LigneRecouvrementVersementForm, extra=0)

@@ -36,6 +36,7 @@
                             <th class="text-right">Solde actuel</th>
                             <th>Montant recouvré / versé</th>
                             <th>Apport hors vente</th>
+                            <th>Date de versement</th>
                             <th>Reçu</th>
                         </tr>
                     </thead>
@@ -63,6 +64,12 @@
                                 {% endif %}
                             </td>
                             <td>
+                                {{ form.date_versement }}
+                                {% if form.date_versement.errors %}
+                                    <div class="text-error text-xs">{{ form.date_versement.errors|striptags }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
                                 {{ form.recu }}
                                 {% if form.recu.errors %}
                                     <div class="text-error text-xs">{{ form.recu.errors|striptags }}</div>
@@ -71,7 +78,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center py-6 text-gray-400">Aucun superviseur actif</td>
+                            <td colspan="6" class="text-center py-6 text-gray-400">Aucun superviseur actif</td>
                         </tr>
                         {% endfor %}
                     </tbody>

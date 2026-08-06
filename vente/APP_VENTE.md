@@ -118,9 +118,7 @@ Mobile-first, cohérent avec les conventions posées dans `marchandise/APP_MARCH
 
 ## Tableau de bord superviseur (`agents/`)
 
-`agents/services/superviseur_service.py` — `get_stock_superviseur` et `get_distributions_recentes` ont été remplacés par `get_produits_en_circulation(superviseur)` : regroupe les `DetailDistribution` actives par agent/produit avec la quantité restant à vendre. Reflète l'activité réelle depuis que la marchandise ne transite plus systématiquement par le stock du superviseur.
-
-`agents/templates/agents/dashboards/superviseur.html` — les blocs "Stock sous votre responsabilité" et "Activité récente" sont remplacés par un bloc unique "Produits en circulation". Les 4 KPI financiers du haut de page (`finances_superviseur`) et la section agents (`agents_terrain`/`agents_financiers`) sont **inchangés**.
+`agents/services/superviseur_service.py` — `get_stock_superviseur` et `get_distributions_recentes` avaient été remplacés par `get_produits_en_circulation(superviseur)` (regroupait les `DetailDistribution` actives par agent/produit avec la quantité restant à vendre). **Ce bloc et son calcul sont supprimés depuis le 06/08/2026** — remplacés par un bloc "Accès rapide" (boutons vers `vente:enregistrer_vente`, `vente:historique_ventes`, `liste_agents_sup`), voir `agents/APP_AGENT.md`. Les 4 KPI financiers du haut de page (`finances_superviseur`) et la section agents (`agents_terrain`/`agents_financiers`) sont inchangés.
 
 ---
 

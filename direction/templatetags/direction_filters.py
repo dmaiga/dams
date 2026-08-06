@@ -1,4 +1,5 @@
 # direction/templatetags/custom_filters.py
+import re
 from django import template
 from django.utils.formats import number_format
 from decimal import Decimal, ROUND_HALF_UP
@@ -142,6 +143,23 @@ def format_number(value):
 
     except Exception:
         return value
+
+
+@register.filter
+def clean_engagement_label(value):
+    """
+    Retire l'identifiant technique parfois accolé en fin de libellé d'une
+    Operation générée automatiquement côté dams_agro pour un engagement
+    superviseur ↔ champ — ex. "Avance de trésorerie — 2" (2 = référence
+    superviseur, un pk sans valeur métier pour la Direction) ou
+    "Remboursement — Avance de trésorerie #17" (17 = pk technique de
+    l'EngagementFinancier). Ni l'un ni l'autre n'est un besoin business —
+    voir analyse_champ/views.py::operation_detail_view pour le commentaire
+    réel de l'engagement, affiché séparément.
+    """
+    if not value:
+        return value
+    return re.sub(r'\s*(—\s*\d+|#\s*\d+)\s*$', '', str(value)).strip()
 
 
 @register.filter

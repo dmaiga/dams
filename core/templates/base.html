@@ -503,19 +503,19 @@
                             <i class="fas fa-list"></i>
                             <span>Historique ventes</span>
                         </a>
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}" 
+                    {%if request.user.agent.user.username == "abdoulaye.kone"%}
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_lots,ajouter_lot,modifier_lot' %}active{% endif %}"
                            href="{% url 'liste_lots' %}">
                             <i class="fas fa-pallet"></i>
                             <span>Stock Entrepôt</span>
                         </a>
-                   
-                    {%if request.user.agent.user.username == "abdoulaye.kone"%}  
-                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_depenses' %}active{% endif %}" 
+
+                        <a class="nav-link {% if request.resolver_match.url_name in 'liste_depenses' %}active{% endif %}"
                             href="{% url 'liste_depenses' %}">
                              <i class="fas fa-file-invoice"></i>
                                 <span>Dépenses</span>
                         </a>
-                    
+
                     {% endif %}
 
                         
@@ -525,11 +525,13 @@
                             <span>Distribuer (exception)</span>
                         </a>
 
-                        <a class="nav-link {% if request.resolver_match.namespace == 'finance' and request.resolver_match.url_name in 'mes_engagements_champ,creer_engagement_champ,rembourser_engagement_champ' %}active{% endif %}"
+                    {% if request.user.agent.user.username == "abdoulaye.kone" %}
+                        <a class="nav-link {% if request.resolver_match.namespace == 'finance' and request.resolver_match.url_name in 'mes_engagements_champ,creer_engagement_champ' %}active{% endif %}"
                            href="{% url 'finance:mes_engagements_champ' %}">
                             <i class="fas fa-hand-holding-usd"></i>
                             <span>Engagements champ</span>
                         </a>
+                    {% endif %}
 
                     </div>
                     {% elif request.user.agent.est_rot %}

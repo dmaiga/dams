@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from decimal import Decimal
 
@@ -11,8 +12,10 @@ from core.models import Agent, Depense, Recouvrement, RecouvrementSuperviseur, R
 from analyse_champ.services import (
     DamsAgroAPIError,
     creer_engagement_dams_agro,
-    rembourser_engagement_dams_agro,
+    get_engagements_champ_superviseur,
 )
+
+logger = logging.getLogger(__name__)
 
 SEUIL_ALERTE_SOLDE = Decimal("30000")
 
@@ -238,6 +241,61 @@ def creer_engagement_champ(*, superviseur, nature, montant, commentaire, date_de
     )
 
 
+def synchroniser_engagements_champ(superviseur):
+    """
+    Réconciliation Constat 1 (sprint-06) : rattrape un remboursement
+    d'engagement champ enregistré directement côté dams_agro (rôle `finance`
+    de ce repo séparé, page propre à dams_agro) — que `dams` n'apprend
+    autrement jamais, faute de webhook (dams_agro est un contrat figé,
+    aucune modification n'y est possible, décision actée au sprint
+    précédent). Déclenchée à l'entrée sur finance:mes_engagements_champ
+    (décision de mdmaiga, 06/08/2026 : un clic suffit, pas de tâche planifiée
+    ni de bouton séparé — le volume attendu est faible, un seul agent
+    habilité).
+
+    Ne compare que les engagements encore ouverts localement
+    (`reste_a_rembourser_champ > 0`) : un engagement déjà soldé ici ne peut
+    plus diverger. Pour chaque écart constaté (dams_agro montre moins de
+    reste que `dams`), crée le `RemboursementChamp` manquant, sans référence
+    dams_agro individuelle (on ne connaît que l'écart agrégé, pas le détail
+    des remboursements distants qui l'ont produit).
+
+    Best-effort : dams_agro injoignable ou en erreur ne doit jamais empêcher
+    l'affichage de la page — l'échec est journalisé et avalé (même principe
+    que lister_engagements_champ, qui elle ne fait aucun appel réseau).
+    """
+    a_verifier = [
+        d for d in Depense.objects.filter(
+            effectue_par=superviseur,
+            categorie__in=CATEGORIES_ENGAGEMENT_CHAMP,
+            reference_dams_agro__isnull=False,
+        ).prefetch_related('remboursements_champ')
+        if d.reste_a_rembourser_champ > 0
+    ]
+    if not a_verifier:
+        return
+
+    try:
+        distants = get_engagements_champ_superviseur(reference_superviseur_dams_agro(superviseur))
+    except DamsAgroAPIError as exc:
+        logger.warning(
+            "Synchronisation engagements champ impossible pour superviseur %s : %s",
+            superviseur.pk, exc,
+        )
+        return
+
+    reste_distant_par_id = {e['id']: Decimal(e['reste_a_rembourser']) for e in distants}
+
+    for depense in a_verifier:
+        reste_distant = reste_distant_par_id.get(depense.reference_dams_agro)
+        if reste_distant is None:
+            continue
+
+        ecart = depense.reste_a_rembourser_champ - reste_distant
+        if ecart > 0:
+            RemboursementChamp.objects.create(depense=depense, montant=ecart)
+
+
 def lister_engagements_champ(superviseur, limite=20):
     """
     Avances/dépenses champ de CE superviseur, les plus récentes en premier —
@@ -253,34 +311,4 @@ def lister_engagements_champ(superviseur, limite=20):
         )
         .prefetch_related('remboursements_champ')
         .order_by('-date_depense')[:limite]
-    )
-
-
-def rembourser_engagement_champ(*, depense, montant):
-    """
-    Enregistre le remboursement (partiel ou total) d'une avance/dépense
-    champ. Lève ValidationError (dépense invalide, montant hors bornes) ou
-    DamsAgroAPIError (échec de synchronisation) — dans les deux cas, aucun
-    RemboursementChamp n'est créé.
-    """
-    if not depense.est_engagement_champ:
-        raise ValidationError("Cette dépense n'est pas un engagement superviseur ↔ champ.")
-    if not depense.reference_dams_agro:
-        raise ValidationError("Cet engagement n'a pas de référence dams_agro — synchronisation impossible.")
-    if montant is None or montant <= 0:
-        raise ValidationError("Le montant doit être supérieur à zéro.")
-    if montant > depense.reste_a_rembourser_champ:
-        raise ValidationError(
-            f"Le montant dépasse le reste à rembourser ({depense.reste_a_rembourser_champ})."
-        )
-
-    resultat = rembourser_engagement_dams_agro(
-        engagement_id=depense.reference_dams_agro,
-        montant=montant,
-    )
-
-    return RemboursementChamp.objects.create(
-        depense=depense,
-        montant=montant,
-        reference_dams_agro=resultat['id'],
     )

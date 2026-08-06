@@ -25,8 +25,16 @@ l'API dams_agro consommée par `dams` (`/api/dashboard/`, `/api/operations/`, `/
 reste strictement GET, sans authentification. Ne pas réutiliser ce header ailleurs.
 
 Client HTTP côté `dams` : `analyse_champ/services.py` (`_post_json`, `creer_engagement_dams_agro`,
-`rembourser_engagement_dams_agro`) — timeout 10s, toute erreur (réseau/timeout/HTTP) levée comme
-`DamsAgroAPIError`, jamais silencieuse.
+`_request_engagements`, `get_engagements_champ_superviseur`) — timeout 10s, toute erreur
+(réseau/timeout/HTTP) levée comme `DamsAgroAPIError`, jamais silencieuse.
+
+> ⚠️ **`POST /api/engagements/<id>/remboursements/` n'est plus appelé par `dams`
+> depuis le 06/08/2026** (décision mdmaiga : le remboursement ne doit jamais être
+> initié depuis `dams`, ça disperserait la responsabilité — c'est à dams_agro de
+> l'indiquer). L'endpoint reste documenté ci-dessous pour référence (contrat
+> dams_agro inchangé, potentiellement rappelable plus tard), mais `dams` ne fait
+> plus que le **lire** via `GET /api/engagements/` (réconciliation, voir § Usage
+> prévu plus bas) — jamais l'appeler en écriture.
 
 ---
 
@@ -145,10 +153,13 @@ Mêmes query params que la liste (`reference_superviseur`, `period`, `date_from`
 dams_agro (`/api/dashboard/`), mais **incohérent avec `/api/engagements/`** (string). Ne pas
 supposer un type unique pour tous les montants de cette API : vérifier au cas par cas.
 
-**Usage prévu côté `dams`** (réconciliation, cf. `docs/sprints/sprint-06.md` Constat 1) :
-appeler avec `?reference_superviseur=<id_agent>`, comparer `reste_a_rembourser` (float) à la
-somme locale (`Depense.reste_a_rembourser_champ` de ce superviseur), créer les
-`RemboursementChamp` manquants pour combler l'écart.
+**Non utilisé côté `dams`** pour la réconciliation — ce endpoint ne donne qu'un total
+agrégé (`reste_a_rembourser` pour l'ensemble des engagements du superviseur), pas de
+détail par engagement, donc pas assez précis pour savoir **quelle** `Depense` locale
+mettre à jour. La réconciliation réelle (`finance.services.synchroniser_engagements_champ`,
+implémentée le 06/08/2026) utilise plutôt `GET /api/engagements/?reference_superviseur=...`
+ci-dessus (liste, `reste_a_rembourser` par engagement, matché par `id` ==
+`Depense.reference_dams_agro`).
 
 ---
 
@@ -158,6 +169,13 @@ somme locale (`Depense.reste_a_rembourser_champ` de ce superviseur), créer les
 d'objets `RemboursementEngagement` imbriqués, triés par date décroissante).
 
 **Erreurs** : `404` si l'id n'existe pas.
+
+**Deuxième usage côté `dams` (06/08/2026)** : `analyse_champ.services.get_engagement_detail`,
+consommé par `operation_detail_view` (page Direction `finance_champs/operations/<pk>/`) pour
+retrouver le commentaire réel (`note`/`label`) d'un engagement à partir de l'`Operation` générée
+automatiquement côté dams_agro — celle-ci n'a qu'un `note` générique pour une avance ("Généré
+automatiquement depuis l'engagement #N"), jamais le commentaire métier. L'id est extrait par regex
+depuis `note`/`label` de l'Operation (`#(\d+)`), pas de champ dédié exposé côté API pour ce lien.
 
 ---
 

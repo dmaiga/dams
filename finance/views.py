@@ -17,12 +17,12 @@ from analyse_champ.services import DamsAgroAPIError
 
 from finance.forms import (
     DepenseFinanceForm, EngagementChampForm, RecouvrementSuperviseurForm,
-    RecouvrementVersementFormSet, RemboursementChampForm, VersementBancaireForm,
+    RecouvrementVersementFormSet, VersementBancaireForm,
 )
 from finance.services import (
     DATE_DEBUT_FINANCE, creer_engagement_champ, lister_engagements_champ,
-    lister_soldes_superviseurs, rembourser_engagement_champ, solde_caisse_globale,
-    solde_superviseur,
+    lister_soldes_superviseurs, solde_caisse_globale,
+    solde_superviseur, synchroniser_engagements_champ,
 )
 from django.core.exceptions import ValidationError
 
@@ -225,19 +225,23 @@ def recouvrement_versement_groupe(request):
                     superviseur = form.cleaned_data['superviseur']
                     montant_hors_vente = form.cleaned_data.get('montant_hors_vente') or Decimal('0.00')
                     recu = form.cleaned_data.get('recu')
-                    maintenant = timezone.now()
+                    # Recouvrement a posteriori (sprint-06, Constat 5) : la date saisie est la
+                    # valeur business (RecouvrementSuperviseur.date_recouvrement et
+                    # VersementBancaire.date_versement_reelle) — date_creation (auto_now_add)
+                    # reste l'horodatage système, non touché.
+                    date_versement = form.cleaned_data.get('date_versement') or timezone.now()
 
                     RecouvrementSuperviseur.objects.create(
                         superviseur=superviseur,
                         rot=agent,
                         montant=montant,
-                        date_recouvrement=maintenant,
+                        date_recouvrement=date_versement,
                     )
                     versement = VersementBancaire.objects.create(
                         effectue_par=agent,
                         montant_vente=montant,
                         montant_hors_vente=montant_hors_vente,
-                        date_versement_reelle=maintenant,
+                        date_versement_reelle=date_versement,
                     )
                     if recu:
                         RecuVersement.objects.create(
@@ -360,6 +364,7 @@ def mes_engagements_champ(request):
     if not _acces_engagement_champ(agent):
         return redirect('access_denied')
 
+    synchroniser_engagements_champ(agent)
     engagements_champ = lister_engagements_champ(agent)
 
     return render(request, 'finance/mes_engagements_champ.html', {
@@ -396,42 +401,4 @@ def creer_engagement_champ_view(request):
     return render(request, 'finance/creer_engagement_champ.html', {
         'form': form,
         'page_title': 'Nouvel engagement (champ)',
-    })
-
-
-@login_required
-def rembourser_engagement_champ_view(request, pk):
-    agent = request.user.agent
-    if not _acces_engagement_champ(agent):
-        return redirect('access_denied')
-
-    # Anti-IDOR : un superviseur ne rembourse que ses propres engagements.
-    depense = get_object_or_404(
-        Depense,
-        pk=pk,
-        effectue_par=agent,
-        categorie__in=['AVANCE_CHAMP', 'DEPENSE_CHAMP'],
-    )
-
-    if request.method == 'POST':
-        form = RemboursementChampForm(request.POST)
-        if form.is_valid():
-            try:
-                rembourser_engagement_champ(
-                    depense=depense,
-                    montant=form.cleaned_data['montant'],
-                )
-                messages.success(request, "Remboursement enregistré et synchronisé avec dams_agro.")
-                return redirect('finance:mes_engagements_champ')
-            except DamsAgroAPIError as exc:
-                messages.error(request, f"Échec de synchronisation avec dams_agro : {exc}")
-            except ValidationError as exc:
-                messages.error(request, str(exc))
-    else:
-        form = RemboursementChampForm()
-
-    return render(request, 'finance/rembourser_engagement_champ.html', {
-        'form': form,
-        'depense': depense,
-        'page_title': 'Rembourser un engagement',
     })

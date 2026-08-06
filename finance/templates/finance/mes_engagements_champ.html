@@ -34,7 +34,6 @@
                         <th class="text-end">Remboursé</th>
                         <th class="text-end">Reste</th>
                         <th>État</th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -42,9 +41,9 @@
                     <tr>
                         <td>
                             {% if depense.categorie == 'AVANCE_CHAMP' %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle">Avance</span>
+                                <span class="badge bg-success">Avance</span>
                             {% else %}
-                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Dépense pour compte</span>
+                                <span class="badge bg-warning text-dark">Dépense pour compte</span>
                             {% endif %}
                         </td>
                         <td class="text-muted small">{{ depense.date_depense|date:"d/m/Y" }}</td>
@@ -63,13 +62,6 @@
                                 <span class="badge bg-success">Soldé</span>
                             {% endif %}
                         </td>
-                        <td>
-                            {% if depense.reste_a_rembourser_champ > 0 %}
-                            <a href="{% url 'finance:rembourser_engagement_champ' depense.pk %}" class="btn btn-sm btn-outline-primary">
-                                Rembourser
-                            </a>
-                            {% endif %}
-                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -83,9 +75,9 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         {% if depense.categorie == 'AVANCE_CHAMP' %}
-                            <span class="badge bg-success-subtle text-success border border-success-subtle">Avance</span>
+                            <span class="badge bg-success">Avance</span>
                         {% else %}
-                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Dépense pour compte</span>
+                            <span class="badge bg-warning text-dark">Dépense pour compte</span>
                         {% endif %}
                         <div class="small text-muted mt-1">{{ depense.note|default:"—" }}</div>
                     </div>
@@ -99,11 +91,6 @@
                         </div>
                     </div>
                 </div>
-                {% if depense.reste_a_rembourser_champ > 0 %}
-                <a href="{% url 'finance:rembourser_engagement_champ' depense.pk %}" class="btn btn-sm btn-outline-primary mt-2 w-100">
-                    Rembourser
-                </a>
-                {% endif %}
             </div>
             {% endfor %}
         </div>

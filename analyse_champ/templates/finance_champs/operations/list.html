@@ -99,29 +99,27 @@
         </select>
         <select
             name="period"
+            id="period-select"
             class="select select-bordered"
         >
-            <option value="">
-                Toute période
-            </option>
-
-            <option value="today">
+            <option value="today" {% if selected_period == 'today' or not selected_period %}selected{% endif %}>
                 Aujourd'hui
             </option>
 
-            <option value="week">
+            <option value="week" {% if selected_period == 'week' %}selected{% endif %}>
                 Cette semaine
             </option>
 
-            <option value="month">
-                Ce mois
-            </option>
-
-            <option value="year">
-                Cette année
+            <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>
+                Personnalisé
             </option>
 
         </select>
+
+        <div id="custom-dates-container" class="flex flex-wrap gap-2 {% if selected_period != 'custom' %}hidden{% endif %}">
+            <input type="date" name="date_from" class="input input-bordered" value="{{ date_from }}">
+            <input type="date" name="date_to" class="input input-bordered" value="{{ date_to }}">
+        </div>
 
         <button
             type="submit"
@@ -131,6 +129,22 @@
         </button>
 
     </form>
+
+</div>
+
+<!-- KPIs -->
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <div class="stat bg-base-100 rounded-box shadow border-l-4 border-success">
+        <div class="stat-title">Revenus</div>
+        <div class="stat-value text-success">{{ kpis.revenus|fcfa }}</div>
+    </div>
+
+    <div class="stat bg-base-100 rounded-box shadow border-l-4 border-error">
+        <div class="stat-title">Dépenses</div>
+        <div class="stat-value text-error">{{ kpis.depenses|fcfa }}</div>
+    </div>
 
 </div>
 
@@ -201,7 +215,7 @@
                         <td>
 
                             <div class="font-semibold">
-                                {{ operation.label }}
+                                {{ operation.label|clean_engagement_label }}
                             </div>
 
                         </td>
@@ -275,5 +289,19 @@
 
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const periodeSelect = document.getElementById('period-select');
+    const customDatesContainer = document.getElementById('custom-dates-container');
+
+    function toggleCustomDates() {
+        customDatesContainer.classList.toggle('hidden', periodeSelect.value !== 'custom');
+    }
+
+    toggleCustomDates();
+    periodeSelect.addEventListener('change', toggleCustomDates);
+});
+</script>
 
 {% endblock %}

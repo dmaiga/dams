@@ -2344,10 +2344,13 @@ class Depense(models.Model):
 class RemboursementChamp(models.Model):
     """
     Remboursement (partiel ou total), par le champ, d'une Depense de
-    categorie AVANCE_CHAMP/DEPENSE_CHAMP. Chaque remboursement est d'abord
-    synchronisé avec dams_agro (POST /api/engagements/<id>/remboursements/)
-    par finance.services.rembourser_engagement_champ — ce modèle n'est écrit
-    qu'après succès de cet appel, jamais créé directement (voir finance/APP_FINANCE.md).
+    categorie AVANCE_CHAMP/DEPENSE_CHAMP. Le remboursement est toujours
+    initié côté dams_agro (jamais depuis `dams` — décision sprint-06 :
+    le superviseur ne doit pas pouvoir déclencher un remboursement lui-même,
+    ça disperserait la responsabilité). Ce modèle n'est donc jamais écrit
+    directement : uniquement par finance.services.synchroniser_engagements_champ,
+    qui rattrape après coup ce que dams_agro a déjà enregistré (voir
+    finance/APP_FINANCE.md).
     """
     depense = models.ForeignKey(
         Depense,

@@ -1,9 +1,13 @@
+import re
+
 from django.shortcuts import render
 from analyse_champ.services import (
+    DamsAgroAPIError,
     get_dashboard,
 
     get_operations,
     get_operation_detail,
+    get_engagement_detail,
 
     get_categories,
     get_products,
@@ -21,17 +25,30 @@ from analyse_champ.services import (
     get_connaissances
 )
 
+# Repère l'id d'engagement dams_agro accolé par `engagements/services.py`
+# (dams_agro, contrat figé) à la fin du label ("... #17") ou dans la note
+# générique d'une avance ("... engagement #17.") d'une Operation générée
+# automatiquement — voir get_engagement_detail.
+ENGAGEMENT_ID_PATTERN = re.compile(r'#(\d+)')
+
+
 def build_filters(request):
     """
     Fonction utilitaire qui extrait les paramètres de filtrage de la requête HTTP
     pour les transformer en un dictionnaire utilisable par les services API.
+
+    `period=custom` n'est PAS transmis à dams_agro : ce n'est pas une valeur
+    reconnue par son `DateFilterMixin` (seulement today/week/month/year,
+    voir docs/api/api_structure.md côté dams_agro) — dans ce cas seuls
+    date_from/date_to (saisis par l'utilisateur) doivent filtrer.
     """
     params = {}
     period = request.GET.get('period')
     date_from = request.GET.get('date_from')
     date_to = request.GET.get('date_to')
 
-    if period: params['period'] = period
+    if period and period != 'custom':
+        params['period'] = period
     if date_from: params['date_from'] = date_from
     if date_to: params['date_to'] = date_to
 
@@ -52,9 +69,20 @@ def dashboard_view(request):
 # =========================
 def operation_list_view(request):
 
-    params = build_filters(
+    # Filtres de période seuls (period/date_from/date_to) — servent à la
+    # fois à la liste et aux KPIs revenus/dépenses ci-dessous. `type`/
+    # `categorie` ne s'appliquent qu'à la liste : /api/dashboard/ ne les
+    # accepte pas (voir docs/api/api_structure.md côté dams_agro).
+    periode_params = build_filters(
         request
     )
+
+    # Défaut local à cette vue (pas dans build_filters, réutilisée ailleurs
+    # sans ce défaut) : premier chargement de page, aucun filtre encore
+    # soumis — "Aujourd'hui" est présélectionné dans le formulaire, la
+    # requête doit refléter la même période dès le premier affichage.
+    if 'period' not in request.GET and not periode_params.get('date_from'):
+        periode_params['period'] = 'today'
 
     operation_type = request.GET.get(
         'type'
@@ -64,29 +92,37 @@ def operation_list_view(request):
         'categorie'
     )
 
+    operations_params = dict(periode_params)
+
     if operation_type:
 
-        params['type'] = (
+        operations_params['type'] = (
             operation_type
         )
 
     if categorie:
 
-        params['categorie'] = (
+        operations_params['categorie'] = (
             categorie
         )
 
     operations = get_operations(
-        params=params
+        params=operations_params
     )
 
     categories = get_categories()
+
+    kpis = get_dashboard(
+        params=periode_params
+    )
 
     context = {
 
         'operations': operations,
 
         'categories': categories,
+
+        'kpis': kpis,
 
         'selected_type': (
             operation_type
@@ -95,6 +131,10 @@ def operation_list_view(request):
         'selected_categorie': (
             categorie
         ),
+
+        'selected_period': request.GET.get('period', ''),
+        'date_from': request.GET.get('date_from', ''),
+        'date_to': request.GET.get('date_to', ''),
     }
 
     return render(
@@ -114,8 +154,27 @@ def operation_detail_view(
         )
     )
 
+    # Si cette Operation a été générée automatiquement pour un engagement
+    # superviseur ↔ champ, va chercher le commentaire réel sur
+    # l'EngagementFinancier lié — le `note` de l'Operation elle-même ne
+    # contient qu'un texte générique pour une avance (voir
+    # get_engagement_detail). L'id est repéré dans `note` (cas avance,
+    # ".. l'engagement #17.") ou dans `label` (cas remboursement,
+    # "Remboursement — ... #17").
+    engagement = None
+    match = (
+        ENGAGEMENT_ID_PATTERN.search(operation.get('note') or '')
+        or ENGAGEMENT_ID_PATTERN.search(operation.get('label') or '')
+    )
+    if match:
+        try:
+            engagement = get_engagement_detail(match.group(1))
+        except DamsAgroAPIError:
+            engagement = None
+
     context = {
-        'operation': operation
+        'operation': operation,
+        'engagement': engagement,
     }
 
     return render(

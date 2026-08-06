@@ -184,6 +184,89 @@ def _post_json(endpoint, payload):
     return response.json()
 
 
+def _request_engagements(url, params=None):
+    """
+    Équivalent en lecture de _post_json, pour l'app engagements exclusivement :
+    contrairement aux GET des autres apps de ce module (session, non
+    authentifiés côté dams), les endpoints `engagements` sont réservés à DAMS
+    Distribution et authentifiés par X-Api-Key — y compris en GET (voir
+    docs/api/api_structure.md côté dams_agro : "Consommateur : DAMS
+    Distribution exclusivement... Auth : en-tête X-Api-Key... pas de
+    session"). `url` est soit un endpoint absolu de premier appel, soit l'URL
+    `next` de pagination renvoyée telle quelle par dams_agro (auquel cas
+    `params` est ignoré, déjà inclus dedans). Même traduction d'erreurs que
+    _post_json : jamais d'exception brute, toujours DamsAgroAPIError.
+    """
+    headers = {'X-Api-Key': DAMS_DISTRIBUTION_API_KEY} if DAMS_DISTRIBUTION_API_KEY else {}
+
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+    except requests.exceptions.Timeout as exc:
+        logger.error("Timeout dams_agro sur GET %s", url)
+        raise DamsAgroAPIError("dams_agro n'a pas répondu à temps (timeout).") from exc
+    except requests.exceptions.ConnectionError as exc:
+        logger.error("Connexion impossible à dams_agro sur GET %s", url)
+        raise DamsAgroAPIError("Impossible de joindre dams_agro (problème réseau).") from exc
+    except requests.exceptions.RequestException as exc:
+        logger.error("Erreur requête dams_agro sur GET %s : %s", url, exc)
+        raise DamsAgroAPIError(f"Erreur de communication avec dams_agro : {exc}") from exc
+
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except ValueError:
+            detail = response.text[:500]
+        logger.error("dams_agro a refusé GET %s (code %s) : %s", url, response.status_code, detail)
+        raise DamsAgroAPIError(f"dams_agro a refusé la requête ({response.status_code}) : {detail}")
+
+    return response.json()
+
+
+def get_engagements_champ_superviseur(reference_superviseur):
+    """
+    Tous les engagements de CE superviseur côté dams_agro — GET
+    /api/engagements/?reference_superviseur=... Utilisé pour la
+    réconciliation du Constat 1 (sprint-06) : voir
+    finance.services.synchroniser_engagements_champ. Chaque élément contient
+    notamment `id` (== Depense.reference_dams_agro côté dams) et
+    `reste_a_rembourser` (DecimalField rendu string sur cet endpoint —
+    contrairement à /api/engagements/dashboard/, qui rend des float, voir
+    docs/api/api_structure.md côté dams_agro).
+
+    ⚠️ Contrairement au principe général "PageNumberPagination, 20/page"
+    documenté pour le reste de l'API dams_agro, cet endpoint (et plus
+    généralement toute l'app `engagements`) est un `APIView` brut
+    (`engagements/api_views.py::EngagementListCreateAPIView`), pas un
+    `ListAPIView` — il renvoie une **liste JSON directe**, jamais
+    `{count, results, next}`. Vérifié sur le code source dams_agro le
+    06/08/2026 après une AttributeError en usage réel (`list.get`) causée
+    par une première implémentation qui supposait la pagination générale.
+    """
+    url = f'{BASE_URL}/engagements/'
+    params = {'reference_superviseur': reference_superviseur}
+    return _request_engagements(url, params)
+
+
+def get_engagement_detail(engagement_id):
+    """
+    GET /api/engagements/<id>/ — détail d'un engagement, avec ses
+    remboursements imbriqués (`EngagementFinancierDetailSerializer`),
+    authentifié X-Api-Key comme le reste de l'app `engagements`.
+
+    Utilisé par la vue Direction `operation_detail_view` (opérations
+    finance_champs) pour retrouver le **vrai** commentaire métier d'un
+    engagement à partir de l'`Operation` générée automatiquement côté
+    dams_agro : cette Operation a son propre `note`, mais pour une avance de
+    trésorerie il ne contient qu'un message générique ("Généré
+    automatiquement depuis l'engagement #N"), jamais le commentaire que le
+    superviseur a saisi à la création — celui-ci n'existe que sur
+    `EngagementFinancier.note`/`label` (voir
+    `dams_champs/engagements/services.py::creer_engagement`).
+    """
+    url = f'{BASE_URL}/engagements/{engagement_id}/'
+    return _request_engagements(url)
+
+
 def creer_engagement_dams_agro(*, nature, montant, commentaire, reference_superviseur):
     """
     POST /api/engagements/ — crée l'engagement côté dams_agro (source de
@@ -198,13 +281,3 @@ def creer_engagement_dams_agro(*, nature, montant, commentaire, reference_superv
         'note': commentaire or '',
     }
     return _post_json('engagements/', payload)
-
-
-def rembourser_engagement_dams_agro(*, engagement_id, montant):
-    """
-    POST /api/engagements/<engagement_id>/remboursements/ — enregistre le
-    remboursement côté dams_agro. Retourne le dict JSON du
-    RemboursementEngagement créé (dont 'id').
-    """
-    payload = {'montant': str(montant)}
-    return _post_json(f'engagements/{engagement_id}/remboursements/', payload)

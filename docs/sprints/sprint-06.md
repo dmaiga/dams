@@ -85,13 +85,37 @@ déclencheur est la navigation elle-même. Concrètement :
 - Au tout début de la vue `mes_engagements_champ` (avant de construire le contexte et de rendre le
   template), on appelle la réconciliation — mais **scopée au seul superviseur courant** (pas à
   tous, contrairement à la commande planifiée de l'option 1 initialement envisagée) : `GET
-  /api/engagements/dashboard/?reference_superviseur=<id>`, comparaison au reste local, création
-  des `RemboursementChamp` manquants avant l'affichage.
+  /api/engagements/?reference_superviseur=<id>` (liste, pas l'endpoint `/dashboard/` — celui-ci ne
+  donne qu'un total agrégé, pas assez précis pour savoir quelle `Depense` locale mettre à jour),
+  comparaison au reste local par engagement, création des `RemboursementChamp` manquants avant
+  l'affichage.
 - Aucune modification requise côté dams_agro (contrat figé respecté) — c'est bien `dams` qui
   interroge, jamais l'inverse.
 
-**Constat 1 entièrement tranché** — prêt à implémenter, en même temps que le Constat 3 (la
-synchronisation vit dans la même vue que la nouvelle page dédiée).
+**Constat 1 entièrement tranché et implémenté** (06/08/2026) — voir `finance.services.synchroniser_engagements_champ`,
+`analyse_champ.services.get_engagements_champ_superviseur`, `finance/APP_FINANCE.md`.
+
+#### Amendement (06/08/2026) — retrait du remboursement initié depuis `dams`
+
+En testant le flux implémenté, mdmaiga a demandé de retirer l'action "Rembourser" que le
+superviseur pouvait déclencher depuis `dams` (bouton par ligne sur `mes_engagements_champ`,
+introduite avec l'intégration du 05/08/2026, avant ce Constat 1) :
+
+> Retire l'option de remboursement par le superviseur dams, ça disperse la responsabilité, c'est à
+> l'autre de l'indiquer.
+
+Cohérent avec la logique même de ce Constat 1 : si le remboursement doit être **appris** par
+`dams` via réconciliation (jamais poussé par dams_agro), il n'y a pas de raison que `dams` puisse
+aussi **initier** un remboursement de son côté — les deux mécanismes coexistant créaient une
+ambiguïté sur qui décide qu'un engagement est remboursé. Décision : le remboursement ne se
+déclenche **que** côté dams_agro (rôle `finance` de ce repo séparé) ; `dams` se contente désormais
+strictement d'observer via la synchronisation.
+
+Supprimé (pas juste masqué côté UI) : vue `rembourser_engagement_champ_view`, url
+`finance:rembourser_engagement_champ`, template `rembourser_engagement_champ.html`, form
+`RemboursementChampForm`, service `finance.services.rembourser_engagement_champ`, client
+`analyse_champ.services.rembourser_engagement_dams_agro`. Le bouton "Rembourser" est retiré de
+`mes_engagements_champ.html` (desktop et mobile).
 
 ---
 
@@ -132,7 +156,39 @@ superviseur, ex. `produits_circulation:<superviseur_id>`). Le calcul
 superviseurs (pas de critère conditionnel à implémenter), simplement recalculé au plus une fois
 par heure et par superviseur au lieu de à chaque chargement du dashboard.
 
-**Constat 2 entièrement tranché** — prêt à implémenter.
+**Constat 2 entièrement tranché** — implémenté (cache 1h en place).
+
+#### Revirement (06/08/2026, même jour) — retour à l'option 1
+
+Après implémentation, mdmaiga est revenu sur cette décision et a demandé le **retrait complet**
+(option 1, écartée plus tôt au profit du cache) :
+
+> Dans le tableau de bord je veux retirer le tableau de circulation des produits et le remplacer
+> par des boutons qui renseignent les urls importantes — pour eux ce serait ventes, historique
+> vente et agents ; et pour abdoulaye.kone uniquement on indiquera la dépense et affichera
+> l'engagement (aussi dans `core/base.html`), que pour lui.
+
+Le tableau et tout son calcul (`get_produits_en_circulation`/`_calculer_produits_en_circulation`,
+cache inclus) sont supprimés — remplacés par un bloc "Accès rapide" sur
+`agents/templates/agents/dashboards/superviseur.html` : boutons vers `vente:enregistrer_vente`,
+`vente:historique_ventes`, `liste_agents_sup` pour tous les superviseurs ; `liste_depenses` et
+`finance:mes_engagements_champ` en plus, réservés à `abdoulaye.kone` (`request.user.agent.user.username
+== "abdoulaye.kone"`, même condition que le lien nav "Dépenses" déjà en place). Le lien nav
+"Engagements champ" de `core/templates/base.html` — jusque-là ouvert à tout `est_superviseur` — est
+désormais restreint à `abdoulaye.kone` de la même façon : ça répond aussi, au moins côté UI, à la
+question restée ouverte dans "Suggestions complémentaires" point 1 (accès nominatif vs
+`est_superviseur`) — le guard backend (`_acces_engagement_champ`) n'a en revanche pas été changé,
+seule la visibilité du lien l'a été.
+
+**Suite (06/08/2026, même échange)** : mdmaiga a demandé d'ajouter "Stock" (`liste_lots`) à la
+même liste, à la fois sur le dashboard (bouton "Accès rapide") et dans la nav. Contrairement à
+"Dépenses"/"Engagements champ" qui n'avaient jamais été ouverts à tous, `liste_lots` (nav "Stock
+Entrepôt", `core/templates/base.html`) l'était depuis toujours — restreindre ce lien à
+`abdoulaye.kone` retire donc l'accès (au lien nav — l'URL elle-même n'a pas de guard modifié) aux
+autres superviseurs qui l'utilisaient jusque-là. Confirmé explicitement par mdmaiga avant
+application.
+
+**Constat 2 : retour à l'option 1, définitivement tranché.**
 
 ---
 
@@ -226,14 +282,19 @@ Points remarqués en construisant le module du 05/08/2026, qui n'ont pas été s
 mais valent la peine d'être posés sur la table. Aucun n'est urgent ni décidé — à garder ou écarter
 librement.
 
-1. **Restriction d'accès à un seul agent nommé, pas à tout `est_superviseur`.**
-   Le brief initial précisait : « un seul agent dams sera habilité pour ces transactions ». Le
-   guard actuel (`_acces_engagement_champ = agent.est_superviseur`) ouvre pourtant la création et
-   le remboursement à **tous** les superviseurs actifs, pas au seul agent désigné. Le repo a déjà
-   un précédent pour ce genre de restriction nominative (`core/templates/base.html` : le lien
-   "Dépenses" n'apparaît que si `request.user.agent.user.username == "abdoulaye.kone"`). À
-   discuter : faut-il un guard équivalent ici, ou l'ouverture à tout superviseur est-elle en fait
-   voulue et le "un seul agent" du brief ne visait que la phase de test ?
+1. ~~**Restriction d'accès à un seul agent nommé, pas à tout `est_superviseur`.**~~ — **tranché
+   (06/08/2026)**, réponse de mdmaiga :
+   > C'est pas grave qu'il accède, c'est une app fermée avec des users finaux avec peu de maturité
+   > digitale, et pour l'instant le focus est sur le ship, en attendant d'avoir un modèle stable.
+   >
+   Décision : la visibilité des liens nav/dashboard est restreinte à `abdoulaye.kone` (Stock,
+   Dépenses, Engagements champ — voir Constat 2 et 3 ci-dessus), mais **le guard backend
+   `_acces_engagement_champ = agent.est_superviseur` reste inchangé**, volontairement — pas de
+   durcissement défensif (anti-IDOR par URL directe, restriction serveur nominative, etc.) tant que
+   le modèle métier n'est pas stabilisé. Principe à retenir pour la suite du projet : app interne,
+   utilisateurs finaux peu autonomes techniquement, priorité au ship plutôt qu'au durcissement
+   d'accès pour ce genre de cas — ne pas proposer ce type de renforcement de façon proactive avant
+   que mdmaiga ne le demande explicitement.
 
 2. **Absence de protection contre un double-clic / une double soumission.**
    Si le superviseur soumet deux fois le formulaire de création (double-clic, ou re-soumission

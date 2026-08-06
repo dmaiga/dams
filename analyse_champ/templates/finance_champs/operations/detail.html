@@ -28,7 +28,7 @@
 
                 <h1 class="text-3xl font-bold">
 
-                    {{ operation.label }}
+                    {{ operation.label|clean_engagement_label }}
 
                 </h1>
 
@@ -67,6 +67,62 @@
     </div>
 
 </div>
+
+{% if engagement %}
+<!-- Commentaire de l'engagement lié -->
+
+<div class="card bg-base-100 shadow border-l-4 border-primary">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            <i class="fas fa-comment-dots"></i>
+            Commentaire de l'engagement
+        </h2>
+
+        <p class="text-base-content/60 text-sm">
+            {{ engagement.nature_display }} — superviseur réf. {{ engagement.reference_superviseur }}
+        </p>
+
+        {% if engagement.note %}
+
+            <div class="prose max-w-none">
+                {{ engagement.note|linebreaks }}
+            </div>
+
+        {% elif engagement.label %}
+
+            <div class="prose max-w-none">
+                {{ engagement.label }}
+            </div>
+
+        {% else %}
+
+            <p class="text-base-content/50">
+                Aucun commentaire renseigné pour cet engagement.
+            </p>
+
+        {% endif %}
+
+        <div class="grid grid-cols-3 gap-2 mt-2 text-sm">
+            <div>
+                <span class="text-base-content/60">Montant initial</span><br>
+                <span class="font-semibold">{{ engagement.montant_initial|fcfa }}</span>
+            </div>
+            <div>
+                <span class="text-base-content/60">Remboursé</span><br>
+                <span class="font-semibold">{{ engagement.montant_rembourse|fcfa }}</span>
+            </div>
+            <div>
+                <span class="text-base-content/60">Reste à rembourser</span><br>
+                <span class="font-semibold">{{ engagement.reste_a_rembourser|fcfa }}</span>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endif %}
 
 <!-- Informations -->
 

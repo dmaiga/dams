@@ -54,7 +54,12 @@ Voir `docs/sprints/sprint-03.md` pour le détail des décisions et de la formule
 | `finance:historique_depenses` | `/finance/depenses/` | direction | **Non** — idem |
 | `finance:mes_engagements_champ` | `/finance/mes-engagements-champ/` | superviseur (`est_superviseur`) | Oui — lien "Engagements champ" de la nav (`core/templates/base.html`), remplace le lien direct vers le formulaire de création |
 | `finance:creer_engagement_champ` | `/finance/engagement-champ/nouveau/` | superviseur (`est_superviseur`) | Oui — bouton "Nouvel engagement" sur `mes_engagements_champ` |
-| `finance:rembourser_engagement_champ` | `/finance/engagement-champ/<pk>/rembourser/` | superviseur, propriétaire uniquement (anti-IDOR) | Oui — bouton "Rembourser" par ligne, sur `mes_engagements_champ` |
+
+`finance:rembourser_engagement_champ` a existé un temps (06/08/2026) puis a
+été **supprimée** le même jour (vue, url, form, template, client dams_agro) :
+le superviseur ne doit pas pouvoir déclencher lui-même un remboursement
+(dispersion de responsabilité) — voir section "Engagements superviseur ↔
+champ" ci-dessous.
 
 Les vues et templates marqués "Non" restent en place (code, urls.py, templates intacts) — seuls les liens de navigation ont été retirés, sur demande explicite, pour ne pas encombrer l'interface avec des actions redondantes ou non utilisées. Elles restent accessibles par URL directe si besoin d'une correction ponctuelle.
 
@@ -66,6 +71,20 @@ Guards locaux (pattern de permission par capacité, voir `rules/ARCHITECTURE.md`
 ### Action groupée (`finance:recouvrement_versement_groupe`)
 
 Remplace dans l'usage quotidien les deux actions individuelles `recouvrer_superviseur` + `creer_versement` : un formset (`RecouvrementVersementFormSet`, `finance/forms.py`) avec une ligne par superviseur actif, montant préempli avec son solde réel actuel (`lister_soldes_superviseurs()`), champ "apport hors vente" et upload de reçu. À la soumission, chaque ligne renseignée crée à la fois un `RecouvrementSuperviseur` (réduit le solde individuel du superviseur) **et** un `VersementBancaire` (+ `RecuVersement` si fichier joint, réduit la caisse globale) dans une transaction atomique. Une ligne laissée vide (superviseur sans recette) n'est simplement pas traitée — pas d'erreur de validation.
+
+**Date de versement modifiable (sprint-06, Constat 5, 06/08/2026)** : champ
+`date_versement` par ligne (`LigneRecouvrementVersementForm`), préempli à
+`timezone.now()` mais éditable, borné au présent/passé
+(`clean_date_versement` refuse toute date future — ce sont des recouvrements
+a posteriori). La valeur saisie alimente **à la fois**
+`RecouvrementSuperviseur.date_recouvrement` et
+`VersementBancaire.date_versement_reelle` (deux faces business du même
+événement) ; `date_creation` (les deux modèles) reste `auto_now_add`, non
+touché — distinction volontaire entre date système (audit) et date business
+(voir aussi `RecouvrementSuperviseurForm`, `agents/forms.py`, qui applique
+déjà ce même principe pour le flux individuel). `direction/factures/liste_versements.html`
+affichait déjà `date_versement_reelle` — aucun changement nécessaire côté
+affichage Direction, seul le point de saisie était manquant.
 
 ---
 
@@ -162,33 +181,78 @@ automatiquement.
   dams_agro correspondant (`reference_dams_agro`).
 
 **Client dams_agro (`analyse_champ/services.py`)** : `creer_engagement_dams_agro`
-et `rembourser_engagement_dams_agro` (POST authentifié `X-Api-Key`,
-`DAMS_DISTRIBUTION_API_KEY` — même nom de variable que côté dams_agro, secret
-partagé). C'est la **seule exception en écriture** au principe GET-only
-d'`analyse_champ` (voir `analyse_champ/APP_ANALYSE_CHAMP.md`).
+(POST authentifié `X-Api-Key`, `DAMS_DISTRIBUTION_API_KEY` — même nom de
+variable que côté dams_agro, secret partagé). C'est la **seule exception en
+écriture** au principe GET-only d'`analyse_champ` (voir
+`analyse_champ/APP_ANALYSE_CHAMP.md`).
+
+**⛔ Le remboursement n'est plus initiable depuis `dams` (retiré le
+06/08/2026, décision mdmaiga)** : laisser le superviseur déclencher lui-même
+un remboursement dispersait la responsabilité — c'est à dams_agro
+(l'autre côté, qui reçoit effectivement l'argent) de l'indiquer. `dams` ne
+fait donc plus **aucun** POST vers `/api/engagements/<id>/remboursements/` ;
+`rembourser_engagement_dams_agro` (client), `rembourser_engagement_champ`
+(service), `RemboursementChampForm`, la vue `rembourser_engagement_champ_view`
+et son template ont été supprimés (dead code, pas juste masqués côté UI —
+l'URL elle-même n'existe plus). `dams` **apprend** un remboursement fait côté
+dams_agro uniquement via `synchroniser_engagements_champ` (ci-dessous),
+jamais en l'initiant.
 
 **Stratégie "remote-first", sans retry automatique** (aucune infra Celery/
 APScheduler dans ce repo — confirmé) : `finance.services.creer_engagement_champ`
-et `rembourser_engagement_champ` appellent **toujours** dams_agro en premier ;
-la `Depense`/le `RemboursementChamp` local n'est créé qu'en cas de succès. En
-cas d'échec (réseau, timeout, HTTP, refus métier dams_agro), `DamsAgroAPIError`
-est levée, journalisée (`logger.error`), et **rien n'est écrit localement** —
-le superviseur voit un message d'erreur et doit ressaisir manuellement.
+appelle **toujours** dams_agro en premier ; la `Depense` locale n'est créée
+qu'en cas de succès. En cas d'échec (réseau, timeout, HTTP, refus métier
+dams_agro), `DamsAgroAPIError` est levée, journalisée (`logger.error`), et
+**rien n'est écrit localement** — le superviseur voit un message d'erreur et
+doit ressaisir manuellement.
 
 **Services** (`finance/services.py`) :
 - `reference_superviseur_dams_agro(superviseur)` → `str(superviseur.pk)`,
   identifiant stable transmis à dams_agro (champ texte libre côté dams_agro,
   aucun compte partagé) — ne jamais faire varier cette valeur.
 - `creer_engagement_champ(superviseur, nature, montant, commentaire, date_depense=None)`
-- `rembourser_engagement_champ(depense, montant)` — valide
-  `montant <= depense.reste_a_rembourser_champ` avant l'appel réseau.
 - `lister_engagements_champ(superviseur, limite=20)` — **nouveau (sprint-06,
   Constat 3)** : liste locale (pas d'appel API), utilisée par
   `finance:mes_engagements_champ`. Reprend la logique qui vivait auparavant
   dans `SuperviseurDashboardService.get_engagements_champ` (`agents/`,
   supprimée) — déplacée ici pour que toute la logique métier "engagements
-  champ" reste dans `finance/`, à côté de `creer_engagement_champ`/
-  `rembourser_engagement_champ`.
+  champ" reste dans `finance/`, à côté de `creer_engagement_champ`.
+- `synchroniser_engagements_champ(superviseur)` — **nouveau (sprint-06,
+  Constat 1)** : rattrape un remboursement enregistré directement côté
+  dams_agro (jamais appris autrement par `dams`, faute de webhook —
+  dams_agro est un contrat figé). Compare, pour chaque engagement encore
+  ouvert localement, `reste_a_rembourser_champ` au `reste_a_rembourser`
+  distant (`GET /api/engagements/?reference_superviseur=...`, liste directe
+  — cet endpoint ne pagine pas, voir note ci-dessous) ;
+  crée le `RemboursementChamp` manquant sur écart positif (sans référence
+  dams_agro individuelle — seul l'écart agrégé est connu, pas le détail des
+  remboursements distants qui l'ont produit). **Déclenchée à deux endroits**
+  (décision de mdmaiga, étendue le 06/08/2026) :
+  1. à l'entrée sur `finance:mes_engagements_champ` (`finance/views.py`) ;
+  2. à l'entrée sur le dashboard superviseur (`SuperviseurDashboardService.build_dashboard_perimetre`,
+     `agents/services/superviseur_service.py`) — le KPI "Cash détenu" de ce
+     dashboard (`get_finances_superviseur` → `solde_superviseur`, terme
+     `remboursements_champ`) serait sinon faussé et visible en premier,
+     avant même que le superviseur aille consulter le détail de ses
+     engagements. Court-circuitée sans appel réseau s'il n'y a rien
+     d'ouvert à vérifier (voir docstring) — coût quasi nul dans le cas
+     courant, mais ajoute jusqu'à ~10s de latence potentielle (timeout
+     réseau) au chargement du dashboard principal dans le cas contraire,
+     à surveiller si ça devient sensible en usage réel.
+  Best-effort dans les deux cas : `DamsAgroAPIError` est journalisée
+  (`logger.warning`) et avalée, jamais remontée à la vue — dams_agro
+  injoignable ne doit pas empêcher l'affichage de la page.
+
+**Client dams_agro, app `engagements` (`analyse_champ/services.py`)** :
+`get_engagements_champ_superviseur(reference_superviseur)` — **nouveau
+(sprint-06)**, GET authentifié `X-Api-Key` (comme les POST de cette même
+app — contrairement aux autres GET d'`analyse_champ`, en session, voir
+`analyse_champ/APP_ANALYSE_CHAMP.md`), suit la pagination (`next`) jusqu'à
+épuisement. ⚠️ Sur cet endpoint (`GET /api/engagements/`), `reste_a_rembourser`
+est une string (`DecimalField`) — sur `GET /api/engagements/dashboard/`
+(non utilisé ici), c'est un float. Ne pas supposer un type unique pour tous
+les montants de cette API (contrat vérifié le 06/08/2026,
+`dams_champs/docs/api/api_structure.md`).
 
 **Propriétés calculées sur `Depense`** (`core/models.py`, jamais stockées —
 même logique que `EngagementFinancier` côté dams_agro) : `est_engagement_champ`,
@@ -198,10 +262,16 @@ même logique que `EngagementFinancier` côté dams_agro) : `est_engagement_cham
 **Vues/écrans** :
 - `finance:mes_engagements_champ` (`finance/templates/finance/mes_engagements_champ.html`)
   — **nouveau (sprint-06, Constat 3)**, porte d'entrée superviseur du flux :
-  liste ses engagements (même tableau qu'auparavant sur le dashboard) + lien
-  "Nouvel engagement". Remplace le bloc "Engagements champ" qui était
-  directement affiché sur le dashboard superviseur — retiré (trop dense pour
-  un écran de résumé, cf. sprint-06). Le lien "Engagements champ" de la nav
+  liste ses engagements (nature, date, commentaire, montant initial,
+  remboursé, reste, état) + lien "Nouvel engagement". **Pas d'action
+  "Rembourser"** — retirée le 06/08/2026 (voir plus haut). Badges "Avance"/
+  "Dépense pour compte" en `bg-success`/`bg-warning text-dark` (Bootstrap 5.1
+  classique) — les classes `-subtle`/`-emphasis` utilisées dans une première
+  version n'existent qu'à partir de Bootstrap 5.3 ; ce repo est en 5.1.3
+  (`core/templates/base.html`), elles ne s'appliquaient donc pas du tout
+  (badge sans couleur, peu visible). Remplace le bloc "Engagements champ" qui
+  était directement affiché sur le dashboard superviseur — retiré (trop dense
+  pour un écran de résumé, cf. sprint-06). Le lien "Engagements champ" de la nav
   (`core/templates/base.html`) pointe désormais ici plutôt que vers le
   formulaire de création.
 - Dashboard Direction (`finance/dashboard.html`) : colonne "Reste à rembourser
