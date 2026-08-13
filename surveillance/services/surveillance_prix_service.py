@@ -3,12 +3,15 @@ from decimal import Decimal
 from django.db.models import BooleanField, Case, Count, F, Min, Value, When
 
 from core.models import LotEntrepot, Vente
-from surveillance.constants import DATE_PLANCHER_PRIX
+from surveillance.constants import DATE_PLANCHER_PRIX, SEUIL_MARGE_MINIMALE
 
 
 class SurveillancePrixService:
-    # Une vente dont la marge unitaire est <= 45 FCFA est une anomalie.
-    SEUIL_MARGE_MINIMALE = Decimal('45.00')
+    # Marge minimale attendue par vente unitaire — source unique :
+    # surveillance.constants.SEUIL_MARGE_MINIMALE (corrigé le 2026-08-13, même
+    # correctif que PrixSurveillanceService : valeur locale 45 FCFA jamais
+    # alignée sur la constante déclarée pour cet usage).
+    SEUIL_MARGE_MINIMALE = Decimal(str(SEUIL_MARGE_MINIMALE))
 
     @staticmethod
     def get_resume(order_by=None):
@@ -18,7 +21,7 @@ class SurveillancePrixService:
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lte=(
+                prix_vente_unitaire__lt=(
                     F('detail_distribution__lot__prix_achat_unitaire')
                     + SurveillancePrixService.SEUIL_MARGE_MINIMALE
                 ),
@@ -93,7 +96,7 @@ class SurveillancePrixService:
             .annotate(
                 rouge=Case(
                     When(
-                        prix_vente_unitaire__lte=(
+                        prix_vente_unitaire__lt=(
                             lot.prix_achat_unitaire
                             + SurveillancePrixService.SEUIL_MARGE_MINIMALE
                         ),
@@ -130,7 +133,7 @@ class SurveillancePrixService:
                 detail_distribution__lot=lot,
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lte=(
+                prix_vente_unitaire__lt=(
                     lot.prix_achat_unitaire
                     + SurveillancePrixService.SEUIL_MARGE_MINIMALE
                 ),

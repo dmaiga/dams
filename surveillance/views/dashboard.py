@@ -48,8 +48,7 @@ class DashboardSurveillanceView(SurveillanceAccessMixin, TemplateView):
         ventes_rouges = PrixSurveillanceService.ventes_a_perte(limit=10)
         nb_produits_rouges = PrixSurveillanceService.count_anomalies()
 
-        nb_agents_sans_vente = StockAgeService.count_agents_sans_vente_recente()
-        nb_lots_dormants = StockAgeService.count_lots_stock_dormant()
+        nb_lots_dormants = StockAgeService.count_lots_dormants_entrepot()
 
         # Variations spécifiques de la semaine sélectionnée
         superviseurs = SuperviseurSurveillanceService.variations_semaine(debut_semaine=debut_date)
@@ -69,7 +68,6 @@ class DashboardSurveillanceView(SurveillanceAccessMixin, TemplateView):
             "nb_produits_rouges": nb_produits_rouges,
             "ventes_rouges": ventes_rouges,
 
-            "nb_agents_sans_vente": nb_agents_sans_vente,
             "nb_lots_dormants": nb_lots_dormants,
 
             "superviseurs_surveillance": superviseurs[:5],

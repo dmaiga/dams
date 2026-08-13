@@ -74,10 +74,10 @@
     </div>
 
     <div class="stat bg-base-100 border-l-4 border-warning shadow rounded-box">
-      <div class="stat-title">Stock &amp; Rotation</div>
-      <div class="stat-value text-xl text-warning">{{ nb_agents_sans_vente|add:nb_lots_dormants }}</div>
+      <div class="stat-title">Stock dormant</div>
+      <div class="stat-value text-xl text-warning">{{ nb_lots_dormants }}</div>
       <div class="stat-desc">
-        Rotation lente + stock dormant
+        Entrepôt central, non distribué
         <a href="{% url 'stock_rotation' %}" class="link link-primary font-semibold">Voir tout →</a>
       </div>
     </div>

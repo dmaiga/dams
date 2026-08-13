@@ -13,9 +13,16 @@ from surveillance.services.vente_service import KG_EXPRESSION
 class DetailProduitService:
 
     @staticmethod
-    def get_data(produit, debut_semaine=None):
+    def get_data(produit, debut_semaine=None, debut_mois=None, periode="semaine"):
         from surveillance.constants import DATE_PLANCHER_VENTES
-        if debut_semaine:
+
+        if periode == "mois":
+            if debut_mois:
+                debut_actuel, fin_actuel = ComparaisonPeriodeService.mois(debut_mois)
+            else:
+                debut_actuel, fin_actuel = ComparaisonPeriodeService.mois_actuel()
+            debut_prec, fin_prec = ComparaisonPeriodeService.mois_prec(debut_actuel)
+        elif debut_semaine:
             debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine(debut_semaine)
             debut_prec, fin_prec = ComparaisonPeriodeService.semaine_prec(debut_semaine)
         else:

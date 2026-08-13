@@ -46,3 +46,35 @@ def date_to_week_string(d: date) -> str:
 def qs_semaine(semaine_selectionnee: str | None) -> str:
     """Querystring '?semaine=...' pour propager le filtre dans les liens de nav, vide si absent."""
     return f"?semaine={semaine_selectionnee}" if semaine_selectionnee else ""
+
+def parse_mois(raw: str | None) -> date:
+    """
+    Reçoit la valeur du <input type="month"> (ex: "2026-08").
+    Retourne le 1er jour du mois correspondant.
+    Retourne le 1er jour du mois courant si raw est absent, invalide ou dans le futur.
+    """
+    today = date.today()
+    debut_mois_courant = today.replace(day=1)
+
+    if raw:
+        match = re.match(r'^(\d{4})-(\d{1,2})$', raw)
+        if match:
+            try:
+                annee = int(match.group(1))
+                mois = int(match.group(2))
+                parsed_date = date(annee, mois, 1)
+                # Empêche la sélection d'un mois futur
+                if parsed_date > debut_mois_courant:
+                    return debut_mois_courant
+                return parsed_date
+            except ValueError:
+                pass
+    return debut_mois_courant
+
+def date_to_month_string(d: date) -> str:
+    """Retourne une chaîne au format 'YYYY-MM' pour la date d."""
+    return f"{d.year}-{d.month:02d}"
+
+def qs_mois(mois_selectionne: str | None) -> str:
+    """Querystring '?mois=...' pour propager le filtre dans les liens de nav, vide si absent."""
+    return f"?mois={mois_selectionne}" if mois_selectionne else ""

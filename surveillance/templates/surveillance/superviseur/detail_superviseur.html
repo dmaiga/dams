@@ -57,13 +57,41 @@
 
   </div>
 
+  <!-- FILTRES -->
+  <div class="card bg-base-100 shadow border border-base-200">
+    <div class="card-body p-5">
+      <h2 class="card-title text-base mb-3">Filtres — Agents</h2>
+      <form method="get" class="flex flex-wrap items-end gap-4">
+        <input type="hidden" name="from" value="{{ origine }}">
+        {% if semaine_selectionnee %}<input type="hidden" name="semaine" value="{{ semaine_selectionnee }}">{% endif %}
+
+        <div class="form-control">
+          <label class="label pb-1"><span class="label-text text-xs font-semibold uppercase text-base-content/60">Produit</span></label>
+          <select name="produit" class="select select-bordered select-sm">
+            <option value="">Tous</option>
+            {% for produit in produits %}
+            <option value="{{ produit.id }}" {% if selected_produit == produit.id %}selected{% endif %}>
+              {{ produit.nom }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm">Appliquer</button>
+      </form>
+    </div>
+  </div>
+
   <!-- AGENTS -->
   <div class="card bg-base-100 shadow border border-base-200">
     <div class="card-body p-5">
       <div class="flex items-center justify-between mb-3">
         <div>
           <h2 class="card-title text-base">Agents</h2>
-          <p class="text-xs text-base-content/50 mt-0.5">Quels agents produisent ? Quels agents sont faibles ?</p>
+          <p class="text-xs text-base-content/50 mt-0.5">
+            Quels agents produisent ? Quels agents sont faibles ?
+            {% if selected_produit %}<span class="badge badge-outline badge-sm ml-1">Filtré par produit</span>{% endif %}
+          </p>
         </div>
         <span class="badge badge-primary badge-outline">{{ agents_stats|length }}</span>
       </div>

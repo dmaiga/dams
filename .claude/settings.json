@@ -63,7 +63,14 @@
       "Bash(python manage.py check --deploy)",
       "Bash(xargs grep -l \"direction_filters\")",
       "Bash(xargs grep -l \"date_debut_fonction\\\\|assert_salaire\")",
-      "Bash(dbt compile *)"
+      "Bash(dbt compile *)",
+      "Bash(python manage.py test monitoring core.tests -v 1)",
+      "Bash(git stash *)",
+      "Bash(python manage.py test monitoring.tests.AlerteMoteurTestCase.test_evaluer_baisse_activite_cree_alerte_avec_distribution_hydratee -v 2)",
+      "Bash(python manage.py test core -v 1)",
+      "Bash(python manage.py test surveillance.tests.StockAgeServiceTestCase.test_agent_sans_vente_depuis_plus_de_deux_jours_present -v 1)",
+      "Bash(python manage.py test monitoring surveillance -v 1)",
+      "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/c--Users-Admin-By-me-dams/8b93095f-5571-475c-82b2-7028daaa55e3/scratchpad/demo_alertes.py\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

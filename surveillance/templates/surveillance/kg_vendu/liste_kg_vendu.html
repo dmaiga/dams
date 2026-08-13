@@ -19,7 +19,7 @@
         <h1 class="text-2xl font-bold tracking-tight">Analyse Kg Vendus</h1>
         <p class="text-sm text-base-content/60 mt-0.5">Volumes vendus par superviseur et par agent.</p>
       </div>
-      {% include "partials/_filtre_semaine.html" %}
+      {% include "partials/_filtre_periode.html" %}
     </div>
     <div class="overflow-x-auto">
       {% include "partials/_nav_themes.html" %}
@@ -107,7 +107,12 @@
     <div class="card-body p-5">
       <h2 class="card-title text-base mb-3">Filtres — Détail agents</h2>
       <form method="get">
+        <input type="hidden" name="periode" value="{{ periode }}">
+        {% if periode == 'mois' %}
+        <input type="hidden" name="mois" value="{{ mois_selectionne }}">
+        {% else %}
         <input type="hidden" name="semaine" value="{{ semaine_selectionnee }}">
+        {% endif %}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
           <div class="form-control">

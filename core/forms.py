@@ -1281,8 +1281,8 @@ class VersementForm(forms.ModelForm):
         - Affecte le ROT (source de vérité)
         - Gère les reçus multiples
         """
-        if rot is None or not (rot.est_rot or rot.est_direction or rot.est_gestionnaire_stock):
-            raise ValueError("Le versement doit être effectué par un ROT, la Direction ou un gestionnaire de stock")
+        if rot is None or not (rot.est_rot or rot.est_direction):
+            raise ValueError("Le versement doit être effectué par un ROT ou la Direction")
 
         versement = super().save(commit=False)
         versement.effectue_par = rot
@@ -1303,8 +1303,52 @@ class VersementForm(forms.ModelForm):
         return versement
 
 
+class VersementSuperviseurLigneForm(forms.Form):
+    """
+    Une ligne du formset gestionnaire de stock : un superviseur, un montant reçu
+    en espèces libre. Pas de solde préaffiché ni comparé (décision mdmaiga,
+    sprint-07) — contrairement à finance.LigneRecouvrementVersementForm.
+    """
+    superviseur = forms.ModelChoiceField(
+        queryset=Agent.objects.filter(type_agent='entrepot', est_actif=True),
+        widget=forms.HiddenInput,
+    )
+    montant = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False, min_value=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'placeholder': '0.00',
+        })
+    )
 
-class RecuVersementForm(forms.Form): 
+
+VersementSuperviseurFormSet = forms.formset_factory(VersementSuperviseurLigneForm, extra=0)
+
+
+class VersementSuperviseurGlobalForm(forms.Form):
+    """Champs communs à toute la soumission (un seul bordereau, un seul hors-vente)."""
+    montant_hors_vente = forms.DecimalField(
+        max_digits=12, decimal_places=2, required=False, min_value=0,
+        label="Montant hors vente",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'})
+    )
+    bordereau = forms.FileField(
+        required=False,
+        label="Bordereau de versement",
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.pdf,.jpg,.jpeg,.png,.doc,.docx',
+        })
+    )
+    description = forms.CharField(
+        required=False,
+        label="Description",
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2})
+    )
+
+
+class RecuVersementForm(forms.Form):
     versement = forms.ModelChoiceField(
         queryset=VersementBancaire.objects.all(),
         required=False,

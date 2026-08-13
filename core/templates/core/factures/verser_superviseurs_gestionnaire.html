@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h4 class="mb-3">➕ Versement superviseurs</h4>
+
+    <div class="alert alert-info small">
+        <i class="fas fa-circle-info"></i>
+        Indiquez ce que vous avez reçu de chaque superviseur. Une ligne laissée vide n'est simplement
+        pas traitée. Le montant hors vente et le bordereau sont communs à toute la soumission.
+    </div>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ formset.management_form }}
+
+        {% if formset.non_form_errors %}
+            <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+        {% endif %}
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <table class="table table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>Superviseur</th>
+                            <th>Montant reçu</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for form, superviseur in lignes %}
+                        <tr>
+                            <td>
+                                {{ superviseur.full_name }}
+                                {{ form.superviseur }}
+                            </td>
+                            <td>
+                                {{ form.montant }}
+                                {% if form.montant.errors %}
+                                    <div class="text-danger small">{{ form.montant.errors|striptags }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-center text-muted py-4">Aucun superviseur actif</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>📎 Hors vente et bordereau</h6>
+
+                {{ global_form.montant_hors_vente.label_tag }}
+                {{ global_form.montant_hors_vente }}
+                {% if global_form.montant_hors_vente.errors %}
+                    <div class="text-danger small">{{ global_form.montant_hors_vente.errors|striptags }}</div>
+                {% endif %}
+
+                {{ global_form.bordereau.label_tag }}
+                {{ global_form.bordereau }}
+                {% if global_form.bordereau.errors %}
+                    <div class="text-danger small">{{ global_form.bordereau.errors|striptags }}</div>
+                {% endif %}
+
+                {{ global_form.description.label_tag }}
+                {{ global_form.description }}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            💾 Enregistrer
+        </button>
+        <a href="{% url 'liste_versement' %}" class="btn btn-secondary">
+            Annuler
+        </a>
+    </form>
+</div>
+{% endblock %}

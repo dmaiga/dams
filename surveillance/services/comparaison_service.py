@@ -27,28 +27,29 @@ class ComparaisonPeriodeService:
         return ComparaisonPeriodeService.semaine_prec(debut)
 
     @staticmethod
-    def mois_actuel():
-        today = timezone.now().date()
-
-        debut = today.replace(day=1)
-
+    def mois(debut):
+        """debut = 1er jour du mois. Retourne (debut, fin_du_mois)."""
         prochain_mois = debut + relativedelta(months=1)
         fin = prochain_mois - timedelta(days=1)
-
         return debut, fin
 
     @staticmethod
-    def mois_precedent():
-
-        debut_actuel, _ = (
-            ComparaisonPeriodeService.mois_actuel()
-        )
-
-        debut_prec = debut_actuel - relativedelta(months=1)
-
-        fin_prec = debut_actuel - timedelta(days=1)
-
+    def mois_prec(debut):
+        """debut = 1er jour du mois de référence. Retourne (1er jour, dernier jour) du mois précédent."""
+        debut_prec = debut - relativedelta(months=1)
+        fin_prec = debut - timedelta(days=1)
         return debut_prec, fin_prec
+
+    @staticmethod
+    def mois_actuel():
+        today = timezone.now().date()
+        debut = today.replace(day=1)
+        return ComparaisonPeriodeService.mois(debut)
+
+    @staticmethod
+    def mois_precedent():
+        debut_actuel, _ = ComparaisonPeriodeService.mois_actuel()
+        return ComparaisonPeriodeService.mois_prec(debut_actuel)
     
 class ComparaisonService:
     @staticmethod

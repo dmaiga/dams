@@ -3,22 +3,25 @@ from decimal import Decimal
 from django.db.models import Count, F, Min
 
 from core.models import Agent, LotEntrepot, Vente
-from surveillance.constants import DATE_PLANCHER_PRIX
+from surveillance.constants import DATE_PLANCHER_PRIX, SEUIL_MARGE_MINIMALE
 
 
 class PrixSurveillanceService:
-    # Une vente doit générer au moins 45 FCFA de marge unitaire.
-    SEUIL_MARGE_MINIMALE = Decimal('45.00')
+    # Marge minimale attendue par vente unitaire — source unique :
+    # surveillance.constants.SEUIL_MARGE_MINIMALE (corrigé le 2026-08-13 : ce
+    # service définissait auparavant sa propre valeur locale, 45 FCFA, jamais
+    # alignée sur la constante déclarée pour cet usage).
+    SEUIL_MARGE_MINIMALE = Decimal(str(SEUIL_MARGE_MINIMALE))
 
     @staticmethod
     def ventes_a_perte(limit=None):
-        # 1 requête : lots dont une vente a une marge unitaire <= 50 FCFA.
+        # 1 requête : lots dont une vente a une marge unitaire < SEUIL_MARGE_MINIMALE.
         lot_stats = (
             Vente.objects
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lte=(
+                prix_vente_unitaire__lt=(
                     F('detail_distribution__lot__prix_achat_unitaire')
                     + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
                 ),
@@ -55,7 +58,7 @@ class PrixSurveillanceService:
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lte=(
+                prix_vente_unitaire__lt=(
                     F('detail_distribution__lot__prix_achat_unitaire')
                     + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
                 ),
@@ -115,7 +118,7 @@ class PrixSurveillanceService:
             .filter(
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
-                prix_vente_unitaire__lte=(
+                prix_vente_unitaire__lt=(
                     F('detail_distribution__lot__prix_achat_unitaire')
                     + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
                 ),
@@ -124,3 +127,38 @@ class PrixSurveillanceService:
             .distinct()
             .count()
         )
+
+    @staticmethod
+    def ventes_sous_marge_minimale():
+        """Ventes individuelles (pas de regroupement par lot) dont la marge
+        unitaire est strictement sous SEUIL_MARGE_MINIMALE — référence de
+        l'alerte Telegram "marge minimale" : contrairement à ventes_a_perte(),
+        une ligne = une vente, pas un lot agrégé."""
+        ventes = (
+            Vente.objects
+            .filter(
+                est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
+                prix_vente_unitaire__lt=(
+                    F('detail_distribution__lot__prix_achat_unitaire')
+                    + PrixSurveillanceService.SEUIL_MARGE_MINIMALE
+                ),
+            )
+            .select_related('agent', 'agent__superviseur', 'detail_distribution__lot__produit')
+            .annotate(
+                marge=F('prix_vente_unitaire') - F('detail_distribution__lot__prix_achat_unitaire')
+            )
+            .order_by('marge')
+        )
+
+        return [
+            {
+                "vente": vente,
+                "agent": vente.agent,
+                "superviseur": vente.agent.superviseur,
+                "produit": vente.detail_distribution.lot.produit,
+                "prix_vente": vente.prix_vente_unitaire,
+                "marge": vente.marge,
+            }
+            for vente in ventes
+        ]

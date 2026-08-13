@@ -65,9 +65,11 @@ class Alerte(models.Model):
     TYPES = [
         ("solde", "Solde superviseur"),
         ("solde_persistant", "Solde persistant"),
-        ("stock", "Stock ancien"),
-        ("prix", "Variation prix"),
-        ("activite", "Baisse activité"),
+        ("stock_entrepot", "Stock dormant — entrepôt"),
+        ("stock_superviseur", "Stock en rétention — superviseurs"),
+        ("stock_agent", "Stock en rétention — agents"),
+        ("prix", "Ventes sous la marge minimale"),
+        ("activite", "Baisse d'activité commerciale"),
     ]
 
     type_alerte = models.CharField(max_length=30, choices=TYPES)

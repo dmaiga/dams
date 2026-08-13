@@ -59,16 +59,28 @@ class AlerteDeduplicationService:
         return existante, False, True
 
     @staticmethod
-    def cloturer_si_resolue(type_alerte, cles_identification_actives):
+    def cloturer_si_resolue(type_alerte, cles_identification_actives, champ_cle=None):
         """Clôture (RESOLUE) toute Alerte ACTIVE de ce type dont les clés d'identification
         n'apparaissent plus dans cles_identification_actives (liste de dicts, une par
-        situation encore constatée lors du run courant)."""
-        if not cles_identification_actives:
-            cles_suivies = []
-        else:
-            cles_suivies = list(cles_identification_actives[0].keys())
+        situation encore constatée lors du run courant).
 
-        for alerte in Alerte.objects.filter(type_alerte=type_alerte, statut="ACTIVE"):
+        champ_cle : à préciser quand un même type_alerte mélange plusieurs familles de
+        clés (ex. "activite" regroupée par superviseur ET individuelle par agent) — sans
+        cela, une famille de clés vide fermerait à tort les alertes de l'autre famille
+        (leur champ de clé absent vaudrait toujours None, jamais présent dans les
+        situations actives de l'autre famille). Restreint alors le queryset aux alertes
+        où ce champ est renseigné, et ignore les clés des situations elles-mêmes.
+        """
+        if champ_cle is not None:
+            cles_suivies = [champ_cle]
+            alertes = Alerte.objects.filter(
+                type_alerte=type_alerte, statut="ACTIVE", **{f"{champ_cle}__isnull": False}
+            )
+        else:
+            cles_suivies = list(cles_identification_actives[0].keys()) if cles_identification_actives else []
+            alertes = Alerte.objects.filter(type_alerte=type_alerte, statut="ACTIVE")
+
+        for alerte in alertes:
             cles_alerte = {champ: getattr(alerte, f"{champ}_id") for champ in cles_suivies}
             if cles_alerte not in [
                 {champ: (v.pk if hasattr(v, "pk") else v) for champ, v in situation.items()}

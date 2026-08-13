@@ -67,6 +67,7 @@ urlpatterns = [
     path('versements/<int:versement_id>/', views.detail_versement, name='detail_versement'),
     path('versement/<int:pk>/ajouter-recus/', views.AjouterRecusView.as_view(), name='ajouter_recus'),
     path('versement/creer/', views.creer_versement, name='creer_versement'),
+    path('versement-superviseurs/', views.verser_superviseurs_gestionnaire, name='verser_superviseurs_gestionnaire'),
     path('versements/<int:versement_id>/modifier/', views.modifier_versement, name='modifier_versement'),
     path('versements/<int:versement_id>/supprimer/', views.supprimer_versement, name='supprimer_versement'),
     path('recus/', views.recu_liste, name='recu_liste'),

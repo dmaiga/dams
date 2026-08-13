@@ -23,9 +23,11 @@
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">{{ produit.nom }}</h1>
-        <p class="text-sm text-base-content/60 mt-0.5">Analyse hebdomadaire de performance.</p>
+        <p class="text-sm text-base-content/60 mt-0.5">
+          {% if periode == 'mois' %}Analyse mensuelle de performance.{% else %}Analyse hebdomadaire de performance.{% endif %}
+        </p>
       </div>
-      {% include "partials/_filtre_semaine.html" %}
+      {% include "partials/_filtre_periode.html" %}
     </div>
     <div class="overflow-x-auto">
       {% include "partials/_nav_themes.html" %}
@@ -36,13 +38,13 @@
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
     <div class="stat bg-base-100 shadow rounded-box border border-base-200">
-      <div class="stat-title text-xs uppercase font-bold tracking-wide">Kg — Semaine</div>
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">{% if periode == 'mois' %}Kg — Mois{% else %}Kg — Semaine{% endif %}</div>
       <div class="stat-value text-2xl text-primary">{{ kg_actuel|floatformat:0 }}</div>
-      <div class="stat-desc">Volume vendu cette semaine</div>
+      <div class="stat-desc">{% if periode == 'mois' %}Volume vendu ce mois{% else %}Volume vendu cette semaine{% endif %}</div>
     </div>
 
     <div class="stat bg-base-100 shadow rounded-box border border-base-200">
-      <div class="stat-title text-xs uppercase font-bold tracking-wide">Kg — Semaine précédente</div>
+      <div class="stat-title text-xs uppercase font-bold tracking-wide">{% if periode == 'mois' %}Kg — Mois précédent{% else %}Kg — Semaine précédente{% endif %}</div>
       <div class="stat-value text-2xl text-base-content/70">{{ kg_prec|floatformat:0 }}</div>
       <div class="stat-desc">Référence N-1</div>
     </div>
@@ -52,7 +54,7 @@
       <div class="stat-value text-2xl {% if variation < 0 %}text-error{% else %}text-success{% endif %}">
         {% if variation < 0 %}▼{% else %}▲{% endif %} {{ variation }}%
       </div>
-      <div class="stat-desc">Semaine N vs N-1</div>
+      <div class="stat-desc">{% if periode == 'mois' %}Mois N vs N-1{% else %}Semaine N vs N-1{% endif %}</div>
     </div>
 
   </div>
@@ -63,7 +65,7 @@
       <div class="flex items-center justify-between mb-3">
         <div>
           <h2 class="card-title text-base">Par superviseur</h2>
-          <p class="text-xs text-base-content/50 mt-0.5">Quel superviseur vend ce produit cette semaine ?</p>
+          <p class="text-xs text-base-content/50 mt-0.5">Quel superviseur vend ce produit {% if periode == 'mois' %}ce mois-ci{% else %}cette semaine{% endif %} ?</p>
         </div>
         <span class="badge badge-primary badge-outline">{{ superviseurs_stats|length }}</span>
       </div>
@@ -100,7 +102,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun résultat cette semaine</td>
+              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun résultat sur la période sélectionnée</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -115,7 +117,7 @@
       <div class="flex items-center justify-between mb-3">
         <div>
           <h2 class="card-title text-base">Par agent</h2>
-          <p class="text-xs text-base-content/50 mt-0.5">Quels agents vendent réellement ce produit cette semaine ?</p>
+          <p class="text-xs text-base-content/50 mt-0.5">Quels agents vendent réellement ce produit {% if periode == 'mois' %}ce mois-ci{% else %}cette semaine{% endif %} ?</p>
         </div>
         <span class="badge badge-secondary badge-outline">{{ agents_stats|length }}</span>
       </div>
@@ -150,7 +152,7 @@
             </tr>
             {% empty %}
             <tr>
-              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun résultat cette semaine</td>
+              <td colspan="4" class="text-center py-8 text-base-content/40">Aucun résultat sur la période sélectionnée</td>
             </tr>
             {% endfor %}
           </tbody>

@@ -48,11 +48,26 @@ Génère la synthèse globale de la santé commerciale et des alertes de l'écos
 Interface d'analyse granulaire permettant d'évaluer les flux de marchandises sortantes (kg) selon des filtres temporels et structurels.
 
 * **Template associé** : `surveillance/kg_vendu/liste_kg_vendu.html`
-* **Paramètres d'URL interceptés (`GET`)** : `periode` (semaine ou mois), `superviseur` (ID), `produit` (ID).
+* **Paramètres d'URL interceptés (`GET`)** : `periode` (semaine ou mois — implémenté le 2026-08-13, la vue
+  ne le lisait pas jusque-là malgré cette section), `superviseur` (ID), `produit` (ID).
 * **Données et Contextes injectés** :
-* Les statistiques globales et de performance (`kpis`, `superviseurs_stats`, `agents_stats`) générées dynamiquement par `ListeKgVenduService`.
+* Les statistiques globales et de performance (`kpis`, `superviseurs_stats`, `agents_stats`) générées dynamiquement par `ListeKgVenduService` — le service reste agnostique de `periode`, il reçoit juste `(date_debut, date_fin)` déjà résolues par la vue (`ComparaisonPeriodeService.mois()`/`week_utils.parse_semaine`).
 * La liste des superviseurs actifs d'entrepôt (utilisateurs filtrés sur `Agent.objects.filter(type_agent="entrepot", est_actif=True)`).
 * L'intégralité du catalogue des produits pour alimenter les listes de sélection des filtres de l'interface.
+
+**Filtre période partagé** (`partials/_filtre_periode.html`, 2026-08-13) : bascule Semaine/Mois
+(liens `?periode=semaine|mois`, défaut semaine) + champ de saisie adapté (`<input type="week">` ou
+`<input type="month">`). Réutilisé par `liste_kg_vendu.html` et `detail_produit.html` — remplace
+`partials/_filtre_semaine.html` sur ces deux pages (`_filtre_semaine.html` reste utilisé tel quel par
+`dashboard_surveillance.html`/`detail_superviseur.html`, qui n'ont pas de mode mensuel). Utilitaires
+associés : `week_utils.parse_mois`/`date_to_month_string`/`qs_mois`,
+`ComparaisonPeriodeService.mois(debut)`/`mois_prec(debut)` (variantes paramétrées de
+`mois_actuel()`/`mois_precedent()`, qui restent inchangées pour leurs appelants existants).
+
+`detail_superviseur.html` a par ailleurs reçu (2026-08-13) un filtre **produit** dédié sur son tableau
+Agents (`DetailSuperviseurService.get_data(..., produit=...)`), sur le même modèle que
+`ListeKgVenduService.get_agents(..., produit=...)` — restreint uniquement ce tableau, jamais les KPI
+globaux du superviseur.
 
 
 
@@ -77,19 +92,45 @@ Ces deux vues sont transverses : atteignables depuis "Kg vendus", "Anomalies pri
 
 ### 5. Suivi Durée de Vie du Stock (`StockRotationView`)
 
-Vue dédiée au thème "Stock & Rotation" (Sprint 04 / Chantier 2 du backlog). Délégation complète au service `StockAgeService` (`surveillance/services/stock_age_service.py`), sur le modèle exact de `SurveillancePrixService`.
+Vue dédiée au thème "Stock & Rotation" (Sprint 04 / Chantier 2 du backlog). Délégation complète au
+service `StockAgeService` (`surveillance/services/stock_age_service.py`).
+
+**Recadrage du 2026-08-13** : cette page affiche désormais **uniquement le stock dormant à l'entrepôt
+central** (non distribué). Elle n'affiche plus ni la rétention chez les superviseurs/agents, ni
+l'activité commerciale des agents — ces deux tableaux ont été retirés (`RotationLenteListView`
+supprimée, avec sa route `/surveillance/stock-rotation/rotation-lente/`, son template et son partial
+`_table_rotation_lente.html`) car ils faisaient doublon, avec moins de précision, avec
+`direction.suivi_distributions` (filtrable par agent/superviseur/produit/période, quantité restante
+réelle par distribution) — les mélanger sur cette page induisait en erreur plutôt qu'il n'aidait.
 
 * **Template associé** : `surveillance/stock_rotation/dashboard_stock.html`.
-* **Pas de filtre semaine** : les deux alertes se calculent sur une fenêtre glissante depuis `timezone.now()` (constantes `DELAI_ROTATION_JOURS = 2`, `DELAI_STOCK_DORMANT_JOURS = 14` dans `surveillance/constants.py`), pas depuis une semaine calendaire sélectionnée.
-* **Alerte 1 — rotation lente** (`StockAgeService.agents_sans_vente_recente()`) : `DetailDistribution` dont la distribution (`DistributionAgent.date_distribution`) date de plus de 2 jours, et dont la dernière `Vente` non supprimée associée (s'il y en a une) date aussi de plus de 2 jours. Une seule requête SQL (agrégation `Max` + filtre `HAVING` via `Q(OR)`), jamais de boucle Python avec requête par itération. Chaque ligne porte l'ID de la `DistributionAgent` et du `DetailDistribution` (liens directs vers l'admin Django), pour permettre la suppression d'un enregistrement erroné.
-* **Alerte 2 — stock dormant** (`StockAgeService.lots_stock_dormant()`) : deux sources fusionnées, chacune filtrée avec `quantite_restante > 0` et une ancienneté de plus de 14 jours —
-  * `LotEntrepot` encore en entrepôt central (ancienneté sur `date_reception`) ;
-  * `AffectationLotSuperviseur` mis à disposition d'un superviseur mais pas encore redistribué à un agent terrain (ancienneté sur `date_affectation`).
+* **Source** : `StockAgeService.lots_dormants_entrepot()` / `count_lots_dormants_entrepot()` /
+  `valeur_stock_dormant_entrepot()` — méthodes dédiées UI, requêtes SQL pures sur `LotEntrepot`
+  uniquement (`quantite_restante > 0`, `date_reception` antérieure à `DELAI_STOCK_DORMANT_JOURS = 15`
+  jours, postérieure à `DATE_PLANCHER_STOCK`). Aucun calcul de rétention superviseur/agent déclenché
+  par cette page.
+* Vue dédiée « voir tout » : `StockDormantListView` (`/surveillance/stock-rotation/stock-dormant/`),
+  paginée (`Paginator`, 20/page), réutilisant `partials/_table_stock_dormant.html` (recentré
+  entrepôt-only : plus de branche superviseur/agent dans le template).
+* Le dashboard global (`DashboardSurveillanceView`) affiche le même total (`nb_lots_dormants`,
+  entrepôt uniquement) dans sa carte « Stock dormant ».
 
-  Chaque ligne porte `reference_lot`, la localisation ("Entrepôt central" ou le superviseur concerné) et l'ID de l'objet source (lien admin direct : `LotEntrepot` ou `AffectationLotSuperviseur` selon l'origine).
-* **Plancher `DATE_PLANCHER_STOCK`** (`surveillance/constants.py`, actuellement `date(2026, 7, 1)`) : les distributions/affectations antérieures sont ignorées par les deux alertes — données historiques non fiables pour ce type de détection. Valeur ajustable indépendamment de `DATE_PLANCHER_PRIX`, même si les deux partagent aujourd'hui la même date.
-* Chaque alerte a sa méthode `count_*` (COUNT SQL pur, pour les badges) et sa méthode de détail avec `limit` appliqué au niveau SQL.
-* Le dashboard global (`DashboardSurveillanceView`) n'affiche qu'un résumé chiffré agrégé (carte "Stock & Rotation", même traitement que la carte "Anomalies prix") — pas de tableau détaillé dupliqué. La vue `StockRotationView` affiche un aperçu (10 premiers par alerte) avec un lien "Voir tout →" vers deux vues dédiées : `RotationLenteListView` (`/surveillance/stock-rotation/rotation-lente/`) et `StockDormantListView` (`/surveillance/stock-rotation/stock-dormant/`), toutes deux réutilisant les partials `partials/_table_rotation_lente.html` et `partials/_table_stock_dormant.html`, paginées (`Paginator`, 20 par page, `partials/_pagination.html` en style DaisyUI `join`/`btn`).
+#### Ce que cette page ne fait plus (et pourquoi) — voir `monitoring/APP_MONITORING.md`
+
+L'UI et la notification Telegram n'ont pas la même portée : `StockAgeService` garde ses méthodes
+3-origines (`lots_stock_dormant()`, `count_lots_stock_dormant()`, `valeur_stock_dormant()`, seuils
+différenciés entrepôt/superviseur/agent) et son calcul d'activité commerciale globale
+(`agents_sans_vente_recente()`), mais **exclusivement pour le moteur d'alertes de `monitoring`** —
+plus aucune vue `surveillance` ne les appelle.
+
+**Incident de performance corrigé** : avant ce recadrage, `StockRotationView` appelait ces méthodes
+3-origines, dont le calcul de rétention agent (`_lignes_stock_retenu_agents`, N+1 sur
+`DetailDistribution.quantite_restante_calculee`, property à 2 requêtes par ligne) — répété 3 fois par
+requête HTTP (liste + `count_*` + `valeur_*`, chacun recalculant indépendamment). Observé en
+production : ~2400 requêtes SQL, 7s de temps de réponse sur `/surveillance/stock-rotation/`. Les
+nouvelles méthodes entrepôt-only n'exécutent jamais ce calcul. Testé (`StockRotationViewTestCase`,
+`surveillance/tests.py`) : la page reste sous un budget de 40 requêtes même avec plusieurs
+distributions âgées en base.
 
 ---
 

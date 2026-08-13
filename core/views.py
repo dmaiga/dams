@@ -35,16 +35,16 @@ from .models import (
     Dette, PaiementDette, BonusAgent,Fournisseur,
     JournalModificationDistribution, MouvementStock,
     Recouvrement,VersementBancaire,VersementBancaire,
-    RecuVersement,FactureLotEntrepot
+    RecuVersement,FactureLotEntrepot,RecouvrementSuperviseur
 )
 
 # Project forms
 from .forms import (
     DepenseForm, FactureLotForm, VenteDetailAgentForm,VenteGrosAgentForm,
-    VenteSuperviseurForm,DistributionForm, ReceptionLotForm, 
+    VenteSuperviseurForm,DistributionForm, ReceptionLotForm,
     DetteForm, PaiementDetteForm,RecouvrementForm,TelephoneOrUsernameLoginForm,
     FournisseurForm,VersementForm,FactureLotForm,RecuVersementForm,
-    PerteForm,DepenseForm
+    PerteForm,DepenseForm,VersementSuperviseurFormSet,VersementSuperviseurGlobalForm
 
 )
 
@@ -1520,6 +1520,10 @@ def gestion_factures_lot(request, lot_id):
 def creer_versement(request):
     agent_connecte = request.user.agent
 
+    if agent_connecte.est_gestionnaire_stock:
+        messages.error(request, "❌ Utilisez « Versement superviseurs » pour enregistrer un versement.")
+        return redirect("access_denied")
+
     if request.method == "POST":
         form = VersementForm(request.POST, request.FILES)
         if form.is_valid():
@@ -1535,6 +1539,88 @@ def creer_versement(request):
         {
             "form": form,
             "rot": agent_connecte
+        }
+    )
+
+
+@login_required
+def verser_superviseurs_gestionnaire(request):
+    """
+    Collecte groupée par le gestionnaire de stock : un montant reçu par
+    superviseur actif, sans solde préaffiché. Chaque ligne saisie crée un
+    RecouvrementSuperviseur (réduit le solde individuel — c'est le correctif
+    du bug sprint-07 Constat 1) ; un seul VersementBancaire + un seul
+    RecuVersement sont créés pour toute la soumission.
+    """
+    agent_connecte = request.user.agent
+    if not agent_connecte.est_gestionnaire_stock:
+        return redirect('access_denied')
+
+    superviseurs = Agent.objects.filter(type_agent='entrepot', est_actif=True)
+    initial = [{'superviseur': superviseur.pk, 'montant': None} for superviseur in superviseurs]
+
+    if request.method == "POST":
+        formset = VersementSuperviseurFormSet(request.POST, initial=initial)
+        global_form = VersementSuperviseurGlobalForm(request.POST, request.FILES)
+        if formset.is_valid() and global_form.is_valid():
+            montant_hors_vente = global_form.cleaned_data.get('montant_hors_vente') or Decimal('0.00')
+            bordereau = global_form.cleaned_data.get('bordereau')
+            description = global_form.cleaned_data.get('description')
+            maintenant = timezone.now()
+
+            nb_traites = 0
+            total_montant = Decimal('0.00')
+            with transaction.atomic():
+                for form in formset:
+                    montant = form.cleaned_data.get('montant')
+                    if not montant:
+                        continue
+
+                    superviseur = form.cleaned_data['superviseur']
+                    RecouvrementSuperviseur.objects.create(
+                        superviseur=superviseur,
+                        rot=agent_connecte,
+                        montant=montant,
+                        date_recouvrement=maintenant,
+                    )
+                    total_montant += montant
+                    nb_traites += 1
+
+                if nb_traites:
+                    versement = VersementBancaire.objects.create(
+                        effectue_par=agent_connecte,
+                        montant_vente=total_montant,
+                        montant_hors_vente=montant_hors_vente,
+                        description=description,
+                        date_versement_reelle=maintenant,
+                    )
+                    if bordereau:
+                        RecuVersement.objects.create(
+                            versement=versement,
+                            fichier=bordereau,
+                            description=f"Bordereau pour versement {versement.id}",
+                        )
+
+            if nb_traites:
+                messages.success(request, f"{nb_traites} superviseur(s) versé(s) avec succès.")
+                return redirect("liste_versement")
+            messages.info(request, "Aucun montant saisi — rien à traiter.")
+        else:
+            messages.error(request, "Veuillez corriger les erreurs ci-dessous.")
+    else:
+        formset = VersementSuperviseurFormSet(initial=initial)
+        global_form = VersementSuperviseurGlobalForm()
+
+    lignes = list(zip(formset.forms, superviseurs))
+
+    return render(
+        request,
+        "core/factures/verser_superviseurs_gestionnaire.html",
+        {
+            "formset": formset,
+            "global_form": global_form,
+            "lignes": lignes,
+            "page_title": "Versement superviseurs",
         }
     )
 

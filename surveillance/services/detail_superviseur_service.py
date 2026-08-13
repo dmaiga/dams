@@ -13,7 +13,7 @@ from surveillance.services.vente_service import KG_EXPRESSION
 class DetailSuperviseurService:
 
     @staticmethod
-    def get_data(superviseur, debut_semaine=None):
+    def get_data(superviseur, debut_semaine=None, produit=None):
         from surveillance.constants import DATE_PLANCHER_VENTES
         if debut_semaine:
             debut_actuel, fin_actuel = ComparaisonPeriodeService.semaine(debut_semaine)
@@ -40,14 +40,19 @@ class DetailSuperviseurService:
 
         variation = ComparaisonService.variation(kg_actuel, kg_prec)
 
-        # 1 requête : kg + nb produits distincts par agent
+        # 1 requête : kg + nb produits distincts par agent — filtrable par produit
+        # (n'affecte que ce tableau, pas les KPI globaux du superviseur, même
+        # convention que ListeKgVenduService.get_agents).
+        agent_qs = Vente.objects.filter(
+            **base,
+            date_vente__date__gte=max(debut_actuel, DATE_PLANCHER_VENTES),
+            date_vente__date__lte=fin_actuel,
+        )
+        if produit:
+            agent_qs = agent_qs.filter(detail_distribution__lot__produit=produit)
+
         agent_rows = (
-            Vente.objects
-            .filter(
-                **base,
-                date_vente__date__gte=max(debut_actuel, DATE_PLANCHER_VENTES),
-                date_vente__date__lte=fin_actuel,
-            )
+            agent_qs
             .values('agent')
             .annotate(
                 kg=Sum(KG_EXPRESSION),

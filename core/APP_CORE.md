@@ -125,3 +125,34 @@ Le modèle `Alerte` centralise les notifications critiques poussées vers la dir
 `Vente.commentaire_perte` (nouveau champ) couvre le cas d'un produit vendu à l'unité (conditionné) : aucune quantité n'est déduite nulle part, seulement une note — le workflow de vente reste inchangé pour ce type de produit (décision produit : ne pas complexifier un cas qui n'a pas besoin d'un vrai décompte).
 
 Migrations : `0111_perte_detail_distribution`, `0112_vente_commentaire_perte`, `0113_perte_vente`.
+
+---
+
+## 9. Versement dédié au gestionnaire de stock (`verser_superviseurs_gestionnaire`) — sprint-07
+
+Bug corrigé : le gestionnaire de stock utilisait jusqu'ici `creer_versement`/`VersementForm`, qui crée
+uniquement un `VersementBancaire` global — **sans jamais créer de `RecouvrementSuperviseur`**. Le
+solde des superviseurs n'était donc jamais réduit par ce chemin, et le moteur d'alerte (`monitoring`,
+`evaluer_solde_superviseur`) répétait indéfiniment l'alerte « solde » alors que l'argent avait bien
+été remis dans les faits.
+
+* **`verser_superviseurs_gestionnaire`** (`core/views.py`, route `versement-superviseurs/`) — accès
+  restreint à `agent.est_gestionnaire_stock`. Formulaire dédié : une ligne par superviseur actif
+  (`VersementSuperviseurFormSet`, `core/forms.py`) avec uniquement un montant libre — **aucun solde
+  n'est préaffiché ni comparé**, contrairement à `finance.recouvrement_versement_groupe`. Un champ
+  hors-vente et un bordereau uniques pour toute la soumission (`VersementSuperviseurGlobalForm`),
+  au lieu d'un champ par ligne côté `finance`.
+* Chaque ligne saisie crée un `RecouvrementSuperviseur` (réduit le solde individuel — c'est le
+  correctif du bug). Une fois la boucle terminée, un seul `VersementBancaire` (+ un seul
+  `RecuVersement` si bordereau fourni) est créé pour toute la soumission, dans un
+  `transaction.atomic()`.
+* **`creer_versement`/`VersementForm`** restent inchangés pour ROT et Direction, mais le gestionnaire
+  de stock n'y a plus accès : `VersementForm.save()` n'accepte plus `rot.est_gestionnaire_stock`
+  (seuls `est_rot`/`est_direction`), et `creer_versement` redirige explicitement vers `access_denied`
+  si un gestionnaire de stock tente d'y accéder.
+* `core/templates/core/factures/liste_versement.html` conditionne le bouton « + Versement » selon le
+  rôle (`verser_superviseurs_gestionnaire` pour le gestionnaire de stock, `creer_versement` pour les
+  autres) — le lien de menu « Versements » (`base.html`) reste `liste_versement` pour tous, inchangé.
+* Les écrans existants `finance.recouvrement_versement_groupe` (Direction) et
+  `agents.recouvrer_superviseur` (ROT) restent inchangés, en parallèle (périmètre du sprint-07 limité
+  au gestionnaire de stock).

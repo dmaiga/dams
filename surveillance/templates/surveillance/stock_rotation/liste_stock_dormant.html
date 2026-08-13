@@ -16,7 +16,7 @@
   <div class="space-y-3 border-b border-base-200 pb-4">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">Stock dormant</h1>
-      <p class="text-sm text-base-content/60 mt-0.5">Liste complète des lots en entrepôt ou chez un superviseur, non ou partiellement distribués, depuis plus de 14 jours.</p>
+      <p class="text-sm text-base-content/60 mt-0.5">Liste complète des lots en entrepôt central, non ou partiellement distribués, depuis plus de 15 jours.</p>
     </div>
     <div class="overflow-x-auto">
       {% include "partials/_nav_themes.html" %}
@@ -31,7 +31,7 @@
     <div class="stat bg-base-100 shadow rounded-box border-l-4 border-info border border-base-200">
       <div class="stat-title text-xs uppercase font-bold tracking-wide">Valeur immobilisée</div>
       <div class="stat-value text-2xl text-info">{{ valeur_stock_dormant|floatformat:0 }}</div>
-      <div class="stat-desc">FCFA — entrepôt central + superviseurs</div>
+      <div class="stat-desc">FCFA — entrepôt central</div>
     </div>
   </div>
 
