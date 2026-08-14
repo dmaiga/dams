@@ -1,7 +1,9 @@
 # Sprint 07 — Collecte superviseur du gestionnaire de stock + alertes groupées par superviseur
 
-**Statut** : 📋 cadré — décisions actées avec mdmaiga le 12/08/2026, prêt à implémenter (aucun code
-écrit sur ces points).
+**Statut** : ✅ terminé — les deux constats sont implémentés (vérifié le 14/08/2026 :
+`core.views.verser_superviseurs_gestionnaire`, `VersementForm.save()` restreint à
+`est_rot`/`est_direction`, regroupement par superviseur dans
+`monitoring/services/moteur_alerte.py`).
 
 ## Contexte
 

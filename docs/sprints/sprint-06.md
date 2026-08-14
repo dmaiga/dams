@@ -1,6 +1,8 @@
 # Sprint 06 — Corrections & arbitrages : Engagements superviseur ↔ champ (dams_agro)
 
-**Statut** : 📋 à cadrer — constats de mdmaiga du 05/08/2026, à trancher avant la prochaine session (aucun code écrit sur ces points).
+**Statut** : ✅ terminé — les 5 constats sont tranchés et implémentés (vérifié le 14/08/2026 :
+`finance.services.synchroniser_engagements_champ`, `finance:mes_engagements_champ`, retrait du
+tableau "Produits en circulation", `date_versement` validé sur `LigneRecouvrementVersementForm`).
 
 ## Contexte
 
