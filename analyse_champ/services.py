@@ -267,6 +267,22 @@ def get_engagement_detail(engagement_id):
     return _request_engagements(url)
 
 
+# =========================
+# CESSIONS
+# =========================
+
+def get_cessions_dashboard(params=None):
+    """
+    Indicateurs agrégés des cessions dams_champs (GET /api/cessions/dashboard/,
+    non authentifié — endpoint de lecture ouvert comme le reste de l'API
+    dams_agro hors `engagements`, voir dams_champs/docs/api/api_structure.md).
+    Sert au calcul du KPI « CA total » du dashboard direction (dashboard_view) :
+    `dashboard.revenus` (finance) + `montant_total` (cessions), sans dupliquer
+    le calcul de la valeur des cessions ici — c'est dams_champs qui le fait.
+    """
+    return fetch_json('cessions/dashboard/', params=params)
+
+
 def creer_engagement_dams_agro(*, nature, montant, commentaire, reference_superviseur):
     """
     POST /api/engagements/ — crée l'engagement côté dams_agro (source de

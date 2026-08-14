@@ -132,6 +132,33 @@
 
 </div>
 
+<!-- CA total (champ + cessions DAMS Distribution) -->
+<!-- Volontairement séparé de la grille Revenus/Dépenses/Résultat
+     ci-dessus : ce n'est PAS un cinquième KPI de même nature, c'est une
+     somme (CA champ + CA cessions) qui ne doit jamais être confondue avec
+     Revenus (CA champ seul) ni avec le détail des cessions. -->
+<div class="card bg-base-100 shadow border-l-4 border-info">
+
+    <div class="card-body">
+
+        <h2 class="card-title">
+            CA total (champ + cessions DAMS Distribution)
+        </h2>
+
+        <div class="stat-value text-info">
+            {{ dashboard.ca_total|fcfa }}
+        </div>
+
+        <p class="text-sm text-base-content/70">
+            Dont CA champ (Revenus) : {{ dashboard.revenus|fcfa }} FCFA
+            &nbsp;+&nbsp;
+            CA cessions DAMS Distribution : {{ dashboard.ca_cession|fcfa }} FCFA
+        </p>
+
+    </div>
+
+</div>
+
 <!-- KPIs secondaires -->
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

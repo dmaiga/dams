@@ -102,12 +102,16 @@
             id="period-select"
             class="select select-bordered"
         >
-            <option value="today" {% if selected_period == 'today' or not selected_period %}selected{% endif %}>
+            <option value="today" {% if selected_period == 'today' %}selected{% endif %}>
                 Aujourd'hui
             </option>
 
             <option value="week" {% if selected_period == 'week' %}selected{% endif %}>
                 Cette semaine
+            </option>
+
+            <option value="month" {% if selected_period == 'month' or not selected_period %}selected{% endif %}>
+                Ce mois
             </option>
 
             <option value="custom" {% if selected_period == 'custom' %}selected{% endif %}>

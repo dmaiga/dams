@@ -1,9 +1,12 @@
 import re
 
 from django.shortcuts import render
+from decimal import Decimal
+
 from analyse_champ.services import (
     DamsAgroAPIError,
     get_dashboard,
+    get_cessions_dashboard,
 
     get_operations,
     get_operation_detail,
@@ -61,7 +64,20 @@ def dashboard_view(request):
     """Récupère les données du dashboard et les envoie au template."""
     params = build_filters(request)
     dashboard = get_dashboard(params=params)
-    
+
+    # KPI « CA total » = CA du champ (finance) + CA des cessions vers DAMS
+    # Distribution — additionné ici, jamais recalculé : la valeur des
+    # cessions (quantite × prix_cession) est déjà calculée côté dams_champs
+    # (GET /api/cessions/dashboard/, voir analyse_champ/services.py).
+    # Volontairement affiché à part de Revenus/Dépenses/Résultat pour ne
+    # pas laisser croire que le CA cession est déjà inclus dans ces
+    # derniers — voir dashboard.html.
+    cessions_dashboard = get_cessions_dashboard(params=params)
+    ca_champ = Decimal(str(dashboard.get('revenus') or 0))
+    ca_cession = Decimal(str(cessions_dashboard.get('montant_total') or 0))
+    dashboard['ca_cession'] = ca_cession
+    dashboard['ca_total'] = ca_champ + ca_cession
+
     return render(request, 'dashboard.html', {'dashboard': dashboard})
 
 # =========================
@@ -79,10 +95,12 @@ def operation_list_view(request):
 
     # Défaut local à cette vue (pas dans build_filters, réutilisée ailleurs
     # sans ce défaut) : premier chargement de page, aucun filtre encore
-    # soumis — "Aujourd'hui" est présélectionné dans le formulaire, la
-    # requête doit refléter la même période dès le premier affichage.
+    # soumis — "Ce mois" est présélectionné dans le formulaire, la requête
+    # doit refléter la même période dès le premier affichage. Un filtre
+    # par défaut sur la seule journée masquait trop d'opérations pour un
+    # premier coup d'œil.
     if 'period' not in request.GET and not periode_params.get('date_from'):
-        periode_params['period'] = 'today'
+        periode_params['period'] = 'month'
 
     operation_type = request.GET.get(
         'type'
