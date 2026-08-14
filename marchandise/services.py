@@ -1,19 +1,25 @@
 """Services metier de l'application marchandise."""
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
+from django.utils import timezone
 
 from core.models import (
+    Agent,
     AffectationLotSuperviseur,
     DetailDistribution,
     DistributionAgent,
+    Fournisseur,
     LotEntrepot,
+    MouvementStock,
+    Produit,
     Vente,
 )
+from core.services.lot_service import generer_reference_lot
 
 
 _NON_RENSEIGNE = object()
@@ -277,3 +283,118 @@ class AffectationLotService:
         if not isinstance(valeur, date):
             raise ValidationError("La date d'affectation corrigee est invalide.")
         return valeur
+
+
+class CessionReceptionService:
+    """Reception d'une cession envoyee par l'app `cessions` de dams_champs
+    (POST /api/cessions/), matérialisée comme un LotEntrepot de stock
+    central — au meme titre qu'une reception manuelle via
+    `core.forms.ReceptionLotForm` (marchandise/views.py::reception_lot).
+
+    dams_champs reste la source de verite de la notion metier "cession" :
+    ce service ne fait que projeter chaque cession recue en un LotEntrepot,
+    sans recreer de notion parallele. Idempotent au niveau base de donnees
+    via `LotEntrepot.cession_idempotency_key` (contrainte unique).
+    """
+
+    # Fournisseur dedie representant DAMS Agro / le champ, deja utilise
+    # pour 36 lots existants a la decouverte du code (2026-08) — reutilise
+    # tel quel plutot que d'introduire un nom concurrent.
+    NOM_FOURNISSEUR_CHAMP = "Champ DAMS"
+
+    # Agent de reception impose par le contrat métier (etape 6) : le
+    # superviseur "entrepot" abdoulaye.kone, distinct de l'agent ROT
+    # "kone.abdoulaye" — ne pas confondre les deux comptes.
+    USERNAME_AGENT_RECEPTION = "abdoulaye.kone"
+
+    @classmethod
+    def recevoir_cession(cls, *, idempotency_key, produit_nom, quantite, prix_unitaire, date_cession):
+        """Cree (ou retrouve) le LotEntrepot correspondant a une cession.
+
+        Retourne un tuple (lot, cree) ou `cree` est False si un lot portant
+        deja cette `idempotency_key` existait (cession retransmise).
+
+        Leve ValidationError si le produit ou l'agent de reception sont
+        introuvables — jamais de creation silencieuse de referentiel.
+        """
+        produit = cls._resoudre_produit(produit_nom)
+        agent = cls._resoudre_agent_reception()
+        fournisseur = cls._resoudre_fournisseur_champ()
+        date_reception = cls._convertir_date_reception(date_cession)
+
+        try:
+            with transaction.atomic():
+                lot = LotEntrepot.objects.create(
+                    produit=produit,
+                    fournisseur=fournisseur,
+                    quantite_initiale=quantite,
+                    quantite_restante=quantite,
+                    prix_achat_unitaire=prix_unitaire,
+                    date_reception=date_reception,
+                    receptionne_par=agent,
+                    reference_lot=generer_reference_lot(),
+                    cession_idempotency_key=idempotency_key,
+                )
+                # Meme invariant que ReceptionLotForm.save() : toute
+                # reception de lot cree systematiquement son mouvement
+                # d'entree — voir marchandise/APP_MARCHANDISE.md.
+                MouvementStock.objects.create(
+                    produit=lot.produit,
+                    lot=lot,
+                    type_mouvement='RECEPTION',
+                    quantite=lot.quantite_initiale,
+                    date_mouvement=lot.date_reception,
+                )
+        except IntegrityError:
+            # La contrainte unique sur cession_idempotency_key est la seule
+            # garantie fiable en cas de requetes concurrentes portant la
+            # meme cle — un simple if exists() prealable ne suffirait pas.
+            lot = LotEntrepot.objects.filter(
+                cession_idempotency_key=idempotency_key
+            ).select_related('produit', 'fournisseur').first()
+            if lot is None:
+                raise
+            return lot, False
+
+        return lot, True
+
+    @staticmethod
+    def _resoudre_produit(produit_nom):
+        try:
+            return Produit.objects.get(nom__iexact=(produit_nom or '').strip())
+        except Produit.DoesNotExist:
+            raise ValidationError(
+                f"Produit inconnu côté DAMS Distribution : « {produit_nom} ». "
+                "Aucun Produit créé automatiquement — le référentiel produit "
+                "doit exister prealablement (core.models.Produit)."
+            )
+
+    @classmethod
+    def _resoudre_agent_reception(cls):
+        try:
+            return Agent.objects.select_related('user').get(
+                user__username=cls.USERNAME_AGENT_RECEPTION
+            )
+        except Agent.DoesNotExist:
+            raise ValidationError(
+                "Agent de reception introuvable "
+                f"(username={cls.USERNAME_AGENT_RECEPTION!r}). "
+                "Precondition : ce compte doit exister dans dams avant toute "
+                "reception de cession — aucune creation automatique."
+            )
+
+    @classmethod
+    def _resoudre_fournisseur_champ(cls):
+        fournisseur, _ = Fournisseur.objects.get_or_create(
+            nom=cls.NOM_FOURNISSEUR_CHAMP
+        )
+        return fournisseur
+
+    @staticmethod
+    def _convertir_date_reception(date_cession):
+        """Cession -> DateTimeField : minuit (heure du projet, UTC) le jour
+        de la cession. Les lots recus manuellement portent l'heure reelle de
+        saisie ; ceux issus d'une cession n'en ont pas — minuit est la
+        convention la moins arbitraire pour une date sans heure source."""
+        naive = datetime.combine(date_cession, time.min)
+        return timezone.make_aware(naive) if timezone.is_naive(naive) else naive

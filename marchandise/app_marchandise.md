@@ -22,6 +22,33 @@ Elle ne connaît ni les paiements, ni les banques, ni les dettes fournisseurs.
 
 ---
 
+## API — réception des cessions dams_champs
+
+`POST /api/cessions/` (hors namespace `/marchandise/`, monté directement
+dans `dams/urls.py`) : reçoit une cession déclarée côté dams_champs (app
+`cessions`) et la matérialise comme un `LotEntrepot` de stock central.
+Authentifié par clé API dédiée (`X-Api-Key`,
+`settings.DAMS_CHAMPS_API_KEY`, `marchandise/permissions.py`), pas par
+session — seul endpoint du repo `dams` accepté en écriture. Contrat
+complet, correspondance des champs et mécanisme d'idempotence documentés
+dans `docs/API_CESSIONS.md`.
+
+- `marchandise/serializers.py::CessionReceptionSerializer` — validation
+  structurelle du payload.
+- `marchandise/services.py::CessionReceptionService` — résolution
+  produit/fournisseur/agent, création atomique `LotEntrepot` +
+  `MouvementStock`, idempotence au niveau base de données
+  (`LotEntrepot.cession_idempotency_key`, contrainte unique).
+- `marchandise/api_views.py::CessionReceptionAPIView` — vue mince
+  (authentification, validation, délégation au service).
+
+dams_champs reste la source de vérité de la notion métier "cession" ;
+`dams` ne fait que la recevoir, sans workflow supplémentaire (pas de
+`Vente`, pas de `DetailDistribution`, pas d'affectation créée à cette
+étape).
+
+---
+
 ## URLs (`/marchandise/`)
 
 | Nom | URL | Accès |
@@ -48,6 +75,7 @@ Les modèles restent dans `core.models`. `marchandise` les importe sans les poss
 | `Fournisseur` | Référentiel fournisseur |
 | `DistributionAgent` | Créé si distribution directe à un agent lors de l'affectation |
 | `DetailDistribution` | Vérité économique de la distribution (quantité réellement distribuée, base des ventes et des recouvrements). |
+| `LotEntrepot.cession_idempotency_key` | UUID nullable/unique — clé d'idempotence des lots créés via `POST /api/cessions/` (`NULL` pour tout lot reçu manuellement) |
 
 ---
 
@@ -76,6 +104,25 @@ Le prix dépend du type de l'agent qui vendra (`terrain`/mami → détail unique
 ---
 
 ## Service métier (`marchandise/services.py`)
+
+### `CessionReceptionService.recevoir_cession(...)`
+
+Point d'entrée métier de la réception d'une cession dams_champs. Voir
+`docs/API_CESSIONS.md` pour le détail complet (correspondance de champs,
+idempotence, atomicité). Résumé :
+
+- Résout `produit` (`Produit.objects.get`, jamais créé automatiquement),
+  `receptionne_par` (`Agent` username `abdoulaye.kone`, jamais créé
+  automatiquement) et `fournisseur` (`get_or_create` sur `"Champ DAMS"`,
+  fournisseur dédié déjà existant, jamais dupliqué).
+- Crée `LotEntrepot` + `MouvementStock(type_mouvement='RECEPTION')` dans un
+  même `transaction.atomic()` — même invariant que
+  `ReceptionLotForm.save()`.
+- Idempotent au niveau base de données via la contrainte unique sur
+  `LotEntrepot.cession_idempotency_key` : une `IntegrityError` (requêtes
+  concurrentes portant la même clé) est rattrapée pour relire et retourner
+  le lot déjà créé, plutôt qu'un `if exists()` applicatif non fiable en
+  cas de concurrence.
 
 ### `AffectationLotService.corriger_affectation(...)`
 

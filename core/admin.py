@@ -91,10 +91,11 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(LotEntrepot)
 class LotEntrepotAdmin(admin.ModelAdmin):
-    list_display = ['produit', 'fournisseur', 'quantite_initiale', 'quantite_restante', 'prix_achat_unitaire', 'date_reception']
+    list_display = ['produit', 'fournisseur', 'quantite_initiale', 'quantite_restante', 'prix_achat_unitaire', 'date_reception', 'cession_idempotency_key']
     list_filter = ['produit', 'fournisseur', 'date_reception']
-    search_fields = ['produit__nom', 'fournisseur__nom', 'reference_lot']
-    
+    search_fields = ['produit__nom', 'fournisseur__nom', 'reference_lot', 'cession_idempotency_key']
+    readonly_fields = ['cession_idempotency_key']
+
     def get_queryset(self, request):
         """Optimise les requêtes pour éviter N+1 sur produit et fournisseur"""
         return super().get_queryset(request).select_related('produit', 'fournisseur')

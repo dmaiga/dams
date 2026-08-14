@@ -239,19 +239,8 @@ class ReceptionLotForm(forms.ModelForm):
             instance.produit = produit
 
         if not instance.reference_lot:
-            prefix = timezone.now().strftime("%Y%m%d")
-            dernier_lot = LotEntrepot.objects.filter(
-                reference_lot__startswith=prefix
-            ).order_by('-reference_lot').first()
-            if dernier_lot:
-                try:
-                    dernier_num = int(dernier_lot.reference_lot[-4:])
-                    nouveau_num = dernier_num + 1
-                except (ValueError, IndexError):
-                    nouveau_num = 1
-            else:
-                nouveau_num = 1
-            instance.reference_lot = f"{prefix}-{nouveau_num:04d}"
+            from core.services.lot_service import generer_reference_lot
+            instance.reference_lot = generer_reference_lot()
 
         # ----- Invariant métier -----
         instance.quantite_restante = instance.quantite_initiale

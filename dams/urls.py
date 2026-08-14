@@ -21,6 +21,7 @@ from django.contrib.auth import views as auth_views
 from core.views import logout_user,custom_login
 from django.conf import settings
 from django.conf.urls.static import static
+from marchandise.api_views import CessionReceptionAPIView
 
 urlpatterns = [
         # URLs d'authentification
@@ -42,6 +43,10 @@ urlpatterns = [
     path("finance/", include(("finance.urls", "finance"), namespace="finance"),),
     path('bi/', include('bi.urls')),
 
+    # Réception des cessions dams_champs (app `cessions`) → LotEntrepot.
+    # Authentifié par clé API dédiée (X-Api-Key, settings.DAMS_CHAMPS_API_KEY),
+    # pas par session — voir docs/API_CESSIONS.md.
+    path('api/cessions/', CessionReceptionAPIView.as_view(), name='api_cessions'),
 
 ]
 if settings.DEBUG:

@@ -999,9 +999,23 @@ class LotEntrepot(models.Model):
         decimal_places=2,
         default=0
     )
-    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True) 
+    reference_lot = models.CharField(max_length=100, unique=True, blank=True, null=True)
 
- 
+    # Clé d'idempotence de la cession source (app `cessions` de dams_champs),
+    # renseignée uniquement pour les lots créés via POST /api/cessions/.
+    # NULL pour tout lot reçu manuellement (ReceptionLotForm) — PostgreSQL
+    # autorise plusieurs NULL sous une contrainte unique, donc `unique=True`
+    # ne s'applique qu'aux lots réellement issus d'une cession. Sert à
+    # détecter qu'une même cession a déjà été intégrée si dams_champs la
+    # retransmet (voir marchandise/services.py::CessionReceptionService).
+    cession_idempotency_key = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        verbose_name="Clé d'idempotence de la cession source",
+    )
+
+
 
     def __str__(self):
         produit = self.produit.nom if self.produit else "Produit inconnu"

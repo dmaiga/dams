@@ -55,6 +55,13 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     "http://localhost:8000,http://127.0.0.1:8000"
 ).split(",")
 
+# Clé API attendue de dams_champs sur POST /api/cessions/ (en-tête
+# X-Api-Key). Sens inverse de DAMS_DISTRIBUTION_API_KEY ci-dessus (qui
+# authentifie `dams` en tant qu'appelant vers dams_agro sur son
+# /api/engagements/) : ici `dams` est le serveur qui reçoit. Secret dédié,
+# distinct de DAMS_DISTRIBUTION_API_KEY — jamais codé en dur.
+DAMS_CHAMPS_API_KEY = os.getenv("DAMS_CHAMPS_API_KEY", "")
+
 
 # URLs de redirection
 LOGIN_URL = 'login'
@@ -72,11 +79,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.humanize', 
+    'django.contrib.humanize',
     'django_extensions',
     'mathfilters',
     'tinymce',
     'debug_toolbar',
+    'rest_framework',
     'core',
     'agents',
     'direction',
