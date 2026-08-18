@@ -57,11 +57,25 @@
 .bi-scope .bi-onglet:hover { color: var(--ink); background: transparent; }
 .bi-scope .bi-onglet.active { color: var(--ink); border-bottom-color: var(--accent); background: transparent; }
 
+/* ---- Toolbar d'en-tête (18/08/2026) : regroupe en une seule rangée ce qui était empilé
+   verticalement (retour, bascule mois/semaine, formulaire de période, bouton masquer les
+   données sensibles) — filtres à gauche, actions à droite, wrap propre sur petit écran. ---- */
+.bi-scope .bi-toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 0 18px; margin-bottom: 0; border-bottom: 1px solid var(--border);
+}
+.bi-scope .bi-toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.bi-scope .bi-toolbar-right { display: flex; align-items: center; margin-left: auto; }
+.bi-scope .bi-retour .btn { display: inline-flex; align-items: center; gap: 6px; }
+.bi-scope .bi-toggle-sensible { margin: 0; }
+
 /* ---- Filtres ---- */
-.bi-scope .bi-periode-form,
+.bi-scope .bi-periode-form {
+    display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0;
+}
 .bi-scope .bi-granularite-toggle {
     display: flex; align-items: flex-end; flex-wrap: wrap; gap: 18px;
-    padding: 16px 0 20px; margin-bottom: 0;
+    padding: 0; margin-bottom: 0;
 }
 .bi-scope .bi-periode-form > div { display: flex; flex-direction: column; gap: 5px; }
 .bi-scope .bi-periode-form label {
@@ -138,8 +152,8 @@
 /* ---- Masquage des données sensibles (CA / marge / rentabilité) en entretien ----
    Le masquage lui-même est géré en JS pur (remplacement du texte par des puces,
    cf. dashboard_agents.html) : pas de dépendance à une classe CSS externe pour
-   l'effet visuel, seule la mise en forme du bouton reste ici. */
-.bi-scope .bi-toggle-sensible { margin: 0 0 16px; }
+   l'effet visuel, seule la mise en forme du bouton reste ici. Placé dans .bi-toolbar-right
+   depuis le 18/08/2026 (regroupement des boutons d'en-tête) — la marge vit sur .bi-toolbar. */
 .bi-scope .bi-toggle-sensible .btn { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ---- Sections / panels (remplace ombre portée) ---- */
@@ -179,6 +193,8 @@
 /* ---- Barlist (classements CSS/SVG légers — remplace Chart.js pour produits/agents) ---- */
 .bi-scope .bi-barlist { display: flex; flex-direction: column; gap: 10px; }
 .bi-scope .bi-barrow { display: grid; grid-template-columns: 160px 1fr 108px; align-items: center; gap: 12px; }
+.bi-scope a.bi-barrow-link { text-decoration: none; color: inherit; border-radius: 4px; transition: background-color .12s ease; }
+.bi-scope a.bi-barrow-link:hover { background: var(--surface-2); }
 .bi-scope .bi-barrow .bi-rlabel { font-size: 12.5px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bi-scope .bi-barrow .bi-track { position: relative; height: 16px; background: var(--surface-2); border-radius: 2px; overflow: visible; }
 .bi-scope .bi-barrow .bi-fill { position: absolute; top: 0; left: 0; bottom: 0; max-width: 100%; border-radius: 2px; background: var(--accent); }

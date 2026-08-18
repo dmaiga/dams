@@ -1,0 +1,238 @@
+{% extends "bi/base_dashboard.html" %}
+{% load format_fcfa direction_filters %}
+
+{% block filtre_periode %}
+<div class="bi-toolbar">
+    <div class="bi-toolbar-left">
+        <div class="bi-retour">
+            <a href="{% url 'bi:agents' %}?annee={{ annee }}&mois={{ mois }}" class="btn btn-outline">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+        <div class="bi-granularite-toggle">
+            <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
+            <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
+        </div>
+        <form method="get" class="bi-periode-form">
+            <input type="hidden" name="granularite" value="{{ granularite }}">
+            {% if granularite == "semaine" %}
+            <div>
+                <label for="bi-semaine">Semaine</label>
+                <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
+                    {% for s in semaines_disponibles %}
+                    <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            <div>
+                <label for="bi-annee">Année</label>
+                <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
+            </div>
+            <div>
+                <label for="bi-mois">Mois</label>
+                <select id="bi-mois" name="mois" class="select">
+                    <option value="">—</option>
+                    {% for valeur, libelle in mois_options %}
+                    <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+        </form>
+    </div>
+    <div class="bi-toolbar-right">
+        <div class="bi-toggle-sensible">
+            <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
+                <i class="fas fa-eye-slash"></i>
+                <span>Masquer CA / incentive / marge</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="bi-panel">
+    <h2>{{ agent.full_name }}</h2>
+    <p>
+        Superviseur : {{ agent.superviseur.full_name|default:"—" }}
+        &middot; Type : {{ agent.get_type_agent_display }}
+        &middot; Statut :
+        {% if agent.est_actif %}<span class="bi-badge bi-vert">&nbsp;</span> Actif
+        {% else %}<span class="bi-badge bi-rouge">&nbsp;</span> Inactif{% endif %}
+    </p>
+</div>
+
+<div class="bi-panel">
+    <h2>Atteinte des objectifs — {{ periode_libelle }}</h2>
+    {% if periode_courante %}
+    <div class="bi-kpis">
+        <div class="bi-kpi bi-{{ periode_courante.statut_couleur }}">
+            <div class="bi-kpi-label">Kg vendus (net des pertes)</div>
+            <div class="bi-kpi-valeur">{{ periode_courante.kg_vendus|format_number }} <span class="bi-kpi-unite">kg</span></div>
+            {% if delta_kg_vendus is not None %}
+            <div class="bi-kpi-label">
+                vs {{ periode_precedente_libelle }} :
+                <span class="bi-badge {% if delta_kg_vendus >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+                    {% if delta_kg_vendus >= 0 %}+{% endif %}{{ delta_kg_vendus|format_number }} kg{% if delta_kg_vendus_pct is not None %} ({% if delta_kg_vendus_pct >= 0 %}+{% endif %}{{ delta_kg_vendus_pct|floatformat:0 }}%){% endif %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="bi-kpi bi-{{ periode_courante.statut_couleur }}">
+            <div class="bi-kpi-label">Kg/jour vs objectif 50kg</div>
+            <div class="bi-kpi-valeur">{{ periode_courante.kg_par_jour|default_if_none:"—"|format_number }} <span class="bi-kpi-unite">kg/j</span></div>
+            <div class="bi-kpi-label">{{ periode_courante.statut_label }}</div>
+        </div>
+        <div class="bi-kpi {% if periode_courante.statut_750kg == 'atteint' %}bi-vert{% else %}bi-rouge{% endif %}">
+            <div class="bi-kpi-label">Seuil salaire fixe (750 kg/mois)</div>
+            <div class="bi-kpi-valeur">
+                {% if periode_courante.statut_750kg == 'atteint' %}✅ Atteint{% else %}❌ Sous objectif{% endif %}
+            </div>
+        </div>
+        <div class="bi-kpi">
+            <div class="bi-kpi-label">Incentive ({{ taux_incentive|format_number }} FCFA/kg)</div>
+            <div class="bi-kpi-valeur bi-sensible">{{ periode_courante.incentive_projetee|fcfa }}</div>
+            <div class="bi-kpi-label">Calcul en direct — identique à la vue Direction du module paie</div>
+            {% if granularite == "mois" and periode_courante.incentive %}
+            <div class="bi-kpi-label" style="margin-top:6px;">
+                Verrouillée en paie : <span class="bi-sensible">{{ periode_courante.incentive|fcfa }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <p>Aucune donnée pour cette période.</p>
+    {% endif %}
+
+    <h3>Tendance ({{ granularite|yesno:"semaine,mois" }}, {{ tendance|length }} dernières périodes)</h3>
+    <div class="bi-chart-wrap"><canvas id="chart-agent-tendance"></canvas></div>
+</div>
+
+<div class="bi-panel">
+    <h2>Produits vendus — {{ periode_libelle }}</h2>
+    <div class="overflow-x-auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th class="text-right">Kg vendus</th>
+                    <th class="text-right">Ventes</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produits %}
+                <tr>
+                    <td>{{ p.produit_nom|default:"—" }}</td>
+                    <td class="text-right">{{ p.kg_vendus|format_number }}</td>
+                    <td class="text-right">{{ p.nombre_ventes }}</td>
+                    <td class="text-right bi-sensible">{{ p.ca_total|fcfa }}</td>
+                    <td class="text-right bi-sensible">{{ p.marge|fcfa }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">Aucune vente sur cette période.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="bi-comparaison">Toujours au grain mensuel, même en vue semaine (pas de détail produit hebdomadaire).</p>
+</div>
+
+<div class="bi-panel">
+    <h2>Stock en main <span class="bi-comparaison">(snapshot batch, pas temps réel — mis à jour au dernier passage BI)</span></h2>
+    <div class="overflow-x-auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>Reçu le</th>
+                    <th class="text-right">Stock restant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in stock %}
+                <tr>
+                    <td>{{ s.produit_nom|default:"—" }}</td>
+                    <td>{{ s.date_reception|date:"d/m/Y"|default:"—" }}</td>
+                    <td class="text-right">{{ s.stock_restant_kg|format_number }} kg</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">Aucun stock en main actuellement.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if stock %}
+            <tfoot>
+                <tr>
+                    <td colspan="2"><strong>Total</strong></td>
+                    <td class="text-right"><strong>{{ stock_total_kg|format_number }} kg</strong></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    const donneesTendanceAgent = {{ tendance_chart|safe }};
+    new Chart(document.getElementById('chart-agent-tendance'), {
+        data: {
+            labels: donneesTendanceAgent.labels,
+            datasets: [
+                { type: 'line', label: 'Kg/jour', data: donneesTendanceAgent.kg_par_jour, borderColor: '#163d63', backgroundColor: '#163d63', borderWidth: 2, tension: 0, pointRadius: 3, yAxisID: 'y' },
+                { type: 'line', label: 'Objectif (50 kg/j)', data: donneesTendanceAgent.objectif, borderColor: '#8891a0', borderDash: [6, 4], borderWidth: 1, pointRadius: 0, yAxisID: 'y' },
+                { type: 'bar', label: 'Incentive (FCFA)', data: donneesTendanceAgent.incentive_projetee, backgroundColor: '#c9a83a99', yAxisID: 'y1' },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { font: { size: 12 }, color: '#5b6472' } } },
+            scales: {
+                x: { grid: { color: '#e2e5ea' }, ticks: { color: '#8891a0', font: { size: 11 } } },
+                y: { position: 'left', grid: { color: '#e2e5ea' }, ticks: { color: '#8891a0', font: { size: 11 } } },
+                y1: { position: 'right', grid: { display: false }, ticks: { color: '#8891a0', font: { size: 11 } } },
+            },
+        },
+    });
+
+    (function () {
+        var STORAGE_KEY = "bi-donnees-sensibles-masquees";
+        var toggleBtn = document.getElementById("bi-toggle-donnees-sensibles");
+        var cellules = document.querySelectorAll(".bi-sensible");
+        if (!toggleBtn || !cellules.length) return;
+
+        var MASQUE = "••••••";
+
+        function appliquer(masque) {
+            cellules.forEach(function (cellule) {
+                if (masque) {
+                    if (cellule.dataset.valeurReelle === undefined) {
+                        cellule.dataset.valeurReelle = cellule.textContent;
+                    }
+                    cellule.textContent = MASQUE;
+                } else if (cellule.dataset.valeurReelle !== undefined) {
+                    cellule.textContent = cellule.dataset.valeurReelle;
+                }
+            });
+            toggleBtn.innerHTML = masque
+                ? '<i class="fas fa-eye"></i><span>Afficher CA / incentive / marge</span>'
+                : '<i class="fas fa-eye-slash"></i><span>Masquer CA / incentive / marge</span>';
+        }
+
+        var masqueInitial = localStorage.getItem(STORAGE_KEY) === "1";
+        appliquer(masqueInitial);
+
+        toggleBtn.addEventListener("click", function () {
+            var masque = toggleBtn.textContent.indexOf("Afficher") === -1;
+            appliquer(masque);
+            localStorage.setItem(STORAGE_KEY, masque ? "1" : "0");
+        });
+    })();
+</script>
+{% endblock %}

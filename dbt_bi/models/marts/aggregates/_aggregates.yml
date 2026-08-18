@@ -113,6 +113,30 @@ models:
               config:
                 severity: warn
 
+  - name: vw_ventes_agent_produit
+    description: >
+      Sprint-11 (18/08/2026). Fiche détail agent, bloc "Produits vendus". 1 ligne par agent x
+      produit x mois — kg_vendus net des pertes (cohérent avec vw_performance_agent, même
+      sprint). "Type" de produit = nom du produit (Produit n'a pas de vraie catégorie, décision
+      différée par le PO — clarifié par mdmaiga le 18/08/2026, voir sprint-11 § Décisions
+      actées).
+    columns:
+      - name: ventes_agent_produit_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
+      - name: produit_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
+
   - name: vw_analyse_stock
     description: "Dashboard 5 (Stock & Fournisseur). 1 ligne par couple produit x fournisseur (KPI-401, KPI-402)."
     columns:

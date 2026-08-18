@@ -6,6 +6,7 @@ select
     id as perte_id,
     lot_id,
     vente_id,
+    detail_distribution_id,
     quantite_perdue::numeric(10, 2) as quantite_perdue,
     -- Kg perdus utilisés uniquement pour l'incentive de l'agent (sprint-10, 2026-08-18) —
     -- distinct de quantite_perdue, qui reste un concept de décompte de stock (kg pour un

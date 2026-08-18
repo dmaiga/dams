@@ -125,7 +125,8 @@ Filtre Type d'agent (terrain / agent gros / agent polivalent)
 ```
 Tableau : qui ramène quoi (trié par kilo vendu, pas par rentabilité)
 
-Colonnes : Équipe, Effectif, Kilo vendu, vs période précédente (kg), CA, Marge brute
+Colonnes : Équipe (lien vers la fiche détail équipe, Partie 4), Effectif, Kilo vendu, vs période
+précédente (kg), CA, Marge brute
 
 Superviseur A :
   • Effectif : 5 agents
@@ -141,9 +142,18 @@ Superviseur D :
 ### **PARTIE 2 : PERFORMANCE AGENT vs OBJECTIF**
 
 ```
-Tableau : Chaque agent et sa performance (colonnes : Agent, Superviseur, Type, Kg vendus,
-Jours actifs, Jours ouvrés, Kg/jour, Statut objectif, Rentabilité — pas de colonne ratio
-incentive/marge, retirée le 24/07/2026)
+Tableau : Chaque agent et sa performance (colonnes : Agent (lien vers la fiche détail, Partie 3),
+Superviseur, Jours actifs ("15/26" — jours actifs sur jours ouvrés combinés en un seul champ,
+allégé le 18/08/2026 : deux colonnes séparées prenaient de la place pour peu de valeur de
+lecture), Kg vendus, vs période précédente (delta n vs n-1, même pattern que le delta superviseur
+de la Partie 1), Kg/jour (couleur = statut objectif, badge vert/jaune/rouge directement sur la
+valeur plutôt qu'une colonne "Statut objectif" séparée), Rentabilité (masquable via le bouton
+"Masquer les données sensibles", comme CA/marge_brute de la Partie 1).
+
+Type retiré de ce tableau le 18/08/2026 (déjà filtrable via le sélecteur existant, colonne peu
+utile en plus). Rentabilité un temps retirée puis réintégrée le même jour (clarification de
+mdmaiga : bon indicateur, à garder — seul le comportement masquable/affichable devait être
+préservé, pas la colonne elle-même).
 
 Agent A : 
   • Kg vendus ce mois : 250 kg (50 kg × 5 jours travail)
@@ -161,18 +171,110 @@ Agent E :
   • Kg vendus : 40 kg (8 kg/jour)
   • Objectif : 50 kg/jour ❌ TRÈS FAIBLE (16%)
 
-Colonne : Statut Objectif
-  ✅ = Atteint (>= 50 kg/jour)
-  ⚠️ = Proche mais pas encore (40-50 kg/jour)
-  ❌ = Sous objectif (< 40 kg/jour)
+Couleur du badge Kg/jour :
+  ✅ vert = Atteint (>= 50 kg/jour)
+  ⚠️ jaune = Proche mais pas encore (40-50 kg/jour)
+  ❌ rouge = Sous objectif (< 40 kg/jour)
 
-Rentabilité : au grain semaine, assimilée à la marge brute (pas d'incentive au grain
-hebdomadaire, fct_salaires reste mensuel).
-
-Graphique :
+Graphique "Kg/jour vs objectif" : chaque ligne cliquable, mène à la fiche détail agent
+(Partie 3) — ajouté le 18/08/2026.
   • Qui est au-dessus de 50 kg/jour ?
   • Qui est en-dessous ?
   • Tendance : ça s'améliore ou ça décline ?
+```
+
+### **PARTIE 3 : FICHE DÉTAIL AGENT** (sprint-11, 18/08/2026)
+
+```
+Accessible en cliquant sur le nom d'un agent dans le tableau de la Partie 2 — pas un nouvel
+onglet du sommaire, une page de drill-down (bi:agent_detail, agent_id en paramètre).
+
+En-tête : nom, superviseur, type d'agent, statut actif/inactif.
+
+Bloc "Atteinte des objectifs" (bascule Mois / Semaine, comme la Partie 2 — la réunion du lundi
+porte sur le progrès semaine par semaine, pas seulement mensuel + tendance 6 dernières périodes) :
+  • Kg vendus (net des pertes), Kg/jour vs objectif 50kg (badge vert/jaune/rouge)
+  • Comparaison n vs n-1 : delta kg vendus vs la période précédente (mois ou semaine selon la
+    bascule), en valeur et en %, même pattern que le delta superviseur de la Partie 1
+  • Statut vs seuil 750 kg/mois (salaire fixe, paie/APP_PAIE.md § 1.quater) — mois uniquement
+  • Incentive (kg vendus net × RegleSalaire.incentive_par_kg, lue en direct — jamais codée en
+    dur) : disponible aux deux granularités, bouge à chaque vente. Reproduit exactement le calcul
+    déjà utilisé par la vue Direction "liste des salaires" du module `paie`
+    (`SalaireListeService`, qui appelle `CalculatorSalaire.calcul_salaire_mamy` en direct, sans
+    jamais lire le modèle `Salaire` stocké — pas de génération manuelle requise pour connaître un
+    salaire au quotidien). Une incentive "verrouillée" (fct_salaires, mois uniquement) s'affiche
+    en plus quand elle existe — montant figé via une génération manuelle optionnelle côté paie
+    (ex. avant versement), affichée en complément pour comparaison, pas comme la référence.
+  • Graphique combiné : kg/jour (ligne) + incentive (barres, axe secondaire) sur 6 périodes vs
+    ligne objectif 50kg/j
+  Pas de nouvel "objectif configurable" par agent — réutilise les deux seuils déjà en place
+  (décision produit, docs/sprints/sprint-11.md § Décisions actées).
+  Incentive projetée et CA/marge masquables ensemble via le même bouton "Masquer les données
+  sensibles" que le reste de l'app (localStorage, cf. dashboard_agents.html) — donnée de
+  projection jugée sensible au même titre que le CA/la marge.
+
+Bloc "Produits vendus" (mois sélectionné) :
+  • Tableau : Produit, Kg vendus, Nombre de ventes, CA, Marge — trié par kg vendus décroissant
+  • "Produit" = nom du produit (Riz, Oignon...), pas une vraie catégorie (Produit n'en a pas,
+    décision différée par le PO) — sert à voir ce qui contribue le plus au volume de l'agent.
+
+Bloc "Stock en main" (snapshot courant, pas de filtre de période) :
+  • Tableau : Produit, Date de réception du lot, Kg restants — + total
+  • Batch, pas temps réel (décision produit : ce dashboard est consulté hebdomadairement, un
+    décalage d'un cycle de refresh dbt est acceptable). Source : fct_stock_agent.sql.
+```
+
+### **PARTIE 4 : FICHE DÉTAIL SUPERVISEUR** (sprint-11, 18/08/2026)
+
+```
+Accessible en cliquant sur le nom d'une équipe dans le tableau de la Partie 1 — pendant de la
+Partie 3 à l'échelle d'une équipe. Cadrée avec mdmaiga avant codage (accent sur le volume des
+ventes, deux dimensions mois/semaine).
+
+En-tête : nom du superviseur, nombre d'agents actifs.
+
+Ordre de page imposé (mdmaiga, 18/08/2026) : KPIs → tableau produits → tableau agents →
+graphes tendance → stock en main.
+
+**1. KPIs — Volume de ventes** (mois ou semaine sélectionné), 4 cartes sur la même ligne :
+  • Kg vendus (équipe), vs période précédente (delta n vs n-1, valeur + %)
+  • Objectif équipe = somme des 50 kg/jour de chaque agent actif (nb_agents_actifs × 50),
+    comparé au kg/jour réel de l'équipe — pas un seuil inventé, dérivé de l'objectif agent déjà
+    en place ; même statut vert/jaune/rouge (≥50 atteint, ≥40 proche, sinon sous objectif)
+  • CA moyen par agent vs cible (bi/constants.py::CA_MOYEN_AGENT_CIBLE = 500 000 FCFA — existait
+    déjà dans le mart et dans les constantes mais n'était affiché nulle part avant ce sprint),
+    calculé (ca / nb_agents_actifs) plutôt que lu du champ stocké (mensuel uniquement), pour
+    fonctionner aux deux granularités
+  • Rentabilité nette équipe — mois uniquement (coûts salariaux mensuels par nature, non
+    disponible au grain semaine). "Coût équipe" retiré (mdmaiga, 18/08/2026) : gardé les 4
+    KPI ci-dessus sur une seule ligne plutôt que 5.
+
+**2. Tableau produits** (toujours mois, comme la Partie 3) :
+  • Produit, Kg vendus, vs mois précédent (delta), Ventes, CA, Marge — agrégé sur toute l'équipe
+  • Filtre par produit (sélecteur) — influence aussi le tableau Agents (voir 3.) et le
+    graphique de tendance (voir 4.)
+
+**3. Tableau agents** (période sélectionnée) :
+  • Agent (lien vers sa propre fiche détail, Partie 3), Kg vendus, vs période précédente
+    (delta), Kg/jour (badge de couleur = statut objectif individuel)
+  • Si un produit est filtré (2.) ET granularité = mois : Kg vendus/delta deviennent
+    spécifiques à ce produit pour chaque agent (pas de grain hebdomadaire pour les données
+    produit, donc pas d'effet du filtre en vue semaine — mention explicite affichée)
+
+**4. Graphes tendance** (6 dernières périodes, mois ou semaine) :
+  • Un seul graphique combiné : barres = kg vendus équipe (toute granularité), courbes =
+    kg vendus par produit, une couleur par produit — mois uniquement (pas de courbe produit en
+    vue semaine, données indisponibles à ce grain)
+  • Sans filtre produit : les 5 produits les plus vendus sur la fenêtre (évite de surcharger le
+    graphique) ; avec filtre : uniquement le produit sélectionné
+
+**5. Stock en main de l'équipe** (snapshot batch) :
+  • Produit, Kg restants — agrégé sur tous les agents, + total
+
+Hiérarchie utilisée (blocs 2, 3, 5) : équipe ACTUELLE (core.Agent.superviseur_id, cohérent avec
+VwPerformanceAgent.superviseur_id), pas la hiérarchie au moment de la distribution embarquée
+dans FctStockAgent — garantit que la liste d'agents, le stock et les produits affichés
+correspondent tous à la même équipe.
 ```
 
 ---

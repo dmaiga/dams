@@ -274,3 +274,46 @@ class VwDepensesCategorie(models.Model):
     class Meta:
         managed = False
         db_table = 'bi_"."vw_depenses_categorie'
+
+
+class FctStockAgent(models.Model):
+    """Sprint-11 (18/08/2026). Fiche détail agent, bloc "Stock en main". Grain = 1 ligne par
+    DetailDistribution encore active (stock restant > 0) — un agent qui a tout vendu/perdu sur
+    une ligne n'y apparaît plus. Batch (pas temps réel, décision produit), cf.
+    dbt_bi/models/marts/fct_stock_agent.sql."""
+
+    stock_agent_id = models.IntegerField(primary_key=True)
+    detail_distribution_id = models.IntegerField()
+    agent_id = models.IntegerField()
+    superviseur_id = models.IntegerField(null=True)
+    lot_id = models.IntegerField()
+    produit_id = models.IntegerField(null=True)
+    produit_nom = models.CharField(max_length=100, null=True)
+    date_reception = models.DateField(null=True)
+    stock_restant = models.DecimalField(max_digits=12, decimal_places=2)
+    stock_restant_kg = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."fct_stock_agent'
+
+
+class VwVentesAgentProduit(models.Model):
+    """Sprint-11 (18/08/2026). Fiche détail agent, bloc "Produits vendus". Grain = agent x
+    produit x mois — kg_vendus net des pertes (cohérent avec VwPerformanceAgent). "Type" de
+    produit = nom du produit (pas de vraie catégorie sur Produit), cf.
+    dbt_bi/models/marts/aggregates/vw_ventes_agent_produit.sql."""
+
+    ventes_agent_produit_id = models.IntegerField(primary_key=True)
+    agent_id = models.IntegerField()
+    produit_id = models.IntegerField(null=True)
+    produit_nom = models.CharField(max_length=100, null=True)
+    mois = models.DateField()
+    kg_vendus = models.DecimalField(max_digits=12, decimal_places=2)
+    ca_total = models.DecimalField(max_digits=15, decimal_places=2)
+    marge = models.DecimalField(max_digits=15, decimal_places=2)
+    nombre_ventes = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."vw_ventes_agent_produit'

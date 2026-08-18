@@ -293,6 +293,79 @@
 
 ---
 
+### **KPI-403 : Kg Vendus par Produit et par Agent** ⭐ NOUVEAU (sprint-11, 18/08/2026)
+- **Nom** : Quels produits font le volume d'un agent ?
+- **Formule** : SUM(quantite_en_kg − kilo_perdu_incentive) GROUP BY agent, produit, mois
+- **Dimension** : Agent x Produit x Mois — "produit" = nom du produit (pas de vraie catégorie,
+  décision différée par le PO), fiche détail agent uniquement
+- **Vigilance** : aucune (KPI de composition, pas de seuil vert/jaune/rouge)
+- **Source** : `dbt_bi/models/marts/aggregates/vw_ventes_agent_produit.sql`
+
+---
+
+### **KPI-404 : Kg en Stock chez l'Agent** ⭐ NOUVEAU (sprint-11, 18/08/2026)
+- **Nom** : Combien de stock l'agent a-t-il encore en main ?
+- **Formule** : Quantité distribuée − ventes déjà faites − pertes déclarées, par ligne de
+  distribution encore active (réplique `DetailDistribution.quantite_restante_calculee`)
+- **Dimension** : Agent x Produit, fiche détail agent uniquement
+- **Vigilance** : aucune pour l'instant (pas de statut "stock dormant chez l'agent" en v1 —
+  piste ouverte, pas construite ce sprint)
+- **Fraîcheur** : batch dbt, pas temps réel (décision produit — dashboard consulté
+  hebdomadairement, cf. `docs/sprints/sprint-11.md` § Décisions actées)
+- **Source** : `dbt_bi/models/marts/fct_stock_agent.sql`
+
+---
+
+### **KPI-405 : Incentive (calcul en direct)** ⭐ NOUVEAU (sprint-11, 18/08/2026)
+- **Nom** : Combien l'agent gagne-t-il actuellement en incentive ?
+- **Formule** : kg_vendus (net des pertes) × RegleSalaire.incentive_par_kg (lu en direct, jamais
+  codé en dur) — calculé côté Django (`bi/views.py::dashboard_agent_detail`), pas en dbt : pas de
+  drift possible avec le taux réel, disponible aux deux granularités (mois/semaine).
+- **Dimension** : Agent x (mois ou semaine), fiche détail agent uniquement
+- **Précision importante** (correction du 18/08/2026, après vérification de
+  `paie/services/salaire_liste_service.py`) : ce calcul reproduit **exactement** ce que la vue
+  Direction "liste des salaires" du module `paie` affiche déjà au quotidien —
+  `SalaireListeService.get_salaires()` appelle `CalculatorSalaire.calcul_salaire_mamy(...)` en
+  direct, sans jamais lire le modèle `Salaire` stocké. Il n'y a donc **pas** de "génération
+  manuelle obligatoire" pour connaître un salaire — le modèle `Salaire`/
+  `SalaireGenerationService` existe toujours, mais sert un usage séparé et optionnel
+  (verrouiller/archiver un montant, par ex. avant versement). KPI-303 (`fct_salaires`, mensuel)
+  ne reflète que les lignes verrouillées de cette façon — souvent absentes ou en retard sur les
+  ventes réelles — et est affiché en complément de KPI-405, pas comme la valeur de référence.
+- **Vigilance** : aucune (pas de seuil vert/jaune/rouge).
+- **Sensibilité** : masquable avec CA/marge (même bouton "Masquer les données sensibles" que le
+  reste de l'app).
+
+---
+
+### **KPI-406 : Objectif Équipe (kg/jour)** ⭐ NOUVEAU (sprint-11, 18/08/2026)
+- **Nom** : L'équipe dans son ensemble tire-t-elle assez ?
+- **Formule** : objectif = nb_agents_actifs × 50 kg/jour, comparé au kg/jour réel de l'équipe
+  (kg_vendus équipe / jours ouvrés de la période) — dérivé de l'objectif agent (KPI-401/402), pas
+  un nouveau seuil inventé
+- **Dimension** : Superviseur x (mois ou semaine), fiche détail équipe uniquement
+- **Vigilance** : même logique 3 paliers que le niveau agent (✅ ≥50 kg/jour/agent en moyenne,
+  ⚠️ ≥40, ❌ en dessous)
+- **Source** : calculé côté Django (`bi/views.py::dashboard_superviseur_detail`), à partir de
+  `VwPerformanceSuperviseur(_semaine).nb_agents_actifs`/`kg_vendus`
+
+---
+
+### **KPI-407 : CA Moyen par Agent vs Cible** (branché le 18/08/2026)
+- **Nom** : Chaque agent de l'équipe rapporte-t-il assez en moyenne ?
+- **Formule** : CA équipe / nb_agents_actifs, comparé à la cible `CA_MOYEN_AGENT_CIBLE`
+  (500 000 FCFA)
+- **Dimension** : Superviseur x (mois ou semaine), fiche détail équipe uniquement
+- **Constat** : `ca_moyen_par_agent` (mensuel) et `CA_MOYEN_AGENT_CIBLE` existaient déjà
+  (`VwPerformanceSuperviseur`, `bi/constants.py`) mais n'étaient affichés/comparés nulle part
+  avant ce sprint. Recalculé côté Django (`ca / nb_agents_actifs`) plutôt que lu du champ stocké,
+  pour fonctionner aux deux granularités (le champ mart n'existe qu'au grain mensuel).
+- **Vigilance** : `bi/constants.py::statut_ca_moyen_agent` — ✅ ≥ cible, ⚠️ en dessous, ❌ négatif
+  (cas théorique)
+- **Sensibilité** : masquable comme CA/marge/rentabilité.
+
+---
+
 ## 📦 KPI STOCK & FOURNISSEUR (Dashboard 5)
 
 ### KPI-501 : Valeur Stock Total

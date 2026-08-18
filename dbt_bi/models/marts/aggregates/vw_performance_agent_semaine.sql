@@ -8,6 +8,8 @@
 -- Pas d'incentive/ratio ici : fct_salaires est à grain mensuel (date_debut = début de mois de
 -- paie), sommer par semaine n'aurait pas de sens — voir bi/views.py dashboard_agents pour la
 -- façon dont la "rentabilité" hebdo est assimilée à la marge brute (sans retrait incentive).
+-- Kg net des pertes (sprint-11, 2026-08-18) : même correctif que vw_performance_agent.sql
+-- (grain mensuel) — voir ce fichier pour le raisonnement complet.
 with semaines_actives as (
     select distinct date_trunc('week', date_vente)::date as semaine
     from {{ ref('fct_ventes') }}
@@ -37,13 +39,14 @@ agent_semaine as (
 
 ventes_agent as (
     select
-        agent_id,
-        date_trunc('week', date_vente)::date as semaine,
-        sum(total_vente - total_cout_achat) as marge,
-        sum(quantite_en_kg) as kg_vendus,
-        count(distinct date_vente) as jours_actifs
-    from {{ ref('fct_ventes') }}
-    group by agent_id, date_trunc('week', date_vente)::date
+        v.agent_id,
+        date_trunc('week', v.date_vente)::date as semaine,
+        sum(v.total_vente - v.total_cout_achat) as marge,
+        sum(v.quantite_en_kg - coalesce(p.kilo_perdu_incentive, 0)) as kg_vendus,
+        count(distinct v.date_vente) as jours_actifs
+    from {{ ref('fct_ventes') }} v
+    left join {{ ref('stg_pertes') }} p on p.vente_id = v.vente_id
+    group by v.agent_id, date_trunc('week', v.date_vente)::date
 )
 
 select

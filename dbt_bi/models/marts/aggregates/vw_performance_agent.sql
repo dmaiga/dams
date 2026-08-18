@@ -22,6 +22,14 @@
 -- directe (exclut direction/rot/entrepot/stagiaire/gestionnaire_stock).
 -- superviseur_id/nom = hiérarchie actuelle (comme vw_performance_superviseur.cout_equipe),
 -- exposés pour permettre le filtre par superviseur côté Django.
+-- Kg net des pertes (sprint-11, 2026-08-18) : kg_vendus/kg_par_jour/statut_objectif_50kg
+-- déduisent désormais les kilos perdus déclarés sur chaque vente (stg_pertes.
+-- kilo_perdu_incentive, jointe par vente_id), pour rester cohérent avec l'incentive
+-- (fct_salaires, corrigée au sprint-10) affichée juste à côté sur la fiche détail agent — un
+-- agent qui a déclaré une perte ne doit pas sembler avoir atteint 50kg/jour sur un volume qu'il
+-- n'a pas réellement écoulé. Contrairement à Django (non rétroactif), dbt recalcule tout
+-- l'historique à chaque run : les KPI passés reflètent désormais le net, pas seulement les
+-- nouvelles pertes déclarées après ce sprint.
 with mois_actifs as (
     select distinct date_trunc('month', date_vente)::date as mois
     from {{ ref('fct_ventes') }}
@@ -51,13 +59,14 @@ agent_mois as (
 
 ventes_agent as (
     select
-        agent_id,
-        date_trunc('month', date_vente)::date as mois,
-        sum(total_vente - total_cout_achat) as marge,
-        sum(quantite_en_kg) as kg_vendus,
-        count(distinct date_vente) as jours_actifs
-    from {{ ref('fct_ventes') }}
-    group by agent_id, date_trunc('month', date_vente)::date
+        v.agent_id,
+        date_trunc('month', v.date_vente)::date as mois,
+        sum(v.total_vente - v.total_cout_achat) as marge,
+        sum(v.quantite_en_kg - coalesce(p.kilo_perdu_incentive, 0)) as kg_vendus,
+        count(distinct v.date_vente) as jours_actifs
+    from {{ ref('fct_ventes') }} v
+    left join {{ ref('stg_pertes') }} p on p.vente_id = v.vente_id
+    group by v.agent_id, date_trunc('month', v.date_vente)::date
 ),
 
 incentive_agent as (

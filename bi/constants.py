@@ -133,6 +133,16 @@ def statut_rentabilite_agent(valeur):
     return VERT if valeur >= RENTABILITE_AGENT_CIBLE else JAUNE
 
 
+def statut_ca_moyen_agent(valeur):
+    """Sprint-11 (18/08/2026) : CA_MOYEN_AGENT_CIBLE existait déjà (fiche détail superviseur) mais
+    n'était branché nulle part avant ce sprint."""
+    if valeur is None:
+        return NEUTRE
+    if valeur < 0:
+        return ROUGE
+    return VERT if valeur >= CA_MOYEN_AGENT_CIBLE else JAUNE
+
+
 def statut_objectif_agent(statut_50kg):
     return STATUT_OBJECTIF_COULEURS.get(statut_50kg, NEUTRE)
 

@@ -1,0 +1,317 @@
+{% extends "bi/base_dashboard.html" %}
+{% load format_fcfa direction_filters %}
+
+{% block filtre_periode %}
+<div class="bi-toolbar">
+    <div class="bi-toolbar-left">
+        <div class="bi-retour">
+            <a href="{% url 'bi:agents' %}?annee={{ annee }}&mois={{ mois }}" class="btn btn-outline">
+                <i class="fas fa-arrow-left"></i> Retour
+            </a>
+        </div>
+        <div class="bi-granularite-toggle">
+            <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
+            <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
+        </div>
+        <form method="get" class="bi-periode-form">
+            <input type="hidden" name="granularite" value="{{ granularite }}">
+            {% if granularite == "semaine" %}
+            <div>
+                <label for="bi-semaine">Semaine</label>
+                <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
+                    {% for s in semaines_disponibles %}
+                    <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            <div>
+                <label for="bi-annee">Année</label>
+                <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
+            </div>
+            <div>
+                <label for="bi-mois">Mois</label>
+                <select id="bi-mois" name="mois" class="select">
+                    <option value="">—</option>
+                    {% for valeur, libelle in mois_options %}
+                    <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+        </form>
+    </div>
+    <div class="bi-toolbar-right">
+        <div class="bi-toggle-sensible">
+            <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
+                <i class="fas fa-eye-slash"></i>
+                <span>Masquer CA / rentabilité</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="bi-panel">
+    <h2>Équipe de {{ superviseur.full_name }}</h2>
+    <p>{{ nb_agents_actifs }} agent{{ nb_agents_actifs|pluralize }} actif{{ nb_agents_actifs|pluralize }}</p>
+</div>
+
+<!-- 1. KPIs -->
+<div class="bi-panel">
+    <h2>Volume de ventes — {{ periode_libelle }}</h2>
+    {% if equipe_courante %}
+    <div class="bi-kpis">
+        <div class="bi-kpi bi-{{ statut_couleur_equipe }}">
+            <div class="bi-kpi-label">Kg vendus (équipe)</div>
+            <div class="bi-kpi-valeur">{{ equipe_courante.kg_vendus|format_number }} <span class="bi-kpi-unite">kg</span></div>
+            {% if delta_kg_vendus is not None %}
+            <div class="bi-kpi-label">
+                vs {{ periode_precedente_libelle }} :
+                <span class="bi-badge {% if delta_kg_vendus >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+                    {% if delta_kg_vendus >= 0 %}+{% endif %}{{ delta_kg_vendus|format_number }} kg{% if delta_kg_vendus_pct is not None %} ({% if delta_kg_vendus_pct >= 0 %}+{% endif %}{{ delta_kg_vendus_pct|floatformat:0 }}%){% endif %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="bi-kpi bi-{{ statut_couleur_equipe }}">
+            <div class="bi-kpi-label">Objectif équipe ({{ nb_agents_actifs }} × 50 kg/j)</div>
+            <div class="bi-kpi-valeur">{{ kg_par_jour_equipe|format_number }} <span class="bi-kpi-unite">/ {{ objectif_kg_jour_equipe }} kg/j</span></div>
+            <div class="bi-kpi-label">{{ statut_label_equipe }}</div>
+        </div>
+        <div class="bi-kpi bi-{{ statut_ca_moyen }}">
+            <div class="bi-kpi-label">CA moyen par agent (cible {{ ca_moyen_cible|fcfa }})</div>
+            <div class="bi-kpi-valeur bi-sensible">{{ ca_moyen_par_agent|fcfa }}</div>
+        </div>
+        {% if granularite == "mois" %}
+        <div class="bi-kpi {% if equipe_courante.rentabilite_nette >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+            <div class="bi-kpi-label">Rentabilité nette équipe</div>
+            <div class="bi-kpi-valeur bi-sensible">{{ equipe_courante.rentabilite_nette|fcfa }}</div>
+        </div>
+        {% else %}
+        <div class="bi-kpi">
+            <div class="bi-kpi-label">Rentabilité nette équipe</div>
+            <div class="bi-kpi-valeur">—</div>
+            <div class="bi-kpi-label">Non disponible en vue hebdomadaire (coûts salariaux mensuels)</div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <p>Aucune donnée pour cette période.</p>
+    {% endif %}
+</div>
+
+<!-- 2. Tableau par produits -->
+<div class="bi-panel">
+    <h2>Produits vendus par l'équipe — {{ mois_produits_libelle }}</h2>
+    <form method="get" class="bi-periode-form">
+        <input type="hidden" name="granularite" value="{{ granularite }}">
+        <input type="hidden" name="annee" value="{{ annee }}">
+        <input type="hidden" name="mois" value="{{ mois }}">
+        <div>
+            <label for="bi-produit">Produit</label>
+            <select id="bi-produit" name="produit" class="select" onchange="this.form.submit()">
+                <option value="">Tous les produits</option>
+                {% for p in produits_options %}
+                <option value="{{ p.produit_id }}" {% if produit_filtre == p.produit_id %}selected{% endif %}>{{ p.produit_nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Filtrer</button>
+    </form>
+    <div class="overflow-x-auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th class="text-right">Kg vendus</th>
+                    <th class="text-right">vs {{ mois_precedent_libelle_produits }}</th>
+                    <th class="text-right">Ventes</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produits %}
+                <tr>
+                    <td>{{ p.produit_nom|default:"—" }}</td>
+                    <td class="text-right">{{ p.kg_vendus|format_number }}</td>
+                    <td class="text-right">
+                        {% if p.kg_vendus_delta is not None %}
+                        <span class="bi-badge {% if p.kg_vendus_delta >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+                            {% if p.kg_vendus_delta >= 0 %}+{% endif %}{{ p.kg_vendus_delta|format_number }}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="text-right">{{ p.nombre_ventes }}</td>
+                    <td class="text-right bi-sensible">{{ p.ca_total|fcfa }}</td>
+                    <td class="text-right bi-sensible">{{ p.marge|fcfa }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">Aucune vente sur cette période.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="bi-comparaison">Toujours au grain mensuel, même en vue semaine (pas de détail produit hebdomadaire).</p>
+</div>
+
+<!-- 3. Tableau agents -->
+<div class="bi-panel">
+    <h2>Agents de l'équipe — {{ periode_libelle }}{% if produit_filtre and granularite == "mois" %} — kg du produit filtré{% endif %}</h2>
+    <div class="overflow-x-auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Agent</th>
+                    <th class="text-right">Kg vendus</th>
+                    <th class="text-right">vs période précédente</th>
+                    <th class="text-right">Kg/jour</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in agents_equipe %}
+                <tr>
+                    <td><a href="{% url 'bi:agent_detail' a.agent_id %}?annee={{ annee }}&mois={{ mois }}&granularite={{ granularite }}&semaine={{ semaine_selectionnee|date:'Y-m-d' }}">{{ a.nom_complet }}</a></td>
+                    {% if produit_filtre and granularite == "mois" %}
+                    <td class="text-right">{{ a.kg_vendus_produit|format_number }}</td>
+                    <td class="text-right">
+                        {% if a.kg_vendus_produit_delta is not None %}
+                        <span class="bi-badge {% if a.kg_vendus_produit_delta >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+                            {% if a.kg_vendus_produit_delta >= 0 %}+{% endif %}{{ a.kg_vendus_produit_delta|format_number }}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    {% else %}
+                    <td class="text-right">{{ a.kg_vendus|format_number }}</td>
+                    <td class="text-right">
+                        {% if a.kg_vendus_delta is not None %}
+                        <span class="bi-badge {% if a.kg_vendus_delta >= 0 %}bi-vert{% else %}bi-rouge{% endif %}">
+                            {% if a.kg_vendus_delta >= 0 %}+{% endif %}{{ a.kg_vendus_delta|format_number }}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    {% endif %}
+                    <td class="text-right">
+                        <span class="bi-badge bi-{{ a.statut_couleur }}" title="{{ a.statut_label }}">&nbsp;</span>
+                        {{ a.kg_par_jour|default_if_none:"—"|format_number }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">Aucun agent actif sur cette période.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if produit_filtre and granularite == "semaine" %}
+    <p class="bi-comparaison">Le filtre produit n'affecte pas ce tableau en vue hebdomadaire (données produit disponibles au grain mensuel uniquement) — kg vendus affiché reste le total équipe.</p>
+    {% endif %}
+</div>
+
+<!-- 4. Graphes tendance kg et produit -->
+<div class="bi-panel">
+    <h2>Tendance — {{ granularite|yesno:"semaine,mois" }}, {{ tendance|length }} dernières périodes</h2>
+    <div class="bi-chart-wrap"><canvas id="chart-superviseur-tendance"></canvas></div>
+    {% if granularite == "semaine" %}
+    <p class="bi-comparaison">Les courbes par produit ne sont disponibles qu'en vue mensuelle.</p>
+    {% endif %}
+</div>
+
+<!-- 5. Stock en main -->
+<div class="bi-panel">
+    <h2>Stock en main de l'équipe <span class="bi-comparaison">(snapshot batch, pas temps réel)</span></h2>
+    <div class="overflow-x-auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th class="text-right">Stock restant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in stock %}
+                <tr>
+                    <td>{{ s.produit_nom|default:"—" }}</td>
+                    <td class="text-right">{{ s.stock_restant_kg|format_number }} kg</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="2">Aucun stock en main actuellement.</td></tr>
+                {% endfor %}
+            </tbody>
+            {% if stock %}
+            <tfoot>
+                <tr>
+                    <td><strong>Total</strong></td>
+                    <td class="text-right"><strong>{{ stock_total_kg|format_number }} kg</strong></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block dashboard_scripts %}
+<script>
+    const donneesTendanceEquipe = {{ tendance_chart|safe }};
+    const datasetsTendance = [
+        { type: 'bar', label: 'Kg vendus (équipe)', data: donneesTendanceEquipe.kg_vendus, backgroundColor: '#16406399', order: 2 },
+    ];
+    donneesTendanceEquipe.produits.forEach(function (p) {
+        datasetsTendance.push({
+            type: 'line', label: p.label, data: p.data,
+            borderColor: p.color, backgroundColor: p.color,
+            borderWidth: 2, tension: 0, pointRadius: 3, yAxisID: 'y1', order: 1,
+        });
+    });
+    new Chart(document.getElementById('chart-superviseur-tendance'), {
+        data: { labels: donneesTendanceEquipe.labels, datasets: datasetsTendance },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { font: { size: 12 }, color: '#5b6472' } } },
+            scales: {
+                x: { grid: { color: '#e2e5ea' }, ticks: { color: '#8891a0', font: { size: 11 } } },
+                y: { position: 'left', grid: { color: '#e2e5ea' }, ticks: { color: '#8891a0', font: { size: 11 } }, title: { display: true, text: 'Kg équipe' } },
+                y1: { position: 'right', grid: { display: false }, ticks: { color: '#8891a0', font: { size: 11 } }, title: { display: true, text: 'Kg par produit' } },
+            },
+        },
+    });
+
+    (function () {
+        var STORAGE_KEY = "bi-donnees-sensibles-masquees";
+        var toggleBtn = document.getElementById("bi-toggle-donnees-sensibles");
+        var cellules = document.querySelectorAll(".bi-sensible");
+        if (!toggleBtn || !cellules.length) return;
+
+        var MASQUE = "••••••";
+
+        function appliquer(masque) {
+            cellules.forEach(function (cellule) {
+                if (masque) {
+                    if (cellule.dataset.valeurReelle === undefined) {
+                        cellule.dataset.valeurReelle = cellule.textContent;
+                    }
+                    cellule.textContent = MASQUE;
+                } else if (cellule.dataset.valeurReelle !== undefined) {
+                    cellule.textContent = cellule.dataset.valeurReelle;
+                }
+            });
+            toggleBtn.innerHTML = masque
+                ? '<i class="fas fa-eye"></i><span>Afficher CA / rentabilité</span>'
+                : '<i class="fas fa-eye-slash"></i><span>Masquer CA / rentabilité</span>';
+        }
+
+        var masqueInitial = localStorage.getItem(STORAGE_KEY) === "1";
+        appliquer(masqueInitial);
+
+        toggleBtn.addEventListener("click", function () {
+            var masque = toggleBtn.textContent.indexOf("Afficher") === -1;
+            appliquer(masque);
+            localStorage.setItem(STORAGE_KEY, masque ? "1" : "0");
+        });
+    })();
+</script>
+{% endblock %}

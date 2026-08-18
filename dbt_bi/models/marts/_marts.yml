@@ -126,6 +126,37 @@ models:
               arguments:
                 expression: "<= quantite_initiale"
 
+  - name: fct_stock_agent
+    description: >
+      Sprint-11 (18/08/2026). Grain = 1 ligne par DetailDistribution encore active (stock
+      restant > 0). Réplique DetailDistribution.quantite_restante_calculee — quantite_perdue
+      (pas kilo_perdu_incentive) déduite, cohérent avec le fait que kilo_perdu_incentive ne doit
+      jamais affecter le stock (cf. paie/APP_PAIE.md § 1.quater). Batch, pas temps réel
+      (décision produit, docs/sprints/sprint-11.md § Décisions actées).
+    columns:
+      - name: detail_distribution_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
+      - name: produit_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
+      - name: stock_restant
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+
   - name: fct_paiements_fournisseur
     columns:
       - name: paiement_id

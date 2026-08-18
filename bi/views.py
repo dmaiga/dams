@@ -1,11 +1,13 @@
+import calendar
 import json
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 from types import SimpleNamespace
 
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, Max, Sum
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -13,6 +15,7 @@ from django.utils.dateparse import parse_date
 from bi import constants
 from bi.models import (
     AjustementPrixAchat,
+    FctStockAgent,
     VwAnalyseStock,
     VwDepensesCategorie,
     VwMargeFournisseur,
@@ -23,7 +26,9 @@ from bi.models import (
     VwRentabiliteGlobale,
     VwRentabiliteJournaliere,
     VwRentabiliteProduit,
+    VwVentesAgentProduit,
 )
+from core.models import Agent, RegleSalaire
 
 
 def _est_utilisateur_autorise(user):
@@ -404,11 +409,17 @@ def dashboard_agents(request):
                     semaine=semaine_precedente
                 ).values_list("superviseur_id", "kg_vendus")
             )
+            kg_vendus_precedents_agent = dict(
+                VwPerformanceAgentSemaine.objects.filter(
+                    semaine=semaine_precedente
+                ).values_list("agent_id", "kg_vendus")
+            )
             periode_precedente_libelle = f"la semaine du {semaine_precedente:%d/%m/%Y}"
         else:
             superviseurs_qs = VwPerformanceSuperviseurSemaine.objects.none()
             agents_qs = VwPerformanceAgentSemaine.objects.none()
             kg_vendus_precedents = {}
+            kg_vendus_precedents_agent = {}
             periode_precedente_libelle = None
     else:
         annee, mois = context["annee"], context["mois"]
@@ -428,6 +439,11 @@ def dashboard_agents(request):
             VwPerformanceSuperviseur.objects.filter(
                 mois__year=annee_prec, mois__month=mois_prec
             ).values_list("superviseur_id", "kg_vendus")
+        )
+        kg_vendus_precedents_agent = dict(
+            VwPerformanceAgent.objects.filter(
+                mois__year=annee_prec, mois__month=mois_prec
+            ).values_list("agent_id", "kg_vendus")
         )
         periode_precedente_libelle = f"{MOIS_FR[mois_prec]} {annee_prec}"
 
@@ -454,8 +470,18 @@ def dashboard_agents(request):
     for a in agents:
         a.statut_couleur = constants.statut_objectif_agent(a.statut_objectif_50kg)
         a.statut_label = constants.STATUT_OBJECTIF_LABELS.get(a.statut_objectif_50kg, "—")
-        # Grain semaine (VwPerformanceAgentSemaine) n'a pas d'incentive (fct_salaires est
-        # mensuel, cf. commentaire dbt) : rentabilité affichée = marge brute dans ce cas.
+        # Jours actifs/ouvrés combinés en une seule info ("15/26") — les deux colonnes
+        # séparées prenaient de la place pour peu de valeur de lecture (mdmaiga, 18/08/2026).
+        a.jours_label = (
+            f"{a.jours_actifs}/{a.jours_ouvres}" if a.jours_ouvres else "—"
+        )
+        kg_precedent = kg_vendus_precedents_agent.get(a.agent_id)
+        a.kg_vendus_precedent = kg_precedent
+        a.kg_vendus_delta = (a.kg_vendus - kg_precedent) if kg_precedent is not None else None
+        # Rentabilité : réintégrée le 18/08/2026 (retrait précédent = mauvaise lecture de
+        # la demande de mdmaiga, la colonne reste utile) — grain semaine
+        # (VwPerformanceAgentSemaine) n'a pas d'incentive (fct_salaires est mensuel, cf.
+        # commentaire dbt), rentabilité affichée = marge brute dans ce cas.
         a.rentabilite_affichee = getattr(a, "rentabilite_agent", a.marge)
         a.statut_rentabilite = constants.statut_rentabilite_agent(a.rentabilite_affichee)
 
@@ -468,6 +494,7 @@ def dashboard_agents(request):
     chart_data = _chart_json(
         {
             "labels": [a.nom_complet for a in agents],
+            "agent_ids": [a.agent_id for a in agents],
             "kg_par_jour": [a.kg_par_jour for a in agents],
             "objectif": [50 for _ in agents],
         }
@@ -486,6 +513,564 @@ def dashboard_agents(request):
         }
     )
     return render(request, "bi/dashboard_agents.html", context)
+
+
+def _mois_moins_n(annee, mois, n):
+    """Retourne (annee, mois) n mois avant (annee, mois) — arithmétique pure, même esprit que
+    _mois_precedent (pas de dépendance date lib supplémentaire)."""
+    total = (annee * 12 + (mois - 1)) - n
+    return total // 12, total % 12 + 1
+
+
+NB_PERIODES_TENDANCE = 6
+
+
+@bi_access_required
+def dashboard_agent_detail(request, agent_id):
+    """Sprint-11 (18/08/2026, étendu le même jour). Fiche détail d'un agent, accessible depuis
+    une ligne du tableau de dashboard_agents. Trois blocs demandés par mdmaiga :
+    - Atteinte des objectifs : tendance sur les 6 dernières périodes, bascule mois/semaine
+      (comme dashboard_agents — la réunion hebdomadaire du lundi porte sur le progrès semaine
+      par semaine, pas seulement mensuel) + comparaison n vs n-1 (delta kg vendus vs période
+      précédente, même pattern que le delta superviseur de dashboard_agents). 50 kg/jour (BI) et
+      750 kg/mois (seuil du salaire fixe, paie). Pas de nouvel "objectif configurable" : décision
+      actée (docs/sprints/sprint-11.md).
+    - Produits vendus : VwVentesAgentProduit filtrée sur le mois courant (pas de grain
+      hebdomadaire pour ce bloc), triée par kg vendus décroissant — "type" = nom du produit,
+      clarifié par mdmaiga au cadrage du sprint.
+    - Stock en main : FctStockAgent, snapshot batch (pas de filtre de période), décision produit
+      actée (séparation OLTP/BI).
+    Incentive (corrigé le 18/08/2026 après vérification de paie/services/salaire_liste_service.py
+    — la vue Direction "liste des salaires" y appelle CalculatorSalaire.calcul_salaire_mamy(...)
+    EN DIRECT, elle ne lit jamais le modèle Salaire ; aucune génération manuelle n'est requise
+    pour connaître un salaire au quotidien). L'incentive affichée ici (kg_vendus net x
+    RegleSalaire.incentive_par_kg, lue en direct, jamais codée en dur) reproduit donc exactement
+    ce calcul, et fonctionne à toute granularité (mois ou semaine) puisqu'elle ne dépend pas de
+    fct_salaires. Le modèle Salaire/SalaireGenerationService existe toujours mais sert un usage
+    séparé et optionnel (verrouiller/archiver un montant, ex. avant versement) — quand une ligne
+    existe pour la période (VwPerformanceAgent.incentive, mois uniquement), elle est affichée en
+    complément pour comparaison, pas comme LA valeur de référence. Masquable comme CA/marge
+    (bi-toggle-donnees-sensibles).
+    Pas de "Toutes périodes" ici (cohérent avec dashboard_agents, cf. son commentaire d'en-tête).
+    """
+    agent = get_object_or_404(
+        Agent.objects.select_related("user", "superviseur__user"), pk=agent_id
+    )
+    context = _base_context(request, "agents", f"Détail agent — {agent.full_name}")
+
+    granularite = request.GET.get("granularite")
+    if granularite not in ("semaine", "mois"):
+        granularite = "mois"
+    context["granularite"] = granularite
+
+    taux_incentive = (
+        RegleSalaire.objects.filter(type_agent="terrain", actif=True)
+        .values_list("incentive_par_kg", flat=True)
+        .first()
+    ) or Decimal("0.00")
+
+    annee, mois = context["annee"], context["mois"]
+    if not annee or not mois:
+        annee, mois = _dernier_mois_disponible()
+        context["annee"], context["mois"] = annee, mois
+
+    if granularite == "semaine":
+        Modele = VwPerformanceAgentSemaine
+        champ_periode = "semaine"
+        semaines_disponibles = list(
+            VwPerformanceAgentSemaine.objects.filter(agent_id=agent_id)
+            .order_by("-semaine")
+            .values_list("semaine", flat=True)
+            .distinct()[:26]
+        )
+        semaine_demandee = parse_date(request.GET.get("semaine") or "")
+        periode_courante_val = (
+            semaine_demandee
+            if semaine_demandee in semaines_disponibles
+            else (semaines_disponibles[0] if semaines_disponibles else None)
+        )
+        context["semaines_disponibles"] = semaines_disponibles
+        context["semaine_selectionnee"] = periode_courante_val
+        if periode_courante_val:
+            context["periode_libelle"] = (
+                f"Semaine du {periode_courante_val:%d/%m/%Y} au "
+                f"{(periode_courante_val + timedelta(days=6)):%d/%m/%Y}"
+            )
+            debut_tendance = periode_courante_val - timedelta(weeks=NB_PERIODES_TENDANCE - 1)
+            tendance_qs = Modele.objects.filter(
+                agent_id=agent_id, semaine__gte=debut_tendance, semaine__lte=periode_courante_val
+            ).order_by("semaine")
+            periode_precedente_val = periode_courante_val - timedelta(weeks=1)
+            periode_precedente_libelle = f"la semaine du {periode_precedente_val:%d/%m/%Y}"
+        else:
+            tendance_qs = Modele.objects.none()
+            periode_precedente_val = None
+            periode_precedente_libelle = None
+    else:
+        Modele = VwPerformanceAgent
+        champ_periode = "mois"
+        context["periode_libelle"] = f"{MOIS_FR[mois]} {annee}"
+        periode_courante_val = date(annee, mois, 1)
+        annee_debut, mois_debut = _mois_moins_n(annee, mois, NB_PERIODES_TENDANCE - 1)
+        tendance_qs = Modele.objects.filter(
+            agent_id=agent_id,
+            mois__gte=date(annee_debut, mois_debut, 1),
+            mois__lte=periode_courante_val,
+        ).order_by("mois")
+        annee_prec, mois_prec = _mois_precedent(annee, mois)
+        periode_precedente_val = date(annee_prec, mois_prec, 1)
+        periode_precedente_libelle = f"{MOIS_FR[mois_prec]} {annee_prec}"
+
+    tendance = list(tendance_qs)
+    for t in tendance:
+        t.periode = getattr(t, champ_periode)
+        t.statut_couleur = constants.statut_objectif_agent(t.statut_objectif_50kg)
+        t.statut_label = constants.STATUT_OBJECTIF_LABELS.get(t.statut_objectif_50kg, "—")
+        # Seuil salaire fixe (paie/services/salaire_calculator.py, kilo net des pertes depuis
+        # le sprint-10 — kg_vendus ici est déjà net, corrigé au sprint-11 pour la cohérence).
+        t.statut_750kg = "atteint" if t.kg_vendus >= 750 else "sous_objectif"
+        t.incentive_projetee = (t.kg_vendus or Decimal("0.00")) * taux_incentive
+
+    periode_courante = next((t for t in tendance if t.periode == periode_courante_val), None)
+    periode_precedente = next((t for t in tendance if t.periode == periode_precedente_val), None)
+    if periode_precedente is None and periode_precedente_val is not None:
+        # Fenêtre de tendance trop courte pour couvrir n-1 (ne devrait pas arriver avec
+        # NB_PERIODES_TENDANCE >= 2, gardé par robustesse) — requête dédiée.
+        periode_precedente = Modele.objects.filter(
+            agent_id=agent_id, **{champ_periode: periode_precedente_val}
+        ).first()
+        if periode_precedente:
+            periode_precedente.incentive_projetee = (
+                periode_precedente.kg_vendus or Decimal("0.00")
+            ) * taux_incentive
+
+    delta_kg_vendus = None
+    delta_kg_vendus_pct = None
+    if periode_courante and periode_precedente:
+        delta_kg_vendus = periode_courante.kg_vendus - periode_precedente.kg_vendus
+        if periode_precedente.kg_vendus:
+            delta_kg_vendus_pct = float(
+                delta_kg_vendus / periode_precedente.kg_vendus * 100
+            )
+
+    produits = list(
+        VwVentesAgentProduit.objects.filter(
+            agent_id=agent_id, mois=date(annee, mois, 1)
+        ).order_by("-kg_vendus")
+    )
+
+    stock = list(FctStockAgent.objects.filter(agent_id=agent_id).order_by("-stock_restant_kg"))
+    stock_total_kg = sum((s.stock_restant_kg for s in stock), Decimal("0.00"))
+
+    if not tendance and not produits and not stock:
+        context["est_vide"] = True
+        context["agent"] = agent
+        return render(request, "bi/dashboard_agent_detail.html", context)
+
+    tendance_chart = _chart_json(
+        {
+            "labels": (
+                [f"S{t.periode:%W} ({t.periode:%d/%m})" for t in tendance]
+                if granularite == "semaine"
+                else [f"{MOIS_FR[t.periode.month][:3]} {t.periode.year}" for t in tendance]
+            ),
+            "kg_par_jour": [float(t.kg_par_jour or 0) for t in tendance],
+            "incentive_projetee": [float(t.incentive_projetee or 0) for t in tendance],
+            "objectif": [50 for _ in tendance],
+        }
+    )
+
+    context.update(
+        {
+            "agent": agent,
+            "tendance": tendance,
+            "tendance_chart": tendance_chart,
+            "periode_courante": periode_courante,
+            "periode_precedente_libelle": periode_precedente_libelle,
+            "delta_kg_vendus": delta_kg_vendus,
+            "delta_kg_vendus_pct": delta_kg_vendus_pct,
+            "taux_incentive": taux_incentive,
+            "produits": produits,
+            "stock": stock,
+            "stock_total_kg": stock_total_kg,
+        }
+    )
+    return render(request, "bi/dashboard_agent_detail.html", context)
+
+
+def _jours_ouvres_dans_periode(date_debut, date_fin):
+    """Compte les jours lundi-samedi (dimanche exclu) entre deux dates incluses — même
+    convention que les marts dbt (vw_performance_agent(_semaine).sql, cf. utils/calendrier.py
+    pour la convention "lundi-samedi" ailleurs dans le repo)."""
+    jours = 0
+    courant = date_debut
+    while courant <= date_fin:
+        if courant.weekday() != 6:
+            jours += 1
+        courant += timedelta(days=1)
+    return jours
+
+
+@bi_access_required
+def dashboard_superviseur_detail(request, superviseur_id):
+    """Sprint-11 (18/08/2026, cadré avec mdmaiga avant codage). Fiche détail d'un superviseur —
+    pendant de dashboard_agent_detail à l'échelle d'une équipe. Décisions actées :
+    - Bascule Mois/Semaine (comme le reste de ce dashboard), avec n vs n-1.
+    - Objectif équipe = somme des 50 kg/jour de chaque agent actif (nb_agents_actifs x 50),
+      comparé au kg/jour réel de l'équipe — pas un seuil inventé, dérivé de l'objectif agent
+      existant. Même statut vert/jaune/rouge que le niveau agent (>=50 atteint, >=40 proche).
+    - CA moyen par agent vs cible (bi/constants.py::CA_MOYEN_AGENT_CIBLE, existait déjà mais
+      n'était branché nulle part) — calculé ici (ca / nb_agents_actifs) plutôt que lu depuis
+      VwPerformanceSuperviseur.ca_moyen_par_agent, qui n'existe qu'au grain mensuel : garantit
+      la même formule aux deux granularités.
+    - Coût/rentabilité d'équipe (cout_equipe, rentabilite_nette) : mois uniquement, ces montants
+      n'existent pas au grain semaine (salaires mensuels par nature, cf. commentaire dbt de
+      vw_performance_superviseur_semaine.sql).
+    - Stock en main et produits vendus agrégés sur l'ÉQUIPE ACTUELLE (core.Agent.superviseur_id,
+      hiérarchie actuelle) plutôt que sur le superviseur_id embarqué dans FctStockAgent (hiérarchie
+      au moment de la distribution — cf. distinction déjà documentée pour fct_ventes/fct_salaires)
+      : cohérence garantie avec la liste d'agents affichée, filtrée elle aussi sur la hiérarchie
+      actuelle (VwPerformanceAgent.superviseur_id).
+    Révision du 18/08/2026 (retours mdmaiga après la première version) :
+    - Retrait du KPI "Coût équipe" (gardé Kg vendus/Objectif équipe/CA moyen/Rentabilité nette
+      sur la même ligne).
+    - Ordre de page imposé : KPIs → tableau produits → tableau agents → graphes tendance →
+      stock en main.
+    - Comparaison n vs n-1 ajoutée aussi sur le tableau produits ET le tableau agents (pas
+      seulement le KPI global).
+    - Filtre produit (GET ?produit=<id>) étendu : influence désormais aussi le tableau agents
+      (kg vendus/delta deviennent spécifiques à ce produit) — mois uniquement, pas de grain
+      hebdomadaire pour vw_ventes_agent_produit.
+    - Graphique tendance unifié (plus de mini-graphique séparé) : barres = kg vendus équipe,
+      courbes = kg vendus par produit (une couleur par produit, top 5 si pas de filtre, sinon
+      uniquement le produit filtré) — mois uniquement, l'axe produit reste vide en vue semaine.
+    """
+    superviseur = get_object_or_404(
+        Agent.objects.select_related("user"), pk=superviseur_id, type_agent="entrepot"
+    )
+    context = _base_context(request, "agents", f"Détail équipe — {superviseur.full_name}")
+
+    granularite = request.GET.get("granularite")
+    if granularite not in ("semaine", "mois"):
+        granularite = "mois"
+    context["granularite"] = granularite
+
+    annee, mois = context["annee"], context["mois"]
+    if not annee or not mois:
+        annee, mois = _dernier_mois_disponible()
+        context["annee"], context["mois"] = annee, mois
+
+    types_cibles = [c for c, _ in constants.TYPE_AGENT_CHOICES]
+    agents_equipe_ids = list(
+        Agent.objects.filter(
+            superviseur_id=superviseur_id, type_agent__in=types_cibles
+        ).values_list("id", flat=True)
+    )
+
+    if granularite == "semaine":
+        ModeleEquipe = VwPerformanceSuperviseurSemaine
+        ModeleAgents = VwPerformanceAgentSemaine
+        champ_periode = "semaine"
+        semaines_disponibles = list(
+            VwPerformanceSuperviseurSemaine.objects.filter(superviseur_id=superviseur_id)
+            .order_by("-semaine")
+            .values_list("semaine", flat=True)
+            .distinct()[:26]
+        )
+        semaine_demandee = parse_date(request.GET.get("semaine") or "")
+        periode_courante_val = (
+            semaine_demandee
+            if semaine_demandee in semaines_disponibles
+            else (semaines_disponibles[0] if semaines_disponibles else None)
+        )
+        context["semaines_disponibles"] = semaines_disponibles
+        context["semaine_selectionnee"] = periode_courante_val
+        if periode_courante_val:
+            date_debut_periode = periode_courante_val
+            date_fin_periode = periode_courante_val + timedelta(days=6)
+            context["periode_libelle"] = (
+                f"Semaine du {date_debut_periode:%d/%m/%Y} au {date_fin_periode:%d/%m/%Y}"
+            )
+            periode_precedente_val = periode_courante_val - timedelta(weeks=1)
+            periode_precedente_libelle = f"la semaine du {periode_precedente_val:%d/%m/%Y}"
+        else:
+            date_debut_periode = date_fin_periode = None
+            periode_precedente_val = None
+            periode_precedente_libelle = None
+    else:
+        ModeleEquipe = VwPerformanceSuperviseur
+        ModeleAgents = VwPerformanceAgent
+        champ_periode = "mois"
+        context["periode_libelle"] = f"{MOIS_FR[mois]} {annee}"
+        periode_courante_val = date(annee, mois, 1)
+        date_debut_periode = periode_courante_val
+        date_fin_periode = date(annee, mois, calendar.monthrange(annee, mois)[1])
+        annee_prec, mois_prec = _mois_precedent(annee, mois)
+        periode_precedente_val = date(annee_prec, mois_prec, 1)
+        periode_precedente_libelle = f"{MOIS_FR[mois_prec]} {annee_prec}"
+
+    equipe_courante = (
+        ModeleEquipe.objects.filter(
+            superviseur_id=superviseur_id, **{champ_periode: periode_courante_val}
+        ).first()
+        if periode_courante_val
+        else None
+    )
+    equipe_precedente = (
+        ModeleEquipe.objects.filter(
+            superviseur_id=superviseur_id, **{champ_periode: periode_precedente_val}
+        ).first()
+        if periode_precedente_val
+        else None
+    )
+
+    delta_kg_vendus = None
+    delta_kg_vendus_pct = None
+    if equipe_courante and equipe_precedente:
+        delta_kg_vendus = equipe_courante.kg_vendus - equipe_precedente.kg_vendus
+        if equipe_precedente.kg_vendus:
+            delta_kg_vendus_pct = float(delta_kg_vendus / equipe_precedente.kg_vendus * 100)
+
+    # ---- Objectif équipe (somme des 50 kg/jour des agents actifs) ----
+    nb_agents_actifs = equipe_courante.nb_agents_actifs if equipe_courante else 0
+    jours_ouvres_periode = (
+        _jours_ouvres_dans_periode(date_debut_periode, date_fin_periode)
+        if date_debut_periode
+        else 0
+    )
+    objectif_kg_jour_equipe = nb_agents_actifs * 50
+    kg_par_jour_equipe = (
+        (equipe_courante.kg_vendus / jours_ouvres_periode)
+        if (equipe_courante and jours_ouvres_periode)
+        else Decimal("0.00")
+    )
+    kg_par_jour_moyen_agent = (
+        (kg_par_jour_equipe / nb_agents_actifs) if nb_agents_actifs else Decimal("0.00")
+    )
+    if not nb_agents_actifs:
+        statut_equipe = "sous_objectif"
+    elif kg_par_jour_moyen_agent >= 50:
+        statut_equipe = "atteint"
+    elif kg_par_jour_moyen_agent >= 40:
+        statut_equipe = "proche"
+    else:
+        statut_equipe = "sous_objectif"
+
+    # ---- CA moyen par agent vs cible ----
+    ca_moyen_par_agent = (
+        (equipe_courante.ca / nb_agents_actifs) if (equipe_courante and nb_agents_actifs) else None
+    )
+
+    # ---- Tendance équipe sur 6 périodes ----
+    if granularite == "semaine":
+        debut_tendance = (
+            periode_courante_val - timedelta(weeks=NB_PERIODES_TENDANCE - 1)
+            if periode_courante_val
+            else None
+        )
+        tendance_qs = (
+            ModeleEquipe.objects.filter(
+                superviseur_id=superviseur_id,
+                semaine__gte=debut_tendance,
+                semaine__lte=periode_courante_val,
+            ).order_by("semaine")
+            if debut_tendance
+            else ModeleEquipe.objects.none()
+        )
+    else:
+        annee_debut, mois_debut = _mois_moins_n(annee, mois, NB_PERIODES_TENDANCE - 1)
+        tendance_qs = ModeleEquipe.objects.filter(
+            superviseur_id=superviseur_id,
+            mois__gte=date(annee_debut, mois_debut, 1),
+            mois__lte=periode_courante_val,
+        ).order_by("mois")
+    tendance = list(tendance_qs)
+    for t in tendance:
+        t.periode = getattr(t, champ_periode)
+
+    # ---- Agents de l'équipe (drill-down vers leur propre fiche) ----
+    agents_equipe = (
+        list(
+            ModeleAgents.objects.filter(
+                superviseur_id=superviseur_id, **{champ_periode: periode_courante_val}
+            ).order_by("-kg_par_jour")
+        )
+        if periode_courante_val
+        else []
+    )
+    agents_precedent_kg = (
+        dict(
+            ModeleAgents.objects.filter(
+                superviseur_id=superviseur_id, **{champ_periode: periode_precedente_val}
+            ).values_list("agent_id", "kg_vendus")
+        )
+        if periode_precedente_val
+        else {}
+    )
+    for a in agents_equipe:
+        a.statut_couleur = constants.statut_objectif_agent(a.statut_objectif_50kg)
+        a.statut_label = constants.STATUT_OBJECTIF_LABELS.get(a.statut_objectif_50kg, "—")
+        kg_prec = agents_precedent_kg.get(a.agent_id)
+        a.kg_vendus_precedent = kg_prec
+        a.kg_vendus_delta = (a.kg_vendus - kg_prec) if kg_prec is not None else None
+
+    # ---- Produits vendus par l'équipe (toujours mois, comme la fiche agent) + comparaison n-1 ----
+    mois_courant_date = date(annee, mois, 1)
+    annee_prec_produits, mois_prec_produits = _mois_precedent(annee, mois)
+    mois_precedent_date = date(annee_prec_produits, mois_prec_produits, 1)
+    mois_precedent_libelle_produits = f"{MOIS_FR[mois_prec_produits]} {annee_prec_produits}"
+
+    produits_base_qs = VwVentesAgentProduit.objects.filter(
+        agent_id__in=agents_equipe_ids, mois=mois_courant_date
+    )
+    produits_options = list(
+        produits_base_qs.values("produit_id", "produit_nom").distinct().order_by("produit_nom")
+    )
+    produit_filtre = request.GET.get("produit")
+    produits_qs = produits_base_qs
+    if produit_filtre:
+        produits_qs = produits_qs.filter(produit_id=produit_filtre)
+    produits = list(
+        produits_qs.values("produit_id", "produit_nom")
+        .annotate(
+            kg_vendus=Sum("kg_vendus"), ca_total=Sum("ca_total"),
+            marge=Sum("marge"), nombre_ventes=Sum("nombre_ventes"),
+        )
+        .order_by("-kg_vendus")
+    )
+    produits_precedent_kg = dict(
+        VwVentesAgentProduit.objects.filter(
+            agent_id__in=agents_equipe_ids, mois=mois_precedent_date
+        )
+        .values("produit_id")
+        .annotate(kg_vendus=Sum("kg_vendus"))
+        .values_list("produit_id", "kg_vendus")
+    )
+    for p in produits:
+        kg_prec = produits_precedent_kg.get(p["produit_id"])
+        p["kg_vendus_precedent"] = kg_prec
+        p["kg_vendus_delta"] = (p["kg_vendus"] - kg_prec) if kg_prec is not None else None
+
+    # ---- Filtre produit : influence aussi le tableau agents (kg vendus + delta de CE produit
+    # uniquement), disponible seulement en vue mois — VwVentesAgentProduit n'a pas de grain
+    # hebdomadaire (cf. sprint-10/11, "toujours au grain mensuel"). ----
+    if produit_filtre and granularite == "mois":
+        agent_produit_courant = dict(
+            VwVentesAgentProduit.objects.filter(
+                agent_id__in=agents_equipe_ids, produit_id=produit_filtre, mois=mois_courant_date
+            ).values_list("agent_id", "kg_vendus")
+        )
+        agent_produit_precedent = dict(
+            VwVentesAgentProduit.objects.filter(
+                agent_id__in=agents_equipe_ids, produit_id=produit_filtre, mois=mois_precedent_date
+            ).values_list("agent_id", "kg_vendus")
+        )
+        for a in agents_equipe:
+            a.kg_vendus_produit = agent_produit_courant.get(a.agent_id, Decimal("0.00"))
+            kg_prec_produit = agent_produit_precedent.get(a.agent_id)
+            a.kg_vendus_produit_precedent = kg_prec_produit
+            a.kg_vendus_produit_delta = (
+                (a.kg_vendus_produit - kg_prec_produit) if kg_prec_produit is not None else None
+            )
+
+    # ---- Stock en main agrégé de l'équipe (snapshot batch) ----
+    stock = list(
+        FctStockAgent.objects.filter(agent_id__in=agents_equipe_ids)
+        .values("produit_id", "produit_nom")
+        .annotate(stock_restant_kg=Sum("stock_restant_kg"))
+        .order_by("-stock_restant_kg")
+    )
+    stock_total_kg = sum((s["stock_restant_kg"] for s in stock), Decimal("0.00"))
+
+    if not equipe_courante and not agents_equipe and not produits and not stock:
+        context["est_vide"] = True
+        context["superviseur"] = superviseur
+        return render(request, "bi/dashboard_superviseur_detail.html", context)
+
+    tendance_labels = (
+        [f"S{t.periode:%W} ({t.periode:%d/%m})" for t in tendance]
+        if granularite == "semaine"
+        else [f"{MOIS_FR[t.periode.month][:3]} {t.periode.year}" for t in tendance]
+    )
+
+    # ---- Courbes produit sur le même graphique que le volume (bar = volume équipe, ligne par
+    # produit) — mois uniquement (pas de grain hebdomadaire pour vw_ventes_agent_produit). Sans
+    # filtre : les 5 produits les plus vendus sur la fenêtre, pour ne pas surcharger le
+    # graphique. Avec filtre : uniquement le produit sélectionné. ----
+    PALETTE_PRODUITS = ["#c9a83a", "#7a4fb5", "#2f9e6f", "#c0563a", "#3a7fc0"]
+    courbes_produits = []
+    if granularite == "mois" and tendance:
+        annee_debut, mois_debut = _mois_moins_n(annee, mois, NB_PERIODES_TENDANCE - 1)
+        ventes_fenetre = VwVentesAgentProduit.objects.filter(
+            agent_id__in=agents_equipe_ids,
+            mois__gte=date(annee_debut, mois_debut, 1),
+            mois__lte=mois_courant_date,
+        )
+        if produit_filtre:
+            ventes_fenetre = ventes_fenetre.filter(produit_id=produit_filtre)
+            produits_a_tracer = list(
+                ventes_fenetre.values_list("produit_id", "produit_nom").distinct()
+            )
+        else:
+            produits_a_tracer = list(
+                ventes_fenetre.values("produit_id", "produit_nom")
+                .annotate(total=Sum("kg_vendus"))
+                .order_by("-total")
+                .values_list("produit_id", "produit_nom")[:5]
+            )
+        par_produit_mois = {
+            (row["produit_id"], row["mois"]): row["kg_vendus"]
+            for row in ventes_fenetre.values("produit_id", "mois").annotate(kg_vendus=Sum("kg_vendus"))
+        }
+        for i, (pid, pnom) in enumerate(produits_a_tracer):
+            courbes_produits.append(
+                {
+                    "label": pnom,
+                    "color": PALETTE_PRODUITS[i % len(PALETTE_PRODUITS)],
+                    "data": [
+                        float(par_produit_mois.get((pid, t.periode), 0) or 0) for t in tendance
+                    ],
+                }
+            )
+
+    tendance_chart = _chart_json(
+        {
+            "labels": tendance_labels,
+            "kg_vendus": [float(t.kg_vendus or 0) for t in tendance],
+            "produits": courbes_produits,
+        }
+    )
+
+    context.update(
+        {
+            "superviseur": superviseur,
+            "equipe_courante": equipe_courante,
+            "nb_agents_actifs": nb_agents_actifs,
+            "jours_ouvres_periode": jours_ouvres_periode,
+            "objectif_kg_jour_equipe": objectif_kg_jour_equipe,
+            "kg_par_jour_equipe": kg_par_jour_equipe,
+            "statut_equipe": statut_equipe,
+            "statut_couleur_equipe": constants.statut_objectif_agent(statut_equipe),
+            "statut_label_equipe": constants.STATUT_OBJECTIF_LABELS.get(statut_equipe, "—"),
+            "ca_moyen_par_agent": ca_moyen_par_agent,
+            "statut_ca_moyen": constants.statut_ca_moyen_agent(ca_moyen_par_agent),
+            "ca_moyen_cible": constants.CA_MOYEN_AGENT_CIBLE,
+            "delta_kg_vendus": delta_kg_vendus,
+            "delta_kg_vendus_pct": delta_kg_vendus_pct,
+            "periode_precedente_libelle": periode_precedente_libelle,
+            "tendance": tendance,
+            "tendance_chart": tendance_chart,
+            "agents_equipe": agents_equipe,
+            "produits": produits,
+            "produits_options": produits_options,
+            "produit_filtre": int(produit_filtre) if produit_filtre else None,
+            "mois_produits_libelle": f"{MOIS_FR[mois]} {annee}",
+            "mois_precedent_libelle_produits": mois_precedent_libelle_produits,
+            "stock": stock,
+            "stock_total_kg": stock_total_kg,
+        }
+    )
+    return render(request, "bi/dashboard_superviseur_detail.html", context)
 
 
 @bi_access_required
