@@ -2,53 +2,51 @@
 {% load format_fcfa direction_filters %}
 
 {% block filtre_periode %}
-<div class="bi-toolbar">
-    <div class="bi-toolbar-left">
-        <div class="bi-retour">
-            <a href="{% url 'bi:agents' %}?annee={{ annee }}&mois={{ mois }}" class="btn btn-outline">
-                <i class="fas fa-arrow-left"></i> Retour
-            </a>
-        </div>
-        <div class="bi-granularite-toggle">
-            <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
-            <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
-        </div>
-        <form method="get" class="bi-periode-form">
-            <input type="hidden" name="granularite" value="{{ granularite }}">
-            {% if granularite == "semaine" %}
-            <div>
-                <label for="bi-semaine">Semaine</label>
-                <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
-                    {% for s in semaines_disponibles %}
-                    <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% else %}
-            <div>
-                <label for="bi-annee">Année</label>
-                <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
-            </div>
-            <div>
-                <label for="bi-mois">Mois</label>
-                <select id="bi-mois" name="mois" class="select">
-                    <option value="">—</option>
-                    {% for valeur, libelle in mois_options %}
-                    <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-            <button type="submit" class="btn btn-primary">Filtrer</button>
-        </form>
+<div class="bi-toolbar-left">
+    <div class="bi-retour">
+        <a href="{% url 'bi:agents' %}?annee={{ annee }}&mois={{ mois }}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Retour
+        </a>
     </div>
-    <div class="bi-toolbar-right">
-        <div class="bi-toggle-sensible">
-            <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
-                <i class="fas fa-eye-slash"></i>
-                <span>Masquer CA / rentabilité</span>
-            </button>
+    <div class="bi-granularite-toggle">
+        <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
+        <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
+    </div>
+    <form method="get" class="bi-periode-form">
+        <input type="hidden" name="granularite" value="{{ granularite }}">
+        {% if granularite == "semaine" %}
+        <div>
+            <label for="bi-semaine">Semaine</label>
+            <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
+                {% for s in semaines_disponibles %}
+                <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
+                {% endfor %}
+            </select>
         </div>
+        {% else %}
+        <div>
+            <label for="bi-annee">Année</label>
+            <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
+        </div>
+        <div>
+            <label for="bi-mois">Mois</label>
+            <select id="bi-mois" name="mois" class="select">
+                <option value="">—</option>
+                {% for valeur, libelle in mois_options %}
+                <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Filtrer</button>
+    </form>
+</div>
+<div class="bi-toolbar-right">
+    <div class="bi-toggle-sensible">
+        <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
+            <i class="fas fa-eye-slash"></i>
+            <span>Masquer CA / rentabilité</span>
+        </button>
     </div>
 </div>
 {% endblock %}

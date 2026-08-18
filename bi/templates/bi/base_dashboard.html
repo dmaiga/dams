@@ -17,30 +17,36 @@
     {% endfor %}
 </nav>
 
-{% block filtre_periode %}
-<form method="get" class="bi-periode-form">
-    <div>
-        <label for="bi-annee">Année</label>
-        <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
+
+
+<div class="bi-toolbar">
+    {% block filtre_periode %}
+    <div class="bi-toolbar-left">
+        <form method="get" class="bi-periode-form">
+            <div>
+                <label for="bi-annee">Année</label>
+                <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
+            </div>
+            <div>
+                <label for="bi-mois">Mois</label>
+                <select id="bi-mois" name="mois" class="select">
+                    <option value="">—</option>
+                    {% for valeur, libelle in mois_options %}
+                    <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% block extra_filtres %}{% endblock %}
+            <button type="submit" class="btn btn-primary">Filtrer</button>
+            {% if annee or mois %}
+            <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline">Toutes périodes</a>
+            {% else %}
+            <a href="{{ request.path }}" class="btn btn-outline">Dernier mois</a>
+            {% endif %}
+        </form>
     </div>
-    <div>
-        <label for="bi-mois">Mois</label>
-        <select id="bi-mois" name="mois" class="select">
-            <option value="">—</option>
-            {% for valeur, libelle in mois_options %}
-            <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    {% block extra_filtres %}{% endblock %}
-    <button type="submit" class="btn btn-primary">Filtrer</button>
-    {% if annee or mois %}
-    <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline">Toutes périodes</a>
-    {% else %}
-    <a href="{{ request.path }}" class="btn btn-outline">Dernier mois</a>
-    {% endif %}
-</form>
-{% endblock %}
+    {% endblock %}
+</div>
 
 {% if est_vide %}
 <div class="bi-vide">

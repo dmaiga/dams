@@ -16,6 +16,7 @@ import environ
 from datetime import date
 import environ
 import os
+import sys
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 from dotenv import load_dotenv
@@ -254,3 +255,12 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = "report@antares-rh.com"
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL ="DAM'S <report@antares-rh.com>"
+
+# Hasher de mot de passe allégé pendant `manage.py test` (18/08/2026) : PBKDF2 (par défaut,
+# ~600k itérations) est volontairement coûteux en CPU pour la sécurité en production, mais
+# chaque User.objects.create_user() dans les tests (26 occurrences dans **/tests.py au
+# 18/08/2026) paie ce coût inutilement — MD5PasswordHasher est en clair des dizaines de fois
+# plus rapide, acceptable uniquement parce que la base de test est jetée après chaque run.
+# Ne s'applique qu'à `manage.py test` (sys.argv), jamais en dev/prod.
+if "test" in sys.argv:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

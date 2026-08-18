@@ -112,6 +112,35 @@ Correctifs (spec précise fournie par mdmaiga, suivie à la lettre) :
 - Non vérifié visuellement (pas d'outil de capture d'écran/navigateur disponible dans cet
   environnement) — à confirmer par mdmaiga en conditions réelles.
 
+**Deuxième passe (mdmaiga, même jour)** : la toolbar avait beau être compacte, elle était encore
+réécrite en entier (avec son wrapper `.bi-toolbar`) par chacune des 3 pages qui l'utilisaient —
+duplication et risque de divergence future. Remontée dans le gabarit parent
+`bi/templates/bi/base_dashboard.html` : la structure `.bi-toolbar > .bi-toolbar-left (bloc
+`retour` + bloc `filtre_periode`) / .bi-toolbar-right (bloc `toolbar_actions`)` est désormais
+définie **une seule fois**, avec deux nouveaux blocs overridables (`retour`, `toolbar_actions`)
+en plus de `filtre_periode`/`extra_filtres` qui existaient déjà. Chaque page enfant ne fournit
+plus que son contenu spécifique (le bouton Retour, la bascule + le formulaire, le bouton
+masquer/afficher), sans plus jamais réécrire le wrapper. Bénéfice non cherché mais bienvenu :
+`dashboard_sante.html`, `dashboard_produits.html`, `dashboard_depenses.html` et
+`dashboard_stock.html` (qui n'avaient jamais été touchés) héritent automatiquement de la même
+toolbar propre, sans aucune modification de leur part — vérifié (`bi-toolbar` présent une seule
+fois sur les 7 pages BI, `bi-retour`/`bi-toggle-sensible` uniquement là où prévu).
+
+**Troisième passe (mdmaiga, même jour)** : retour en arrière partiel sur les blocs `retour`/
+`toolbar_actions` — mdmaiga a jugé que forcer ces deux slots nommés dans le gabarit pour des
+éléments qui ne concernent que 3 pages sur 7 était un sur-travail imposé au gabarit plutôt qu'une
+simplification. Structure finale : `base_dashboard.html` ne fournit plus que le `<div
+class="bi-toolbar">` vide et **un seul** bloc `filtre_periode` (comme à l'origine) ; chaque page
+qui a besoin d'un bouton Retour, d'une bascule mois/semaine ou d'un bouton "données sensibles"
+compose entièrement son `.bi-toolbar-left`/`.bi-toolbar-right` à l'intérieur de ce bloc unique.
+Les pages qui n'ont besoin que du formulaire par défaut (`dashboard_sante.html`,
+`dashboard_produits.html`, etc.) restent inchangées. Vérifié par recherche exacte des balises
+(`<div class="bi-toolbar-left">`/`<div class="bi-toolbar-right">`, pas une recherche de
+sous-chaîne — un faux positif du panneau Debug Toolbar en environnement DEBUG, qui réinjecte le
+texte des commentaires Django template ailleurs dans la page, avait d'abord fait croire à un
+doublon) : exactement 1 `.bi-toolbar-left` sur les 7 pages, `.bi-toolbar-right` uniquement sur
+les 3 pages agent/équipe.
+
 Reste à faire manuellement en déploiement : `dbt run` complet (les nouveaux marts et les deux
 corrigés) sur la base de production.
 
