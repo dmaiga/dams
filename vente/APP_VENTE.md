@@ -49,22 +49,25 @@ Guard local : `_acces_superviseur(agent) = agent.est_superviseur` (pattern de pe
 | `Vente` | Vente enregistrée par le superviseur pour un agent. `prix_vente_unitaire` saisi à chaque vente (obligatoire) ; `type_vente` pré-coché sur `detail` mais modifiable ; `mode_paiement` toujours `'comptant'` (valeur par défaut du modèle, non exposée dans le formulaire). `commentaire_perte` (2026-08-04) : note de perte pour un produit à l'unité, voir § Perte ci-dessous |
 | `Recouvrement` | Créé automatiquement à **chaque** vente (toutes comptant pour l'instant) |
 | `Dette` | Non utilisée par cette app — `Vente.save()` (existant, non modifié) ne la crée que si `mode_paiement == 'credit'`, ce que `VenteForm` n'envoie jamais actuellement |
-| `Perte` | (2026-08-04) Perte déclarée en même temps qu'une vente sur un produit vrac — voir § Perte ci-dessous. `Perte.lot`/`quantite_perdue`/`description` existaient déjà (perte entrepôt, `core/views.py`) ; `detail_distribution` et `vente` sont nouveaux |
+| `Perte` | (2026-08-04, étendu 2026-08-18) Perte déclarée en même temps qu'une vente, vrac ou conditionné — voir § Perte ci-dessous. `Perte.lot`/`quantite_perdue`/`description` existaient déjà (perte entrepôt, `core/views.py`) ; `detail_distribution`, `vente` (2026-08-04) et `kilo_perdu_incentive` (2026-08-18) sont nouveaux |
 
-Migrations `core` liées à cette évolution : `0111_perte_detail_distribution`, `0112_vente_commentaire_perte`, `0113_perte_vente`. Aucune migration `core` n'avait été nécessaire pour le sprint 02 d'origine — voir `docs/sprints/sprint-02.md`.
+Migrations `core` liées à cette évolution : `0111_perte_detail_distribution`, `0112_vente_commentaire_perte`, `0113_perte_vente`, `0117_perte_kilo_perdu_incentive`. Aucune migration `core` n'avait été nécessaire pour le sprint 02 d'origine — voir `docs/sprints/sprint-02.md`.
 
 ---
 
-## Déclaration de perte à la vente (2026-08-04)
+## Déclaration de perte à la vente (2026-08-04, étendue 2026-08-18 — sprint-10)
 
 Un agent ne remettait parfois que le kilo effectivement vendu quand une partie du stock distribué avait péri avant la vente, sans le signaler — ce qui gonflait à tort son "reste à vendre"/recouvrer. `VenteForm` permet désormais de déclarer cette perte **dans le même formulaire, à la même soumission** que la vente (pas un flux séparé — décision produit : ne pas complexifier un geste quotidien pour des utilisateurs peu à l'aise avec l'outil) :
 
+**⚠️ Depuis le 2026-08-18, la perte déclarée ici a un effet direct sur la paie de l'agent** — `paie/services/salaire_calculator.py::calcul_salaire_mamy` déduit `Perte.kilo_perdu_incentive` du kilo vendu avant d'appliquer l'incentive (25 FCFA/kg) et de comparer au seuil des 750 kg (`paie/APP_PAIE.md` § 1.quater). Toute modification de `VenteForm`/`Perte` doit garder ce champ cohérent.
+
 - Case à cocher `declaration_perte` (repliée par défaut, sous le champ Quantité de `enregistrer_vente.html`).
-- **Produit vrac** (`Produit.poids_unitaire_kg` vide) : `quantite_perdue` (kg) devient obligatoire. `VenteForm.save()` crée `Vente` + `Perte(detail_distribution=..., vente=..., quantite_perdue=...)` dans le même `transaction.atomic()`. `Perte.save()` ne décrémente **jamais** `LotEntrepot.quantite_restante` quand `detail_distribution` est renseigné (déjà décrémenté à la distribution) — uniquement `DetailDistribution.quantite_restante_calculee` qui soustrait désormais aussi `Sum(pertes.quantite_perdue)` (`core/models.py`), en plus des ventes.
-- **Produit à l'unité** (conditionné) : seul `commentaire_perte` est obligatoire — aucune quantité déduite nulle part, `Vente.commentaire_perte` stocke juste une note. Décision volontaire : ne pas complexifier un cas qui n'a pas besoin d'un vrai décompte.
-- `Perte.vente` (FK, `related_name='pertes_liees'`) relie la perte vrac à la vente déclarée en même temps — utilisé par `direction/templates/direction/analyses/ventes/liste_ventes_admin.html` pour afficher une icône ⓘ au survol (commentaire de perte, quelle que soit la variante vrac/unité).
-- Le contrôle de quantité (`clean()`) vérifie que `quantite` (vendue) + `quantite_perdue` ne dépasse pas `detail_distribution.quantite_restante_calculee` **avant** la soumission — les deux sont retirés du même stock en une seule transaction.
-- AJAX (`ajax_distributions_par_agent`) expose `is_vrac` par distribution pour piloter l'affichage JS (kg+commentaire vs commentaire seul) sans aller-retour serveur.
+- **Produit vrac** (`Produit.poids_unitaire_kg` vide) : `quantite_perdue` (kg) devient obligatoire. `VenteForm.save()` crée `Vente` + `Perte(detail_distribution=..., vente=..., quantite_perdue=..., kilo_perdu_incentive=quantite_perdue)` dans le même `transaction.atomic()`. `Perte.save()` ne décrémente **jamais** `LotEntrepot.quantite_restante` quand `detail_distribution` est renseigné (déjà décrémenté à la distribution) — uniquement `DetailDistribution.quantite_restante_calculee` qui soustrait désormais aussi `Sum(pertes.quantite_perdue)` (`core/models.py`), en plus des ventes.
+- **Produit conditionné** (sac/carton, `Produit.poids_unitaire_kg` renseigné) : `commentaire_perte` reste obligatoire, et un nouveau champ `kilo_perdu_incentive` (kg) est **également obligatoire**, borné par le poids nominal vendu sur la ligne (`quantite × poids_unitaire_kg`). Ce champ sert **uniquement** à la paie — `Perte.quantite_perdue` reste à `0` pour ce cas et n'affecte jamais `quantite_restante_calculee` (le sac reste compté comme vendu en entier, même si une partie de son contenu est déclarée perdue). Ne pas confondre les deux champs : `quantite_perdue` = décompte de stock (unité de la distribution) ; `kilo_perdu_incentive` = toujours en kg, uniquement pour l'incentive.
+- `Perte.vente` (FK, `related_name='pertes_liees'`) relie la perte à la vente déclarée en même temps, pour les deux types de produit depuis le 2026-08-18 — utilisé par `direction/templates/direction/analyses/ventes/liste_ventes_admin.html` pour afficher un bouton ⓘ cliquable (pas un hover, cf. note ci-dessous) donnant le détail de la perte.
+- Le contrôle de quantité (`clean()`) vérifie que `quantite` (vendue) + `quantite_perdue` ne dépasse pas `detail_distribution.quantite_restante_calculee` **avant** la soumission (vrac uniquement) — les deux sont retirés du même stock en une seule transaction. Pour un produit conditionné, `kilo_perdu_incentive` est validé séparément contre le poids nominal vendu sur la ligne, pas contre le stock restant.
+- AJAX (`ajax_distributions_par_agent`) expose `is_vrac` par distribution pour piloter l'affichage JS (`quantite_perdue` vs `kilo_perdu_incentive` + `commentaire_perte`) sans aller-retour serveur.
+- **Affichage** (`liste_ventes_admin.html`) : le hover natif (`title`) a été remplacé le 2026-08-18 par un bouton ⓘ cliquable ouvrant un `<dialog>` (DaisyUI, pattern déjà utilisé dans `fournisseurs/detail.html`) — le `title` HTML ne se déclenchait pas de façon fiable au tactile (superviseurs sur tablette).
 
 ---
 
@@ -133,7 +136,7 @@ Mobile-first, cohérent avec les conventions posées dans `marchandise/APP_MARCH
 - Toutes les ventes sont `mode_paiement='comptant'` — recouvrement systématique, aucune `Dette` créée par cette app.
 - `date_vente` : seul le jour est demandé à l'utilisateur ; l'heure est fixée par le serveur (`timezone.localtime().time()`) au moment de l'enregistrement, pour éviter les blocages de saisie observés avec un champ datetime complet sur mobile.
 - Soft delete : `Vente.est_supprime` — jamais de suppression en dur (toutes les requêtes filtrent `est_supprime=False`).
-- Déclaration de perte (2026-08-04) : `quantite` (vendue) + `quantite_perdue` (si vrac) `<= detail_distribution.quantite_restante_calculee` avant soumission — `VenteForm.clean()`. Pour un produit à l'unité, aucune quantité n'est déduite, seul `Vente.commentaire_perte` est renseigné.
+- Déclaration de perte (2026-08-04, étendue 2026-08-18) : vrac — `quantite` (vendue) + `quantite_perdue` `<= detail_distribution.quantite_restante_calculee` avant soumission (`VenteForm.clean()`). Conditionné — `Vente.commentaire_perte` reste requis, et `kilo_perdu_incentive` (kg, nouveau) `<= quantite × poids_unitaire_kg` ; ce champ n'est jamais comparé à `quantite_restante_calculee` (pas un décompte de stock, uniquement la paie — voir § Perte).
 
 ---
 

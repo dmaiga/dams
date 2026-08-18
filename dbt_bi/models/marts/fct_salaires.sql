@@ -20,6 +20,12 @@
 -- (>= 750 kg -> 20000, sinon 10000), cf. paie/services/salaire_calculator.py::calcul_salaire_mamy.
 -- Recalculé ici plutôt que lu depuis salaire_base stocké : garantit un KPI cohérent avec la
 -- règle même si une ligne a été générée avant le déploiement du nouveau calculateur.
+-- Kg net des pertes (sprint-10, 2026-08-18) : le seuil des 750 kg se lit désormais sur le kg
+-- vendu MOINS les kg perdus déclarés par le superviseur sur ces ventes (stg_pertes.
+-- kilo_perdu_incentive, jointe par vente_id), aligné sur calcul_salaire_mamy côté Django.
+-- Non rétroactif : seules les lignes de salaire calculées après la mise en production de ce
+-- correctif reflètent la déduction (les pertes déclarées avant n'ont pas généré de recalcul
+-- de paie historique).
 -- Zéro avant mai (dbt-7, 2026-08-03, décision produit) : toute ligne salaire dont date_debut <
 -- 2026-05-01 est ramenée à 0 (salaire_base, incentive, salaire_total), tous types d'agent
 -- confondus. Les montants stockés avant cette date sont jugés caducs par la direction (régimes
@@ -39,14 +45,31 @@ ventes as (
     select * from {{ ref('fct_ventes') }}
 ),
 
-kg_par_salaire as (
+pertes as (
+    select * from {{ ref('stg_pertes') }}
+),
+
+kg_perdu_par_salaire as (
     select
         s.salaire_id,
-        coalesce(sum(v.quantite_en_kg), 0) as kg_realise
+        coalesce(sum(p.kilo_perdu_incentive), 0) as kg_perdu
     from salaires s
     left join ventes v
         on v.agent_id = s.agent_id
         and v.date_vente between s.date_debut and s.date_fin
+    left join pertes p on p.vente_id = v.vente_id
+    group by s.salaire_id
+),
+
+kg_par_salaire as (
+    select
+        s.salaire_id,
+        coalesce(sum(v.quantite_en_kg), 0) - coalesce(max(kp.kg_perdu), 0) as kg_realise
+    from salaires s
+    left join ventes v
+        on v.agent_id = s.agent_id
+        and v.date_vente between s.date_debut and s.date_fin
+    left join kg_perdu_par_salaire kp on kp.salaire_id = s.salaire_id
     group by s.salaire_id
 ),
 

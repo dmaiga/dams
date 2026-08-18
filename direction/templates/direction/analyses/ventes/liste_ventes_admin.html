@@ -386,10 +386,29 @@ function togglePeriodFields(value) {
                                 <div class="font-medium truncate max-w-[100px]" title="{{ vente.produit_nom }}">
                                     {{ vente.produit_nom|truncatechars:15 }}
                                 </div>
-                                {% if vente.commentaire_perte %}
-                                <i class="fas fa-circle-info text-warning-content bg-warning rounded-circle flex-shrink-0" style="font-size:0.65rem; padding:2px;" title="Perte : {{ vente.commentaire_perte }}"></i>
-                                {% elif vente.pertes_liees.all %}
-                                <i class="fas fa-circle-info text-warning-content bg-warning rounded-circle flex-shrink-0" style="font-size:0.65rem; padding:2px;" title="Perte ({{ vente.pertes_liees.all.0.quantite_perdue }} kg) : {{ vente.pertes_liees.all.0.description }}"></i>
+                                {% if vente.commentaire_perte or vente.pertes_liees.all %}
+                                <button type="button" class="btn btn-circle btn-warning border-0 flex-shrink-0 p-0" style="width:1.5rem; height:1.5rem; min-height:1.5rem;" onclick="document.getElementById('perte-vente-{{ vente.id }}').showModal()" aria-label="Voir la perte déclarée">
+                                    <i class="fas fa-circle-info text-warning-content" style="font-size:0.65rem;"></i>
+                                </button>
+                                <dialog id="perte-vente-{{ vente.id }}" class="modal">
+                                    <div class="modal-box max-w-sm">
+                                        <h3 class="font-semibold text-sm mb-2">Perte déclarée</h3>
+                                        {% if vente.pertes_liees.all %}
+                                        <p class="text-sm"><span class="font-medium">{{ vente.pertes_liees.all.0.kilo_perdu_incentive|default:"0" }} kg</span> — {{ vente.pertes_liees.all.0.description }}</p>
+                                        {% if vente.commentaire_perte %}
+                                        <p class="text-sm text-gray-500 mt-1">{{ vente.commentaire_perte }}</p>
+                                        {% endif %}
+                                        {% else %}
+                                        <p class="text-sm">{{ vente.commentaire_perte }}</p>
+                                        {% endif %}
+                                        <form method="dialog" class="modal-action">
+                                            <button class="btn btn-sm">Fermer</button>
+                                        </form>
+                                    </div>
+                                    <form method="dialog" class="modal-backdrop">
+                                        <button>Fermer</button>
+                                    </form>
+                                </dialog>
                                 {% endif %}
                             </div>
                             {% if vente.specification %}
@@ -397,10 +416,22 @@ function togglePeriodFields(value) {
                             {% endif %}
                         </td>
 
-                        <!-- Quantité (kg) -->
+                        <!-- Quantité (kg) — si une perte est déclarée, le brut vendu est barré et
+                             remplacé par le net facturable à l'incentive (brut - kg perdus). -->
                         <td class="px-3 py-2 text-right">
+                            {% if vente.kilo_perdu > 0 %}
+                            <div class="flex flex-col items-end leading-tight">
+                                <span class="text-gray-400 line-through text-xs">{{ vente.quantite_en_kg|format_number }} kg</span>
+                                <span>
+                                    <span class="font-semibold text-warning-content">{{ vente.kilo_net|format_number }}</span>
+                                    <span class="text-xs text-gray-500">kg</span>
+                                </span>
+                                <span class="badge badge-warning badge-xs text-[10px]">-{{ vente.kilo_perdu|format_number }} kg perdus</span>
+                            </div>
+                            {% else %}
                             <span class="font-semibold">{{ vente.quantite_en_kg|format_number }}</span>
                             <span class="text-xs text-gray-500">kg</span>
+                            {% endif %}
                         </td>
 
                         <!-- Prix (achat / vente), même cellule, dégradé pour différencier -->

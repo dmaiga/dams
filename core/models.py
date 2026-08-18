@@ -1259,6 +1259,19 @@ class Perte(models.Model):
         related_name="pertes_liees"
     )
     quantite_perdue = models.DecimalField(max_digits=10, decimal_places=2)
+    # Kg perdus utilisés uniquement pour déduire l'incentive de l'agent
+    # (paie/services/salaire_calculator.py). Distinct de quantite_perdue,
+    # qui reste exprimée dans l'unité de stock de la distribution (kg pour
+    # un produit vrac, nombre de sacs/cartons pour un produit conditionné)
+    # et ne doit jamais être modifiée pour refléter une perte partielle en
+    # kg à l'intérieur d'un sac déjà compté comme vendu.
+    kilo_perdu_incentive = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Kg perdus (incentive)"
+    )
     quantite_perdue_originale = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -1829,7 +1842,23 @@ class Vente(models.Model):
         # produit vrac
         return self.quantite
 
-    
+    @property
+    def kilo_perdu(self):
+        """Kg perdus déclarés sur cette vente (Perte.kilo_perdu_incentive) —
+        ce qui réduit l'incentive de l'agent, cf. calcul_salaire_mamy.
+        Somme en Python (pas .aggregate()) pour rester compatible avec un
+        éventuel prefetch_related('pertes_liees') côté vue."""
+        return sum(
+            (p.kilo_perdu_incentive or Decimal('0.00') for p in self.pertes_liees.all()),
+            Decimal('0.00')
+        )
+
+    @property
+    def kilo_net(self):
+        """Kg réellement facturables à l'incentive : quantite_en_kg - kilo_perdu."""
+        return self.quantite_en_kg - self.kilo_perdu
+
+
     class Meta:
         ordering = ['-date_vente']
         verbose_name = "Vente"

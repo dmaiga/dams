@@ -7,7 +7,7 @@ from datetime import date, timedelta, datetime
 from decimal import Decimal
 from core.models import Produit, LotEntrepot, Vente, Fournisseur, Perte
 from django.core.cache import cache
-from django.db.models.functions import TruncMonth
+from django.db.models.functions import TruncMonth, Coalesce
 import calendar
 
 class ProductAnalysisService:
@@ -66,7 +66,10 @@ class ProductAnalysisService:
         # =========================
         pertes = Perte.objects.aggregate(
             pertes_valeur=Sum(
-                F("quantite_perdue") * F("lot__prix_achat_unitaire"),
+                Coalesce(
+                    F("kilo_perdu_incentive"), F("quantite_perdue"),
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                ) * F("lot__prix_achat_unitaire"),
                 output_field=DecimalField(max_digits=15, decimal_places=2),
             )
         )
@@ -247,10 +250,21 @@ class ProductAnalysisService:
                 # Quantité initiale totale
                 total_initial_quantity=Sum("lots__quantite_initiale"),
 
-                # Pertes
-                total_losses_quantite=Sum("lots__pertes__quantite_perdue"),
+                # Pertes — kilo_perdu_incentive si renseigné (perte déclarée à la vente,
+                # sprint-10 : quantite_perdue reste à 0 pour un produit conditionné, pour ne
+                # pas fausser le décompte de stock en sacs/cartons), sinon quantite_perdue
+                # (perte entrepôt classique).
+                total_losses_quantite=Sum(
+                    Coalesce(
+                        F("lots__pertes__kilo_perdu_incentive"), F("lots__pertes__quantite_perdue"),
+                        output_field=DecimalField(max_digits=10, decimal_places=2),
+                    )
+                ),
                 total_losses_valeur=Sum(
-                    F("lots__pertes__quantite_perdue") * F("lots__prix_achat_unitaire"),
+                    Coalesce(
+                        F("lots__pertes__kilo_perdu_incentive"), F("lots__pertes__quantite_perdue"),
+                        output_field=DecimalField(max_digits=10, decimal_places=2),
+                    ) * F("lots__prix_achat_unitaire"),
                     output_field=DecimalField(max_digits=15, decimal_places=2),
                 ),
             )
@@ -429,20 +443,29 @@ class ProductAnalysisService:
         except Produit.DoesNotExist:
             return None
 
+        # Quantité perdue "effective" par ligne de Perte : kilo_perdu_incentive quand il est
+        # renseigné (déclaration de perte à la vente, sprint-10 — vrac comme conditionné, où
+        # quantite_perdue reste à 0 pour ne pas fausser le décompte de stock en sacs/cartons),
+        # sinon quantite_perdue (perte entrepôt classique, kilo_perdu_incentive toujours nul).
+        perte_effective = Coalesce(
+            F("pertes__kilo_perdu_incentive"), F("pertes__quantite_perdue"),
+            output_field=DecimalField(max_digits=10, decimal_places=2),
+        )
+
         lots = (
             LotEntrepot.objects
             .filter(produit_id=product_id)
             .select_related("fournisseur")
             .annotate(
                 pertes_quantite=Sum(
-                    "pertes__quantite_perdue",
+                    perte_effective,
                     filter=Q(
                         date_reception__gte=ProductAnalysisService.DATE_BASCULE_PERTES_DATETIME
                     ),
                     default=0,
                 ),
                 pertes_valeur=Sum(
-                    F("pertes__quantite_perdue") * F("prix_achat_unitaire"),
+                    perte_effective * F("prix_achat_unitaire"),
                     output_field=DecimalField(max_digits=15, decimal_places=2),
                     filter=Q(
                         date_reception__gte=ProductAnalysisService.DATE_BASCULE_PERTES_DATETIME
@@ -497,13 +520,17 @@ class ProductAnalysisService:
         # ============================
         # 🔹 PERTES TOTALES (1 QUERY)
         # ============================
+        perte_effective_globale = Coalesce(
+            F("kilo_perdu_incentive"), F("quantite_perdue"),
+            output_field=DecimalField(max_digits=10, decimal_places=2),
+        )
         pertes = Perte.objects.filter(
             lot__in=lots,
             lot__date_reception__gte=ProductAnalysisService.DATE_BASCULE_PERTES_DATETIME,
         ).aggregate(
-            pertes_quantite=Sum("quantite_perdue"),
+            pertes_quantite=Sum(perte_effective_globale),
             pertes_valeur=Sum(
-                F("quantite_perdue") * F("lot__prix_achat_unitaire"),
+                perte_effective_globale * F("lot__prix_achat_unitaire"),
                 output_field=DecimalField(max_digits=15, decimal_places=2)
             )
         )
@@ -634,9 +661,13 @@ class ProductAnalysisService:
                     output_field=DecimalField(max_digits=15, decimal_places=2),
                 ),
 
-                # Pertes
+                # Pertes — kilo_perdu_incentive si renseigné, sinon quantite_perdue (voir
+                # get_product_detail ci-dessus pour le raisonnement complet).
                 pertes_valeur=Sum(
-                    F("lots__pertes__quantite_perdue") * F("lots__prix_achat_unitaire"),
+                    Coalesce(
+                        F("lots__pertes__kilo_perdu_incentive"), F("lots__pertes__quantite_perdue"),
+                        output_field=DecimalField(max_digits=10, decimal_places=2),
+                    ) * F("lots__prix_achat_unitaire"),
                     output_field=DecimalField(max_digits=15, decimal_places=2),
                 ),
 

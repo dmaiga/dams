@@ -35,6 +35,54 @@ même règle : toute évolution future du seuil/montants doit être répercutée
 
 ---
 
+## 1.quater Déduction des kilos perdus sur l'incentive (Mamies, `calcul_salaire_mamy`) — 18/08/2026
+
+L'incentive terrain (25 FCFA/kg, `RegleSalaire.incentive_par_kg`) se calcule désormais sur le **kilo
+net** de la période, pas sur le kilo brut vendu :
+
+```
+kilo_perdu     = Sum(Perte.kilo_perdu_incentive) sur les Perte liées aux ventes de l'agent/période
+kilo_facturable = kilo_total (brut vendu) - kilo_perdu
+incentive       = kilo_facturable * incentive_par_kg
+```
+
+Le seuil des 750 kg du § 1.bis se lit lui aussi sur `kilo_facturable` (net des pertes), pas sur
+`kilo_total` brut — une perte déclarée peut donc faire basculer un agent sous le seuil des 20 000 FCFA
+de fixe théorique.
+
+`kilo_perdu`/`kilo_facturable` sont exposés dans le dict retourné par `calcul_salaire_mamy`, à
+afficher sur l'écran de fiche de paie pour que l'agent/superviseur comprenne l'écart entre kilo vendu
+et incentive perçue.
+
+**Origine de `Perte.kilo_perdu_incentive`** (`core.models.Perte`, `vente.forms.VenteForm`) : distinct
+de `Perte.quantite_perdue`, qui reste un concept de **décompte de stock**
+(`DetailDistribution.quantite_restante_calculee`), exprimé dans l'unité de la distribution — kg pour
+un produit vrac, nombre de sacs/cartons pour un produit conditionné. `kilo_perdu_incentive` est
+toujours en kg, quel que soit le type de produit :
+
+* Produit vrac : les deux champs coïncident (l'unité de stock est déjà le kg) — `kilo_perdu_incentive`
+  reçoit la même valeur que `quantite_perdue`.
+* Produit conditionné (sac/carton) : une perte partielle à l'intérieur d'une unité déjà comptée comme
+  vendue (ex. 5 kg abîmés sur un sac de 25 kg) ne peut pas être exprimée dans `quantite_perdue` sans
+  fausser le décompte de stock en sacs. `quantite_perdue` reste à 0 pour ce cas, seul
+  `kilo_perdu_incentive` porte la valeur saisie par le superviseur — sans aucun impact sur
+  `quantite_restante_calculee`.
+
+**Non rétroactif** : ne s'applique qu'aux calculs de paie effectués à partir de la mise en production
+de ce correctif ; les paies déjà émises pour des pertes déjà déclarées ne sont pas recalculées.
+
+**Répliqué côté BI** (`dbt_bi/models/marts/fct_salaires.sql`, CTE `kg_perdu_par_salaire`) : même
+principe que le § 1.bis — le seuil des 750 kg recalculé en dbt lit `stg_pertes.kilo_perdu_incentive`
+joint par `vente_id`, pour rester cohérent avec `calcul_salaire_mamy`. Le montant `incentive` lui-même
+n'est pas recalculé côté dbt (lu tel quel depuis `stg_salaires`) — seul le seuil du fixe l'est.
+
+Hors périmètre de ce correctif (décision explicite, pas un oubli) : `calcul_salaire_gros` (incentive
+au carton, pas au kg) et le bonus superviseur (`calcul_salaire_superviseur`, basé sur `kilo_total`
+brut cumulé des mamies) restent inchangés — la demande portait spécifiquement sur l'incentive de
+l'agent terrain en kg.
+
+---
+
 ## 1.ter Éligibilité des agents à la paie (`agents_eligibles_periode`) — 05/08/2026
 
 `SalaireGenerationService` et `SalaireListeService` partagent la même fonction

@@ -87,6 +87,14 @@
               <div class="text-danger small mt-1">{{ error }}</div>
             {% endfor %}
           </div>
+          <div class="mb-2 d-none" id="perte-kilo-incentive-wrapper">
+            <label class="form-label fw-semibold small">{{ form.kilo_perdu_incentive.label }}</label>
+            {{ form.kilo_perdu_incentive }}
+            <div class="form-text">{{ form.kilo_perdu_incentive.help_text }}</div>
+            {% for error in form.kilo_perdu_incentive.errors %}
+              <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+          </div>
           <div class="mb-0">
             <label class="form-label fw-semibold small">{{ form.commentaire_perte.label }}</label>
             {{ form.commentaire_perte }}
@@ -181,7 +189,10 @@
 const perteCheckbox = document.getElementById('{{ form.declaration_perte.id_for_label }}');
 const perteBlock = document.getElementById('perte-block');
 const perteQuantiteWrapper = document.getElementById('perte-quantite-wrapper');
+const perteKiloIncentiveWrapper = document.getElementById('perte-kilo-incentive-wrapper');
 const distSelectEl = document.getElementById('{{ form.detail_distribution.id_for_label }}');
+const agentSelectEl = document.getElementById('{{ form.agent_terrain.id_for_label }}');
+const initialDetailId = "{{ form.data.detail_distribution|default:'' }}";
 
 function updatePerteBlock() {
   if (!perteCheckbox.checked) {
@@ -193,18 +204,16 @@ function updatePerteBlock() {
   const selected = distSelectEl.selectedOptions[0];
   const isVrac = selected && selected.dataset.isVrac;
   perteQuantiteWrapper.classList.toggle('d-none', !isVrac);
+  perteKiloIncentiveWrapper.classList.toggle('d-none', !!isVrac);
 }
 
 perteCheckbox.addEventListener('change', updatePerteBlock);
 
-document.getElementById('{{ form.agent_terrain.id_for_label }}').addEventListener('change', function () {
-  const agentId = this.value;
+function chargerDistributions(agentId, selectedDetailId) {
   const distSelect = distSelectEl;
 
   distSelect.innerHTML = '<option value="">Chargement…</option>';
   distSelect.disabled = true;
-  perteCheckbox.checked = false;
-  updatePerteBlock();
 
   if (!agentId) {
     distSelect.innerHTML = '<option value="">— sélectionnez d\'abord un agent —</option>';
@@ -228,10 +237,20 @@ document.getElementById('{{ form.agent_terrain.id_for_label }}').addEventListene
         distSelect.appendChild(opt);
       });
       distSelect.disabled = false;
+      if (selectedDetailId) {
+        distSelect.value = selectedDetailId;
+      }
+      updatePerteBlock();
     })
     .catch(() => {
       distSelect.innerHTML = '<option value="">Erreur de chargement</option>';
     });
+}
+
+agentSelectEl.addEventListener('change', function () {
+  perteCheckbox.checked = false;
+  updatePerteBlock();
+  chargerDistributions(this.value, null);
 });
 
 distSelectEl.addEventListener('change', function () {
@@ -250,5 +269,14 @@ document.getElementById('vente-form').addEventListener('submit', function () {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Enregistrement…';
 });
+
+// Après une soumission invalide, Django re-rend le formulaire mais le select
+// "Produit distribué" (peuplé uniquement en JS) repart à zéro — sans ce bloc,
+// l'utilisateur doit re-sélectionner l'agent avant de pouvoir choisir à nouveau
+// un produit, alors que le reste de sa saisie (quantité, perte, prix…) est
+// conservé par Django. On recharge la liste et on restaure la sélection.
+if (agentSelectEl.value) {
+  chargerDistributions(agentSelectEl.value, initialDetailId);
+}
 </script>
 {% endblock %}

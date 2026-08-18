@@ -2,7 +2,7 @@
 from decimal import Decimal
 from django.db.models import Sum, F
 from django.db.models.functions import Coalesce
-from core.models import Agent, Vente, RegleSalaire
+from core.models import Agent, Vente, Perte, RegleSalaire
 from django.utils import timezone
 
 class CalculatorSalaire:
@@ -88,12 +88,22 @@ class CalculatorSalaire:
             )
         )["total"]
 
-        incentive = kilo_total * incentive_par_kg
+        # Kg perdus déclarés par le superviseur sur ces ventes (Perte.kilo_perdu_incentive,
+        # distinct de Perte.quantite_perdue qui ne sert qu'au décompte de stock) — réduisent
+        # l'incentive de l'agent, à partir de la mise en production de ce correctif (non
+        # rétroactif sur les paies déjà émises).
+        kilo_perdu = Perte.objects.filter(vente__in=ventes).aggregate(
+            total=Coalesce(Sum("kilo_perdu_incentive"), Decimal("0.00"))
+        )["total"]
+
+        kilo_facturable = kilo_total - kilo_perdu
+
+        incentive = kilo_facturable * incentive_par_kg
 
         # ===== FIXE VARIABLE SELON LE VOLUME RÉALISÉ =====
-        # >= 750 kg sur la période -> fixe 20 000 ; en dessous -> fixe 10 000.
+        # >= 750 kg sur la période (net des pertes) -> fixe 20 000 ; en dessous -> fixe 10 000.
         # S'applique à tous les agents terrain (salaire_base_personnel n'est plus lu ici).
-        if kilo_total >= Decimal("750"):
+        if kilo_facturable >= Decimal("750"):
             salaire_base_theorique = Decimal("20000")
         else:
             salaire_base_theorique = Decimal("10000")
@@ -117,6 +127,8 @@ class CalculatorSalaire:
             "bonus": Decimal("0.00"),
             "salaire_total": salaire_base + incentive,
             "kilo_total": kilo_total,
+            "kilo_perdu": kilo_perdu,
+            "kilo_facturable": kilo_facturable,
         }
     
     # =========================

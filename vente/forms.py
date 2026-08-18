@@ -171,6 +171,15 @@ class VenteForm(forms.Form):
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
     )
 
+    kilo_perdu_incentive = forms.DecimalField(
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        required=False,
+        label="Kg perdus dans le sac/carton",
+        help_text="Poids perdu à l'intérieur d'une unité (sac/carton) déjà comptée comme vendue — sert uniquement au calcul de l'incentive, pas au décompte de stock.",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+
     commentaire_perte = forms.CharField(
         required=False,
         label="Commentaire",
@@ -232,6 +241,7 @@ class VenteForm(forms.Form):
         quantite = cleaned_data.get('quantite')
         declaration_perte = cleaned_data.get('declaration_perte')
         quantite_perdue = cleaned_data.get('quantite_perdue')
+        kilo_perdu_incentive = cleaned_data.get('kilo_perdu_incentive')
         commentaire_perte = cleaned_data.get('commentaire_perte')
 
         if detail_distribution and agent_terrain and detail_distribution.distribution.agent_terrain_id != agent_terrain.id:
@@ -257,8 +267,18 @@ class VenteForm(forms.Form):
                         'quantite_perdue',
                         f"Vendu + perdu dépasse ce qu'il reste à distribuer ({detail_distribution.quantite_restante_calculee})"
                     )
-            elif not commentaire_perte:
-                self.add_error('commentaire_perte', "Indiquez un commentaire pour cette perte.")
+            else:
+                if not commentaire_perte:
+                    self.add_error('commentaire_perte', "Indiquez un commentaire pour cette perte.")
+
+                poids_unitaire = detail_distribution.lot.produit.poids_unitaire_kg
+                if not kilo_perdu_incentive:
+                    self.add_error('kilo_perdu_incentive', "Indiquez le nombre de kg perdus dans le sac/carton.")
+                elif quantite and poids_unitaire and kilo_perdu_incentive > (quantite * poids_unitaire):
+                    self.add_error(
+                        'kilo_perdu_incentive',
+                        f"La perte ne peut pas dépasser le poids vendu sur cette ligne ({quantite * poids_unitaire} kg)"
+                    )
 
         return cleaned_data
 
@@ -288,10 +308,23 @@ class VenteForm(forms.Form):
             )
 
             if declaration_perte and is_vrac:
+                quantite_perdue = self.cleaned_data['quantite_perdue']
                 Perte.objects.create(
                     detail_distribution=detail_distribution,
                     vente=vente,
-                    quantite_perdue=self.cleaned_data['quantite_perdue'],
+                    quantite_perdue=quantite_perdue,
+                    kilo_perdu_incentive=quantite_perdue,
+                    description=self.cleaned_data.get('commentaire_perte') or "Perdu (déclaré à la vente)",
+                )
+            elif declaration_perte:
+                # Produit conditionné (sac/carton) : le sac reste compté comme
+                # vendu (quantite_perdue=0, aucun impact sur le stock restant),
+                # seul kilo_perdu_incentive réduit l'incentive de l'agent.
+                Perte.objects.create(
+                    detail_distribution=detail_distribution,
+                    vente=vente,
+                    quantite_perdue=Decimal("0.00"),
+                    kilo_perdu_incentive=self.cleaned_data['kilo_perdu_incentive'],
                     description=self.cleaned_data.get('commentaire_perte') or "Perdu (déclaré à la vente)",
                 )
 

@@ -97,7 +97,30 @@ qs.annotate(
 * **Filtre période par défaut = `mois`** (mois calendaire courant), plus `annee` — les KPI "CA"/"Marge" en haut de page suivent le filtre choisi (comme avant), mais partent du mois en cours tant que direction n'a rien sélectionné, au lieu de l'année entière. `VenteAnalyseService.normalize_period` gère déjà les trois modes (`annee`/`mois`/`perso`), seul le défaut de `periode` a changé dans `get_queryset()`.
 * **Quantité affichée en kg** (`Vente.quantite_en_kg`, `core/models.py`) et non plus la quantité brute : un produit conditionné (ex. l'ail, 1 unité = 10 kg) multiplie `quantite` par `Produit.poids_unitaire_kg` ; un produit vrac garde `quantite` telle quelle — évite de confondre "10" unités avec "10 kg".
 * **Colonne Prix fusionnée** ("Prix (achat / vente)") : prix d'achat et prix de vente dans la même cellule, différenciés par un dégradé de texte (`bg-gradient-to-r` + `bg-clip-text`) plutôt que deux colonnes séparées — plus compact.
-* **Icône de perte** : si une perte a été déclarée en même temps qu'une vente (`Vente.commentaire_perte` pour un produit à l'unité, ou `Vente.pertes_liees` pour un produit vrac — voir `vente/APP_VENTE.md` § Déclaration de perte), une icône ⓘ apparaît à côté du nom du produit, avec le commentaire au survol (`title`). Le queryset est `prefetch_related('pertes_liees')` pour rester à zéro requête en boucle.
+* **Icône de perte** (2026-08-04, révisée sprint-10 le 18/08/2026) : si une perte a été déclarée en même temps qu'une vente (`Vente.commentaire_perte` et/ou `Vente.pertes_liees`, vrac comme conditionné — voir `vente/APP_VENTE.md` § Déclaration de perte), un bouton ⓘ apparaît à côté du nom du produit, ouvrant un `<dialog>` au clic (plus un `title` au survol — ne se déclenchait pas de façon fiable au tactile sur tablette). Le queryset est `prefetch_related('pertes_liees')` pour rester à zéro requête en boucle.
+* **Quantité nette affichée si perte déclarée** (sprint-10, 18/08/2026) : la colonne Quantité barre le kg brut vendu (`Vente.quantite_en_kg`) et affiche à la place le kg net facturable à l'incentive (`Vente.kilo_net` = brut − `Vente.kilo_perdu`, `core/models.py`), avec un badge "-X kg perdus". `kilo_perdu`/`kilo_net` somment `pertes_liees` en Python (pas `.aggregate()`) pour rester compatibles avec le `prefetch_related` existant. Cohérent avec `paie/services/salaire_calculator.py::calcul_salaire_mamy`, qui déduit ces mêmes kg de l'incentive versée.
+
+---
+
+### Pertes affichées côté `ProductAnalysisService` (fiche produit, KPI globaux) — corrigé 18/08/2026
+
+`direction/services/product_analysis_service.py` (fiche produit `ProductDetailView`, KPI globaux
+`get_product_kpis`, dashboard `get_products_by_period`) calcule ses "pertes" à partir de la table
+`Perte`, filtrée sur `date_reception >= DATE_BASCULE_PERTES_DATETIME` (2026-06-01, périodes
+antérieures jugées non fiables pour ce KPI — même logique que le "zéro avant mai" de
+`fct_salaires.sql`, cf. `paie/APP_PAIE.md` § 1.bis).
+
+**Bug corrigé (18/08/2026)** : ce service sommait uniquement `Perte.quantite_perdue`. Depuis
+sprint-10 (`vente/APP_VENTE.md` § Déclaration de perte), une perte déclarée sur un produit
+conditionné (sac/carton) laisse `quantite_perdue` à `0` par construction (pour ne pas fausser le
+décompte de stock en sacs) et porte le kg réellement perdu dans `Perte.kilo_perdu_incentive` —
+une perte de ce type était donc invisible sur la fiche produit et les KPI globaux, alors qu'elle
+apparaissait bien dans l'incentive de l'agent. Toutes les agrégations de ce fichier utilisent
+désormais `Coalesce(kilo_perdu_incentive, quantite_perdue)` par ligne de `Perte` plutôt que
+`quantite_perdue` seule : pour une perte entrepôt classique (`kilo_perdu_incentive` toujours nul),
+le comportement est inchangé ; pour une perte vrac déclarée à la vente, les deux champs coïncident
+(`kilo_perdu_incentive` mirrore `quantite_perdue`) ; pour une perte conditionnée, c'est
+`kilo_perdu_incentive` qui prime.
 
 ---
 
