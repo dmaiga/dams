@@ -2,65 +2,40 @@
 {% load format_fcfa direction_filters %}
 
 {% block filtre_periode %}
-<div class="bi-toolbar-left">
-    <div class="bi-retour">
+    {% include "bi/partials/_toolbar_filtre_periode.html" %}
+{% endblock %}
+
+{% block dashboard_content %}
+
+<div class="bi-panel" style="display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem;">
+    <!-- Bouton Retour à gauche -->
+    <div>
         <a href="{% url 'bi:agents' %}?annee={{ annee }}&mois={{ mois }}" class="btn btn-outline">
             <i class="fas fa-arrow-left"></i> Retour
         </a>
     </div>
-    <div class="bi-granularite-toggle">
-        <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
-        <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
-    </div>
-    <form method="get" class="bi-periode-form">
-        <input type="hidden" name="granularite" value="{{ granularite }}">
-        {% if granularite == "semaine" %}
-        <div>
-            <label for="bi-semaine">Semaine</label>
-            <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
-                {% for s in semaines_disponibles %}
-                <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% else %}
-        <div>
-            <label for="bi-annee">Année</label>
-            <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
-        </div>
-        <div>
-            <label for="bi-mois">Mois</label>
-            <select id="bi-mois" name="mois" class="select">
-                <option value="">—</option>
-                {% for valeur, libelle in mois_options %}
-                <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-        <button type="submit" class="btn btn-primary">Filtrer</button>
-    </form>
-</div>
-<div class="bi-toolbar-right">
-    <div class="bi-toggle-sensible">
-        <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
-            <i class="fas fa-eye-slash"></i>
-            <span>Masquer CA / incentive / marge</span>
-        </button>
-    </div>
-</div>
-{% endblock %}
 
-{% block dashboard_content %}
-<div class="bi-panel">
-    <h2>{{ agent.full_name }}</h2>
-    <p>
-        Superviseur : {{ agent.superviseur.full_name|default:"—" }}
-        &middot; Type : {{ agent.get_type_agent_display }}
-        &middot; Statut :
-        {% if agent.est_actif %}<span class="bi-badge bi-vert">&nbsp;</span> Actif
-        {% else %}<span class="bi-badge bi-rouge">&nbsp;</span> Inactif{% endif %}
-    </p>
+    <!-- Informations Agent -->
+    <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+        <h2 style="margin: 0; font-size: 1.25rem; font-weight: 600;">
+            {{ agent.full_name }}
+        </h2>
+        
+        <div style="font-size: 0.9rem; color: #6c757d; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span><strong>Superviseur :</strong> {{ agent.superviseur.full_name|default:"—" }}</span>
+            <span>&bull;</span>
+            <span><strong>Type :</strong> {{ agent.get_type_agent_display }}</span>
+            <span>&bull;</span>
+            <span>
+                <strong>Statut :</strong>
+                {% if agent.est_actif %}
+                    <span class="bi-badge bi-vert">&nbsp;</span> Actif
+                {% else %}
+                    <span class="bi-badge bi-rouge">&nbsp;</span> Inactif
+                {% endif %}
+            </span>
+        </div>
+    </div>
 </div>
 
 <div class="bi-panel">

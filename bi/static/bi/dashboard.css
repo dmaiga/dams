@@ -1,8 +1,6 @@
 /* DAMS BI — système visuel Sprint 5 (S-709).
    Tokens et composants extraits de docs/docs_bi/bi/maquettes/DAMS_BI_maquette_v1.html
-   (Direction, 24/07/2026). Scope volontairement limité à .bi-scope : surcharge ciblée des
-   pages BI, pas de réécriture globale de DaisyUI/Tailwind (cf. SPRINT_5_UIUX_Executif.md).
-   Thème clair uniquement — le mode sombre de la maquette n'est pas porté (décision actée). */
+   Scope limité à .bi-scope : surcharge ciblée des pages BI. */
 
 .bi-scope {
     --bg: #ffffff;
@@ -34,108 +32,246 @@
 
 .bi-scope .tabular,
 .bi-scope td.text-right,
-.bi-scope th.text-right { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.bi-scope th.text-right { 
+    font-variant-numeric: tabular-nums; 
+    font-feature-settings: "tnum" 1; 
+}
 
 /* ---- Breadcrumb ---- */
 .bi-scope .bi-breadcrumb {
-    color: var(--ink-faint); font-size: 12.5px;
-    padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid var(--border);
+    color: var(--ink-faint); 
+    font-size: 12.5px;
+    padding-bottom: 14px; 
+    margin-bottom: 4px; 
+    border-bottom: 1px solid var(--border);
 }
 
-/* ---- Tabnav (remplace les onglets pilule) ---- */
+/* ---- Tabnav ---- */
 .bi-scope .bi-onglets {
-    display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 0;
-    border-bottom: 1px solid var(--border); padding-bottom: 0;
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 4px; 
+    margin: 2px 0 0;
+    border-bottom: 1px solid var(--border); 
+    padding-bottom: 0;
 }
+
 .bi-scope .bi-onglet {
-    display: inline-block; padding: 12px 4px; margin-right: 22px;
-    font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
-    color: var(--ink-muted); text-decoration: none;
-    border-bottom: 2px solid transparent; transform: translateY(1px);
-    border-radius: 0; background: transparent;
+    display: inline-block; 
+    padding: 12px 4px; 
+    margin-right: 22px;
+    font-size: 13px; 
+    font-weight: 600; 
+    letter-spacing: 0.02em;
+    color: var(--ink-muted); 
+    text-decoration: none;
+    border-bottom: 2px solid transparent; 
+    transform: translateY(1px);
+    border-radius: 0; 
+    background: transparent;
 }
+
 .bi-scope .bi-onglet:hover { color: var(--ink); background: transparent; }
 .bi-scope .bi-onglet.active { color: var(--ink); border-bottom-color: var(--accent); background: transparent; }
 
-/* ---- Toolbar d'en-tête (18/08/2026) : regroupe en une seule rangée ce qui était empilé
-   verticalement (retour, bascule mois/semaine, formulaire de période, bouton masquer les
-   données sensibles) — filtres à gauche, actions à droite, wrap propre sur petit écran. ---- */
+/* ---- Toolbar d'en-tête ---- */
 .bi-scope .bi-toolbar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 14px 0 18px; margin-bottom: 0; border-bottom: 1px solid var(--border);
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 16px;
+    padding: 14px 0 18px; 
+    margin-bottom: 0; 
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
 }
-.bi-scope .bi-toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
-.bi-scope .bi-toolbar-right { display: flex; align-items: center; margin-left: auto; }
-.bi-scope .bi-retour .btn { display: inline-flex; align-items: center; gap: 6px; }
-.bi-scope .bi-toggle-sensible { margin: 0; }
 
-/* ---- Filtres ---- */
-.bi-scope .bi-periode-form {
-    display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 0;
+.bi-scope .bi-toolbar-left { 
+    display: flex; 
+    align-items: center; 
+    gap: 12px; 
+    flex-wrap: wrap; 
 }
+
+.bi-scope .bi-toolbar-right { 
+    display: flex; 
+    align-items: center; 
+    margin-left: auto; 
+}
+
+.bi-scope .bi-retour .btn { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- Boutons génériques / actions ---- */
+.bi-scope .btn {
+    font: inherit;
+    font-weight: 600;
+    font-size: 12.5px;
+    border-radius: 4px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--ink);
+    text-transform: none;
+    min-height: 0;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    line-height: 1.2;
+}
+
+.bi-scope .btn-primary {
+    background: var(--accent); 
+    border-color: var(--accent); 
+    color: var(--accent-ink);
+}
+
+.bi-scope .btn-primary:hover {
+    background: #0f2c48;
+    border-color: #0f2c48;
+}
+
+.bi-scope .btn-outline {
+    border-color: var(--border-strong); 
+    color: var(--ink-muted); 
+    background: var(--bg);
+}
+
+.bi-scope .btn-outline:hover {
+    background: var(--surface);
+    color: var(--ink);
+}
+
+/* ---- Filtres & Formulaire Période ---- */
 .bi-scope .bi-granularite-toggle {
-    display: flex; align-items: flex-end; flex-wrap: wrap; gap: 18px;
-    padding: 0; margin-bottom: 0;
+    display: inline-flex;
+    padding: 0;
+    gap: 0;
 }
-.bi-scope .bi-periode-form > div { display: flex; flex-direction: column; gap: 5px; }
+
+.bi-scope .bi-granularite-toggle .btn { 
+    border-radius: 0; 
+    margin-right: -1px; 
+}
+
+.bi-scope .bi-granularite-toggle .btn:first-child { 
+    border-radius: 4px 0 0 4px; 
+}
+
+.bi-scope .bi-granularite-toggle .btn:last-child { 
+    border-radius: 0 4px 4px 0; 
+    margin-right: 0; 
+}
+
+.bi-scope .bi-periode-form {
+    display: inline-flex; 
+    align-items: center; 
+    gap: 8px; 
+    margin: 0; 
+    padding: 0;
+    flex-wrap: wrap;
+}
+
+.bi-scope .bi-periode-form > div { 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 6px; 
+}
+
 .bi-scope .bi-periode-form label {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--ink-faint); font-weight: 600; margin: 0;
+    font-size: 11px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.06em;
+    color: var(--ink-faint); 
+    font-weight: 700; 
+    margin: 0;
 }
+
 .bi-scope .bi-periode-form .input,
 .bi-scope .bi-periode-form .select {
-    font: inherit; color: var(--ink); background: var(--bg);
-    border: 1px solid var(--border-strong); border-radius: 4px;
-    padding: 6px 9px; min-width: 96px; height: auto; box-shadow: none;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 6px 9px;
+    min-width: 80px;
+    height: 30px;
+    box-shadow: none;
 }
-.bi-scope .bi-periode-form .btn {
-    font: inherit; font-weight: 600; font-size: 12.5px;
-    border-radius: 4px; padding: 7px 16px; border: 1px solid var(--border-strong);
-    background: var(--bg); color: var(--ink); text-transform: none; min-height: 0; height: auto;
-}
-.bi-scope .bi-periode-form .btn-primary,
-.bi-scope .bi-granularite-toggle .btn-primary {
-    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
-}
-.bi-scope .bi-periode-form .btn-outline,
-.bi-scope .bi-granularite-toggle .btn-outline {
-    border-color: var(--border-strong); color: var(--ink-muted); background: var(--bg);
-}
-.bi-scope .bi-granularite-toggle { padding: 0 0 4px; gap: 0; }
-.bi-scope .bi-granularite-toggle .btn { border-radius: 0; margin-right: -1px; }
-.bi-scope .bi-granularite-toggle .btn:first-child { border-radius: 4px 0 0 4px; }
-.bi-scope .bi-granularite-toggle .btn:last-child { border-radius: 0 4px 4px 0; margin-right: 0; }
 
-/* ---- KPI tiles (remplace bordure gauche colorée + ombre) ---- */
+.bi-scope .bi-toolbar-separateur {
+    display: inline-block;
+    width: 1px;
+    height: 18px;
+    background: var(--border-strong);
+}
+
+/* ---- Masquage Données Sensibles ---- */
+.bi-scope .bi-toggle-sensible { margin: 0; }
+.bi-scope .bi-toggle-sensible .btn { white-space: nowrap; }
+
+/* ---- KPI tiles ---- */
 .bi-scope .bi-kpis {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
-    background: var(--border); border: 1px solid var(--border); margin-bottom: 24px;
+    display: grid; 
+    grid-template-columns: repeat(4, 1fr); 
+    gap: 1px;
+    background: var(--border); 
+    border: 1px solid var(--border); 
+    margin-bottom: 24px;
 }
+
 .bi-scope .bi-kpi {
-    background: var(--bg); padding: 18px 20px; border-radius: 0; border-left: none; box-shadow: none;
+    background: var(--bg); 
+    padding: 18px 20px; 
+    border-radius: 0; 
+    border-left: none; 
+    box-shadow: none;
 }
+
 .bi-scope .bi-kpi.bi-principal { grid-column: span 2; background: var(--surface); }
+
 .bi-scope .bi-kpi-label {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--ink-faint); font-weight: 700;
+    font-size: 11px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.06em;
+    color: var(--ink-faint); 
+    font-weight: 700;
 }
+
 .bi-scope .bi-kpi-valeur {
-    font-family: var(--font-num); font-size: 26px; font-weight: 600; margin-top: 8px; color: var(--ink);
+    font-family: var(--font-num); 
+    font-size: 26px; 
+    font-weight: 600; 
+    margin-top: 8px; 
+    color: var(--ink);
     font-variant-numeric: tabular-nums;
 }
+
 .bi-scope .bi-kpi.bi-principal .bi-kpi-valeur { font-size: 34px; }
 .bi-scope .bi-kpi-unite { font-family: var(--font-ui); font-size: 12.5px; color: var(--ink-faint); font-weight: 600; margin-left: 4px; }
+
 @media (max-width: 860px) {
     .bi-scope .bi-kpis { grid-template-columns: repeat(2, 1fr); }
     .bi-scope .bi-kpi.bi-principal { grid-column: span 2; }
 }
 
-/* ---- Badges / chips de statut (accent ink-blue, good/warning/critical/neutre) ---- */
+/* ---- Badges / Chips ---- */
 .bi-scope .bi-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 3px;
+    display: inline-flex; 
+    align-items: center; 
+    gap: 5px;
+    font-size: 11.5px; 
+    font-weight: 700; 
+    padding: 2px 7px; 
+    border-radius: 3px;
     letter-spacing: 0.01em;
 }
+
 .bi-scope .bi-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none; }
 .bi-scope .bi-badge.bi-vert { background: var(--good-soft); color: var(--good); }
 .bi-scope .bi-badge.bi-vert::before { background: var(--good); }
@@ -149,18 +285,30 @@
 .bi-scope .bi-comparaison { margin: 0 0 20px; font-size: 12.5px; color: var(--ink-muted); }
 .bi-scope .bi-comparaison b { color: var(--ink); font-family: var(--font-num); }
 
-/* ---- Masquage des données sensibles (CA / marge / rentabilité) en entretien ----
-   Le masquage lui-même est géré en JS pur (remplacement du texte par des puces,
-   cf. dashboard_agents.html) : pas de dépendance à une classe CSS externe pour
-   l'effet visuel, seule la mise en forme du bouton reste ici. Placé dans .bi-toolbar-right
-   depuis le 18/08/2026 (regroupement des boutons d'en-tête) — la marge vit sur .bi-toolbar. */
-.bi-scope .bi-toggle-sensible .btn { display: inline-flex; align-items: center; gap: 6px; }
-
-/* ---- Sections / panels (remplace ombre portée) ---- */
-.bi-scope .bi-panel {
-    background: var(--bg); border-radius: 0; padding: 26px 0; margin-bottom: 0;
-    box-shadow: none; border: none; border-top: 1px solid var(--border);
+.bi-scope .bi-legende-formule {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
 }
+
+.bi-scope .bi-legende-formule i { color: var(--ink-faint); margin-top: 2px; }
+.bi-scope .bi-legende-formule strong { color: var(--ink); font-weight: 600; }
+
+/* ---- Panels ---- */
+.bi-scope .bi-panel {
+    background: var(--bg); 
+    border-radius: 0; 
+    padding: 26px 0; 
+    margin-bottom: 0;
+    box-shadow: none; 
+    border: none; 
+    border-top: 1px solid var(--border);
+}
+
 .bi-scope .bi-panel:first-child { border-top: none; padding-top: 6px; }
 .bi-scope .bi-panel h2 { font-size: 14px; font-weight: 650; color: var(--ink); margin-bottom: 4px; }
 .bi-scope .bi-vide { text-align: center; padding: 48px 16px; color: var(--ink-faint); font-size: 13px; }
@@ -169,28 +317,41 @@
 /* ---- Tables ---- */
 .bi-scope .table-wrap,
 .bi-scope .overflow-x-auto { border: 1px solid var(--border); border-radius: 4px; overflow-x: auto; }
+
 .bi-scope table.table {
     width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg);
 }
+
 .bi-scope table.table thead th {
     text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--ink-faint); font-weight: 700; background: var(--surface);
     padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap;
 }
+
 .bi-scope table.table tbody td {
     padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; color: var(--ink);
 }
+
 .bi-scope table.table tbody tr:last-child td { border-bottom: none; }
 .bi-scope table.table tbody tr:nth-child(even) { background: transparent; }
 .bi-scope table.table tbody tr:hover { background: var(--surface); }
 .bi-scope table.table td.text-right, .bi-scope table.table th.text-right { text-align: right; font-family: var(--font-num); }
 
-/* ---- Chart wrap (Chart.js — Santé Globale uniquement) ---- */
-.bi-scope .bi-chart-wrap { position: relative; width: 100%; height: 320px; border: 1px solid var(--border); border-radius: 4px; padding: 16px 16px 4px; box-sizing: border-box; }
-.bi-scope .bi-chart-wrap canvas { width: 100% !important; height: 100% !important; }
-@media (max-width: 640px) { .bi-scope .bi-chart-wrap { height: 240px; } }
+.bi-scope table.table th.th-tri { padding: 0; }
+.bi-scope table.table th.th-tri a {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: inherit;
+    text-decoration: none;
+    padding: 10px 14px;
+}
+.bi-scope table.table th.th-tri.text-right a { justify-content: flex-end; }
+.bi-scope table.table th.th-tri a:hover { color: var(--ink); background: var(--surface-2); }
+.bi-scope table.table th.th-tri i { font-size: 10px; }
+.bi-scope table.table th.th-tri i.bi-tri-inactif { opacity: 0.35; }
 
-/* ---- Barlist (classements CSS/SVG légers — remplace Chart.js pour produits/agents) ---- */
+/* ---- Barlist ---- */
 .bi-scope .bi-barlist { display: flex; flex-direction: column; gap: 10px; }
 .bi-scope .bi-barrow { display: grid; grid-template-columns: 160px 1fr 108px; align-items: center; gap: 12px; }
 .bi-scope a.bi-barrow-link { text-decoration: none; color: inherit; border-radius: 4px; transition: background-color .12s ease; }
@@ -201,30 +362,11 @@
 .bi-scope .bi-barrow .bi-fill.bi-rouge { background: var(--critical); }
 .bi-scope .bi-barrow .bi-fill.bi-jaune { background: var(--warning); }
 .bi-scope .bi-barrow .bi-rvalue { font-family: var(--font-num); font-size: 12.5px; text-align: right; color: var(--ink); }
-.bi-scope .bi-barrow .bi-refline { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--ink-faint); }
-.bi-scope .bi-barrow .bi-refline::after {
-    content: attr(data-label); position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
-    font-size: 10px; color: var(--ink-faint); white-space: nowrap;
-}
+
 @media (max-width: 640px) { .bi-scope .bi-barrow { grid-template-columns: 108px 1fr 84px; } }
 
-/* ---- Split bar (dépenses par catégorie — remplace le pie chart Chart.js) ---- */
-.bi-scope .bi-splitbar { display: flex; height: 26px; border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
-.bi-scope .bi-splitbar div { height: 100%; }
-.bi-scope .bi-legend-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-.bi-scope .bi-legend-list .bi-legend-row { display: grid; grid-template-columns: 16px 1fr 110px 64px; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink); }
-.bi-scope .bi-legend-list .bi-legend-row .bi-legend-pct { color: var(--ink-muted); }
-.bi-scope .bi-legend-list i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
-
-/* ---- Two-card grid (marge fournisseur / produit) ---- */
+/* ---- Two-card grid ---- */
 .bi-scope .bi-cards2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .bi-scope .bi-cards2 h3 { font-size: 12.5px; color: var(--ink-muted); margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-@media (max-width: 860px) { .bi-scope .bi-cards2 { grid-template-columns: 1fr; } }
 
-/* ---- Sommaire (grille de cartes vers chaque dashboard) ---- */
-.bi-scope .bi-sommaire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); }
-.bi-scope .bi-sommaire-carte {
-    display: block; background: var(--bg); padding: 22px 20px; text-decoration: none; color: var(--ink);
-    font-size: 14px; font-weight: 650; transition: background 0.1s ease;
-}
-.bi-scope .bi-sommaire-carte:hover { background: var(--surface); }
+@media (max-width: 860px) { .bi-scope .bi-cards2 { grid-template-columns: 1fr; } }

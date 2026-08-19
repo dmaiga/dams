@@ -1,0 +1,5 @@
+<th class="{{ classe }} th-tri">
+    <a href="?{{ base_querystring_tri }}{% if base_querystring_tri %}&{% endif %}tri={{ champ }}&ordre={% if tri_agents == champ and ordre_agents == "desc" %}asc{% else %}{% if tri_agents == champ %}desc{% else %}{{ defaut|default:"desc" }}{% endif %}{% endif %}">
+        {{ label }}{% if tri_agents == champ %} <i class="fas fa-sort-{% if ordre_agents == "desc" %}down{% else %}up{% endif %}"></i>{% else %} <i class="fas fa-sort bi-tri-inactif"></i>{% endif %}
+    </a>
+</th>

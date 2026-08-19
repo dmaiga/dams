@@ -1,0 +1,77 @@
+<div class="bi-toolbar-left">
+    <div class="bi-granularite-toggle">
+        <a href="?granularite=mois" class="btn btn-sm {% if granularite == 'mois' or not granularite %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
+        <a href="?granularite=semaine" class="btn btn-sm {% if granularite == 'semaine' %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
+    </div>
+
+    <form method="get" class="bi-periode-form">
+        <input type="hidden" name="granularite" value="{{ granularite|default:'mois' }}">
+
+        {% if granularite == "semaine" %}
+            <div>
+                <label for="bi-semaine">Semaine :</label>
+                <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
+                    {% for s in semaines_disponibles %}
+                    <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>
+                        Semaine du {{ s|date:"d/m/Y" }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% else %}
+            <div>
+                <label for="bi-annee">Année :</label>
+                <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026" style="width: 80px;">
+            </div>
+
+            <div>
+                <label for="bi-mois">Mois :</label>
+                <select id="bi-mois" name="mois" class="select">
+                    <option value="">Tous</option>
+                    {% for valeur, libelle in mois_options %}
+                    <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+
+        {% if type_agent_options %}
+            <span class="bi-toolbar-separateur"></span>
+
+            <div>
+                <label for="bi-superviseur">Superviseur :</label>
+                <select id="bi-superviseur" name="superviseur" class="select" onchange="this.form.submit()">
+                    <option value="">Tous les superviseurs</option>
+                    {% for s in superviseurs %}
+                    <option value="{{ s.superviseur_id }}" {% if superviseur_filtre == s.superviseur_id %}selected{% endif %}>{{ s.superviseur_nom }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="bi-type-agent">Type :</label>
+                <select id="bi-type-agent" name="type_agent" class="select" onchange="this.form.submit()">
+                    <option value="">Tous les types</option>
+                    {% for valeur, libelle in type_agent_options %}
+                    <option value="{{ valeur }}" {% if type_agent_filtre == valeur %}selected{% endif %}>{{ libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+
+        {% if agent or superviseur %}
+            {% if annee or mois or semaine_selectionnee %}
+            <a href="{{ request.path }}?granularite={{ granularite|default:'mois' }}&toutes_periodes=1" class="btn btn-outline btn-sm">Toutes périodes</a>
+            {% endif %}
+        {% endif %}
+    </form>
+</div>
+
+<div class="bi-toolbar-right">
+    <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline btn-sm">
+        <i class="fas fa-eye-slash"></i>
+        <span>Masquer {% if agent %}CA / incentive / marge{% else %}CA / marge / rentabilité{% endif %}</span>
+    </button>
+</div>

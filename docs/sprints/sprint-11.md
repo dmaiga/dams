@@ -141,6 +141,104 @@ texte des commentaires Django template ailleurs dans la page, avait d'abord fait
 doublon) : exactement 1 `.bi-toolbar-left` sur les 7 pages, `.bi-toolbar-right` uniquement sur
 les 3 pages agent/équipe.
 
+**Quatrième passe (mdmaiga, 19/08/2026)** : demande de regrouper le bloc `filtre_periode` — encore
+dupliqué à l'identique dans `dashboard_agents.html`, `dashboard_superviseur_detail.html` et
+`dashboard_agent_detail.html` malgré la troisième passe — en un seul endroit, et d'homogénéiser la
+taille des boîtes (mélange de `select`/`select-sm`, `input`/`input-sm`, gaps et tailles de police
+différents entre les trois copies).
+- Nouveau `bi/templates/bi/partials/_toolbar_filtre_periode.html`, appelé via `{% include %}` par
+  le bloc `filtre_periode` des trois pages concernées. Ceci **révise** la décision de la troisième
+  passe (qui refusait un slot imposé par `base_dashboard.html`) sans la contredire sur le fond : le
+  gabarit parent reste inchangé (bloc `filtre_periode` vide, comme avant), c'est chaque page qui
+  choisit d'inclure le partial — `dashboard_sante.html`, `dashboard_produits.html`,
+  `dashboard_depenses.html`, `dashboard_stock.html` n'y touchent pas.
+- Le partial s'adapte via les variables de contexte déjà présentes (pas de nouvelle variable créée
+  côté vue) : `type_agent_options` détermine l'affichage des filtres Superviseur/Type (propres à
+  `dashboard_agents`), `agent`/`superviseur` déterminent le lien "Toutes périodes" et le libellé du
+  bouton "Masquer" (CA/incentive/marge sur la fiche agent, CA/marge/rentabilité ailleurs).
+- Styles inline supprimés au profit des classes déjà définies dans `dashboard.css`
+  (`.bi-toolbar-left`, `.bi-periode-form`, `.input`/`.select`) ; hauteur fixe (30px) ajoutée sur
+  `.btn`/`.input`/`.select` pour que boutons, champs et selects s'alignent visuellement sur la même
+  ligne quelle que soit la page. Nouvelle classe `.bi-toolbar-separateur` pour le séparateur
+  vertical entre filtres de période et filtres agents.
+- Bug corrigé au passage : sur `dashboard_superviseur_detail.html`, le bouton annonçait "Masquer CA
+  / incentive / marge" mais son JS basculait vers "CA / rentabilité" au clic — unifié en "CA /
+  marge / rentabilité" (ce que la page masque réellement : CA, marge brute, rentabilité nette).
+- Vérifié : les trois templates et le partial compilent (`get_template`), `manage.py check` sans
+  erreur, `dashboard_agents` rendu 200 en mois et en semaine.
+
+**Nouveau graphe équipe (mdmaiga, 19/08/2026)** — demande complémentaire sur `dashboard_agents.html`
+: "chaque superviseur doit pousser ses agents à vendre 50kg/jour", pas de vue permettant de
+comparer une équipe à cet objectif individuel (seul le graphe par agent existait).
+- Nouveau panneau "Kg/jour par équipe vs objectif (50 kg/jour/agent)" inséré entre le tableau
+  "Performance équipes/superviseurs" et le graphe agent existant, même composant visuel
+  (`bi-barlist`, barre + ligne de référence) que celui-ci — cohérence visuelle demandée
+  explicitement ("similaire au agent").
+- Formule identique à celle déjà utilisée sur `dashboard_superviseur_detail` (§ Décisions actées
+  superviseur, point 2) : `kg vendus équipe ÷ jours ouvrés (lun-sam) de la période ÷ nb agents
+  actifs` = kg/jour moyen par agent de l'équipe, comparé au seuil individuel de 50 kg/jour. Nouvelle
+  variable `jours_ouvres_periode` calculée dans `dashboard_agents` (réutilise
+  `_jours_ouvres_dans_periode`, déjà existante pour la fiche équipe) et exposée au contexte/template.
+  Statut couleur (`s.statut_couleur`/`s.statut_label`) calculé avec les mêmes seuils que la fiche
+  équipe (≥50 atteint, ≥40 proche, sinon sous objectif).
+- Suite à une question anticipée de mdmaiga ("si le superviseur voit 13kg/j/agent, comment calculer
+  pour obtenir ceci ?") : légende ajoutée sous le graphe avec la formule en toutes lettres, et
+  `title` (infobulle au survol) sur chaque barre montrant le calcul détaillé de l'équipe concernée
+  (kg vendus, jours ouvrés, nb agents, résultat).
+- Vérifié en conditions réelles via le client Django (rendu direct de la vue, mois et semaine,
+  contenu du panneau et de la légende inspectés dans le HTML généré).
+
+**Correctif KPI Santé Globale (mdmaiga, 19/08/2026)** : sur `dashboard_sante.html`, les 4 KPI de
+chaque groupe (Marge brute, Marge nette) ne tenaient pas sur une ligne — KPI-003 "Marge brute"
+portait le flag `principal` (`grid-column: span 2` en CSS), ce qui poussait le 4ᵉ KPI du groupe à
+la ligne suivante dans la grille `.bi-kpis` (4 colonnes). Flag `principal` retiré du KPI-003 côté
+vue (`bi/views.py`) ; règle CSS partagée `.bi-kpi.bi-principal` non touchée (encore utilisée par
+`dashboard_produits.html`/`dashboard_stock.html`, cohérent avec la prudence déjà actée en deuxième
+passe). Vérifié : `bi-principal` absent du HTML rendu de `dashboard_sante`.
+
+**Élargissement Santé Globale + tri agents (mdmaiga, 19/08/2026)** :
+- `dashboard_agents.html`, dernier tableau ("Agent / Superviseur / ... / Rentabilité") : toutes
+  les colonnes sont désormais triables via en-têtes cliquables (`?tri=...&ordre=asc|desc`), pas
+  seulement les trois initialement citées (kg vendus, delta, rentabilité) — demande élargie à
+  "tout" en cours d'échange. Nouveau partial `bi/templates/bi/partials/_th_tri.html` (une seule
+  définition, réutilisée sur les 7 colonnes) ; tri fait en Python côté vue (pas en SQL) car
+  `kg_vendus_delta`/`rentabilite_affichee`/`jours_label` sont calculés après la requête — les
+  valeurs manquantes (delta sans période précédente) sont toujours reléguées en fin de liste quel
+  que soit le sens choisi. `base_querystring_tri` (querystring courante sans `tri`/`ordre`) construit
+  côté vue pour que le clic sur une colonne préserve les autres filtres actifs (superviseur, type,
+  granularité, semaine).
+- `dashboard_sante.html` — 3 ajouts demandés ("élargir la page") :
+  1. Carte "Marge brute — 6 derniers mois" (graphique barres), fixe et indépendante du filtre de
+     période actif (sert de repère long terme même en vue mensuelle/journalière filtrée).
+  2. Carte "Top 10 agents — kg vendus", sur le mois de référence de la sélection en cours
+     (`mois_reference`, déjà calculé pour la comparaison M-1) — lien vers la fiche détail agent.
+  3. Carte "Top 10 produits — chiffre d'affaires", même mois de référence — pas de fiche détail
+     produit (`bi` n'en a pas, cf. Constat 4), ligne non cliquable.
+  4. **Ajout demandé après coup (mdmaiga, même jour)** : carte "Top 10 agents", affichée côte à
+     côte avec le top kg vendus (`bi-cards2`) plutôt qu'ailleurs sur la page — l'intérêt explicite
+     est la comparaison directe : "les gros vendeurs (kg) ne sont pas forcément ceux qui
+     rapportent le plus". Première version en CA (agrégé depuis `VwVentesAgentProduit`, faute de
+     colonne `ca` sur `VwPerformanceAgent`) **remplacée dans la foulée par la marge brute**
+     (mdmaiga : "plus utile" que le CA) — `VwPerformanceAgent.marge` existe directement au grain
+     agent x mois, ce qui a aussi simplifié le code (plus besoin d'agréger depuis un second mart
+     ni de reconstruire les noms séparément). Vérifié sur données réelles (août 2026) : les
+     classements divergent bien comme attendu (l'agent en tête de la marge n'est que 5ᵉ en kg
+     vendus).
+  - **Bug préexistant corrigé au passage** (pas demandé, mais bloquant pour rendre les nouvelles
+    cartes utilisables) : le bloc `{% block extra_filtres %}` de `dashboard_sante.html` (champs
+    Du/Au) n'était jamais rendu — `base_dashboard.html` ne l'inclut nulle part, seul le bloc
+    `filtre_periode` (resté vide sur cette page) est rendu par le gabarit. La toolbar de
+    `dashboard_sante` était donc invisible depuis un moment (aucun sélecteur Année/Mois/Du/Au à
+    l'écran, seul un accès direct par URL permettait de changer de période). Converti en bloc
+    `filtre_periode` classique (Année/Mois + Du/Au + bouton Filtrer + "Toutes périodes"), même
+    pattern que les 3 pages agent/équipe. **Même bug identifié sur `dashboard_produits.html`,
+    `dashboard_depenses.html` et `dashboard_stock.html`** (toolbar vide, vérifié par rendu direct)
+    — non corrigé ici (hors périmètre de cette demande, aucune nouvelle carte n'en dépend sur ces
+    pages), à traiter dans un futur sprint si mdmaiga le priorise.
+- Vérifié : `manage.py check` sans erreur, rendu direct des deux vues (plusieurs combinaisons de
+  paramètres `tri`/`ordre`/`annee`/`mois`/`toutes_periodes`), contenu HTML des nouvelles cartes et
+  de la toolbar corrigée inspecté avec données réelles.
+
 Reste à faire manuellement en déploiement : `dbt run` complet (les nouveaux marts et les deux
 corrigés) sur la base de production.
 

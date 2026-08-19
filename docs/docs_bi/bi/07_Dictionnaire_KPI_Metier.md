@@ -343,11 +343,16 @@
 - **Formule** : objectif = nb_agents_actifs × 50 kg/jour, comparé au kg/jour réel de l'équipe
   (kg_vendus équipe / jours ouvrés de la période) — dérivé de l'objectif agent (KPI-401/402), pas
   un nouveau seuil inventé
-- **Dimension** : Superviseur x (mois ou semaine), fiche détail équipe uniquement
+- **Dimension** : Superviseur x (mois ou semaine). **Étendu le 19/08/2026** : jusque-là visible
+  uniquement sur la fiche détail équipe (Partie 4), affiché aussi en vue d'ensemble sur le
+  tableau "Performance superviseur" (Partie 1, `dashboard_agents.html`) — une barre par équipe,
+  pour repérer en un coup d'œil quelles équipes poussent vers le seuil individuel de 50 kg/jour
+  sans avoir à ouvrir chaque fiche équipe une par une.
 - **Vigilance** : même logique 3 paliers que le niveau agent (✅ ≥50 kg/jour/agent en moyenne,
   ⚠️ ≥40, ❌ en dessous)
-- **Source** : calculé côté Django (`bi/views.py::dashboard_superviseur_detail`), à partir de
-  `VwPerformanceSuperviseur(_semaine).nb_agents_actifs`/`kg_vendus`
+- **Source** : calculé côté Django (`bi/views.py::dashboard_superviseur_detail` et, depuis le
+  19/08/2026, `dashboard_agents`), à partir de `VwPerformanceSuperviseur(_semaine)
+  .nb_agents_actifs`/`kg_vendus`
 
 ---
 
@@ -482,6 +487,12 @@
 - KPI-010 (23/07/2026) : Rentabilité nette %, secondaire à la marge brute pour cette phase
 - KPI-207 (24/07/2026) : Kilo vendu par équipe — priorité de lecture sur le dashboard Agent
 - KPI-506/507 (24/07/2026) : Marge par produit tous fournisseurs confondus
+- KPI-406 (19/08/2026) : étendu de la fiche détail équipe au tableau Partie 1 du dashboard Agent
+  (une barre par équipe vs le seuil de 50 kg/jour/agent, plus besoin d'ouvrir chaque équipe)
+- 19/08/2026 : Dashboard Santé Globale élargi de 4 cartes — Top 10 agents kg vendus (métrique
+  sous-jacente à KPI-401/402) et marge brute (KPI-302) côte à côte, marge brute 6 derniers mois
+  (tendance fixe), Top 10 produits CA (KPI-101 Dashboard 2) — pas de nouveaux codes KPI,
+  réaffichage classé de métriques existantes sur le mois de référence de la période sélectionnée
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

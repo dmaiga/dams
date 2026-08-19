@@ -59,10 +59,26 @@ Courbe de tendance :
   • CA, dépenses ROT, marge brute — journalier si un mois précis (ou une plage custom) est
     filtré, mensuel en vue cumulée.
 
+4 nouvelles cartes ⭐ NOUVEAU (19/08/2026, mdmaiga : "élargir la santé globale") :
+  • Top 10 agents — kg vendus, et Top 10 agents — marge brute, côte à côte : comparaison
+    directe demandée par mdmaiga ("les gros vendeurs ne sont pas forcément ceux qui rapportent
+    le plus"). Version initiale en CA remplacée par la marge brute le même jour ("plus utile").
+    Sur le mois de référence de la période sélectionnée ; lien cliquable vers la fiche détail
+    agent (Dashboard 3, Partie 3).
+  • Marge brute — 6 derniers mois : graphique barres fixe, indépendant du filtre de période
+    actif (repère de tendance long terme même en vue journalière filtrée sur un seul mois).
+  • Top 10 produits — chiffre d'affaires : même mois de référence, pas de lien (pas de fiche
+    détail produit dans `bi`, cf. Dashboard 2).
+
 Filtres :
   • Année / Mois (comme les autres dashboards)
   • Plage personnalisée Du/Au (date_debut/date_fin) — peut couvrir plusieurs mois, bascule
     alors automatiquement le graphique en grain journalier et les KPI en somme sur la plage.
+  • **Correctif 19/08/2026** : ces filtres n'étaient en réalité jamais affichés à l'écran depuis
+    un moment (bloc template mal câblé — le formulaire Année/Mois/Du/Au existait dans le code
+    mais n'était inclus par aucun gabarit). Toolbar réparée ; seul un accès direct par URL
+    permettait de changer de période avant ce correctif. Même bug repéré sur les dashboards
+    Vente, Dépense et Stock/Fournisseur (non corrigé, hors périmètre de cette demande).
 ```
 
 ---
@@ -139,6 +155,16 @@ Superviseur D :
   • CA : 1,200,000 FCFA — Marge brute : 600,000 FCFA
 ```
 
+**Graphique "Kg/jour par équipe vs objectif" ⭐ NOUVEAU (19/08/2026)** — extension de KPI-406
+(jusque-là visible uniquement sur la fiche détail équipe, Partie 4) à ce tableau : chaque équipe
+en barre, kg/jour moyen par agent actif (kg vendus équipe ÷ jours ouvrés de la période ÷ nb
+agents actifs) comparé au seuil individuel de 50 kg/jour, même code couleur 3 paliers
+(✅ ≥50, ⚠️ ≥40, ❌ en dessous). Objectif explicite de mdmaiga : "chaque superviseur doit pousser
+ses agents à vendre 50 kg/jour" — vue d'ensemble avant de creuser équipe par équipe. Légende sous
+le graphe (formule en toutes lettres) + infobulle par barre montrant le calcul détaillé de
+l'équipe survolée (kg vendus, jours ouvrés, nb agents, résultat), ajoutées suite à une question de
+mdmaiga sur la lisibilité du chiffre affiché.
+
 ### **PARTIE 2 : PERFORMANCE AGENT vs OBJECTIF**
 
 ```
@@ -181,6 +207,13 @@ Graphique "Kg/jour vs objectif" : chaque ligne cliquable, mène à la fiche dét
   • Qui est au-dessus de 50 kg/jour ?
   • Qui est en-dessous ?
   • Tendance : ça s'améliore ou ça décline ?
+
+En-têtes triables ⭐ NOUVEAU (19/08/2026, mdmaiga : "que tout soit filtré par ordre") : les 7
+colonnes du tableau sont cliquables (Agent, Superviseur, Jours actifs, Kg vendus, vs période
+précédente, Kg/jour, Rentabilité), bascule croissant/décroissant, préserve les autres filtres
+actifs (superviseur, type, granularité, semaine). Tri par défaut inchangé (Kg/jour décroissant).
+Les valeurs manquantes (ex. delta sans période précédente disponible) restent toujours en fin de
+liste, quel que soit le sens de tri choisi.
 ```
 
 ### **PARTIE 3 : FICHE DÉTAIL AGENT** (sprint-11, 18/08/2026)

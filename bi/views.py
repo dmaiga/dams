@@ -230,7 +230,6 @@ def dashboard_sante(request):
             "statut": (
                 constants.VERT if courante.marge_brute >= constants.MARGE_BRUTE_CIBLE else constants.JAUNE
             ),
-            "principal": True,
         },
         {
             "code": "KPI-004",
@@ -303,12 +302,49 @@ def dashboard_sante(request):
             }
         )
 
+    # ---- Marge brute des 6 derniers mois (mdmaiga, 19/08/2026) — fixe, indépendant du filtre
+    # de période actif : sert de repère de tendance long terme même quand la sélection en cours
+    # porte sur un seul mois ou une plage custom.
+    semestre = list(VwRentabiliteGlobale.objects.order_by("-mois")[:6])
+    semestre.reverse()
+    chart_semestre = _chart_json(
+        {
+            "labels": [f"{MOIS_FR[l.mois.month]} {l.mois.year}" for l in semestre],
+            "marge_brute": [l.marge_brute for l in semestre],
+        }
+    )
+
+    # ---- Top 10 agents (kg vendus) et top 10 produits (CA), sur le mois de référence de la
+    # période sélectionnée (mois_reference, déjà calculé ci-dessus pour la comparaison M-1) —
+    # reste un mois calendaire unique même en filtre custom multi-mois, pour ne pas avoir à
+    # sommer des grains différents (agent x mois, produit x mois) sur une plage arbitraire.
+    top_agents_kg = list(
+        VwPerformanceAgent.objects.filter(mois=mois_reference).order_by("-kg_vendus")[:10]
+    )
+    top_produits_ca = list(
+        VwRentabiliteProduit.objects.filter(mois=mois_reference).order_by("-ca")[:10]
+    )
+    # Top 10 agents par marge brute (mdmaiga, 19/08/2026, révisé le même jour — CA remplacé par
+    # marge brute, plus utile) : "les gros vendeurs (kg) ne sont pas forcément ceux qui
+    # rapportent le plus" — pertinent à côté du top kg vendus pour ce constat. `marge` existe
+    # directement sur VwPerformanceAgent (grain agent x mois, déjà utilisée par dashboard_agents
+    # pour la colonne Rentabilité côté brut) : pas besoin d'agréger depuis un autre mart.
+    top_agents_marge = list(
+        VwPerformanceAgent.objects.filter(mois=mois_reference).order_by("-marge")[:10]
+    )
+    top_mois_libelle = f"{MOIS_FR[mois_reference.month]} {mois_reference.year}"
+
     context.update(
         {
             "kpis_marge_brute": kpis_marge_brute,
             "kpis_marge_nette": kpis_marge_nette,
             "chart_data": chart_data,
             "chart_est_journalier": chart_est_journalier,
+            "chart_semestre": chart_semestre,
+            "top_agents_kg": top_agents_kg,
+            "top_agents_marge": top_agents_marge,
+            "top_produits_ca": top_produits_ca,
+            "top_mois_libelle": top_mois_libelle,
         }
     )
     return render(request, "bi/dashboard_sante.html", context)
@@ -447,6 +483,17 @@ def dashboard_agents(request):
         )
         periode_precedente_libelle = f"{MOIS_FR[mois_prec]} {annee_prec}"
 
+    if granularite == "semaine":
+        jours_ouvres_periode = (
+            _jours_ouvres_dans_periode(semaine_selectionnee, semaine_selectionnee + timedelta(days=6))
+            if semaine_selectionnee
+            else 0
+        )
+    else:
+        jours_ouvres_periode = _jours_ouvres_dans_periode(
+            date(annee, mois, 1), date(annee, mois, calendar.monthrange(annee, mois)[1])
+        )
+
     type_agent_filtre = request.GET.get("type_agent")
     if type_agent_filtre:
         agents_qs = agents_qs.filter(type_agent=type_agent_filtre)
@@ -466,6 +513,26 @@ def dashboard_agents(request):
         kg_precedent = kg_vendus_precedents.get(s.superviseur_id)
         s.kg_vendus_precedent = kg_precedent
         s.kg_vendus_delta = (s.kg_vendus - kg_precedent) if kg_precedent is not None else None
+        # Kg/jour moyen par agent de l'équipe vs objectif individuel 50 kg/jour — même formule
+        # que dashboard_superviseur_detail (kg_par_jour_equipe / nb_agents_actifs), pour que le
+        # superviseur voie d'un coup d'œil si son équipe pousse vers le seuil individuel.
+        s.objectif_kg_jour_equipe = s.nb_agents_actifs * 50
+        s.kg_par_jour_equipe = (
+            (s.kg_vendus / jours_ouvres_periode) if jours_ouvres_periode else Decimal("0.00")
+        )
+        s.kg_par_jour_moyen_agent = (
+            (s.kg_par_jour_equipe / s.nb_agents_actifs) if s.nb_agents_actifs else Decimal("0.00")
+        )
+        if not s.nb_agents_actifs:
+            statut_equipe = "sous_objectif"
+        elif s.kg_par_jour_moyen_agent >= 50:
+            statut_equipe = "atteint"
+        elif s.kg_par_jour_moyen_agent >= 40:
+            statut_equipe = "proche"
+        else:
+            statut_equipe = "sous_objectif"
+        s.statut_couleur = constants.statut_objectif_agent(statut_equipe)
+        s.statut_label = constants.STATUT_OBJECTIF_LABELS.get(statut_equipe, "—")
 
     for a in agents:
         a.statut_couleur = constants.statut_objectif_agent(a.statut_objectif_50kg)
@@ -484,6 +551,38 @@ def dashboard_agents(request):
         # commentaire dbt), rentabilité affichée = marge brute dans ce cas.
         a.rentabilite_affichee = getattr(a, "rentabilite_agent", a.marge)
         a.statut_rentabilite = constants.statut_rentabilite_agent(a.rentabilite_affichee)
+
+    # Tri du tableau "Agent / Superviseur / ..." (demande mdmaiga, 19/08/2026) : toutes les
+    # colonnes triables via les en-têtes cliquables (?tri=...&ordre=asc|desc), pas seulement
+    # kg vendus/delta/rentabilité initialement suggérés. Tri en Python (pas en SQL) car
+    # kg_vendus_delta/rentabilite_affichee/statut_couleur sont calculés ci-dessus, après la
+    # requête. Les valeurs manquantes (ex. delta sans période précédente) sont toujours
+    # reléguées en fin de liste, quel que soit le sens de tri choisi.
+    TRI_AGENTS_CLES = {
+        "nom": lambda a: a.nom_complet,
+        "superviseur": lambda a: a.superviseur_nom,
+        "jours_actifs": lambda a: a.jours_actifs,
+        "kg_vendus": lambda a: a.kg_vendus,
+        "delta": lambda a: a.kg_vendus_delta,
+        "kg_par_jour": lambda a: a.kg_par_jour,
+        "rentabilite": lambda a: a.rentabilite_affichee,
+    }
+    tri_agents = request.GET.get("tri")
+    if tri_agents not in TRI_AGENTS_CLES:
+        tri_agents = "kg_par_jour"
+    ordre_agents = request.GET.get("ordre")
+    if ordre_agents not in ("asc", "desc"):
+        ordre_agents = "desc"
+    cle_tri = TRI_AGENTS_CLES[tri_agents]
+    agents_avec_valeur = [a for a in agents if cle_tri(a) is not None]
+    agents_sans_valeur = [a for a in agents if cle_tri(a) is None]
+    agents_avec_valeur.sort(key=cle_tri, reverse=(ordre_agents == "desc"))
+    agents = agents_avec_valeur + agents_sans_valeur
+
+    querydict_sans_tri = request.GET.copy()
+    querydict_sans_tri.pop("tri", None)
+    querydict_sans_tri.pop("ordre", None)
+    base_querystring_tri = querydict_sans_tri.urlencode()
 
     superviseurs_chart = _chart_json(
         {
@@ -510,6 +609,10 @@ def dashboard_agents(request):
             "superviseur_filtre": int(superviseur_filtre) if superviseur_filtre else None,
             "type_agent_filtre": type_agent_filtre or None,
             "type_agent_options": constants.TYPE_AGENT_CHOICES,
+            "jours_ouvres_periode": jours_ouvres_periode,
+            "tri_agents": tri_agents,
+            "ordre_agents": ordre_agents,
+            "base_querystring_tri": base_querystring_tri,
         }
     )
     return render(request, "bi/dashboard_agents.html", context)

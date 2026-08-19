@@ -2,66 +2,7 @@
 {% load format_fcfa direction_filters %}
 
 {% block filtre_periode %}
-<div class="bi-toolbar-left">
-    <div class="bi-granularite-toggle">
-        <a href="?granularite=mois" class="btn {% if granularite == "mois" %}btn-primary{% else %}btn-outline{% endif %}">Mois</a>
-        <a href="?granularite=semaine" class="btn {% if granularite == "semaine" %}btn-primary{% else %}btn-outline{% endif %}">Semaine</a>
-    </div>
-    <form method="get" class="bi-periode-form">
-        <input type="hidden" name="granularite" value="{{ granularite }}">
-        {% if granularite == "semaine" %}
-        <div>
-            <label for="bi-semaine">Semaine</label>
-            <select id="bi-semaine" name="semaine" class="select" onchange="this.form.submit()">
-                {% for s in semaines_disponibles %}
-                <option value="{{ s|date:'Y-m-d' }}" {% if s == semaine_selectionnee %}selected{% endif %}>Semaine du {{ s|date:"d/m/Y" }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% else %}
-        <div>
-            <label for="bi-annee">Année</label>
-            <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026">
-        </div>
-        <div>
-            <label for="bi-mois">Mois</label>
-            <select id="bi-mois" name="mois" class="select">
-                <option value="">—</option>
-                {% for valeur, libelle in mois_options %}
-                <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        {% endif %}
-        <div>
-            <label for="bi-superviseur">Superviseur</label>
-            <select id="bi-superviseur" name="superviseur" class="select" onchange="this.form.submit()">
-                <option value="">Tous les superviseurs</option>
-                {% for s in superviseurs %}
-                <option value="{{ s.superviseur_id }}" {% if superviseur_filtre == s.superviseur_id %}selected{% endif %}>{{ s.superviseur_nom }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label for="bi-type-agent">Type d'agent</label>
-            <select id="bi-type-agent" name="type_agent" class="select" onchange="this.form.submit()">
-                <option value="">Tous les types</option>
-                {% for valeur, libelle in type_agent_options %}
-                <option value="{{ valeur }}" {% if type_agent_filtre == valeur %}selected{% endif %}>{{ libelle }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary">Filtrer</button>
-    </form>
-</div>
-<div class="bi-toolbar-right">
-    <div class="bi-toggle-sensible">
-        <button type="button" id="bi-toggle-donnees-sensibles" class="btn btn-outline">
-            <i class="fas fa-eye-slash"></i>
-            <span>Masquer CA / marge / rentabilité</span>
-        </button>
-    </div>
-</div>
+    {% include "bi/partials/_toolbar_filtre_periode.html" %}
 {% endblock %}
 
 {% block dashboard_content %}
@@ -105,6 +46,29 @@
 </div>
 
 <div class="bi-panel">
+    <h2>Kg/jour par équipe vs objectif (50 kg/jour/agent)</h2>
+    <div class="bi-barlist">
+        {% for s in superviseurs %}
+        <a class="bi-barrow bi-barrow-link"
+           href="{% url 'bi:superviseur_detail' s.superviseur_id %}?annee={{ annee }}&mois={{ mois }}&granularite={{ granularite }}&semaine={{ semaine_selectionnee|date:'Y-m-d' }}"
+           title="{{ s.kg_vendus|format_number }} kg vendus ÷ {{ jours_ouvres_periode }} jours ouvrés ÷ {{ s.nb_agents_actifs }} agent{{ s.nb_agents_actifs|pluralize }} actif{{ s.nb_agents_actifs|pluralize }} = {{ s.kg_par_jour_moyen_agent|format_number }} kg/j/agent">
+            <div class="bi-rlabel">{{ s.superviseur_nom }}</div>
+            <div class="bi-track">
+                <div class="bi-fill {% if s.statut_couleur == "rouge" %}bi-rouge{% elif s.statut_couleur == "jaune" %}bi-jaune{% endif %}"
+                     style="width:{% if s.kg_par_jour_moyen_agent %}{% widthratio s.kg_par_jour_moyen_agent 50 100 %}{% else %}0{% endif %}%"></div>
+                <div class="bi-refline" style="left:100%" data-label="Obj. 50"></div>
+            </div>
+            <div class="bi-rvalue">{{ s.kg_par_jour_moyen_agent|default_if_none:"—"|format_number }} kg/j/agent</div>
+        </a>
+        {% endfor %}
+    </div>
+    <p class="bi-comparaison bi-legende-formule">
+        <i class="fas fa-circle-info"></i>
+        Calcul : <strong>kg vendus par l'équipe sur la période ÷ {{ jours_ouvres_periode }} jours ouvrés (lun-sam) ÷ nombre d'agents actifs</strong> = kg/jour par agent, à comparer à l'objectif individuel de 50 kg/jour. Survolez une barre pour voir le détail du calcul de chaque équipe. C'est ce que chaque superviseur doit pousser ses agents à atteindre.
+    </p>
+</div>
+
+<div class="bi-panel">
     <h2>Kg/jour vs objectif (50 kg/jour)</h2>
     <div class="bi-barlist">
         {% for a in agents %}
@@ -126,13 +90,13 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Agent</th>
-                    <th>Superviseur</th>
-                    <th class="text-right">Jours actifs</th>
-                    <th class="text-right">Kg vendus</th>
-                    <th class="text-right">vs période précédente</th>
-                    <th class="text-right">Kg/jour</th>
-                    <th class="text-right">Rentabilité</th>
+                    {% include "bi/partials/_th_tri.html" with champ="nom" label="Agent" classe="" defaut="asc" %}
+                    {% include "bi/partials/_th_tri.html" with champ="superviseur" label="Superviseur" classe="" defaut="asc" %}
+                    {% include "bi/partials/_th_tri.html" with champ="jours_actifs" label="Jours actifs" classe="text-right" defaut="desc" %}
+                    {% include "bi/partials/_th_tri.html" with champ="kg_vendus" label="Kg vendus" classe="text-right" defaut="desc" %}
+                    {% include "bi/partials/_th_tri.html" with champ="delta" label="vs période précédente" classe="text-right" defaut="desc" %}
+                    {% include "bi/partials/_th_tri.html" with champ="kg_par_jour" label="Kg/jour" classe="text-right" defaut="desc" %}
+                    {% include "bi/partials/_th_tri.html" with champ="rentabilite" label="Rentabilité" classe="text-right" defaut="desc" %}
                 </tr>
             </thead>
             <tbody>
@@ -161,20 +125,7 @@
     </div>
 </div>
 
-<div class="bi-panel">
-    <h2>Kilo vendu par équipe / superviseur</h2>
-    <div class="bi-barlist">
-        {% for s in superviseurs %}
-        <div class="bi-barrow">
-            <div class="bi-rlabel">{{ s.superviseur_nom }}</div>
-            <div class="bi-track">
-                <div class="bi-fill" style="width:{% widthratio s.kg_vendus superviseurs.0.kg_vendus 100 %}%"></div>
-            </div>
-            <div class="bi-rvalue">{{ s.kg_vendus|format_number }} kg</div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
+
 {% endblock %}
 
 {% block dashboard_scripts %}
