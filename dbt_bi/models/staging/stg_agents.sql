@@ -14,5 +14,6 @@ select
     salaire_base_personnel::numeric(10, 2) as salaire_base_personnel,
     type_contrat,
     date_debut_fonction,
-    date_fin_contrat
+    date_fin_contrat,
+    date_creation::date as date_creation
 from source

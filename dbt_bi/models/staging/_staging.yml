@@ -66,6 +66,15 @@ models:
       - name: produit_id
         tests: [not_null, unique]
 
+  - name: stg_regle_salaire
+    description: >
+      core_reglesalaire, filtrée actif=true. 1 ligne par type_agent au plus (unique côté
+      Django) — source des taux paie configurables par l'admin, utilisée par fct_salaires
+      pour recalculer salaire_base/incentive sans dépendre de core_salaire.
+    columns:
+      - name: type_agent
+        tests: [not_null, unique]
+
   - name: stg_fournisseurs
     columns:
       - name: fournisseur_id

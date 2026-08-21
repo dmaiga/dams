@@ -98,7 +98,48 @@ class CalculatorSalaire:
 
         kilo_facturable = kilo_total - kilo_perdu
 
-        incentive = kilo_facturable * incentive_par_kg
+        # ===== INCENTIVE =====
+        # Produits avec un taux_incentive dédié (décision réunion produits, 21/08/2026) :
+        # incentive = quantité vendue × taux, indépendante du poids. Les autres produits
+        # restent sur le taux au kg (incentive_par_kg). Les deux portions ne se recoupent
+        # pas : un produit à taux_incentive sort du calcul au kg.
+        ventes_taux_dedie = ventes.filter(
+            detail_distribution__lot__produit__taux_incentive__isnull=False
+        )
+        ventes_au_kg = ventes.exclude(
+            detail_distribution__lot__produit__taux_incentive__isnull=False
+        )
+
+        kilo_au_kg = ventes_au_kg.aggregate(
+            total=Coalesce(
+                Sum(
+                    F("quantite") *
+                    Coalesce(
+                        F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                        Decimal("1")
+                    )
+                ),
+                Decimal("0.00")
+            )
+        )["total"]
+
+        kilo_perdu_au_kg = Perte.objects.filter(vente__in=ventes_au_kg).aggregate(
+            total=Coalesce(Sum("kilo_perdu_incentive"), Decimal("0.00"))
+        )["total"]
+
+        incentive_au_kg = (kilo_au_kg - kilo_perdu_au_kg) * incentive_par_kg
+
+        incentive_taux_dedie = ventes_taux_dedie.aggregate(
+            total=Coalesce(
+                Sum(
+                    F("quantite") *
+                    F("detail_distribution__lot__produit__taux_incentive")
+                ),
+                Decimal("0.00")
+            )
+        )["total"]
+
+        incentive = incentive_au_kg + incentive_taux_dedie
 
         # ===== FIXE VARIABLE SELON LE VOLUME RÉALISÉ =====
         # >= 750 kg sur la période (net des pertes) -> fixe 20 000 ; en dessous -> fixe 10 000.

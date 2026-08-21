@@ -15,6 +15,7 @@ sources:
       - name: core_agent
       - name: auth_user
       - name: core_salaire
+      - name: core_reglesalaire
       - name: core_depense
       - name: core_produit
       - name: core_fournisseur

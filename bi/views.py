@@ -29,6 +29,7 @@ from bi.models import (
     VwVentesAgentProduit,
 )
 from core.models import Agent, RegleSalaire
+from paie.services.salaire_calculator import CalculatorSalaire
 
 
 def _est_utilisateur_autorise(user):
@@ -643,16 +644,20 @@ def dashboard_agent_detail(request, agent_id):
       clarifié par mdmaiga au cadrage du sprint.
     - Stock en main : FctStockAgent, snapshot batch (pas de filtre de période), décision produit
       actée (séparation OLTP/BI).
-    Incentive (corrigé le 18/08/2026 après vérification de paie/services/salaire_liste_service.py
-    — la vue Direction "liste des salaires" y appelle CalculatorSalaire.calcul_salaire_mamy(...)
-    EN DIRECT, elle ne lit jamais le modèle Salaire ; aucune génération manuelle n'est requise
-    pour connaître un salaire au quotidien). L'incentive affichée ici (kg_vendus net x
-    RegleSalaire.incentive_par_kg, lue en direct, jamais codée en dur) reproduit donc exactement
-    ce calcul, et fonctionne à toute granularité (mois ou semaine) puisqu'elle ne dépend pas de
-    fct_salaires. Le modèle Salaire/SalaireGenerationService existe toujours mais sert un usage
-    séparé et optionnel (verrouiller/archiver un montant, ex. avant versement) — quand une ligne
-    existe pour la période (VwPerformanceAgent.incentive, mois uniquement), elle est affichée en
-    complément pour comparaison, pas comme LA valeur de référence. Masquable comme CA/marge
+    Incentive (corrigé le 18/08/2026, réaligné le 21/08/2026 après l'introduction de
+    Produit.taux_incentive — voir paie/APP_PAIE.md et paie/services/salaire_calculator.py).
+    Pour un agent terrain, incentive_projetee appelle désormais directement
+    CalculatorSalaire.calcul_salaire_mamy(agent, date_debut, date_fin) pour chaque période de la
+    tendance, au lieu de réimplémenter la formule (kg_vendus x incentive_par_kg) : cette
+    reimplémentation ignorait les taux dédiés par produit (concombre, huile, spaghetti...) ajoutés
+    au sprint du 21/08, elle sortait donc du "reproduit exactement calcul_salaire_mamy" annoncé
+    plus haut par cette même note. Le calcul reste EN DIRECT, il ne lit jamais le modèle Salaire ;
+    aucune génération manuelle n'est requise pour connaître un salaire au quotidien. Fonctionne à
+    toute granularité (mois ou semaine) puisqu'il ne dépend pas de fct_salaires. Le modèle
+    Salaire/SalaireGenerationService existe toujours mais sert un usage séparé et optionnel
+    (verrouiller/archiver un montant, ex. avant versement) — quand une ligne existe pour la
+    période (VwPerformanceAgent.incentive, mois uniquement), elle est affichée en complément pour
+    comparaison, pas comme LA valeur de référence. Masquable comme CA/marge
     (bi-toggle-donnees-sensibles).
     Pas de "Toutes périodes" ici (cohérent avec dashboard_agents, cf. son commentaire d'en-tête).
     """
@@ -724,6 +729,20 @@ def dashboard_agent_detail(request, agent_id):
         periode_precedente_val = date(annee_prec, mois_prec, 1)
         periode_precedente_libelle = f"{MOIS_FR[mois_prec]} {annee_prec}"
 
+    def _incentive_periode(periode):
+        # Agent terrain : appel direct à calcul_salaire_mamy (source de vérité unique, inclut
+        # les taux dédiés par produit — Produit.taux_incentive). Les autres types d'agent
+        # gardent l'ancienne approximation kg x taux global, hors périmètre de ce calculateur.
+        if agent.type_agent != "terrain":
+            return (getattr(periode, "kg_vendus", None) or Decimal("0.00")) * taux_incentive
+        if granularite == "semaine":
+            date_debut = periode
+            date_fin = periode + timedelta(days=6)
+        else:
+            date_debut = periode
+            date_fin = date(periode.year, periode.month, calendar.monthrange(periode.year, periode.month)[1])
+        return CalculatorSalaire.calcul_salaire_mamy(agent, date_debut, date_fin)["incentive"]
+
     tendance = list(tendance_qs)
     for t in tendance:
         t.periode = getattr(t, champ_periode)
@@ -732,7 +751,7 @@ def dashboard_agent_detail(request, agent_id):
         # Seuil salaire fixe (paie/services/salaire_calculator.py, kilo net des pertes depuis
         # le sprint-10 — kg_vendus ici est déjà net, corrigé au sprint-11 pour la cohérence).
         t.statut_750kg = "atteint" if t.kg_vendus >= 750 else "sous_objectif"
-        t.incentive_projetee = (t.kg_vendus or Decimal("0.00")) * taux_incentive
+        t.incentive_projetee = _incentive_periode(t.periode)
 
     periode_courante = next((t for t in tendance if t.periode == periode_courante_val), None)
     periode_precedente = next((t for t in tendance if t.periode == periode_precedente_val), None)
@@ -743,9 +762,8 @@ def dashboard_agent_detail(request, agent_id):
             agent_id=agent_id, **{champ_periode: periode_precedente_val}
         ).first()
         if periode_precedente:
-            periode_precedente.incentive_projetee = (
-                periode_precedente.kg_vendus or Decimal("0.00")
-            ) * taux_incentive
+            periode_precedente.periode = periode_precedente_val
+            periode_precedente.incentive_projetee = _incentive_periode(periode_precedente_val)
 
     delta_kg_vendus = None
     delta_kg_vendus_pct = None

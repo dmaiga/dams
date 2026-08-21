@@ -71,15 +71,84 @@ toujours en kg, quel que soit le type de produit :
 **Non rétroactif** : ne s'applique qu'aux calculs de paie effectués à partir de la mise en production
 de ce correctif ; les paies déjà émises pour des pertes déjà déclarées ne sont pas recalculées.
 
-**Répliqué côté BI** (`dbt_bi/models/marts/fct_salaires.sql`, CTE `kg_perdu_par_salaire`) : même
-principe que le § 1.bis — le seuil des 750 kg recalculé en dbt lit `stg_pertes.kilo_perdu_incentive`
-joint par `vente_id`, pour rester cohérent avec `calcul_salaire_mamy`. Le montant `incentive` lui-même
-n'est pas recalculé côté dbt (lu tel quel depuis `stg_salaires`) — seul le seuil du fixe l'est.
+**Répliqué côté BI** (`dbt_bi/models/marts/fct_salaires.sql`) : depuis la réécriture du 21/08/2026
+(§1.quinquies), dbt recalcule intégralement `incentive` (et plus seulement le seuil du fixe) à partir
+des mêmes sources — ce paragraphe décrivait l'ancien comportement (incentive lue telle quelle depuis
+`stg_salaires`), obsolète depuis cette réécriture.
 
 Hors périmètre de ce correctif (décision explicite, pas un oubli) : `calcul_salaire_gros` (incentive
 au carton, pas au kg) et le bonus superviseur (`calcul_salaire_superviseur`, basé sur `kilo_total`
 brut cumulé des mamies) restent inchangés — la demande portait spécifiquement sur l'incentive de
 l'agent terrain en kg.
+
+---
+
+## 1.quater.bis Taux d'incentive dédié par produit (`Produit.taux_incentive`) — 21/08/2026
+
+Décision réunion produits (21/08/2026) : certains produits (vendus en gros/carton/tas, pas au kg
+uniforme) ont un taux d'incentive fixé par unité vendue, indépendant du poids — ex. concombre,
+huile, spaghetti, maggi. Modélisé par un champ simple sur `Produit` :
+
+```
+Produit.taux_incentive  # FCFA par unité vendue, nullable, éditable via l'admin
+```
+
+Dans `calcul_salaire_mamy`, les ventes de l'agent sont scindées en deux lots selon que le produit
+vendu a un `taux_incentive` renseigné ou non :
+
+* **Produit à taux dédié** : `incentive_ligne = quantité vendue × taux_incentive`, le poids n'entre
+  pas en jeu (`Produit.poids_unitaire_kg` sert uniquement à la comptabilité stock/kilo pour ce
+  produit, ex. seuil des 750 kg du §1.bis, qui continue de compter TOUS les produits confondus).
+* **Produit sans taux dédié** : logique au kg inchangée (§1.quater) — `incentive_par_kg`, net des
+  pertes déclarées.
+
+`incentive = incentive_au_kg + incentive_taux_dédié`. Décision assumée (mdmaiga, 21/08/2026) : **pas
+d'historique** des changements de taux — un simple champ, pas de table d'audit. Si quelqu'un modifie
+un taux plus tard, les mois déjà affichés/générés avec l'ancien taux ne sont pas recalculés
+rétroactivement pour rester cohérents — risque connu, jugé acceptable à ce stade du projet.
+
+**Répliqué côté BI** : `stg_produits.taux_incentive`, utilisé par `fct_salaires.sql` de la même façon
+(voir §1.quinquies). Aussi branché côté Django dans `bi/views.py::dashboard_agent_detail`
+(`incentive_projetee`), qui appelait auparavant une formule `kg × incentive_par_kg` codée en dur
+ignorant ce champ — corrigé le 21/08/2026 pour appeler `calcul_salaire_mamy` directement (agents
+terrain uniquement ; `gros`/`superviseur` gardent l'ancienne approximation, hors périmètre).
+
+---
+
+## 1.quinquies `fct_salaires` indépendant de `core_salaire` — 21/08/2026
+
+Jusqu'ici, `dbt_bi/models/marts/fct_salaires.sql` lisait `stg_salaires` (donc `core_salaire`,
+alimenté par `SalaireGenerationService.generate()`). En pratique, l'app ne dépend plus de cette
+génération au quotidien — `SalaireListeService` et `bi/views.py::dashboard_agent_detail` appellent
+`CalculatorSalaire.calcul_salaire_mamy/gros/superviseur` **en direct** — et personne ne relance
+`generer_salaires_mensuel` de façon régulière (pas de cron sur le serveur mutualisé de production).
+Résultat avant correctif : `core_salaire` s'arrêtait à juillet 2026, et `fct_salaires` n'avait
+**aucune ligne** pour le mois en cours, alors que l'app affichait un salaire bien réel.
+
+`fct_salaires.sql` est désormais recalculé intégralement à chaque `dbt run`, à partir de
+`fct_ventes` / `stg_pertes` / `stg_produits` / `stg_regle_salaire` (nouveau staging model sur
+`core_reglesalaire`) — il ne lit plus jamais `core_salaire`/`stg_salaires`. Réplique les trois
+calculateurs de `paie/services/salaire_calculator.py` (mamy/gros/superviseur), y compris le taux
+dédié par produit du §1.quater.bis. Grain = agent × mois, mois = tous les mois ayant au moins une
+vente société (comme `vw_performance_agent`). Le modèle `Salaire`/`SalaireGenerationService` Django
+existe toujours mais sert désormais un usage strictement optionnel : verrouiller/archiver un montant
+avant versement (`Salaire.valide`) — ce n'est plus la source que lit le BI.
+
+**Éligibilité répliquée à l'identique** (`agent_eligibilite.py`, §1.ter), sans aucune borne
+supplémentaire — une première version (21/08/2026) avait ajouté `date_debut_fonction <= fin du
+mois` pour éviter un fixe fantôme sur un agent embauché après le mois, mais la comparaison avec
+l'app live a montré que ce n'est pas ainsi que Django gère le cas : un agent actif embauché après
+la période n'est pas exclu, il obtient `jours_travailles = 0` via `get_jours_travailles_mois`, donc
+un fixe **proratisé à 0**, pas un fixe plein. Exclure la ligne au lieu de la neutraliser
+désynchronisait le nombre d'agents affiché de celui de l'app (42 vs 29 constaté sur juin 2026,
+501 158 vs 534 825 FCFA). La borne a été retirée et la proratisation implémentée à l'identique côté
+dbt (`mamy_calcul`, réplique `get_jours_travailles_mois` + le test `if agent.date_debut_fonction`)
+— vérifié après correction : juin 2026 donne bien 42 agents / 276 333 (base) / 224 825 (incentive)
+/ 501 158 (total), identique au live.
+
+Écart connu conservé tel quel (R14) : pour un superviseur, `salaire_base + incentive` ≠
+`salaire_total` (l'écart = `dotation_fonction`, jamais appliquée de façon fiable côté Django non
+plus) — le test dbt `salaire_total = salaire_base + incentive` reste en `warn`, pas bloquant.
 
 ---
 

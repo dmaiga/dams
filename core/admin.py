@@ -80,7 +80,7 @@ class FournisseurAdmin(admin.ModelAdmin):
 
 @admin.register(Produit)
 class ProduitAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'description', 'poids_unitaire_kg']
+    list_display = ['nom', 'description', 'poids_unitaire_kg', 'taux_incentive']
     search_fields = ['nom']
 
 @admin.register(Client)

@@ -45,6 +45,14 @@ class Produit(models.Model):
         help_text="Poids standard d’une unité (carton/sac). Laisser vide si produit non conditionné."
     )
 
+    taux_incentive = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="FCFA par unité vendue, indépendant du poids. Laisser vide pour que l'incentive de ce produit suive le taux au kg (RegleSalaire.incentive_par_kg)."
+    )
+
     def __str__(self):
         return f"{self.nom}"
 
