@@ -5,7 +5,7 @@ from bi import views
 app_name = "bi"
 
 urlpatterns = [
-    path("", views.sommaire, name="sommaire"),
+    path("", views.dashboard_sante, name="sommaire"),
     path("sante/", views.dashboard_sante, name="sante"),
     path("produits/", views.dashboard_produits, name="produits"),
     path("agents/", views.dashboard_agents, name="agents"),

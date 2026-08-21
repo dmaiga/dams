@@ -150,12 +150,6 @@ def _agreger_rentabilite(lignes):
 
 
 @bi_access_required
-def sommaire(request):
-    context = _base_context(request, None, "Sommaire")
-    return render(request, "bi/sommaire.html", context)
-
-
-@bi_access_required
 def dashboard_sante(request):
     titre = dict(constants.DASHBOARDS)["sante"]
     context = _base_context(request, "sante", titre)

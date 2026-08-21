@@ -70,7 +70,10 @@ def test_sommaire_redirige_si_utilisateur_non_autorise(client, django_user_model
 
 @pytest.mark.django_db
 def test_sommaire_ok(client, utilisateur_connecte):
-    response = client.get(reverse("bi:sommaire"), TOUTES_PERIODES)
+    """"" (racine bi) sert directement le dashboard Santé Globale depuis le 21/08/2026."""
+    with patch.object(VwRentabiliteGlobale, "objects") as mock_globale:
+        mock_globale.order_by.return_value = []
+        response = client.get(reverse("bi:sommaire"), TOUTES_PERIODES)
     assert response.status_code == 200
 
 
