@@ -362,6 +362,9 @@
 .bi-scope .bi-barrow .bi-fill.bi-rouge { background: var(--critical); }
 .bi-scope .bi-barrow .bi-fill.bi-jaune { background: var(--warning); }
 .bi-scope .bi-barrow .bi-rvalue { font-family: var(--font-num); font-size: 12.5px; text-align: right; color: var(--ink); }
+/* Marque l'objectif (50 kg/j) sur la piste — positionnée via style="left:X%" inline. */
+.bi-scope .bi-barrow .bi-refline { position: absolute; top: -3px; bottom: -3px; width: 0; border-left: 1px dashed var(--ink-muted); z-index: 1; }
+.bi-scope .bi-barrow .bi-refline::after { content: attr(data-label); position: absolute; top: -14px; right: -2px; transform: translateX(50%); font-size: 9px; color: var(--ink-muted); white-space: nowrap; }
 
 @media (max-width: 640px) { .bi-scope .bi-barrow { grid-template-columns: 108px 1fr 84px; } }
 
