@@ -95,6 +95,8 @@
                     <th class="text-right">Ventes</th>
                     <th class="text-right">CA</th>
                     <th class="text-right">Marge</th>
+                    <th class="text-right">Montant incentive</th>
+                    <th class="text-right">Valeur reçue</th>
                 </tr>
             </thead>
             <tbody>
@@ -105,9 +107,11 @@
                     <td class="text-right">{{ p.nombre_ventes }}</td>
                     <td class="text-right bi-sensible">{{ p.ca_total|fcfa }}</td>
                     <td class="text-right bi-sensible">{{ p.marge|fcfa }}</td>
+                    <td class="text-right bi-sensible">{{ p.montant_incentive|fcfa }}</td>
+                    <td class="text-right bi-sensible">{{ p.valeur_recue|fcfa }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5">Aucune vente sur cette période.</td></tr>
+                <tr><td colspan="7">Aucune vente sur cette période.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

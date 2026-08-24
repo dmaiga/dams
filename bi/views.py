@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, Max, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
@@ -28,7 +29,7 @@ from bi.models import (
     VwRentabiliteProduit,
     VwVentesAgentProduit,
 )
-from core.models import Agent, RegleSalaire
+from core.models import Agent, RegleSalaire, Vente
 from paie.services.salaire_calculator import CalculatorSalaire
 
 
@@ -773,6 +774,36 @@ def dashboard_agent_detail(request, agent_id):
             agent_id=agent_id, mois=date(annee, mois, 1)
         ).order_by("-kg_vendus")
     )
+
+    # Incentive par produit (montant du taux + valeur reçue) — VwVentesAgentProduit n'expose que
+    # le kg, la quantité vendue (nécessaire pour Produit.taux_incentive, FCFA/unité) vient d'une
+    # requête directe sur core.Vente pour le même mois, même approximation que _incentive_periode
+    # ci-dessus (taux terrain utilisé pour tous les types d'agent faute de règle dédiée).
+    mois_fin = date(annee, mois, calendar.monthrange(annee, mois)[1])
+    quantite_par_produit = {
+        row["detail_distribution__lot__produit_id"]: row
+        for row in Vente.objects.filter(
+            agent_id=agent_id,
+            date_vente__date__range=(date(annee, mois, 1), mois_fin),
+            est_supprime=False,
+        )
+        .values(
+            "detail_distribution__lot__produit_id",
+            "detail_distribution__lot__produit__taux_incentive",
+        )
+        .annotate(quantite=Coalesce(Sum("quantite"), Decimal("0.00")))
+    }
+    for p in produits:
+        row = quantite_par_produit.get(p.produit_id)
+        taux_dedie = (
+            row["detail_distribution__lot__produit__taux_incentive"] if row else None
+        )
+        if taux_dedie is not None:
+            p.montant_incentive = taux_dedie
+            p.valeur_recue = row["quantite"] * taux_dedie
+        else:
+            p.montant_incentive = taux_incentive
+            p.valeur_recue = (p.kg_vendus or Decimal("0.00")) * taux_incentive
 
     stock = list(FctStockAgent.objects.filter(agent_id=agent_id).order_by("-stock_restant_kg"))
     stock_total_kg = sum((s.stock_restant_kg for s in stock), Decimal("0.00"))
