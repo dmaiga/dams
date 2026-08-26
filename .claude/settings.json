@@ -70,7 +70,20 @@
       "Bash(python manage.py test core -v 1)",
       "Bash(python manage.py test surveillance.tests.StockAgeServiceTestCase.test_agent_sans_vente_depuis_plus_de_deux_jours_present -v 1)",
       "Bash(python manage.py test monitoring surveillance -v 1)",
-      "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/c--Users-Admin-By-me-dams/8b93095f-5571-475c-82b2-7028daaa55e3/scratchpad/demo_alertes.py\")"
+      "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/c--Users-Admin-By-me-dams/8b93095f-5571-475c-82b2-7028daaa55e3/scratchpad/demo_alertes.py\")",
+      "Bash(python manage.py shell -c \"from core.models import Produit; [print\\(p.id, repr\\(p.nom\\), p.poids_unitaire_kg\\) for p in Produit.objects.all\\(\\).order_by\\('nom'\\)]\")",
+      "Bash(python manage.py makemigrations core --name produit_taux_incentive)",
+      "Bash(dbt build *)",
+      "Bash(python manage.py test bi -v 1)",
+      "Bash(python -m pytest bi/tests/test_views.py::test_dashboard_sante_avec_donnees bi/tests/test_views.py::test_dashboard_sante_graph_journalier_si_mois_precis -q)",
+      "Bash(chromium-cli --help)",
+      "Bash(python -c \"import playwright; print\\(playwright.__file__\\)\")",
+      "Bash(python -m playwright install chromium)",
+      "Bash(curl -sf http://127.0.0.1:8020/ -o /dev/null -w \"%{http_code}\")",
+      "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/c--Users-Admin-By-me-dams/68d679ca-12dd-4800-a006-85cac826f78d/scratchpad/check_refline.py\")",
+      "Bash(lsof -ti:8020 -sTCP:LISTEN)",
+      "Bash(xargs -r kill)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('bi/views.py', encoding='utf-8'\\).read\\(\\)\\)\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

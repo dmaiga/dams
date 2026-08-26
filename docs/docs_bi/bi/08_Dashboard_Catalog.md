@@ -266,8 +266,9 @@ ventes, deux dimensions mois/semaine).
 
 En-tête : nom du superviseur, nombre d'agents actifs.
 
-Ordre de page imposé (mdmaiga, 18/08/2026) : KPIs → tableau produits → tableau agents →
-graphes tendance → stock en main.
+Ordre de page imposé (mdmaiga, 18/08/2026, révisé le 26/08/2026) : KPIs → graphe tendance →
+tableau produits → tableau agents → stock en main (le graphe a été remonté juste sous les KPI
+"Volume de ventes", retour mdmaiga du 26/08/2026).
 
 **1. KPIs — Volume de ventes** (mois ou semaine sélectionné), 4 cartes sur la même ligne :
   • Kg vendus (équipe), vs période précédente (delta n vs n-1, valeur + %)
@@ -282,24 +283,26 @@ graphes tendance → stock en main.
     disponible au grain semaine). "Coût équipe" retiré (mdmaiga, 18/08/2026) : gardé les 4
     KPI ci-dessus sur une seule ligne plutôt que 5.
 
-**2. Tableau produits** (toujours mois, comme la Partie 3) :
-  • Produit, Kg vendus, vs mois précédent (delta), Ventes, CA, Marge — agrégé sur toute l'équipe
-  • Filtre par produit (sélecteur) — influence aussi le tableau Agents (voir 3.) et le
-    graphique de tendance (voir 4.)
-
-**3. Tableau agents** (période sélectionnée) :
-  • Agent (lien vers sa propre fiche détail, Partie 3), Kg vendus, vs période précédente
-    (delta), Kg/jour (badge de couleur = statut objectif individuel)
-  • Si un produit est filtré (2.) ET granularité = mois : Kg vendus/delta deviennent
-    spécifiques à ce produit pour chaque agent (pas de grain hebdomadaire pour les données
-    produit, donc pas d'effet du filtre en vue semaine — mention explicite affichée)
-
-**4. Graphes tendance** (6 dernières périodes, mois ou semaine) :
-  • Un seul graphique combiné : barres = kg vendus équipe (toute granularité), courbes =
-    kg vendus par produit, une couleur par produit — mois uniquement (pas de courbe produit en
-    vue semaine, données indisponibles à ce grain)
+**2. Graphe tendance** (6 dernières périodes, mois ou semaine) :
+  • Un seul graphique combiné : barres = kg vendus équipe, courbes = kg vendus par produit, une
+    couleur par produit — même granularité que la page (26/08/2026 : la vue dbt
+    vw_ventes_agent_produit_semaine, miroir hebdomadaire de vw_ventes_agent_produit, apporte la
+    courbe produit en vue semaine ; avant cette date, la courbe produit n'existait qu'en mois)
   • Sans filtre produit : les 5 produits les plus vendus sur la fenêtre (évite de surcharger le
     graphique) ; avec filtre : uniquement le produit sélectionné
+
+**3. Tableau produits** (période sélectionnée, mois ou semaine — 26/08/2026 : suit désormais la
+granularité de la page au lieu d'être figé au mois, cf. vw_ventes_agent_produit_semaine) :
+  • Produit, Kg vendus, vs période précédente (delta), Ventes, CA, Marge — agrégé sur toute
+    l'équipe
+  • Filtre par produit (sélecteur) — influence aussi le tableau Agents (voir 4.) et le graphique
+    de tendance (voir 2.), quelle que soit la granularité
+
+**4. Tableau agents** (période sélectionnée) :
+  • Agent (lien vers sa propre fiche détail, Partie 3), Kg vendus, vs période précédente
+    (delta), Kg/jour (badge de couleur = statut objectif individuel)
+  • Si un produit est filtré (3.) : Kg vendus/delta deviennent spécifiques à ce produit pour
+    chaque agent, quelle que soit la granularité (26/08/2026 : avant, restreint au mois)
 
 **5. Stock en main de l'équipe** (snapshot batch) :
   • Produit, Kg restants — agrégé sur tous les agents, + total
@@ -319,6 +322,12 @@ correspondent tous à la même équipe.
 **Question clé** : **"Où va notre argent en dépenses ?"**
 
 Dashboard autonome — vu et su de la Direction, pour analyser les postes de dépenses.
+
+**Filtre période (26/08/2026)** : sélecteur Année/Mois ajouté (absent jusque-là — la page était
+contrainte au dernier mois disponible par défaut, sans moyen de consulter un mois antérieur comme
+juillet). Le graphique de répartition par catégorie utilise désormais le composant `bi-barlist`
+partagé (barres + libellé + montant) au lieu d'un split-bar/légende maison qui n'avait jamais eu
+de CSS associée dans `dashboard.css` (rendu cassé, sans mise en forme).
 
 ### Ce qu'on y voit
 
@@ -348,8 +357,15 @@ Alerte :
 **Question clé** : **"Avec quel fournisseur trouve-t-on le meilleur deal ? Combien dort en stock ?"**
 
 Trois cards (24/07/2026, en remplacement d'une table plate fournisseur x produit x mois jugée
-illisible) : Stock par produit/fournisseur, Marge par fournisseur, Marge par produit — ces deux
-dernières réagissent aux mêmes filtres Produit/Fournisseur/Période que la première.
+illisible) : Stock par produit/fournisseur (snapshot, non affecté par la période), Marge par
+fournisseur, Marge par produit — ces deux dernières réagissent au filtre Année/Mois ; les trois
+réagissent au filtre Produit/Fournisseur.
+
+**Filtres (26/08/2026)** : les sélecteurs Produit/Fournisseur/Période existaient déjà côté vue
+(`bi/views.py::dashboard_stock`) et dans le gabarit, mais dans un bloc `{% block extra_filtres %}`
+que `base_dashboard.html` ne déclarait nulle part — les filtres n'étaient donc jamais rendus.
+Repliés dans le bloc `filtre_periode` standard (comme les autres dashboards), avec l'ajout du
+sélecteur Année/Mois qui manquait totalement (page contrainte au dernier mois disponible).
 
 **Réserve Direction (24/07/2026)** : cette page est en réflexion — l'agencement actuel ne
 convainc pas encore totalement, conservé en l'état en attendant un arbitrage (voir

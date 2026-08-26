@@ -70,13 +70,23 @@
     {% endif %}
 </div>
 
-<!-- 2. Tableau par produits -->
+<!-- 2. Graphe tendance kg et produit (juste sous le volume de ventes) -->
 <div class="bi-panel">
-    <h2>Produits vendus par l'équipe — {{ mois_produits_libelle }}</h2>
+    <h2>Tendance — {{ granularite|yesno:"semaine,mois" }}, {{ tendance|length }} dernières périodes</h2>
+    <div class="bi-chart-wrap"><canvas id="chart-superviseur-tendance"></canvas></div>
+</div>
+
+<!-- 3. Tableau par produits -->
+<div class="bi-panel">
+    <h2>Produits vendus par l'équipe — {{ periode_libelle }}</h2>
     <form method="get" class="bi-periode-form">
         <input type="hidden" name="granularite" value="{{ granularite }}">
+        {% if granularite == "semaine" %}
+        <input type="hidden" name="semaine" value="{{ semaine_selectionnee|date:'Y-m-d' }}">
+        {% else %}
         <input type="hidden" name="annee" value="{{ annee }}">
         <input type="hidden" name="mois" value="{{ mois }}">
+        {% endif %}
         <div>
             <label for="bi-produit">Produit</label>
             <select id="bi-produit" name="produit" class="select" onchange="this.form.submit()">
@@ -94,7 +104,7 @@
                 <tr>
                     <th>Produit</th>
                     <th class="text-right">Kg vendus</th>
-                    <th class="text-right">vs {{ mois_precedent_libelle_produits }}</th>
+                    <th class="text-right">vs {{ periode_precedente_libelle }}</th>
                     <th class="text-right">Ventes</th>
                     <th class="text-right">CA</th>
                     <th class="text-right">Marge</th>
@@ -122,12 +132,11 @@
             </tbody>
         </table>
     </div>
-    <p class="bi-comparaison">Toujours au grain mensuel, même en vue semaine (pas de détail produit hebdomadaire).</p>
 </div>
 
-<!-- 3. Tableau agents -->
+<!-- 4. Tableau agents -->
 <div class="bi-panel">
-    <h2>Agents de l'équipe — {{ periode_libelle }}{% if produit_filtre and granularite == "mois" %} — kg du produit filtré{% endif %}</h2>
+    <h2>Agents de l'équipe — {{ periode_libelle }}{% if produit_filtre %} — kg du produit filtré{% endif %}</h2>
     <div class="overflow-x-auto">
         <table class="table">
             <thead>
@@ -142,7 +151,7 @@
                 {% for a in agents_equipe %}
                 <tr>
                     <td><a href="{% url 'bi:agent_detail' a.agent_id %}?annee={{ annee }}&mois={{ mois }}&granularite={{ granularite }}&semaine={{ semaine_selectionnee|date:'Y-m-d' }}">{{ a.nom_complet }}</a></td>
-                    {% if produit_filtre and granularite == "mois" %}
+                    {% if produit_filtre %}
                     <td class="text-right">{{ a.kg_vendus_produit|format_number }}</td>
                     <td class="text-right">
                         {% if a.kg_vendus_produit_delta is not None %}
@@ -172,18 +181,6 @@
             </tbody>
         </table>
     </div>
-    {% if produit_filtre and granularite == "semaine" %}
-    <p class="bi-comparaison">Le filtre produit n'affecte pas ce tableau en vue hebdomadaire (données produit disponibles au grain mensuel uniquement) — kg vendus affiché reste le total équipe.</p>
-    {% endif %}
-</div>
-
-<!-- 4. Graphes tendance kg et produit -->
-<div class="bi-panel">
-    <h2>Tendance — {{ granularite|yesno:"semaine,mois" }}, {{ tendance|length }} dernières périodes</h2>
-    <div class="bi-chart-wrap"><canvas id="chart-superviseur-tendance"></canvas></div>
-    {% if granularite == "semaine" %}
-    <p class="bi-comparaison">Les courbes par produit ne sont disponibles qu'en vue mensuelle.</p>
-    {% endif %}
 </div>
 
 <!-- 5. Stock en main -->

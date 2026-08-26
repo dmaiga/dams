@@ -317,3 +317,22 @@ class VwVentesAgentProduit(models.Model):
     class Meta:
         managed = False
         db_table = 'bi_"."vw_ventes_agent_produit'
+
+
+class VwVentesAgentProduitSemaine(models.Model):
+    """Fiche détail équipe (26/08/2026). Miroir hebdomadaire (semaine ISO lundi-dimanche) de
+    VwVentesAgentProduit, cf. dbt_bi/models/marts/aggregates/vw_ventes_agent_produit_semaine.sql."""
+
+    ventes_agent_produit_semaine_id = models.IntegerField(primary_key=True)
+    agent_id = models.IntegerField()
+    produit_id = models.IntegerField(null=True)
+    produit_nom = models.CharField(max_length=100, null=True)
+    semaine = models.DateField()
+    kg_vendus = models.DecimalField(max_digits=12, decimal_places=2)
+    ca_total = models.DecimalField(max_digits=15, decimal_places=2)
+    marge = models.DecimalField(max_digits=15, decimal_places=2)
+    nombre_ventes = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'bi_"."vw_ventes_agent_produit_semaine'

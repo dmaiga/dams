@@ -28,6 +28,7 @@ from bi.models import (
     VwRentabiliteJournaliere,
     VwRentabiliteProduit,
     VwVentesAgentProduit,
+    VwVentesAgentProduitSemaine,
 )
 from core.models import Agent, RegleSalaire, Vente
 from paie.services.salaire_calculator import CalculatorSalaire
@@ -885,11 +886,18 @@ def dashboard_superviseur_detail(request, superviseur_id):
     - Comparaison n vs n-1 ajoutée aussi sur le tableau produits ET le tableau agents (pas
       seulement le KPI global).
     - Filtre produit (GET ?produit=<id>) étendu : influence désormais aussi le tableau agents
-      (kg vendus/delta deviennent spécifiques à ce produit) — mois uniquement, pas de grain
-      hebdomadaire pour vw_ventes_agent_produit.
+      (kg vendus/delta deviennent spécifiques à ce produit).
     - Graphique tendance unifié (plus de mini-graphique séparé) : barres = kg vendus équipe,
       courbes = kg vendus par produit (une couleur par produit, top 5 si pas de filtre, sinon
-      uniquement le produit filtré) — mois uniquement, l'axe produit reste vide en vue semaine.
+      uniquement le produit filtré).
+    Révision du 26/08/2026 : le tableau produits, le filtre produit et les courbes de tendance
+    par produit suivent désormais la granularité (mois OU semaine) au lieu d'être figés au grain
+    mensuel — nouvelle vue vw_ventes_agent_produit_semaine (dbt), miroir hebdomadaire de
+    vw_ventes_agent_produit. Le graphique de tendance a aussi été remonté juste sous le bloc
+    "Volume de ventes" (retour mdmaiga du 26/08/2026). Correctif au passage : en vue semaine, le
+    formulaire de sélection de semaine ne soumettait pas annee/mois, donc le tableau produits
+    restait figé sur le dernier mois disponible au lieu de suivre la semaine choisie — annee/mois
+    sont maintenant dérivés de la semaine sélectionnée.
     """
     superviseur = get_object_or_404(
         Agent.objects.select_related("user"), pk=superviseur_id, type_agent="entrepot"
@@ -932,6 +940,11 @@ def dashboard_superviseur_detail(request, superviseur_id):
         context["semaines_disponibles"] = semaines_disponibles
         context["semaine_selectionnee"] = periode_courante_val
         if periode_courante_val:
+            # Le formulaire de sélection de semaine ne soumet pas annee/mois (cf. toolbar) :
+            # sans ça, annee/mois restent figés sur le dernier mois disponible et le tableau
+            # produits (grain mensuel only, cf. plus bas) ne suit pas la semaine choisie.
+            annee, mois = periode_courante_val.year, periode_courante_val.month
+            context["annee"], context["mois"] = annee, mois
             date_debut_periode = periode_courante_val
             date_fin_periode = periode_courante_val + timedelta(days=6)
             context["periode_libelle"] = (
@@ -1060,14 +1073,21 @@ def dashboard_superviseur_detail(request, superviseur_id):
         a.kg_vendus_precedent = kg_prec
         a.kg_vendus_delta = (a.kg_vendus - kg_prec) if kg_prec is not None else None
 
-    # ---- Produits vendus par l'équipe (toujours mois, comme la fiche agent) + comparaison n-1 ----
-    mois_courant_date = date(annee, mois, 1)
-    annee_prec_produits, mois_prec_produits = _mois_precedent(annee, mois)
-    mois_precedent_date = date(annee_prec_produits, mois_prec_produits, 1)
-    mois_precedent_libelle_produits = f"{MOIS_FR[mois_prec_produits]} {annee_prec_produits}"
+    # ---- Produits vendus par l'équipe (26/08/2026 : grain mois OU semaine selon la
+    # granularité sélectionnée, cf. vw_ventes_agent_produit_semaine.sql — même période que le
+    # reste de la page, periode_courante_val/periode_precedente_val déjà calculés plus haut pour
+    # les deux granularités) + comparaison n-1. ----
+    ModeleVentesProduit = (
+        VwVentesAgentProduitSemaine if granularite == "semaine" else VwVentesAgentProduit
+    )
+    champ_periode_produit = champ_periode
 
-    produits_base_qs = VwVentesAgentProduit.objects.filter(
-        agent_id__in=agents_equipe_ids, mois=mois_courant_date
+    produits_base_qs = (
+        ModeleVentesProduit.objects.filter(
+            agent_id__in=agents_equipe_ids, **{champ_periode_produit: periode_courante_val}
+        )
+        if periode_courante_val
+        else ModeleVentesProduit.objects.none()
     )
     produits_options = list(
         produits_base_qs.values("produit_id", "produit_nom").distinct().order_by("produit_nom")
@@ -1084,13 +1104,18 @@ def dashboard_superviseur_detail(request, superviseur_id):
         )
         .order_by("-kg_vendus")
     )
-    produits_precedent_kg = dict(
-        VwVentesAgentProduit.objects.filter(
-            agent_id__in=agents_equipe_ids, mois=mois_precedent_date
+    produits_precedent_kg = (
+        dict(
+            ModeleVentesProduit.objects.filter(
+                agent_id__in=agents_equipe_ids,
+                **{champ_periode_produit: periode_precedente_val},
+            )
+            .values("produit_id")
+            .annotate(kg_vendus=Sum("kg_vendus"))
+            .values_list("produit_id", "kg_vendus")
         )
-        .values("produit_id")
-        .annotate(kg_vendus=Sum("kg_vendus"))
-        .values_list("produit_id", "kg_vendus")
+        if periode_precedente_val
+        else {}
     )
     for p in produits:
         kg_prec = produits_precedent_kg.get(p["produit_id"])
@@ -1098,18 +1123,25 @@ def dashboard_superviseur_detail(request, superviseur_id):
         p["kg_vendus_delta"] = (p["kg_vendus"] - kg_prec) if kg_prec is not None else None
 
     # ---- Filtre produit : influence aussi le tableau agents (kg vendus + delta de CE produit
-    # uniquement), disponible seulement en vue mois — VwVentesAgentProduit n'a pas de grain
-    # hebdomadaire (cf. sprint-10/11, "toujours au grain mensuel"). ----
-    if produit_filtre and granularite == "mois":
+    # uniquement), même granularité que le reste de la page. ----
+    if produit_filtre and periode_courante_val:
         agent_produit_courant = dict(
-            VwVentesAgentProduit.objects.filter(
-                agent_id__in=agents_equipe_ids, produit_id=produit_filtre, mois=mois_courant_date
+            ModeleVentesProduit.objects.filter(
+                agent_id__in=agents_equipe_ids,
+                produit_id=produit_filtre,
+                **{champ_periode_produit: periode_courante_val},
             ).values_list("agent_id", "kg_vendus")
         )
-        agent_produit_precedent = dict(
-            VwVentesAgentProduit.objects.filter(
-                agent_id__in=agents_equipe_ids, produit_id=produit_filtre, mois=mois_precedent_date
-            ).values_list("agent_id", "kg_vendus")
+        agent_produit_precedent = (
+            dict(
+                ModeleVentesProduit.objects.filter(
+                    agent_id__in=agents_equipe_ids,
+                    produit_id=produit_filtre,
+                    **{champ_periode_produit: periode_precedente_val},
+                ).values_list("agent_id", "kg_vendus")
+            )
+            if periode_precedente_val
+            else {}
         )
         for a in agents_equipe:
             a.kg_vendus_produit = agent_produit_courant.get(a.agent_id, Decimal("0.00"))
@@ -1140,17 +1172,17 @@ def dashboard_superviseur_detail(request, superviseur_id):
     )
 
     # ---- Courbes produit sur le même graphique que le volume (bar = volume équipe, ligne par
-    # produit) — mois uniquement (pas de grain hebdomadaire pour vw_ventes_agent_produit). Sans
-    # filtre : les 5 produits les plus vendus sur la fenêtre, pour ne pas surcharger le
-    # graphique. Avec filtre : uniquement le produit sélectionné. ----
+    # produit) — même granularité que la tendance équipe (26/08/2026, cf.
+    # vw_ventes_agent_produit_semaine.sql). Sans filtre : les 5 produits les plus vendus sur la
+    # fenêtre, pour ne pas surcharger le graphique. Avec filtre : uniquement le produit
+    # sélectionné. ----
     PALETTE_PRODUITS = ["#c9a83a", "#7a4fb5", "#2f9e6f", "#c0563a", "#3a7fc0"]
     courbes_produits = []
-    if granularite == "mois" and tendance:
-        annee_debut, mois_debut = _mois_moins_n(annee, mois, NB_PERIODES_TENDANCE - 1)
-        ventes_fenetre = VwVentesAgentProduit.objects.filter(
+    if tendance:
+        debut_fenetre = getattr(tendance[0], "periode")
+        ventes_fenetre = ModeleVentesProduit.objects.filter(
             agent_id__in=agents_equipe_ids,
-            mois__gte=date(annee_debut, mois_debut, 1),
-            mois__lte=mois_courant_date,
+            **{f"{champ_periode_produit}__gte": debut_fenetre, f"{champ_periode_produit}__lte": periode_courante_val},
         )
         if produit_filtre:
             ventes_fenetre = ventes_fenetre.filter(produit_id=produit_filtre)
@@ -1164,9 +1196,11 @@ def dashboard_superviseur_detail(request, superviseur_id):
                 .order_by("-total")
                 .values_list("produit_id", "produit_nom")[:5]
             )
-        par_produit_mois = {
-            (row["produit_id"], row["mois"]): row["kg_vendus"]
-            for row in ventes_fenetre.values("produit_id", "mois").annotate(kg_vendus=Sum("kg_vendus"))
+        par_produit_periode = {
+            (row["produit_id"], row[champ_periode_produit]): row["kg_vendus"]
+            for row in ventes_fenetre.values("produit_id", champ_periode_produit).annotate(
+                kg_vendus=Sum("kg_vendus")
+            )
         }
         for i, (pid, pnom) in enumerate(produits_a_tracer):
             courbes_produits.append(
@@ -1174,7 +1208,7 @@ def dashboard_superviseur_detail(request, superviseur_id):
                     "label": pnom,
                     "color": PALETTE_PRODUITS[i % len(PALETTE_PRODUITS)],
                     "data": [
-                        float(par_produit_mois.get((pid, t.periode), 0) or 0) for t in tendance
+                        float(par_produit_periode.get((pid, t.periode), 0) or 0) for t in tendance
                     ],
                 }
             )
@@ -1210,8 +1244,6 @@ def dashboard_superviseur_detail(request, superviseur_id):
             "produits": produits,
             "produits_options": produits_options,
             "produit_filtre": int(produit_filtre) if produit_filtre else None,
-            "mois_produits_libelle": f"{MOIS_FR[mois]} {annee}",
-            "mois_precedent_libelle_produits": mois_precedent_libelle_produits,
             "stock": stock,
             "stock_total_kg": stock_total_kg,
         }
@@ -1254,15 +1286,27 @@ def dashboard_stock(request):
     annee, mois = context["annee"], context["mois"]
 
     stock_base = VwAnalyseStock.objects.filter(valeur_stock__gt=0)
-    produit_options = list(
-        stock_base.exclude(produit_id__isnull=True)
+
+    # Options des filtres Produit/Fournisseur : union stock courant (valeur_stock > 0) + historique
+    # de marge (VwMargeFournisseur, tous mois) — un produit/fournisseur sans stock restant
+    # aujourd'hui mais avec de la marge sur une période passée doit rester filtrable dans les
+    # tableaux de marge ci-dessous, qui ne dépendent pas du stock courant. Avant ce correctif,
+    # seul le fournisseur bénéficiait de cette union ; le produit restait limité au stock courant
+    # (>0), qui ne compte quasiment jamais qu'un ou deux produits (26/08/2026).
+    produits_par_id = dict(
+        VwAnalyseStock.objects.exclude(produit_id__isnull=True)
         .values_list("produit_id", "produit_nom")
         .distinct()
-        .order_by("produit_nom")
     )
+    produits_par_id.update(
+        VwMargeFournisseur.objects.exclude(produit_id__isnull=True)
+        .values_list("produit_id", "produit_nom")
+        .distinct()
+    )
+    produit_options = sorted(produits_par_id.items(), key=lambda item: item[1] or "")
 
     fournisseurs_par_id = dict(
-        stock_base.exclude(fournisseur_id__isnull=True)
+        VwAnalyseStock.objects.exclude(fournisseur_id__isnull=True)
         .values_list("fournisseur_id", "fournisseur_nom")
         .distinct()
     )

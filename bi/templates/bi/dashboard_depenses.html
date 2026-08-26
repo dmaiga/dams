@@ -1,22 +1,42 @@
 {% extends "bi/base_dashboard.html" %}
 {% load l10n format_fcfa direction_filters %}
 
+{% block filtre_periode %}
+<div class="bi-toolbar-left">
+    <form method="get" class="bi-periode-form">
+        <div>
+            <label for="bi-annee">Année :</label>
+            <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026" style="width: 80px;">
+        </div>
+        <div>
+            <label for="bi-mois">Mois :</label>
+            <select id="bi-mois" name="mois" class="select">
+                <option value="">Tous</option>
+                {% for valeur, libelle in mois_options %}
+                <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+        {% if annee or mois %}
+        <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline btn-sm">Toutes périodes</a>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+
 {% block dashboard_content %}
 <div class="bi-panel">
-    <h2>Dépenses par catégorie</h2>
+    <h2>Dépenses par catégorie — {{ periode_libelle }}</h2>
     {% if depenses %}
-    <div class="bi-splitbar">
+    <div class="bi-barlist">
         {% for d in depenses %}
-        <div style="width:{{ d.montant_pct|default_if_none:0|unlocalize }}%;background:{% cycle 'var(--accent)' '#4c7ea3' '#8fb2c9' 'var(--border-strong)' 'var(--surface-2)' as splitcouleur %}"></div>
-        {% endfor %}
-    </div>
-    <div class="bi-legend-list">
-        {% for d in depenses %}
-        <div class="bi-legend-row">
-            <i style="background:{% cycle 'var(--accent)' '#4c7ea3' '#8fb2c9' 'var(--border-strong)' 'var(--surface-2)' as splitcouleur2 %}"></i>
-            <span>{{ d.categorie|default:"Non catégorisé" }}</span>
-            <span class="tabular" style="text-align:right">{{ d.montant|fcfa }}</span>
-            <span class="tabular bi-legend-pct" style="text-align:right">{{ d.montant_pct|default_if_none:"—"|format_number }}%</span>
+        <div class="bi-barrow" title='{{ d.montant_pct|default_if_none:"—"|format_number }}% du total de la période'>
+            <div class="bi-rlabel">{{ d.categorie|default:"Non catégorisé" }}</div>
+            <div class="bi-track">
+                <div class="bi-fill" style="width:{{ d.montant_pct|default_if_none:2|unlocalize }}%"></div>
+            </div>
+            <div class="bi-rvalue">{{ d.montant|fcfa }}</div>
         </div>
         {% endfor %}
     </div>

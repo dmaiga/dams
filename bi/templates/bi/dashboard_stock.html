@@ -1,24 +1,49 @@
 {% extends "bi/base_dashboard.html" %}
 {% load format_fcfa direction_filters %}
 
-{% block extra_filtres %}
-<div>
-    <label for="bi-produit">Produit</label>
-    <select id="bi-produit" name="produit" class="select" onchange="this.form.submit()">
-        <option value="">Tous les produits</option>
-        {% for id, nom in produit_options %}
-        <option value="{{ id }}" {% if produit_filtre == id %}selected{% endif %}>{{ nom|default:"—" }}</option>
-        {% endfor %}
-    </select>
-</div>
-<div>
-    <label for="bi-fournisseur">Fournisseur</label>
-    <select id="bi-fournisseur" name="fournisseur" class="select" onchange="this.form.submit()">
-        <option value="">Tous les fournisseurs</option>
-        {% for id, nom in fournisseur_options %}
-        <option value="{{ id }}" {% if fournisseur_filtre == id %}selected{% endif %}>{{ nom|default:"—" }}</option>
-        {% endfor %}
-    </select>
+{% block filtre_periode %}
+<div class="bi-toolbar-left">
+    <form method="get" class="bi-periode-form">
+        <div>
+            <label for="bi-annee">Année :</label>
+            <input type="number" id="bi-annee" name="annee" value="{{ annee|default_if_none:'' }}" class="input" min="2000" max="2100" placeholder="2026" style="width: 80px;">
+        </div>
+        <div>
+            <label for="bi-mois">Mois :</label>
+            <select id="bi-mois" name="mois" class="select">
+                <option value="">Tous</option>
+                {% for valeur, libelle in mois_options %}
+                <option value="{{ valeur }}" {% if mois == valeur %}selected{% endif %}>{{ libelle }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <span class="bi-toolbar-separateur"></span>
+
+        <div>
+            <label for="bi-produit">Produit :</label>
+            <select id="bi-produit" name="produit" class="select">
+                <option value="">Tous les produits</option>
+                {% for id, nom in produit_options %}
+                <option value="{{ id }}" {% if produit_filtre == id %}selected{% endif %}>{{ nom|default:"—" }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="bi-fournisseur">Fournisseur :</label>
+            <select id="bi-fournisseur" name="fournisseur" class="select">
+                <option value="">Tous les fournisseurs</option>
+                {% for id, nom in fournisseur_options %}
+                <option value="{{ id }}" {% if fournisseur_filtre == id %}selected{% endif %}>{{ nom|default:"—" }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+        {% if annee or mois %}
+        <a href="{{ request.path }}?toutes_periodes=1" class="btn btn-outline btn-sm">Toutes périodes</a>
+        {% endif %}
+    </form>
 </div>
 {% endblock %}
 
@@ -32,6 +57,7 @@
 
 <div class="bi-panel">
     <h2>Stock par produit / fournisseur</h2>
+    <p class="bi-comparaison">Snapshot courant, non affecté par le filtre de période (le filtre année/mois s'applique aux tableaux de marge ci-dessous).</p>
     <div class="overflow-x-auto">
         <table class="table">
             <thead>
@@ -59,7 +85,7 @@
 </div>
 
 <div class="bi-panel">
-    <h2>Marge — par fournisseur et par produit</h2>
+    <h2>Marge — par fournisseur et par produit — {{ periode_libelle }}</h2>
     <div class="bi-cards2">
         <div>
             <h3>Marge par fournisseur (KPI-403 à 405)</h3>

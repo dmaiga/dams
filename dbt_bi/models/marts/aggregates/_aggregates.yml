@@ -137,6 +137,28 @@ models:
                 to: ref('dim_produit')
                 field: produit_id
 
+  - name: vw_ventes_agent_produit_semaine
+    description: >
+      Fiche détail équipe (26/08/2026). Miroir hebdomadaire (semaine ISO lundi-dimanche) de
+      vw_ventes_agent_produit — 1 ligne par agent x produit x semaine, mêmes règles (kg net
+      des pertes).
+    columns:
+      - name: ventes_agent_produit_semaine_id
+        tests: [not_null, unique]
+      - name: agent_id
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agent')
+                field: agent_id
+      - name: produit_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_produit')
+                field: produit_id
+
   - name: vw_analyse_stock
     description: "Dashboard 5 (Stock & Fournisseur). 1 ligne par couple produit x fournisseur (KPI-401, KPI-402)."
     columns:
