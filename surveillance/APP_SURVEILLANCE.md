@@ -134,6 +134,31 @@ distributions âgées en base.
 
 ---
 
+## 🖨️ Commande de gestion : `agents_stock_dormant`
+
+`python manage.py agents_stock_dormant --date_debut AAAA-MM-JJ --date_fin AAAA-MM-JJ [--format texte|pdf] [--output CHEMIN]`
+
+Liste **par superviseur** les agents de vente (`terrain`, `agent_gros`) qui détiennent encore des
+produits reçus **sur la période bornée** `[date_debut, date_fin]` (bornes incluses) — cas « stock
+dormant » côté agent : produit distribué mais pas encore totalement écoulé.
+
+* **Source** : `StockAgeService.stock_detenu_agents_par_superviseur(date_debut, date_fin)`
+  (`surveillance/services/stock_age_service.py`). Contrairement aux méthodes UI/monitoring à fenêtre
+  glissante (`timezone.now()`), la période est **explicite** : filtre sur
+  `distribution__date_distribution__date` entre les deux bornes. Ne retient que les
+  `DetailDistribution` dont `quantite_restante_calculee > 0`. Regroupement
+  superviseur → agent → lignes produit ; superviseur = `distribution.superviseur`, à défaut
+  `agent.superviseur`.
+* **Sortie texte** (défaut) sur stdout, dans la forme : nom du superviseur, puis chaque agent, puis
+  `  - <produit> reçu le JJ/MM/AAAA (reste <qté>)`. Bloc séparé par une ligne de tirets entre
+  superviseurs. Les agents sans superviseur affecté sont regroupés en fin sous « Sans superviseur ».
+* **Sortie PDF** (`--format pdf`, `reportlab`) : même structure. Sans `--output`, écrit dans
+  `rapports/<annee>/<mois>/stock_dormant_<date_debut>_<date_fin>.pdf` (via `utils.paths.chemin_rapport`).
+* Le N+1 sur `quantite_restante_calculee` est assumé (volume faible, commande hors chemin HTTP), au
+  même titre que `_lignes_stock_retenu_agents`.
+
+---
+
 ## 🧭 Navigation thématique commune
 
 Un seul partial, `surveillance/templates/partials/_nav_themes.html`, porte les 4 onglets de premier niveau (Vue d'ensemble / Volumes / Prix / Stock & Rotation), inclus par les 10 templates de l'app (7 vues historiques + `stock_rotation` + les 2 pages de liste complète). Il remplace les blocs de liens ad hoc précédemment dupliqués (tabs sur le dashboard, paires de `btn btn-outline` ailleurs), chacun avec un style différent. Sur chaque page, la nav est placée sur sa propre ligne pleine largeur sous le titre (`overflow-x-auto`), pour ne pas entrer en conflit avec le filtre semaine quand les deux coexistent dans le header.

@@ -314,6 +314,59 @@ class StockAgeService:
         seuil = StockAgeService._seuil_dormant_entrepot()
         return StockAgeService._queryset_lots_dormants_entrepot(seuil).count()
 
+    # ------------------------------------------------------------------
+    # Stock encore détenu par les agents de vente, reçu sur une période
+    # bornée — sert la commande `agents_stock_dormant`. Contrairement aux
+    # méthodes ci-dessus (fenêtre glissante depuis now()), la période est
+    # explicite : on ne garde que les distributions dont la date de
+    # réception tombe entre date_debut et date_fin (bornes incluses), et
+    # dont il reste au moins une unité non écoulée. Regroupement
+    # superviseur → agent → lignes produit.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def stock_detenu_agents_par_superviseur(date_debut, date_fin):
+        details = (
+            DetailDistribution.objects
+            .filter(
+                distribution__agent_terrain__type_agent__in=TYPES_AGENT_VENTE,
+                distribution__date_distribution__date__gte=date_debut,
+                distribution__date_distribution__date__lte=date_fin,
+            )
+            .select_related(
+                'distribution__agent_terrain__user',
+                'distribution__superviseur__user',
+                'distribution__agent_terrain__superviseur__user',
+                'lot__produit',
+            )
+            .order_by(
+                'distribution__superviseur__user__first_name',
+                'distribution__agent_terrain__user__first_name',
+                'distribution__date_distribution',
+            )
+        )
+
+        groupes = {}
+        for detail in details:
+            quantite_restante = detail.quantite_restante_calculee
+            if quantite_restante <= 0:
+                continue
+
+            distribution = detail.distribution
+            agent = distribution.agent_terrain
+            superviseur = distribution.superviseur or (agent.superviseur if agent else None)
+
+            cle_sup = superviseur.id if superviseur else None
+            groupe = groupes.setdefault(cle_sup, {"superviseur": superviseur, "agents": {}})
+            bloc_agent = groupe["agents"].setdefault(agent.id, {"agent": agent, "lignes": []})
+            bloc_agent["lignes"].append({
+                "produit": detail.lot.produit.nom,
+                "date_reception": distribution.date_distribution,
+                "quantite_restante": quantite_restante,
+            })
+
+        return list(groupes.values())
+
     @staticmethod
     def valeur_stock_dormant_entrepot():
         seuil = StockAgeService._seuil_dormant_entrepot()
