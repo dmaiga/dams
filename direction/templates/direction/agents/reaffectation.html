@@ -1,0 +1,172 @@
+{% extends "base_admin.html" %}
+{% block title %}Réaffectation des agents{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4 space-y-6">
+
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Réaffectation des agents</h1>
+            <p class="text-sm text-slate-500 mt-1">
+                Transférer le portefeuille d'agents d'un superviseur vers un autre.
+            </p>
+        </div>
+        <a href="{% url 'historique_reaffectation' %}"
+           class="btn btn-sm btn-ghost text-slate-600">
+            <i class="fas fa-clock-rotate-left mr-1"></i> Historique
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %} text-sm">
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="alert alert-warning text-xs">
+        <i class="fas fa-triangle-exclamation"></i>
+        <span>
+            Les distributions non soldées des agents transférés sont
+            <strong>rebasculées vers le superviseur cible</strong> (le suivi produit
+            suit l'agent). Cela modifie l'attribution historique et impacte les
+            calculs de solde / rétention de stock de l'ancien superviseur. Un
+            instantané du stock encore en circulation est figé dans l'historique.
+        </span>
+    </div>
+
+    <!-- Étape 1 : choix de la source -->
+    <div class="card bg-white shadow-sm border border-slate-200">
+        <div class="card-body">
+            <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                1. Superviseur source
+            </h2>
+            <form method="get" class="flex flex-wrap items-end gap-3">
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-xs">Superviseur</span></label>
+                    <select name="source" class="select select-bordered select-sm min-w-64"
+                            onchange="this.form.submit()">
+                        <option value="">— Choisir —</option>
+                        {% for sup in superviseurs %}
+                        <option value="{{ sup.id }}" {% if source and source.id == sup.id %}selected{% endif %}>
+                            {{ sup.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <noscript><button class="btn btn-sm btn-primary" type="submit">Afficher</button></noscript>
+            </form>
+        </div>
+    </div>
+
+    {% if source %}
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+        <input type="hidden" name="superviseur_source" value="{{ source.id }}">
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-error text-sm">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <!-- Étape 2 : agents -->
+        <div class="card bg-white shadow-sm border border-slate-200">
+            <div class="card-body">
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                    2. Agents à transférer
+                    <span class="text-slate-400 normal-case font-normal">
+                        — portefeuille de {{ source.full_name }}
+                    </span>
+                </h2>
+
+                {% if form.agents.errors %}
+                <p class="text-error text-xs">{{ form.agents.errors.0 }}</p>
+                {% endif %}
+
+                {% if portefeuille %}
+                <div class="overflow-x-auto">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr class="text-xs text-slate-500">
+                                <th></th>
+                                <th>Agent</th>
+                                <th>Type</th>
+                                <th class="text-center">Distributions ouvertes</th>
+                                <th>Stock encore en circulation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in portefeuille %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="agents" value="{{ item.agent.id }}"
+                                           class="checkbox checkbox-sm">
+                                </td>
+                                <td class="font-medium text-slate-800">{{ item.agent.full_name }}</td>
+                                <td class="text-xs text-slate-500">{{ item.agent.get_type_agent_display }}</td>
+                                <td class="text-center">
+                                    {% if item.nb_distributions_ouvertes %}
+                                        <span class="badge badge-warning badge-sm">{{ item.nb_distributions_ouvertes }}</span>
+                                    {% else %}
+                                        <span class="text-slate-300">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-xs text-slate-600">
+                                    {% for s in item.stock_ouvert %}
+                                        <div>{{ s.produit }} — {{ s.quantite_restante }} (lot #{{ s.lot_id }})</div>
+                                    {% empty %}
+                                        <span class="text-slate-300">aucun</span>
+                                    {% endfor %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-sm text-slate-500 py-4">
+                    Ce superviseur n'a aucun agent géré (terrain / gros / stagiaire).
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Étape 3 : cible + motif -->
+        <div class="card bg-white shadow-sm border border-slate-200">
+            <div class="card-body space-y-4">
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                    3. Superviseur cible
+                </h2>
+                <div class="form-control max-w-md">
+                    <label class="label"><span class="label-text text-xs">Transférer vers</span></label>
+                    <select name="superviseur_cible" class="select select-bordered select-sm">
+                        <option value="">— Choisir —</option>
+                        {% for sup in superviseurs %}
+                            {% if sup.id != source.id %}
+                            <option value="{{ sup.id }}">{{ sup.full_name }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    {% if form.superviseur_cible.errors %}
+                    <p class="text-error text-xs">{{ form.superviseur_cible.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                <div class="form-control max-w-md">
+                    <label class="label"><span class="label-text text-xs">Motif (optionnel)</span></label>
+                    <textarea name="motif" rows="2" class="textarea textarea-bordered textarea-sm"
+                              placeholder="Ex. arrivée du superviseur X, réorganisation des marchés…"></textarea>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="btn btn-primary btn-sm"
+                            onclick="return confirm('Confirmer le transfert des agents cochés ?');">
+                        <i class="fas fa-people-arrows mr-1"></i> Transférer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+
+</div>
+{% endblock %}

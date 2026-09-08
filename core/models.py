@@ -1641,6 +1641,94 @@ class JournalModificationDistribution(models.Model):
         verbose_name = "Journal des modifications"
         verbose_name_plural = "Journal des modifications"
 
+
+class TransfertPortefeuilleAgent(models.Model):
+    """
+    En-tête d'un transfert d'un lot d'agents d'un superviseur vers un autre.
+
+    Historise la réaffectation opérée depuis la direction (voir la vue
+    ``direction.views.reaffectation_agents``) : à qui appartenaient les agents,
+    à qui ils passent, qui a déclenché l'opération et pourquoi. Le détail par
+    agent (avec l'instantané du stock encore en circulation au moment T) est
+    porté par ``LigneTransfertAgent``.
+
+    Même mécanisme de fond que la commande ``affecter_superviseurs`` — un
+    ``Agent.objects.filter(...).update(superviseur=...)`` — mais tracé.
+    """
+
+    superviseur_source = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='transferts_portefeuille_sortants',
+        verbose_name="Superviseur source",
+    )
+    superviseur_cible = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='transferts_portefeuille_entrants',
+        verbose_name="Superviseur cible",
+    )
+    effectue_par = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transferts_portefeuille_realises',
+    )
+    motif = models.TextField(blank=True)
+    date_transfert = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_transfert']
+        verbose_name = "Transfert de portefeuille d'agents"
+        verbose_name_plural = "Transferts de portefeuille d'agents"
+
+    def __str__(self):
+        src = self.superviseur_source.full_name if self.superviseur_source else "—"
+        return (
+            f"Transfert #{self.id} : {src} → "
+            f"{self.superviseur_cible.full_name} "
+            f"({self.lignes.count()} agent·s)"
+        )
+
+
+class LigneTransfertAgent(models.Model):
+    """
+    Un agent déplacé dans le cadre d'un ``TransfertPortefeuilleAgent``.
+
+    ``stock_bascule`` fige, au moment du transfert, ce qu'il restait à écouler
+    sur les distributions non soldées de l'agent — celles-là mêmes qui ont été
+    rebasculées vers le superviseur cible. Format :
+    ``[{"produit": str, "lot_id": int, "quantite_restante": str}, ...]``.
+    """
+
+    transfert = models.ForeignKey(
+        TransfertPortefeuilleAgent,
+        on_delete=models.CASCADE,
+        related_name='lignes',
+    )
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        related_name='transferts_portefeuille',
+    )
+    nb_distributions_basculees = models.PositiveIntegerField(default=0)
+    stock_bascule = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        verbose_name = "Ligne de transfert d'agent"
+        verbose_name_plural = "Lignes de transfert d'agent"
+        unique_together = ('transfert', 'agent')
+
+    def __str__(self):
+        return f"{self.agent.full_name} — transfert #{self.transfert_id}"
+
+
 class Vente(models.Model):
     TYPE_VENTE_CHOICES = (
         ('gros', 'Vente en Gros'),

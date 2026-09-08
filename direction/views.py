@@ -41,7 +41,8 @@ from core.models import (
     FactureLotEntrepot, MouvementStock,
     JournalModificationDistribution,
     Recouvrement, VersementBancaire, RecuVersement,
-    Depense,ClotureMensuelle
+    Depense,ClotureMensuelle,
+    TransfertPortefeuilleAgent, LigneTransfertAgent, Perte
 )
 from django.db.models import OuterRef, Subquery, DateTimeField
 
@@ -1476,6 +1477,209 @@ def admin_create_agent(request):
 
     return render(request, 'direction/agents/agent_create.html', {'form': form})
 
+
+# ============================================================================
+# RÉAFFECTATION DES AGENTS  (accès restreint : mdmaiga)
+# ============================================================================
+#
+# Un superviseur quitte l'équipe / un nouveau superviseur arrive : il faut
+# pouvoir déplacer le portefeuille d'agents d'un superviseur vers un autre.
+# Même mécanisme de fond que la commande management `affecter_superviseurs`
+# (Agent.objects.filter(...).update(superviseur=...)), mais :
+#   - piloté depuis la direction, agent par agent, avec un motif ;
+#   - tracé dans TransfertPortefeuilleAgent / LigneTransfertAgent ;
+#   - les distributions non soldées de l'agent sont rebasculées vers le
+#     superviseur cible (choix métier : le suivi produit courant suit l'agent),
+#     avec un instantané figé du stock encore en circulation et une entrée
+#     JournalModificationDistribution par distribution touchée.
+
+from django.contrib.auth.decorators import user_passes_test
+from direction.forms import ReaffectationAgentsForm, TYPES_AGENTS_GERES
+
+
+def _acces_reaffectation(user):
+    return user.is_authenticated and user.username == "mdmaiga"
+
+
+def _stock_ouvert_par_agent(agent_ids):
+    """
+    Stock encore en circulation pour un ENSEMBLE d'agents, en 3 requêtes fixes.
+
+    Retourne {agent_id: {"distribution_ids": [...], "stock": [...]}} où `stock`
+    est une liste de dict {"produit", "lot_id", "quantite_restante"}.
+
+    On n'utilise volontairement pas la property
+    `DetailDistribution.quantite_restante_calculee` (2 requêtes par détail →
+    N+1) : les quantités vendues / perdues sont pré-agrégées par détail en une
+    requête chacune (pas de jointure croisée Vente×Perte qui gonflerait les
+    sommes), puis recombinées en Python.
+    """
+    agent_ids = list(agent_ids)
+    resultat = {aid: {"distribution_ids": [], "stock": []} for aid in agent_ids}
+    if not agent_ids:
+        return resultat
+
+    vendu_par_detail = dict(
+        Vente.objects.filter(
+            detail_distribution__distribution__agent_terrain_id__in=agent_ids,
+            est_supprime=False,
+        ).values_list('detail_distribution').annotate(t=Sum('quantite'))
+    )
+    perdu_par_detail = dict(
+        Perte.objects.filter(
+            detail_distribution__distribution__agent_terrain_id__in=agent_ids,
+        ).values_list('detail_distribution').annotate(t=Sum('quantite_perdue'))
+    )
+
+    details = (
+        DetailDistribution.objects
+        .filter(distribution__agent_terrain_id__in=agent_ids)
+        .select_related('distribution', 'lot__produit')
+    )
+
+    distributions_vues = {aid: set() for aid in agent_ids}
+    for d in details:
+        aid = d.distribution.agent_terrain_id
+        if aid not in resultat:
+            continue
+        restante = (
+            (d.quantite or 0)
+            - (vendu_par_detail.get(d.id) or 0)
+            - (perdu_par_detail.get(d.id) or 0)
+        )
+        if restante and restante > 0:
+            distributions_vues[aid].add(d.distribution_id)
+            resultat[aid]["stock"].append({
+                "produit": d.lot.produit.nom,
+                "lot_id": d.lot_id,
+                "quantite_restante": str(restante),
+            })
+
+    for aid in agent_ids:
+        resultat[aid]["distribution_ids"] = list(distributions_vues[aid])
+    return resultat
+
+
+@login_required
+@user_passes_test(_acces_reaffectation)
+def reaffectation_agents(request):
+    source_id = request.POST.get('superviseur_source') or request.GET.get('source')
+    source = None
+    if source_id:
+        source = Agent.objects.filter(
+            id=source_id, type_agent='entrepot'
+        ).first()
+
+    if request.method == 'POST':
+        form = ReaffectationAgentsForm(request.POST, source=source)
+        if form.is_valid():
+            cible = form.cleaned_data['superviseur_cible']
+            agents = list(form.cleaned_data['agents'])
+            motif = form.cleaned_data['motif']
+
+            stock_map = _stock_ouvert_par_agent([a.id for a in agents])
+
+            with transaction.atomic():
+                transfert = TransfertPortefeuilleAgent.objects.create(
+                    superviseur_source=source,
+                    superviseur_cible=cible,
+                    effectue_par=request.user,
+                    motif=motif,
+                )
+
+                for agent in agents:
+                    info = stock_map.get(agent.id, {"distribution_ids": [], "stock": []})
+                    distribution_ids = info["distribution_ids"]
+                    snapshot = info["stock"]
+
+                    if distribution_ids:
+                        DistributionAgent.objects.filter(
+                            id__in=distribution_ids
+                        ).update(superviseur=cible)
+                        for dist_id in distribution_ids:
+                            JournalModificationDistribution.objects.create(
+                                distribution_id=dist_id,
+                                utilisateur=request.user,
+                                type_action='MODIFICATION',
+                                details=(
+                                    f"Réaffectation agent {agent.full_name} : "
+                                    f"superviseur de la distribution rebasculé "
+                                    f"(transfert #{transfert.id})."
+                                ),
+                                anciennes_valeurs={
+                                    'superviseur': source.full_name if source else None,
+                                    'superviseur_id': source.id if source else None,
+                                },
+                                nouvelles_valeurs={
+                                    'superviseur': cible.full_name,
+                                    'superviseur_id': cible.id,
+                                },
+                            )
+
+                    LigneTransfertAgent.objects.create(
+                        transfert=transfert,
+                        agent=agent,
+                        nb_distributions_basculees=len(distribution_ids),
+                        stock_bascule=snapshot,
+                    )
+
+                # Le pointeur vivant : même mécanisme que `affecter_superviseurs`.
+                Agent.objects.filter(
+                    id__in=[a.id for a in agents]
+                ).update(superviseur=cible)
+
+            messages.success(
+                request,
+                f"{len(agents)} agent·s transféré·s vers {cible.full_name}."
+            )
+            return redirect('historique_reaffectation')
+    else:
+        initial = {'superviseur_source': source.id} if source else None
+        form = ReaffectationAgentsForm(initial=initial, source=source)
+
+    # Portefeuille affiché (avec résumé du stock ouvert par agent).
+    portefeuille = []
+    if source:
+        agents_source = list(
+            Agent.objects.filter(
+                superviseur=source, type_agent__in=TYPES_AGENTS_GERES
+            )
+            .select_related('user')
+            .order_by('user__first_name', 'user__username')
+        )
+        stock_map = _stock_ouvert_par_agent([a.id for a in agents_source])
+        for agent in agents_source:
+            info = stock_map.get(agent.id, {"distribution_ids": [], "stock": []})
+            portefeuille.append({
+                'agent': agent,
+                'nb_distributions_ouvertes': len(info["distribution_ids"]),
+                'stock_ouvert': info["stock"],
+            })
+
+    superviseurs = Agent.objects.filter(
+        type_agent='entrepot'
+    ).select_related('user').order_by('user__first_name', 'user__username')
+
+    return render(request, 'direction/agents/reaffectation.html', {
+        'form': form,
+        'source': source,
+        'portefeuille': portefeuille,
+        'superviseurs': superviseurs,
+    })
+
+
+@login_required
+@user_passes_test(_acces_reaffectation)
+def historique_reaffectation(request):
+    transferts = (
+        TransfertPortefeuilleAgent.objects
+        .select_related('superviseur_source__user', 'superviseur_cible__user', 'effectue_par')
+        .prefetch_related('lignes__agent__user')
+        .order_by('-date_transfert')
+    )
+    return render(request, 'direction/agents/reaffectation_historique.html', {
+        'transferts': transferts,
+    })
 
 
 from django.contrib.auth.decorators import login_required, user_passes_test

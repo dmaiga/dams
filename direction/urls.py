@@ -19,7 +19,8 @@ from direction.views import (
                                  api_calcul_salaire_rapide,export_salaires_excel,
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
                                  RotDetailView,analyse_operationnelle ,
-                                 suivi_distributions
+                                 suivi_distributions,
+                                 reaffectation_agents, historique_reaffectation
                               )
 
 
@@ -118,6 +119,10 @@ urlpatterns = [
          ),
 
      path('direction/agents/creer/', admin_create_agent, name='admin_create_agent'),
+
+    # Réaffectation du portefeuille d'agents entre superviseurs (accès mdmaiga)
+    path('direction/agents/reaffectation/', reaffectation_agents, name='reaffectation_agents'),
+    path('direction/agents/reaffectation/historique/', historique_reaffectation, name='historique_reaffectation'),
 
    # URLs pour les salaires
     path('salaires/', calcul_salaires, name='calcul_salaires'),

@@ -76,3 +76,85 @@ class ExportSalaireForm(forms.Form):
         initial=True,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
+
+
+# Types d'agents rattachables à un superviseur (aligné sur la commande
+# management `affecter_superviseurs`).
+TYPES_AGENTS_GERES = ('terrain', 'agent_gros', 'stagiaire')
+
+
+class ReaffectationAgentsForm(forms.Form):
+    """
+    Transfert d'un lot d'agents d'un superviseur vers un autre.
+
+    Le queryset des agents est restreint dynamiquement au portefeuille du
+    superviseur source (voir ``__init__``) pour qu'on ne puisse pas transférer
+    un agent qui n'appartient pas à la source affichée.
+    """
+
+    superviseur_source = forms.ModelChoiceField(
+        queryset=None,
+        label="Superviseur source",
+        empty_label="— Choisir —",
+    )
+    superviseur_cible = forms.ModelChoiceField(
+        queryset=None,
+        label="Superviseur cible",
+        empty_label="— Choisir —",
+    )
+    agents = forms.ModelMultipleChoiceField(
+        queryset=None,
+        label="Agents à transférer",
+        widget=forms.CheckboxSelectMultiple,
+    )
+    motif = forms.CharField(
+        label="Motif du transfert",
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        source = kwargs.pop('source', None)
+        super().__init__(*args, **kwargs)
+
+        from core.models import Agent
+
+        superviseurs = Agent.objects.filter(
+            type_agent='entrepot'
+        ).select_related('user').order_by('user__first_name', 'user__username')
+
+        self.fields['superviseur_source'].queryset = superviseurs
+        self.fields['superviseur_cible'].queryset = superviseurs
+
+        # Le champ "agents" n'accepte que le portefeuille de la source.
+        if source is not None:
+            portefeuille = Agent.objects.filter(
+                superviseur=source,
+                type_agent__in=TYPES_AGENTS_GERES,
+            ).select_related('user').order_by('user__first_name', 'user__username')
+        else:
+            portefeuille = Agent.objects.none()
+        self.fields['agents'].queryset = portefeuille
+
+    def clean(self):
+        cleaned = super().clean()
+        source = cleaned.get('superviseur_source')
+        cible = cleaned.get('superviseur_cible')
+        agents = cleaned.get('agents')
+
+        if source and cible and source == cible:
+            raise ValidationError(
+                "Le superviseur cible doit être différent du superviseur source."
+            )
+
+        if source and agents:
+            hors_portefeuille = [
+                a for a in agents if a.superviseur_id != source.id
+            ]
+            if hors_portefeuille:
+                noms = ", ".join(a.full_name for a in hors_portefeuille)
+                raise ValidationError(
+                    f"Ces agents ne sont plus rattachés à {source.full_name} : {noms}."
+                )
+
+        return cleaned

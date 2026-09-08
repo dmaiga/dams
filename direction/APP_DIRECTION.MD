@@ -147,6 +147,54 @@ Cette vue surveille de manière exclusive l'activité de versement du Responsabl
 
 ---
 
+## 6bis. Réaffectation du portefeuille d'agents entre superviseurs — ajouté 2026-09-08
+
+Vue `reaffectation_agents` (+ `historique_reaffectation`), URLs
+`direction/agents/reaffectation/` et `.../historique/`. Entrée de menu dans
+`base_admin.html` (section RÉFÉRENTIELS, sous « Agents »), **visible et accessible
+uniquement pour `request.user.username == "mdmaiga"`** (`_acces_reaffectation`,
+`@user_passes_test`).
+
+**Besoin** : un superviseur quitte l'équipe / un nouveau arrive → déplacer le
+portefeuille d'agents d'un superviseur vers un autre sans passer par une commande
+management ad hoc. Reprend le mécanisme de fond de `direction/management/commands/
+affecter_superviseurs.py` (`Agent.objects.filter(...).update(superviseur=cible)`)
+mais piloté depuis l'UI, agent par agent, avec motif et historisation.
+
+**Flux** (`ReaffectationAgentsForm`, `direction/forms.py`) :
+1. Choix du superviseur source (form GET auto-submit) → liste de son portefeuille
+   (`type_agent in ('terrain', 'agent_gros', 'stagiaire')` = `TYPES_AGENTS_GERES`),
+   chaque agent affichant le nombre de distributions encore ouvertes et le stock
+   encore en circulation.
+2. Cases à cocher des agents + superviseur cible + motif.
+3. POST atomique :
+   - `TransfertPortefeuilleAgent` (en-tête) + `LigneTransfertAgent` par agent
+     (`core/models.py`, migration `0119`) ;
+   - `_stock_ouvert_par_agent(agent_ids)` identifie, pour tout l'ensemble d'agents
+     et en **3 requêtes fixes**, les `DistributionAgent` portant encore du stock à
+     écouler, et en fige un instantané (`stock_bascule` JSON : produit / lot_id /
+     quantité restante) ;
+   - **ces distributions non soldées sont rebasculées vers le superviseur cible**
+     (`DistributionAgent.objects.filter(id__in=...).update(superviseur=cible)`),
+     avec une entrée `JournalModificationDistribution` (type `MODIFICATION`,
+     anciennes/nouvelles valeurs de superviseur) par distribution touchée ;
+   - enfin `Agent.superviseur` est mis à jour pour tous les agents cochés.
+
+**Choix métier assumé** : la bascule des distributions non soldées modifie
+l'attribution historique et impacte les calculs de solde / rétention de stock de
+l'ancien superviseur (le suivi produit courant suit l'agent). Un bandeau
+d'avertissement le rappelle dans l'écran ; l'instantané `stock_bascule` conserve
+la trace de ce qui a été déplacé.
+
+**Perf** : ne pas utiliser la property `DetailDistribution.quantite_restante_calculee`
+ici (2 requêtes par détail → ~4800 requêtes sur un gros portefeuille). Les quantités
+vendues / perdues sont pré-agrégées par détail (une requête `values_list(...).annotate(Sum)`
+chacune, sans jointure croisée Vente×Perte qui gonflerait les sommes) puis recombinées
+en Python : `_stock_ouvert_par_agent()` tourne en 3 requêtes quel que soit le nombre
+d'agents, la page complète en ~10.
+
+---
+
 ## 6. Pipelines d'Exportation Métier
 
 Pour répondre aux besoins d'audits externes et de réunions comptables, le système délègue l'extraction de données filtrées au service `VenteExportService`.

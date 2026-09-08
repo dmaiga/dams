@@ -1,0 +1,89 @@
+{% extends "base_admin.html" %}
+{% block title %}Historique des réaffectations{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4 space-y-6">
+
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Historique des réaffectations</h1>
+            <p class="text-sm text-slate-500 mt-1">
+                Chaque transfert de portefeuille d'agents entre superviseurs.
+            </p>
+        </div>
+        <a href="{% url 'reaffectation_agents' %}" class="btn btn-sm btn-primary">
+            <i class="fas fa-people-arrows mr-1"></i> Nouveau transfert
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-success text-sm"><span>{{ message }}</span></div>
+        {% endfor %}
+    {% endif %}
+
+    {% for t in transferts %}
+    <div class="card bg-white shadow-sm border border-slate-200">
+        <div class="card-body">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="text-sm">
+                    <span class="font-semibold text-slate-800">
+                        {{ t.superviseur_source.full_name|default:"—" }}
+                    </span>
+                    <i class="fas fa-arrow-right-long mx-2 text-slate-400"></i>
+                    <span class="font-semibold text-slate-800">
+                        {{ t.superviseur_cible.full_name }}
+                    </span>
+                </div>
+                <div class="text-xs text-slate-400">
+                    {{ t.date_transfert|date:"d/m/Y H:i" }}
+                    {% if t.effectue_par %} · par {{ t.effectue_par.username }}{% endif %}
+                </div>
+            </div>
+
+            {% if t.motif %}
+            <p class="text-xs text-slate-500 mt-1 italic">« {{ t.motif }} »</p>
+            {% endif %}
+
+            <div class="overflow-x-auto mt-3">
+                <table class="table table-sm">
+                    <thead>
+                        <tr class="text-xs text-slate-500">
+                            <th>Agent</th>
+                            <th class="text-center">Distributions rebasculées</th>
+                            <th>Stock figé au transfert</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ligne in t.lignes.all %}
+                        <tr>
+                            <td class="font-medium text-slate-800">{{ ligne.agent.full_name }}</td>
+                            <td class="text-center">
+                                {% if ligne.nb_distributions_basculees %}
+                                    <span class="badge badge-warning badge-sm">{{ ligne.nb_distributions_basculees }}</span>
+                                {% else %}
+                                    <span class="text-slate-300">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs text-slate-600">
+                                {% for s in ligne.stock_bascule %}
+                                    <div>{{ s.produit }} — {{ s.quantite_restante }} (lot #{{ s.lot_id }})</div>
+                                {% empty %}
+                                    <span class="text-slate-300">aucun</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-sm text-slate-500 py-8 text-center">
+        Aucune réaffectation enregistrée pour l'instant.
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
