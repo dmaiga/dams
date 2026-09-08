@@ -13,6 +13,17 @@ def _fmt_date(valeur):
     return valeur.strftime('%d/%m/%Y') if valeur else '—'
 
 
+def _ligne_stock(p):
+    """Rendu d'une ligne produit de stock dormant, identique pour les blocs
+    « superviseur » et « agent » (demande mdmaiga 08/09/2026 : même niveau de
+    détail que la commande `agents_stock_dormant` — produit, quantité restante,
+    date de réception, ancienneté)."""
+    return (
+        f"• {p['produit'].nom} — reste {p['quantite_restante']} — "
+        f"reçu le {_fmt_date(p['date_reference'])} — {p['jours_ecoules']} j"
+    )
+
+
 def _grouper_par_superviseur(items, cle_superviseur='superviseur'):
     """Retourne (groupes, sans_superviseur) : groupes est un dict {superviseur:
     [items]} qui préserve l'ordre d'apparition, sans_superviseur la liste des
@@ -150,10 +161,7 @@ class AlerteMoteur:
         if groupes:
             blocs = []
             for superviseur, produits in groupes.items():
-                lignes_produits = "\n".join(
-                    f"• {p['produit'].nom} — reçu le {_fmt_date(p['date_reference'])} — {p['jours_ecoules']} jours"
-                    for p in produits
-                )
+                lignes_produits = "\n".join(_ligne_stock(p) for p in produits)
                 blocs.append(f"{superviseur.full_name}\n{lignes_produits}")
             message = "⚠️ STOCK EN RÉTENTION — SUPERVISEURS\n\n" + "\n\n".join(blocs)
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
@@ -181,9 +189,7 @@ class AlerteMoteur:
                     par_agent[p["agent"]].append(p)
                 sous_blocs = []
                 for agent, produits in par_agent.items():
-                    lignes_produits = "\n".join(
-                        f"• {p['produit'].nom} — {p['jours_ecoules']} jours" for p in produits
-                    )
+                    lignes_produits = "\n".join(_ligne_stock(p) for p in produits)
                     sous_blocs.append(f"{agent.full_name}\n{lignes_produits}")
                 blocs.append(f"{superviseur.full_name}\n\n" + "\n\n".join(sous_blocs))
             message = "⚠️ STOCK CHEZ LES AGENTS\n\n" + "\n\n".join(blocs)

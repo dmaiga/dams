@@ -1,6 +1,43 @@
 # Sprint 12 — Audit du stock dormant (superviseurs + agents) et enrichissement des notifications Telegram
 
-**Statut** : 📋 à faire — demande de mdmaiga (08/09/2026).
+**Statut** : 🟡 en cours — demande de mdmaiga (08/09/2026).
+
+Fait le 08/09/2026 : investigation sur la base réelle (§ Résultats d'investigation),
+cause racine identifiée et corrigée (rappel 48 h sur `stock_superviseur`/`stock_agent`,
+format des messages Telegram enrichi via un helper partagé, migration `0120` qui clôt
+3 alertes obsolètes de type `stock`), tests `monitoring/tests.py` (+3). Restent ouverts :
+garde-fou `agent_terrain_direct`, décision sur `DATE_PLANCHER_STOCK`, réécriture SQL du
+calcul de rétention agent si le volume l'impose.
+
+---
+
+## Résultats d'investigation (08/09/2026, base locale à jour de la prod)
+
+- **La détection fonctionne** : `StockAgeService.lots_stock_dormant()` renvoie
+  `agent: 122`, `superviseur: 12`, `entrepot: 2` lignes. Rien de cassé côté calcul.
+- **Cause racine de l'absence de notifications superviseur/agent** : `reenvoi_heures: None`
+  pour `stock_superviseur` et `stock_agent` + ces alertes restent `ACTIVE` en permanence
+  (la liste ne retombe jamais à zéro) ⇒ après le **seul** envoi du 13/08/2026, le moteur
+  répond `doit_envoyer=False` à chaque passage. Les deux alertes du 13/08 sont encore
+  `ACTIVE`, `nombre_envois=1`. C'est le « actif mais non branché » ressenti par mdmaiga.
+  → **Corrigé** : `reenvoi_heures: 48` (décision mdmaiga). Les alertes bloquées se
+  renverront au prochain passage cron au-delà de 48 h, avec le message rafraîchi.
+- **Planificateur** : ce repo est local (d'où l'absence d'alertes récentes) ; la prod
+  exécute bien `evaluer_alertes` via cron. Rien à faire côté orchestration.
+- **`agent_terrain_direct` (Constat 2.3)** : sur les 12 affectations superviseur en
+  rétention, **aucune** n'a `agent_terrain_direct` renseigné → pas de pollution observée
+  aujourd'hui. Le garde-fou reste à ajouter par prudence (Tâche 2), pas urgent.
+- **N+1 rétention agent (Constat 2.7)** : `_queryset_stock_retenu_agents` scanne
+  432 `DetailDistribution`, 122 retenus après filtre `quantite_restante_calculee > 0`.
+  ~864 requêtes une fois par passage cron — acceptable pour un job de fond, mais candidat
+  à la réécriture SQL si le volume grossit.
+- **Rafraîchissement dedup (Constat 2.6)** : confirmé côté code
+  (`AlerteDeduplicationService.get_ou_creer` réécrit `message` avant le test de renvoi) et
+  déjà couvert par `test_message_rafraichi_meme_sans_renvoi`. RAS.
+- **Résidus** : 3 alertes de type `stock` (nom d'avant le découpage du 13/08) restées
+  `ACTIVE`, plus gérées par aucun code. → **Clôturées** par la migration `0120`.
+
+---
 
 Sprint d'**investigation + durcissement**, pas de nouvelle capacité : la détection du stock
 dormant existe déjà pour les trois emplacements (entrepôt, superviseur, agent) et les trois
@@ -147,37 +184,36 @@ property par une agrégation SQL des ventes/pertes par `detail_distribution_id` 
 
 ---
 
-## Décisions à acter (mdmaiga) — avant implémentation
+## Décisions (mdmaiga)
 
-1. **Contenu exact des lignes Telegram enrichies.** Proposition (à valider) :
-   - superviseur : `• {produit} — reste {quantite} — reçu le {date} — {jours} j — {valeur} FCFA`
-   - agent : idem, sous le nom de l'agent, lui-même sous le nom du superviseur.
-   Faut-il la **valeur immobilisée** (donnée sensible ?) ou seulement quantité + ancienneté ?
-2. **Sous-total par superviseur** (Σ valeur / Σ jours max) en tête de chaque bloc, ou lignes
-   seules ?
-3. **`agent_terrain_direct`** (Constat 2.3) : exclure de l'origine `superviseur`, ou rattacher à
-   l'agent ?
-4. **`DATE_PLANCHER_STOCK`** (Constat 2.5) : garder 01/07/2026 / avancer / retirer.
-5. **Seuil superviseur** : `DELAI_RETENTION_ACTEURS_JOURS = 3` j est-il toujours le bon seuil
-   d'alerte pour un superviseur, ou faut-il un délai propre (`DELAI_RETENTION_SUPERVISEUR_JOURS`) ?
+1. ✅ **Cadence de rappel** : `reenvoi_heures = 48` pour `stock_superviseur` et `stock_agent`
+   (08/09/2026).
+2. ✅ **Contenu des lignes Telegram** : `• {produit} — reste {quantite} — reçu le {date} — {jours} j`,
+   sans valeur immobilisée (aligné sur la commande `agents_stock_dormant` ; la valeur reste
+   disponible dans la ligne si on la veut plus tard). Hiérarchie inchangée
+   (superviseur → agent → produits). Pas de sous-total par superviseur pour l'instant.
+3. ⏳ **`agent_terrain_direct`** (Constat 2.3) : non observé aujourd'hui — garde-fou
+   `agent_terrain_direct__isnull=True` à ajouter par prudence, sans urgence.
+4. ⏳ **`DATE_PLANCHER_STOCK`** (Constat 2.5) : à trancher — garder 01/07/2026 / avancer / retirer.
+5. ⏳ **Seuil superviseur** : `DELAI_RETENTION_ACTEURS_JOURS = 3` j — garder ou délai propre ?
 
 ---
 
 ## Tâches (ordonnées)
 
-### 1. Investigation (aucune écriture de code)
+### 1. Investigation — ✅ faite (voir § Résultats d'investigation)
 
-- Exécuter `agents_stock_dormant --date_debut 2026-07-01 --date_fin <aujourd'hui>` sur la base
-  réelle : combien d'agents, combien de superviseurs, quel volume de lignes.
-- Requête ad hoc : nombre d'`AffectationLotSuperviseur` avec `agent_terrain_direct` renseigné
-  *et* `quantite_restante > 0` *et* `date_affectation` > 3 j → confirmer/infirmer Constat 2.3.
-- Compter les `DetailDistribution` entrant dans `_lignes_stock_retenu_agents` → chiffrer le N+1
-  (Constat 2.7).
-- Vérifier le comportement de rafraîchissement de `AlerteDeduplicationService` sur un changement
-  de composition (Constat 2.6), en shell si besoin.
-- Consigner les résultats dans une section « Résultats d'investigation » de ce fichier.
+### 1bis. Correctifs livrés le 08/09/2026
 
-### 2. `StockAgeService` — corrections ciblées
+- `monitoring/constants.py` : `reenvoi_heures: 48` pour `stock_superviseur` / `stock_agent`.
+- `monitoring/services/moteur_alerte.py` : helper `_ligne_stock(p)` partagé par
+  `_envoyer_stock_superviseurs` et `_envoyer_stock_agents` — produit + reste + date de
+  réception + ancienneté.
+- `core/migrations/0120_resoudre_alertes_stock_obsoletes.py` : clôt les alertes `type_alerte="stock"`
+  restées `ACTIVE`.
+- `monitoring/tests.py` : +3 tests (messages détaillés superviseur/agent, renvoi après 48 h).
+
+### 2. `StockAgeService` — corrections ciblées (reste à faire)
 
 - Constat 2.3 : selon décision n°3, ajouter `agent_terrain_direct__isnull=True` à
   `_queryset_lots_dormants_superviseur` (ou re-router la ligne vers l'origine `agent`).

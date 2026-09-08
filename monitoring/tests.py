@@ -462,6 +462,71 @@ class AlerteMoteurTestCase(TestCase):
         self.assertIn(self.agent_terrain.full_name, alerte.message)
         self.assertIn(lot.produit.nom, alerte.message)
 
+    def test_evaluer_stock_ancien_superviseur_message_detaille(self):
+        # Le bloc superviseur affiche produit + quantité restante + date de
+        # réception + ancienneté (format aligné sur `agents_stock_dormant`).
+        lot = self._lot(100, 30, timezone.now() - timedelta(days=1))
+        AffectationLotSuperviseur.objects.create(
+            lot=lot,
+            superviseur=self.superviseur,
+            quantite_initiale=30,
+            quantite_restante=30,
+            attribue_par=self.rot,
+            date_affectation=date.today() - timedelta(days=4),
+        )
+
+        AlerteMoteur.evaluer_stock_ancien()
+
+        message = Alerte.objects.get(type_alerte="stock_superviseur", statut="ACTIVE").message
+        self.assertIn("reste 30", message)
+        self.assertIn("reçu le", message)
+        self.assertIn("4 j", message)
+
+    def test_evaluer_stock_ancien_agent_message_detaille(self):
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=5))
+        distribution = self._distribution(timezone.now() - timedelta(days=5))
+        DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=20)
+
+        AlerteMoteur.evaluer_stock_ancien()
+
+        message = Alerte.objects.get(type_alerte="stock_agent", statut="ACTIVE").message
+        self.assertIn("reste 20", message)
+        self.assertIn("reçu le", message)
+        self.assertIn("5 j", message)
+
+    def test_evaluer_stock_ancien_superviseur_renvoi_apres_48h(self):
+        # reenvoi_heures=48 (monitoring/constants.py) : l'alerte doit se
+        # renvoyer, la liste du stock dormant ne retombant jamais à zéro.
+        lot = self._lot(100, 30, timezone.now() - timedelta(days=1))
+        AffectationLotSuperviseur.objects.create(
+            lot=lot,
+            superviseur=self.superviseur,
+            quantite_initiale=30,
+            quantite_restante=30,
+            attribue_par=self.rot,
+            date_affectation=date.today() - timedelta(days=3),
+        )
+
+        AlerteMoteur.evaluer_stock_ancien()
+        alerte = Alerte.objects.get(type_alerte="stock_superviseur", statut="ACTIVE")
+        self.assertEqual(alerte.nombre_envois, 1)
+
+        # Toujours dans la fenêtre de 48 h → pas de renvoi.
+        Alerte.objects.filter(pk=alerte.pk).update(
+            date_dernier_envoi=timezone.now() - timedelta(hours=47)
+        )
+        AlerteMoteur.evaluer_stock_ancien()
+        alerte.refresh_from_db()
+        self.assertEqual(alerte.nombre_envois, 1)
+
+        # Au-delà de 48 h → renvoi.
+        Alerte.objects.filter(pk=alerte.pk).update(
+            date_dernier_envoi=timezone.now() - timedelta(hours=49)
+        )
+        AlerteMoteur.evaluer_stock_ancien()
+        alerte.refresh_from_db()
+        self.assertEqual(alerte.nombre_envois, 2)
+
     # -- Règle "prix" (ventes sous la marge minimale) ------------------------
 
     def test_evaluer_variation_prix_marge_sous_seuil_cree_alerte(self):

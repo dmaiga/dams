@@ -16,10 +16,17 @@ message par situation individuelle :
    **solde persistant** (`solde_persistant` — reste une alerte individuelle par superviseur, `critique`,
    anomalie après 3 cycles de remise consécutifs sans résorption — hors périmètre du regroupement).
 2. **Stock ancien**, trois messages distincts par origine :
-   - `stock_entrepot` — lots dormants à l'entrepôt central (> 15 jours).
+   - `stock_entrepot` — lots dormants à l'entrepôt central (> 15 jours). `reenvoi_heures=None`
+     (envoi unique ; l'entrepôt se vide/re-remplit, donc l'alerte se résout puis se recrée
+     naturellement).
    - `stock_superviseur` — stock en rétention chez un superviseur (> 3 jours), groupé par superviseur.
    - `stock_agent` — stock en rétention chez un agent de vente (> 3 jours), groupé par superviseur puis
      par agent.
+   - `stock_superviseur` / `stock_agent` : `reenvoi_heures=48` (depuis le 08/09/2026, sprint-12).
+     Ces deux listes ne retombent jamais à zéro, donc l'alerte ne se résout jamais — sans rappel,
+     un seul message était envoyé le jour de sa création puis plus rien. Chaque ligne produit est
+     rendue par le helper commun `moteur_alerte._ligne_stock` : `• {produit} — reste {quantité} —
+     reçu le {date} — {jours} j` (même niveau de détail que la commande `agents_stock_dormant`).
 3. **Ventes sous la marge minimale** (`prix` — vente comme référence, pas le lot, groupé par
    superviseur puis par agent ; marge < `surveillance.constants.SEUIL_MARGE_MINIMALE`, 45 FCFA).
 4. **Baisse d'activité commerciale** (`activite`) — dernière vente **valide et globale** de l'agent
