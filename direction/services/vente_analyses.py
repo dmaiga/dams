@@ -37,7 +37,7 @@ class VenteAnalyseService:
             qs = qs.filter(detail_distribution__lot_id=lot_id)
         if superviseur_id:
             qs = qs.filter(
-                agent__superviseur_id=superviseur_id
+                detail_distribution__distribution__superviseur_id=superviseur_id
             )
         return qs
 

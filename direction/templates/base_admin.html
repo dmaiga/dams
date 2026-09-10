@@ -121,7 +121,7 @@
                                 <li>
                                     <a href="{% url 'agent_dashboard' %}"
                                        class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
-                                              {% if 'agent' in request.resolver_match.url_name and request.resolver_match.namespace != 'bi' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                              {% if 'agent' in request.resolver_match.url_name and 'reaffectation' not in request.resolver_match.url_name and request.resolver_match.namespace != 'bi' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
                                         <i class="fas fa-user-tie text-sm w-4 text-center"></i>
                                         <span>Agents</span>
                                     </a>

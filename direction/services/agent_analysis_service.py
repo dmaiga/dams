@@ -445,7 +445,7 @@ class AgentAnalysisService:
     @staticmethod
     def get_superviseur_sales_kpis(superviseur, debut, fin):
         ventes = Vente.objects.filter(
-            agent__superviseur=superviseur,
+            detail_distribution__distribution__superviseur=superviseur,
             date_vente__date__range=(debut, fin),
             stagiaire__isnull=True,
             est_supprime=False

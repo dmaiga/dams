@@ -122,7 +122,7 @@ class SuperviseurAgentsService:
 
         # 1️⃣ CA agents (même logique que ToutesLesVentesView)
         ventes_agents = Vente.objects.filter(
-            agent__superviseur=superviseur,
+            detail_distribution__distribution__superviseur=superviseur,
             agent__type_agent__in=["terrain", "agent_gros"],
             date_vente__date__range=(debut, fin),
             est_supprime=False

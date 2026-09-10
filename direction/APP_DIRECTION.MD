@@ -193,6 +193,33 @@ chacune, sans jointure croisée Vente×Perte qui gonflerait les sommes) puis rec
 en Python : `_stock_ouvert_par_agent()` tourne en 3 requêtes quel que soit le nombre
 d'agents, la page complète en ~10.
 
+**Collision de menu (fix 2026-09-10)** : le lien « Agents » (`base_admin.html`) se
+surlignait aussi sur `reaffectation_agents` car son check `'agent' in url_name` matche
+n'importe quel nom d'URL contenant « agent ». Ajout de l'exclusion
+`'reaffectation' not in request.resolver_match.url_name`.
+
+**Fix historique superviseur des rapports de ventes (2026-09-10)** : `Agent.superviseur`
+étant un pointeur vivant écrasé par la réaffectation, les rapports qui filtraient les
+`Vente` via `agent__superviseur=...` réattribuaient rétroactivement les ventes passées
+d'un agent transféré à son nouveau superviseur (perte d'historique). Remplacé par
+`detail_distribution__distribution__superviseur=...`, qui s'appuie sur
+`DistributionAgent.superviseur` — déjà figé par distribution et non réécrit sauf pour
+le stock non soldé bascule lors d'un transfert (cf. choix métier ci-dessus). Fichiers
+touchés : `direction/services/vente_analyses.py` (`filter_ventes`),
+`direction/services/agent_analysis_service.py` (`get_superviseur_sales_kpis`),
+`direction/services/agent_supervisseur_detail_analyse.py` (`get_flux`, `ventes_agents`).
+`get_matrice_distribution` dans ce dernier fichier utilisait déjà le bon chemin —
+c'est cette incohérence dans un même fichier qui a signalé le bug.
+
+**Périmètre non couvert** : `SuperviseurAgentsService.get_agents_ventes` (même fichier)
+liste le portefeuille **actuel** du superviseur (`Agent.objects.filter(superviseur=...)`)
+puis somme les ventes par agent sans re-filtrer par superviseur — lecture différente
+(« mon équipe actuelle sur la période », pas « ce qui m'était attribué sur la période »),
+volontairement laissée telle quelle. Les usages de `agent__superviseur` dans
+`surveillance/services/*` (stock dormant, prix, etc.) n'ont pas été audités dans ce
+correctif — même risque potentiel, à vérifier si un rapport de surveillance doit rester
+exact après une réaffectation.
+
 ---
 
 ## 6. Pipelines d'Exportation Métier
