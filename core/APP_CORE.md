@@ -156,3 +156,21 @@ solde des superviseurs n'était donc jamais réduit par ce chemin, et le moteur 
 * Les écrans existants `finance.recouvrement_versement_groupe` (Direction) et
   `agents.recouvrer_superviseur` (ROT) restent inchangés, en parallèle (périmètre du sprint-07 limité
   au gestionnaire de stock).
+
+---
+
+## 10. Snapshot manuel de la hiérarchie superviseur (`snapshot_superviseurs`) — 2026-09-10
+
+**Contexte** : `Agent.superviseur` est un pointeur vivant, écrasé à chaque réaffectation — un rapport
+filtré sur une période passée perd donc la trace de « qui supervisait qui » à l'époque. Une refonte
+complète (historisation automatique via signal, réécriture de tous les points d'écriture, branchement
+des lectures `bi`/`surveillance`) a été ébauchée puis **abandonnée comme disproportionnée pour un
+hotfix** — cf. décision du 2026-09-10 : trop de surface touchée pour une valeur immédiate incertaine.
+
+**Choix retenu, minimal** : commande `python manage.py snapshot_superviseurs` (`core/management/
+commands/snapshot_superviseurs.py`) qui capture l'état courant `agent → superviseur` dans le modèle
+`SnapshotSuperviseurAgent` (agent, superviseur, date_snapshot). Pas de branchement automatique, pas
+de signal, pas de lecture dans les rapports — **volontairement pas exploité pour l'instant**. À lancer
+manuellement avant/après toute réaffectation dont on veut garder une trace ponctuelle. Quand le besoin
+de consultation deviendra prioritaire, prévoir un mouvement/table d'événements dédié plutôt qu'une
+réactivation de l'architecture signal abandonnée.

@@ -1642,6 +1642,42 @@ class JournalModificationDistribution(models.Model):
         verbose_name_plural = "Journal des modifications"
 
 
+class SnapshotSuperviseurAgent(models.Model):
+    """
+    Photo, à un instant donné, du lien ``Agent.superviseur`` — capturée
+    manuellement via ``python manage.py snapshot_superviseurs``.
+
+    Volontairement minimal : pas de signal, pas de branchement dans les
+    rapports (voir ``core/APP_CORE.md`` §10). Sert uniquement à garder une
+    trace ponctuelle avant/après une réaffectation, en attendant un chantier
+    d'historisation plus complet si le besoin devient prioritaire.
+    """
+
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        related_name='snapshots_superviseur',
+    )
+    superviseur = models.ForeignKey(
+        Agent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        limit_choices_to={'type_agent': 'entrepot'},
+        related_name='snapshots_agents_geres',
+    )
+    date_snapshot = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_snapshot']
+        verbose_name = "Snapshot superviseur d'un agent"
+        verbose_name_plural = "Snapshots superviseur des agents"
+
+    def __str__(self):
+        sup = self.superviseur.full_name if self.superviseur else "—"
+        return f"{self.agent.full_name} -> {sup} ({self.date_snapshot:%Y-%m-%d %H:%M})"
+
+
 class TransfertPortefeuilleAgent(models.Model):
     """
     En-tête d'un transfert d'un lot d'agents d'un superviseur vers un autre.
