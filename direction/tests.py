@@ -53,7 +53,9 @@ class CorrectionsAdministrativesAccessTests(TestCase):
 
     def _urls(self):
         return [
-            reverse('corrections_hub'),
+            reverse('liste_corrections_lots'),
+            reverse('liste_corrections_distributions'),
+            reverse('liste_corrections_ventes'),
             reverse('corriger_lot', args=[self.lot.id]),
             reverse('corriger_distribution', args=[self.detail.id]),
             reverse('corriger_vente', args=[self.vente.id]),
@@ -75,7 +77,7 @@ class CorrectionsAdministrativesAccessTests(TestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 302, url)
 
-    def test_mdmaiga_accede_aux_4_ecrans(self):
+    def test_mdmaiga_accede_aux_7_ecrans(self):
         self.client.login(username='mdmaiga', password='x')
         for url in self._urls():
             response = self.client.get(url)
@@ -113,16 +115,24 @@ class CorrectionsAdministrativesAccessTests(TestCase):
         self.assertEqual(CorrectionAdministrative.objects.count(), 0)
         self.assertFalse(response.context['form'].is_valid())
 
-    def test_hub_recherche_le_lot_par_produit(self):
+    def test_liste_lots_filtre_par_produit_et_periode(self):
         self.client.login(username='mdmaiga', password='x')
-        response = self.client.get(reverse('corrections_hub'), {'q_lot': 'tomate'})
+        response = self.client.get(reverse('liste_corrections_lots'), {'produit': self.lot.produit_id})
         self.assertEqual(response.status_code, 200)
-        self.assertIn(self.lot, response.context['lots'])
+        self.assertIn(self.lot, response.context['page_obj'])
 
-    def test_hub_sans_recherche_ne_renvoie_aucun_resultat(self):
+        response = self.client.get(reverse('liste_corrections_lots'), {'debut': '2099-01-01'})
+        self.assertNotIn(self.lot, response.context['page_obj'])
+
+    def test_liste_distributions_filtre_par_agent(self):
         self.client.login(username='mdmaiga', password='x')
-        response = self.client.get(reverse('corrections_hub'))
+        agent = self.detail.distribution.agent_terrain
+        response = self.client.get(reverse('liste_corrections_distributions'), {'agent': agent.id})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(list(response.context['lots']), [])
-        self.assertEqual(list(response.context['distributions']), [])
-        self.assertEqual(list(response.context['ventes']), [])
+        self.assertIn(self.detail, response.context['page_obj'])
+
+    def test_liste_ventes_filtre_par_agent(self):
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.get(reverse('liste_corrections_ventes'), {'agent': self.vente.agent_id})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.vente, response.context['page_obj'])

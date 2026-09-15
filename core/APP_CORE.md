@@ -188,9 +188,11 @@ après, pourquoi), et `JournalModificationDistribution` (§ ci-dessus, limité �
 sert de précédent à ne pas redupliquer deux fois de plus.
 
 Champs : `utilisateur` (FK `User`), `content_type`/`object_id`/`cible` (cible générique),
-`type_correction` (7 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `DISTRIBUTION_AGENT`,
-`DISTRIBUTION_SUPERVISEUR`, `DISTRIBUTION_QUANTITE`, `VENTE_PRIX_QUANTITE`), `motif` (obligatoire,
-non-nullable — toute correction doit être justifiée), `anciennes_valeurs`/`nouvelles_valeurs`
+`type_correction` (9 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `DISTRIBUTION_AGENT`,
+`DISTRIBUTION_SUPERVISEUR`, `DISTRIBUTION_QUANTITE`, `DISTRIBUTION_DATE`, `VENTE_PRIX_QUANTITE`,
+`VENTE_DATE` — les deux derniers ajoutés le 2026-09-15, migration `0123`, suite au constat que la
+date d'une distribution/vente est aussi une source d'erreur terrain récurrente), `motif`
+(obligatoire, non-nullable — toute correction doit être justifiée), `anciennes_valeurs`/`nouvelles_valeurs`
 (JSON), `date_action` (`auto_now_add`).
 
 Migration `core/migrations/0122_correction_administrative.py`. Accès aux vues de correction

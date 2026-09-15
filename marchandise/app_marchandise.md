@@ -175,6 +175,9 @@ Correction administrative d'une distribution déjà enregistrée (`DistributionA
 - **Quantité** : même cascade que `corriger_affectation` (delta vers `AffectationLotSuperviseur.
   quantite_initiale` et `LotEntrepot.quantite_restante`), refuse de descendre sous
   `quantite_vendue` déjà enregistrée.
+- **Date** (`date_distribution`, ajouté 2026-09-15) : seul le jour est corrigé, l'heure d'origine
+  est conservée (`datetime.combine(nouvelle_date, ancienne_datetime.time())`) — aucun impact sur
+  les quantités.
 
 **Limite connue, assumée** : le lien vers l'`AffectationLotSuperviseur` source n'est pas porté par
 une FK (même limite que `AffectationLotService._charger_distribution_directe`) — une correction de

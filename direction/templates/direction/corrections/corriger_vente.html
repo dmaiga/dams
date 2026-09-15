@@ -42,6 +42,11 @@
                 </div>
 
                 <div class="form-control">
+                    <label class="label"><span class="label-text text-xs">Date de la vente (actuelle : {{ vente.date_vente|date:"d/m/Y" }})</span></label>
+                    {{ form.date_vente }}
+                </div>
+
+                <div class="form-control">
                     <label class="label"><span class="label-text text-xs">Motif de la correction *</span></label>
                     {{ form.motif }}
                 </div>

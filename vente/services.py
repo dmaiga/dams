@@ -1,10 +1,12 @@
 """Services metier de l'application vente."""
 
+from datetime import date as date_type, datetime
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
+from django.utils import timezone
 
 from core.models import DetailDistribution, Recouvrement, Vente
 from core.services.corrections import enregistrer_correction
@@ -32,6 +34,7 @@ class CorrectionVenteService:
         *,
         prix_vente_unitaire=_NON_RENSEIGNE,
         quantite=_NON_RENSEIGNE,
+        date_vente=_NON_RENSEIGNE,
         motif,
         utilisateur,
     ):
@@ -40,6 +43,7 @@ class CorrectionVenteService:
 
         prix_vente_unitaire = cls._normaliser_montant(prix_vente_unitaire, "Le prix corrigé")
         quantite = cls._normaliser_montant(quantite, "La quantité corrigée")
+        date_vente = cls._normaliser_date(date_vente)
 
         with transaction.atomic():
             vente = Vente.objects.select_for_update().get(pk=vente_id, est_supprime=False)
@@ -55,6 +59,7 @@ class CorrectionVenteService:
 
             anciennes_valeurs = {}
             nouvelles_valeurs = {}
+            corrections_a_logger = []  # (type_correction, anciennes, nouvelles)
             ancienne_quantite = vente.quantite
             ancien_prix = vente.prix_vente_unitaire
 
@@ -91,26 +96,55 @@ class CorrectionVenteService:
                 anciennes_valeurs['prix_vente_unitaire'] = str(ancien_prix)
                 nouvelles_valeurs['prix_vente_unitaire'] = str(prix_vente_unitaire)
 
-            if not anciennes_valeurs:
+            if anciennes_valeurs:
+                corrections_a_logger.append(('VENTE_PRIX_QUANTITE', anciennes_valeurs, nouvelles_valeurs))
+
+            if date_vente is not _NON_RENSEIGNE and date_vente != vente.date_vente.date():
+                ancienne_date = vente.date_vente
+                # Seul le jour est corrige — l'heure d'origine est conservee
+                # (meme principe que VenteForm.save() a la creation).
+                nouvelle_date = datetime.combine(date_vente, ancienne_date.time())
+                if timezone.is_naive(nouvelle_date):
+                    nouvelle_date = timezone.make_aware(nouvelle_date)
+                vente.date_vente = nouvelle_date
+                corrections_a_logger.append((
+                    'VENTE_DATE',
+                    {'date_vente': ancienne_date.date().isoformat()},
+                    {'date_vente': date_vente.isoformat()},
+                ))
+
+            if not corrections_a_logger:
                 return vente
 
-            vente.save(update_fields=['quantite', 'prix_vente_unitaire'])
+            vente.save(update_fields=['quantite', 'prix_vente_unitaire', 'date_vente'])
 
-            recouvrement = Recouvrement.objects.select_for_update().filter(vente=vente).first()
-            if recouvrement is not None:
-                recouvrement.montant_recouvre = vente.total_vente
-                recouvrement.save(update_fields=['montant_recouvre'])
+            if anciennes_valeurs:
+                recouvrement = Recouvrement.objects.select_for_update().filter(vente=vente).first()
+                if recouvrement is not None:
+                    recouvrement.montant_recouvre = vente.total_vente
+                    recouvrement.save(update_fields=['montant_recouvre'])
 
-            enregistrer_correction(
-                cible=vente,
-                type_correction='VENTE_PRIX_QUANTITE',
-                motif=motif,
-                utilisateur=utilisateur,
-                anciennes_valeurs=anciennes_valeurs,
-                nouvelles_valeurs=nouvelles_valeurs,
-            )
+            for type_correction, anciennes, nouvelles in corrections_a_logger:
+                enregistrer_correction(
+                    cible=vente,
+                    type_correction=type_correction,
+                    motif=motif,
+                    utilisateur=utilisateur,
+                    anciennes_valeurs=anciennes,
+                    nouvelles_valeurs=nouvelles,
+                )
 
         return vente
+
+    @staticmethod
+    def _normaliser_date(valeur):
+        if valeur is _NON_RENSEIGNE:
+            return valeur
+        if isinstance(valeur, datetime):
+            return valeur.date()
+        if not isinstance(valeur, date_type):
+            raise ValidationError("La date de vente corrigée est invalide.")
+        return valeur
 
     @staticmethod
     def _normaliser_montant(valeur, libelle):

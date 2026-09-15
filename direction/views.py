@@ -1765,7 +1765,7 @@ def corriger_distribution(request, detail_distribution_id):
         form = CorrectionDistributionForm(request.POST)
         if form.is_valid():
             kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
-            for champ in ('agent_terrain', 'superviseur', 'quantite'):
+            for champ in ('agent_terrain', 'superviseur', 'quantite', 'date_distribution'):
                 if form.cleaned_data.get(champ) is not None:
                     kwargs[champ] = form.cleaned_data[champ]
             try:
@@ -1781,6 +1781,7 @@ def corriger_distribution(request, detail_distribution_id):
             'superviseur': distribution.superviseur_id,
             'agent_terrain': distribution.agent_terrain_id,
             'quantite': detail.quantite,
+            'date_distribution': distribution.date_distribution.date(),
         })
         # Le champ agent_terrain est vide par défaut (pattern AJAX, cf.
         # marchandise.AffectationSuperviseurForm) sauf ici : on préremplit
@@ -1811,7 +1812,7 @@ def corriger_vente(request, vente_id):
         form = CorrectionVenteForm(request.POST)
         if form.is_valid():
             kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
-            for champ in ('prix_vente_unitaire', 'quantite'):
+            for champ in ('prix_vente_unitaire', 'quantite', 'date_vente'):
                 if form.cleaned_data.get(champ) is not None:
                     kwargs[champ] = form.cleaned_data[champ]
             try:
@@ -1826,6 +1827,7 @@ def corriger_vente(request, vente_id):
         form = CorrectionVenteForm(initial={
             'prix_vente_unitaire': vente.prix_vente_unitaire,
             'quantite': vente.quantite,
+            'date_vente': vente.date_vente.date(),
         })
 
     return render(request, 'direction/corrections/corriger_vente.html', {
@@ -1834,70 +1836,124 @@ def corriger_vente(request, vente_id):
     })
 
 
+def _periode_filtree(request):
+    """Lit `debut`/`fin` (GET, `<input type="date">`) — bornes incluses, aucune
+    par défaut (liste vide tant qu'aucun filtre n'est posé, cf. vues ci-dessous).
+    """
+    debut = request.GET.get('debut') or None
+    fin = request.GET.get('fin') or None
+    return debut, fin
+
+
 @login_required
 @user_passes_test(_acces_admin_mdmaiga)
-def corrections_hub(request):
-    """Point d'entrée unique des corrections administratives : recherche un
-    lot / une distribution / une vente à corriger sans passer par le Django
-    admin ni par les écrans opérationnels d'autres apps.
+def liste_corrections_lots(request):
+    """Liste des lots filtrable par produit et période de réception, point
+    d'entrée de la correction de lot — remplace le passage par le Django admin.
     """
-    from django.db.models import Q
+    produit_id = request.GET.get('produit')
+    debut, fin = _periode_filtree(request)
 
-    q_lot = request.GET.get('q_lot', '').strip()
-    q_distribution = request.GET.get('q_distribution', '').strip()
-    q_vente = request.GET.get('q_vente', '').strip()
+    lots = LotEntrepot.objects.select_related('produit', 'fournisseur', 'receptionne_par')
+    if produit_id:
+        lots = lots.filter(produit_id=produit_id)
+    if debut:
+        lots = lots.filter(date_reception__date__gte=debut)
+    if fin:
+        lots = lots.filter(date_reception__date__lte=fin)
+    lots = lots.order_by('-date_reception')
 
-    lots = LotEntrepot.objects.none()
-    if q_lot:
-        lots = (
-            LotEntrepot.objects.filter(
-                Q(produit__nom__icontains=q_lot) | Q(reference_lot__icontains=q_lot)
-            )
-            .select_related('produit', 'fournisseur')
-            .order_by('-date_reception')[:20]
-        )
+    paginator = Paginator(lots, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
-    distributions = DetailDistribution.objects.none()
-    if q_distribution:
-        distributions = (
-            DetailDistribution.objects.filter(
-                Q(lot__produit__nom__icontains=q_distribution)
-                | Q(distribution__agent_terrain__user__first_name__icontains=q_distribution)
-                | Q(distribution__agent_terrain__user__last_name__icontains=q_distribution)
-                | Q(distribution__agent_terrain__user__username__icontains=q_distribution)
-                | Q(distribution__superviseur__user__first_name__icontains=q_distribution)
-                | Q(distribution__superviseur__user__last_name__icontains=q_distribution)
-                | Q(distribution__superviseur__user__username__icontains=q_distribution)
-            )
-            .select_related(
-                'lot__produit',
-                'distribution__agent_terrain__user',
-                'distribution__superviseur__user',
-            )
-            .order_by('-distribution__date_distribution')[:20]
-        )
+    return render(request, 'direction/corrections/liste_lots.html', {
+        'page_obj': page_obj,
+        'produits': Produit.objects.order_by('nom'),
+        'produit_id': produit_id,
+        'debut': debut,
+        'fin': fin,
+    })
 
-    ventes = Vente.objects.none()
-    if q_vente:
-        ventes = (
-            Vente.objects.filter(
-                Q(detail_distribution__lot__produit__nom__icontains=q_vente)
-                | Q(agent__user__first_name__icontains=q_vente)
-                | Q(agent__user__last_name__icontains=q_vente)
-                | Q(agent__user__username__icontains=q_vente),
-                est_supprime=False,
-            )
-            .select_related('agent__user', 'detail_distribution__lot__produit')
-            .order_by('-date_vente')[:20]
-        )
 
-    return render(request, 'direction/corrections/hub.html', {
-        'q_lot': q_lot,
-        'q_distribution': q_distribution,
-        'q_vente': q_vente,
-        'lots': lots,
-        'distributions': distributions,
-        'ventes': ventes,
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def liste_corrections_distributions(request):
+    """Liste des distributions filtrable par agent, superviseur, produit et
+    période — point d'entrée de la correction de distribution."""
+    agent_id = request.GET.get('agent')
+    superviseur_id = request.GET.get('superviseur')
+    produit_id = request.GET.get('produit')
+    debut, fin = _periode_filtree(request)
+
+    details = DetailDistribution.objects.select_related(
+        'lot__produit', 'distribution__agent_terrain__user', 'distribution__superviseur__user'
+    )
+    if agent_id:
+        details = details.filter(distribution__agent_terrain_id=agent_id)
+    if superviseur_id:
+        details = details.filter(distribution__superviseur_id=superviseur_id)
+    if produit_id:
+        details = details.filter(lot__produit_id=produit_id)
+    if debut:
+        details = details.filter(distribution__date_distribution__date__gte=debut)
+    if fin:
+        details = details.filter(distribution__date_distribution__date__lte=fin)
+    details = details.order_by('-distribution__date_distribution')
+
+    paginator = Paginator(details, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'direction/corrections/liste_distributions.html', {
+        'page_obj': page_obj,
+        'agents': Agent.objects.filter(
+            type_agent__in=('terrain', 'agent_gros', 'agent_polivalent', 'stagiaire')
+        ).select_related('user').order_by('user__first_name', 'user__username'),
+        'superviseurs': Agent.objects.filter(type_agent='entrepot')
+            .select_related('user').order_by('user__first_name', 'user__username'),
+        'produits': Produit.objects.order_by('nom'),
+        'agent_id': agent_id,
+        'superviseur_id': superviseur_id,
+        'produit_id': produit_id,
+        'debut': debut,
+        'fin': fin,
+    })
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def liste_corrections_ventes(request):
+    """Liste des ventes filtrable par agent, produit et période — point
+    d'entrée de la correction de vente."""
+    agent_id = request.GET.get('agent')
+    produit_id = request.GET.get('produit')
+    debut, fin = _periode_filtree(request)
+
+    ventes = Vente.objects.filter(est_supprime=False).select_related(
+        'agent__user', 'detail_distribution__lot__produit'
+    )
+    if agent_id:
+        ventes = ventes.filter(agent_id=agent_id)
+    if produit_id:
+        ventes = ventes.filter(detail_distribution__lot__produit_id=produit_id)
+    if debut:
+        ventes = ventes.filter(date_vente__date__gte=debut)
+    if fin:
+        ventes = ventes.filter(date_vente__date__lte=fin)
+    ventes = ventes.order_by('-date_vente')
+
+    paginator = Paginator(ventes, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'direction/corrections/liste_ventes.html', {
+        'page_obj': page_obj,
+        'agents': Agent.objects.filter(
+            type_agent__in=('terrain', 'agent_gros', 'agent_polivalent', 'stagiaire')
+        ).select_related('user').order_by('user__first_name', 'user__username'),
+        'produits': Produit.objects.order_by('nom'),
+        'agent_id': agent_id,
+        'produit_id': produit_id,
+        'debut': debut,
+        'fin': fin,
     })
 
 

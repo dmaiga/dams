@@ -373,3 +373,21 @@ class CorrectionDistributionServiceTests(TestCase):
                 motif='',
                 utilisateur=self.utilisateur,
             )
+
+    def test_corrige_date_conserve_heure_et_journalise(self):
+        ancienne_date = self.distribution.date_distribution
+        nouvelle_date = date(2026, 5, 1)
+
+        CorrectionDistributionService.corriger_distribution(
+            self.detail.id,
+            date_distribution=nouvelle_date,
+            motif='Date de distribution erronée',
+            utilisateur=self.utilisateur,
+        )
+        self.distribution.refresh_from_db()
+
+        self.assertEqual(self.distribution.date_distribution.date(), nouvelle_date)
+        self.assertEqual(self.distribution.date_distribution.time(), ancienne_date.time())
+
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_DATE')

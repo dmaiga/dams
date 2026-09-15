@@ -237,6 +237,11 @@ class CorrectionDistributionForm(forms.Form):
         required=False,
         widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
     )
+    date_distribution = forms.DateField(
+        label="Date de la distribution",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': _INPUT_CLASS}),
+        required=False,
+    )
     motif = forms.CharField(
         label="Motif de la correction",
         widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
@@ -261,16 +266,16 @@ class CorrectionDistributionForm(forms.Form):
         cleaned = super().clean()
         if not any(
             cleaned.get(champ) is not None
-            for champ in ('superviseur', 'agent_terrain', 'quantite')
+            for champ in ('superviseur', 'agent_terrain', 'quantite', 'date_distribution')
         ):
             raise ValidationError(
-                "Indiquez au moins un agent, un superviseur ou une quantité corrigés."
+                "Indiquez au moins un agent, un superviseur, une quantité ou une date corrigés."
             )
         return cleaned
 
 
 class CorrectionVenteForm(forms.Form):
-    """Correction d'une Vente déjà enregistrée — prix et/ou quantité."""
+    """Correction d'une Vente déjà enregistrée — prix, quantité et/ou date."""
 
     prix_vente_unitaire = forms.DecimalField(
         label="Prix de vente unitaire",
@@ -286,6 +291,11 @@ class CorrectionVenteForm(forms.Form):
         required=False,
         widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
     )
+    date_vente = forms.DateField(
+        label="Date de la vente",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': _INPUT_CLASS}),
+        required=False,
+    )
     motif = forms.CharField(
         label="Motif de la correction",
         widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
@@ -293,7 +303,10 @@ class CorrectionVenteForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        if not cleaned.get('prix_vente_unitaire') and not cleaned.get('quantite'):
-            raise ValidationError("Indiquez au moins un prix ou une quantité corrigés.")
+        if not any(
+            cleaned.get(champ) is not None
+            for champ in ('prix_vente_unitaire', 'quantite', 'date_vente')
+        ):
+            raise ValidationError("Indiquez au moins un prix, une quantité ou une date corrigés.")
 
         return cleaned

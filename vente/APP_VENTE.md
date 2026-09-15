@@ -120,7 +120,11 @@ et prix au kilo (produit vrac), ex. 800 FCFA saisi au lieu de 20 000 FCFA pour u
   dynamiquement (jamais stocké), corriger `Recouvrement.montant_recouvre` suffit à tout
   resynchroniser sans code supplémentaire. Voir mémoire projet
   `project_reconciliation_recouvrement_terrain`.
-- Une ligne `CorrectionAdministrative` (`type_correction='VENTE_PRIX_QUANTITE'`) par correction,
+- **Date** (`date_vente`, ajouté 2026-09-15) : seul le jour est corrigé, l'heure d'origine est
+  conservée (même principe que `VenteForm.save()` à la création) — journalisée séparément
+  (`type_correction='VENTE_DATE'`), sans cascade sur `Recouvrement`.
+- Une ligne `CorrectionAdministrative` par correction effectivement appliquée
+  (`type_correction='VENTE_PRIX_QUANTITE'` pour prix/quantité, `'VENTE_DATE'` pour la date),
   `motif` obligatoire. Accès réservé à `direction.views._acces_admin_mdmaiga`.
 
 ---

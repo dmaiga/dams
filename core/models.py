@@ -1662,7 +1662,9 @@ class CorrectionAdministrative(models.Model):
         ('DISTRIBUTION_AGENT', "Agent destinataire de la distribution"),
         ('DISTRIBUTION_SUPERVISEUR', "Superviseur de la distribution"),
         ('DISTRIBUTION_QUANTITE', "Quantité distribuée"),
+        ('DISTRIBUTION_DATE', "Date de la distribution"),
         ('VENTE_PRIX_QUANTITE', "Prix et/ou quantité de la vente"),
+        ('VENTE_DATE', "Date de la vente"),
     )
 
     utilisateur = models.ForeignKey(User, on_delete=models.PROTECT)

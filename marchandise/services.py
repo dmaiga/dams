@@ -415,6 +415,7 @@ class CorrectionDistributionService:
         agent_terrain=_NON_RENSEIGNE,
         superviseur=_NON_RENSEIGNE,
         quantite=_NON_RENSEIGNE,
+        date_distribution=_NON_RENSEIGNE,
         motif,
         utilisateur,
     ):
@@ -422,6 +423,7 @@ class CorrectionDistributionService:
             raise ValidationError("Un motif est obligatoire pour toute correction.")
 
         quantite = AffectationLotService._normaliser_quantite(quantite)
+        date_distribution = AffectationLotService._normaliser_date(date_distribution)
 
         with transaction.atomic():
             detail = DetailDistribution.objects.select_for_update().get(
@@ -465,7 +467,28 @@ class CorrectionDistributionService:
                     {'superviseur_id': superviseur.id, 'superviseur': superviseur.full_name},
                 ))
 
-            if any(t in ('DISTRIBUTION_AGENT', 'DISTRIBUTION_SUPERVISEUR') for t, _, _ in corrections_a_logger):
+            if (
+                date_distribution is not _NON_RENSEIGNE
+                and date_distribution != distribution.date_distribution.date()
+            ):
+                ancienne_date = distribution.date_distribution
+                # Seul le jour est corrige — l'heure d'origine est conservee
+                # (meme principe que VenteForm : le geste metier porte sur le
+                # jour, pas sur l'heure de saisie).
+                nouvelle_date = datetime.combine(date_distribution, ancienne_date.time())
+                if timezone.is_naive(nouvelle_date):
+                    nouvelle_date = timezone.make_aware(nouvelle_date)
+                distribution.date_distribution = nouvelle_date
+                corrections_a_logger.append((
+                    'DISTRIBUTION_DATE',
+                    {'date_distribution': ancienne_date.date().isoformat()},
+                    {'date_distribution': date_distribution.isoformat()},
+                ))
+
+            if any(
+                t in ('DISTRIBUTION_AGENT', 'DISTRIBUTION_SUPERVISEUR', 'DISTRIBUTION_DATE')
+                for t, _, _ in corrections_a_logger
+            ):
                 distribution.save()
 
             if quantite is not _NON_RENSEIGNE and quantite != detail.quantite:

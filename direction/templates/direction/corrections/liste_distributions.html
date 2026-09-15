@@ -1,0 +1,90 @@
+{% extends "base_admin.html" %}
+{% block title %}Corriger une distribution{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto py-8 px-4 space-y-6">
+
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Distributions</h1>
+            <p class="text-sm text-slate-500 mt-1">Filtrer par agent, superviseur, produit et période, puis corriger.</p>
+        </div>
+        <a href="{% url 'historique_corrections' %}" class="btn btn-sm btn-ghost text-slate-600">
+            <i class="fas fa-clock-rotate-left mr-1"></i> Historique
+        </a>
+    </div>
+
+    <form method="get" class="flex flex-wrap items-end gap-3">
+        <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Agent</span></label>
+            <select name="agent" class="select select-bordered select-sm min-w-48">
+                <option value="">Tous</option>
+                {% for a in agents %}
+                <option value="{{ a.id }}" {% if agent_id == a.id|stringformat:"s" %}selected{% endif %}>{{ a.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Superviseur</span></label>
+            <select name="superviseur" class="select select-bordered select-sm min-w-48">
+                <option value="">Tous</option>
+                {% for s in superviseurs %}
+                <option value="{{ s.id }}" {% if superviseur_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Produit</span></label>
+            <select name="produit" class="select select-bordered select-sm min-w-40">
+                <option value="">Tous</option>
+                {% for p in produits %}
+                <option value="{{ p.id }}" {% if produit_id == p.id|stringformat:"s" %}selected{% endif %}>{{ p.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Distribué depuis le</span></label>
+            <input type="date" name="debut" value="{{ debut|default:'' }}" class="input input-bordered input-sm">
+        </div>
+        <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Jusqu'au</span></label>
+            <input type="date" name="fin" value="{{ fin|default:'' }}" class="input input-bordered input-sm">
+        </div>
+        <button type="submit" class="btn btn-sm btn-primary">Filtrer</button>
+        {% if agent_id or superviseur_id or produit_id or debut or fin %}
+        <a href="{% url 'liste_corrections_distributions' %}" class="btn btn-sm btn-ghost">Réinitialiser</a>
+        {% endif %}
+    </form>
+
+    <div class="overflow-x-auto">
+        <table class="table w-full border-separate border-spacing-y-2">
+            <thead>
+                <tr class="text-gray-500 uppercase text-[10px] tracking-widest">
+                    <th class="bg-transparent text-left">Produit</th>
+                    <th class="bg-transparent text-left">Superviseur → Agent</th>
+                    <th class="bg-transparent text-left">Date</th>
+                    <th class="bg-transparent text-right">Qté distribuée</th>
+                    <th class="bg-transparent text-right pr-4"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in page_obj %}
+                <tr class="shadow-sm border border-slate-100">
+                    <td class="text-sm font-medium">{{ d.lot.produit.nom }}</td>
+                    <td class="text-sm">{{ d.distribution.superviseur.full_name }} → {{ d.distribution.agent_terrain.full_name|default:"—" }}</td>
+                    <td class="text-sm">{{ d.distribution.date_distribution|date:"d/m/Y" }}</td>
+                    <td class="text-sm text-right">{{ d.quantite }}</td>
+                    <td class="text-right pr-4">
+                        <a href="{% url 'corriger_distribution' d.id %}" class="btn btn-xs btn-outline">Corriger</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-16 bg-slate-50 rounded-xl text-slate-400 italic">Aucune distribution pour ces filtres.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "direction/corrections/_pagination.html" %}
+</div>
+{% endblock %}

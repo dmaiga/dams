@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -106,3 +107,21 @@ class CorrectionVenteServiceTests(TestCase):
                 motif='',
                 utilisateur=self.utilisateur,
             )
+
+    def test_corrige_date_conserve_heure_et_journalise(self):
+        ancienne_date = self.vente.date_vente
+        nouvelle_date = date(2026, 5, 1)
+
+        CorrectionVenteService.corriger_vente(
+            self.vente.id,
+            date_vente=nouvelle_date,
+            motif='Date de vente erronée',
+            utilisateur=self.utilisateur,
+        )
+        self.vente.refresh_from_db()
+
+        self.assertEqual(self.vente.date_vente.date(), nouvelle_date)
+        self.assertEqual(self.vente.date_vente.time(), ancienne_date.time())
+
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'VENTE_DATE')

@@ -278,11 +278,35 @@
                                     </a>
                                 </li>
                                 <li>
-                                    <a href="{% url 'corrections_hub' %}"
+                                    <a href="{% url 'liste_corrections_lots' %}"
                                        class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
-                                              {% if request.resolver_match.url_name == 'corrections_hub' or request.resolver_match.url_name == 'corriger_lot' or request.resolver_match.url_name == 'corriger_distribution' or request.resolver_match.url_name == 'corriger_vente' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
-                                        <i class="fas fa-wrench text-sm w-4 text-center"></i>
-                                        <span>Corrections administratives</span>
+                                              {% if request.resolver_match.url_name == 'liste_corrections_lots' or request.resolver_match.url_name == 'corriger_lot' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                        <i class="fas fa-boxes-stacked text-sm w-4 text-center"></i>
+                                        <span>Corriger un lot</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'liste_corrections_distributions' %}"
+                                       class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
+                                              {% if request.resolver_match.url_name == 'liste_corrections_distributions' or request.resolver_match.url_name == 'corriger_distribution' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                        <i class="fas fa-truck-ramp-box text-sm w-4 text-center"></i>
+                                        <span>Corriger une distribution</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'liste_corrections_ventes' %}"
+                                       class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
+                                              {% if request.resolver_match.url_name == 'liste_corrections_ventes' or request.resolver_match.url_name == 'corriger_vente' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                        <i class="fas fa-cash-register text-sm w-4 text-center"></i>
+                                        <span>Corriger une vente</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'historique_corrections' %}"
+                                       class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
+                                              {% if request.resolver_match.url_name == 'historique_corrections' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                        <i class="fas fa-clock-rotate-left text-sm w-4 text-center"></i>
+                                        <span>Historique des corrections</span>
                                     </a>
                                 </li>
                             </ul>

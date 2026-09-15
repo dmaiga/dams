@@ -223,22 +223,33 @@ superviseur mal identifié en distribution, confusion prix au sac / prix au kilo
 vente) — sans aucune trace (qui, quand, avant/après, motif). Ce sprint déplace ces
 corrections dans l'application, avec effet domino correct et audit obligatoire.
 
-**5 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
-menu) :
+**7 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
+menu — 4 entrées directes : Corriger un lot / une distribution / une vente,
+Historique) :
 
 | Vue | URL | Rôle |
 |---|---|---|
-| `corrections_hub` | `direction/corrections/` | **Point d'entrée** — 3 recherches (produit/référence, agent/superviseur/produit, agent/produit) menant directement au formulaire de correction, sans passer par le Django admin ni par les écrans opérationnels d'autres apps. |
+| `liste_corrections_lots` | `direction/corrections/lots/` | Liste des lots, filtrable par **produit** et **période de réception** (`debut`/`fin`), paginée 30/page — point d'entrée de la correction de lot. |
+| `liste_corrections_distributions` | `direction/corrections/distributions/` | Liste des distributions, filtrable par **agent**, **superviseur**, **produit** et **période de distribution** — point d'entrée de la correction de distribution. |
+| `liste_corrections_ventes` | `direction/corrections/ventes/` | Liste des ventes, filtrable par **agent**, **produit** et **période de vente** — point d'entrée de la correction de vente. |
 | `corriger_lot` | `direction/corrections/lot/<lot_id>/` | Appelle `marchandise.services.CorrectionLotService.corriger_lot` |
 | `corriger_distribution` | `direction/corrections/distribution/<detail_distribution_id>/` | Appelle `marchandise.services.CorrectionDistributionService.corriger_distribution` |
 | `corriger_vente` | `direction/corrections/vente/<vente_id>/` | Appelle `vente.services.CorrectionVenteService.corriger_vente` |
 | `historique_corrections` | `direction/corrections/historique/` | Lecture de `CorrectionAdministrative` (filtrable par type, paginée 30/page) |
 
-Le lien de menu « Corrections administratives » pointe vers `corrections_hub` (ajouté
-2026-09-15, suite au besoin exprimé par mdmaiga de ne plus passer par le Django
-admin pour déclencher une correction) ; `historique_corrections` reste accessible
-depuis un lien dédié en haut du hub, sur le même modèle que
-« Historique » sur l'écran de réaffectation.
+**Révision du 2026-09-15 (même jour)** : une première version regroupait les 3
+recherches sur un seul écran « hub » (`corrections_hub`) — remplacée à la demande de
+mdmaiga par 3 entrées de menu séparées, chacune ouvrant directement une **liste**
+filtrable par **agent et période** (pas une recherche texte libre), avec le produit en
+filtre secondaire. `corrections_hub`/`hub.html` ont été supprimés, pas seulement
+masqués.
+
+**Correction de date ajoutée** (même révision) : la date manquait aux formulaires de
+distribution et de vente alors que ce sont des erreurs réelles remontées par mdmaiga.
+`CorrectionDistributionForm`/`CorrectionVenteForm` portent désormais `date_distribution`/
+`date_vente` (seul le jour est corrigé, l'heure d'origine est conservée — même
+principe que `VenteForm.save()` à la création). Deux nouveaux types d'audit :
+`DISTRIBUTION_DATE`, `VENTE_DATE` (migration `0123`).
 
 **Formulaires** (`direction/forms.py`) : `CorrectionLotForm`, `CorrectionDistributionForm`,
 `CorrectionVenteForm` — tous avec `motif` obligatoire (`clean()` exige qu'au moins un
@@ -247,10 +258,10 @@ par le service en erreur de formulaire (`form.add_error(None, ...)`) plutôt que
 laisser remonter une 500.
 
 **Points d'entrée secondaires depuis l'existant** (liens « Corriger », visibles
-uniquement pour `mdmaiga`, en plus du hub) : fiche lot (`marchandise/detail_lot.html`),
-tableau « Suivi des distributions » (`direction/analyses/stock/suivi_distributions.html`,
-un lien par ligne), liste des ventes
-(`direction/analyses/ventes/liste_ventes_admin.html`, un lien par ligne).
+uniquement pour `mdmaiga`, en plus des 3 listes dédiées) : fiche lot
+(`marchandise/detail_lot.html`), tableau « Suivi des distributions »
+(`direction/analyses/stock/suivi_distributions.html`, un lien par ligne), liste des
+ventes (`direction/analyses/ventes/liste_ventes_admin.html`, un lien par ligne).
 
 **Journal générique** : `CorrectionAdministrative` (`core/models.py`, voir
 `core/APP_CORE.md` § 11) — une ligne par champ effectivement modifié, jamais une

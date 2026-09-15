@@ -45,9 +45,15 @@
                     </div>
                 </div>
 
-                <div class="form-control">
-                    <label class="label"><span class="label-text text-xs">Quantité distribuée (actuelle : {{ detail.quantite }})</span></label>
-                    {{ form.quantite }}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Quantité distribuée (actuelle : {{ detail.quantite }})</span></label>
+                        {{ form.quantite }}
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Date de la distribution (actuelle : {{ distribution.date_distribution|date:"d/m/Y" }})</span></label>
+                        {{ form.date_distribution }}
+                    </div>
                 </div>
 
                 <div class="form-control">
