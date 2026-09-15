@@ -151,9 +151,11 @@ Cette vue surveille de manière exclusive l'activité de versement du Responsabl
 
 Vue `reaffectation_agents` (+ `historique_reaffectation`), URLs
 `direction/agents/reaffectation/` et `.../historique/`. Entrée de menu dans
-`base_admin.html` (section RÉFÉRENTIELS, sous « Agents »), **visible et accessible
-uniquement pour `request.user.username == "mdmaiga"`** (`_acces_reaffectation`,
-`@user_passes_test`).
+`base_admin.html`, section **ADMIN** dédiée (déplacée depuis RÉFÉRENTIELS le
+2026-09-15, sprint-13), **visible et accessible uniquement pour
+`request.user.username == "mdmaiga"`** (`_acces_admin_mdmaiga`, `@user_passes_test`
+— garde partagée avec les corrections administratives, voir § Corrections
+administratives ci-dessous et `docs/sprints/sprint-13.md`).
 
 **Besoin** : un superviseur quitte l'équipe / un nouveau arrive → déplacer le
 portefeuille d'agents d'un superviseur vers un autre sans passer par une commande
@@ -210,6 +212,54 @@ touchés : `direction/services/vente_analyses.py` (`filter_ventes`),
 `direction/services/agent_supervisseur_detail_analyse.py` (`get_flux`, `ventes_agents`).
 `get_matrice_distribution` dans ce dernier fichier utilisait déjà le bon chemin —
 c'est cette incohérence dans un même fichier qui a signalé le bug.
+
+---
+
+## 6ter. Corrections administratives auditées — sprint-13, 2026-09-15
+
+**Besoin** : mdmaiga corrigeait jusqu'ici, via le Django admin, des erreurs de saisie
+remontées par le terrain (quantité/prix erroné à la réception d'un lot, agent ou
+superviseur mal identifié en distribution, confusion prix au sac / prix au kilo à la
+vente) — sans aucune trace (qui, quand, avant/après, motif). Ce sprint déplace ces
+corrections dans l'application, avec effet domino correct et audit obligatoire.
+
+**4 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
+menu) :
+
+| Vue | URL | Service appelé |
+|---|---|---|
+| `corriger_lot` | `direction/corrections/lot/<lot_id>/` | `marchandise.services.CorrectionLotService.corriger_lot` |
+| `corriger_distribution` | `direction/corrections/distribution/<detail_distribution_id>/` | `marchandise.services.CorrectionDistributionService.corriger_distribution` |
+| `corriger_vente` | `direction/corrections/vente/<vente_id>/` | `vente.services.CorrectionVenteService.corriger_vente` |
+| `historique_corrections` | `direction/corrections/historique/` | lecture de `CorrectionAdministrative` (filtrable par type, paginée 30/page) |
+
+**Formulaires** (`direction/forms.py`) : `CorrectionLotForm`, `CorrectionDistributionForm`,
+`CorrectionVenteForm` — tous avec `motif` obligatoire (`clean()` exige qu'au moins un
+champ métier soit renseigné en plus). Les vues traduisent une `ValidationError` levée
+par le service en erreur de formulaire (`form.add_error(None, ...)`) plutôt que de
+laisser remonter une 500.
+
+**Points d'entrée depuis l'existant** (liens « Corriger », visibles uniquement pour
+`mdmaiga`) : fiche lot (`marchandise/detail_lot.html`), tableau « Suivi des
+distributions » (`direction/analyses/stock/suivi_distributions.html`, un lien par
+ligne), liste des ventes (`direction/analyses/ventes/liste_ventes_admin.html`, un
+lien par ligne).
+
+**Journal générique** : `CorrectionAdministrative` (`core/models.py`, voir
+`core/APP_CORE.md` § 11) — une ligne par champ effectivement modifié, jamais une
+ligne "vide" si rien n'a changé. Voir `marchandise/APP_MARCHANDISE.md` et
+`vente/APP_VENTE.md` pour le détail des cascades par service.
+
+**Limite assumée** (`CorrectionDistributionService`) : le lien vers l'affectation
+source n'existe pas comme FK explicite — une correction de quantité de distribution
+n'est cascadée vers le stock (`AffectationLotSuperviseur`/`LotEntrepot`) que si cette
+source peut être identifiée sans ambiguïté ; sinon seule la distribution est corrigée
+(pas de correction silencieuse et potentiellement fausse du stock central).
+
+**Tests** : `marchandise/tests.py` (`CorrectionLotServiceTests`,
+`CorrectionDistributionServiceTests`), `vente/tests.py`
+(`CorrectionVenteServiceTests`), `direction/tests.py`
+(`CorrectionsAdministrativesAccessTests` — accès, audit, motif obligatoire).
 
 **Périmètre non couvert** : `SuperviseurAgentsService.get_agents_ventes` (même fichier)
 liste le portefeuille **actuel** du superviseur (`Agent.objects.filter(superviseur=...)`)

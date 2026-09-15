@@ -158,3 +158,142 @@ class ReaffectationAgentsForm(forms.Form):
                 )
 
         return cleaned
+
+
+# ============================================================================
+# CORRECTIONS ADMINISTRATIVES (sprint-13, accès restreint : mdmaiga)
+# ============================================================================
+
+
+_INPUT_CLASS = 'input input-bordered input-sm w-full'
+_SELECT_CLASS = 'select select-bordered select-sm w-full'
+_TEXTAREA_CLASS = 'textarea textarea-bordered textarea-sm w-full'
+
+
+class CorrectionLotForm(forms.Form):
+    """Correction d'un LotEntrepot à la réception — quantité, prix, date."""
+
+    quantite_initiale = forms.DecimalField(
+        label="Quantité initiale",
+        min_value=0.01,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
+    )
+    prix_achat_unitaire = forms.DecimalField(
+        label="Prix d'achat unitaire",
+        min_value=0.01,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
+    )
+    date_reception = forms.DateField(
+        label="Date de réception",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': _INPUT_CLASS}),
+        required=False,
+    )
+    motif = forms.CharField(
+        label="Motif de la correction",
+        widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if not any(
+            cleaned.get(champ) is not None
+            for champ in ('quantite_initiale', 'prix_achat_unitaire', 'date_reception')
+        ):
+            raise ValidationError(
+                "Indiquez au moins une quantité, un prix ou une date corrigés."
+            )
+        return cleaned
+
+
+class CorrectionDistributionForm(forms.Form):
+    """Correction d'une distribution déjà enregistrée — agent, superviseur,
+    quantité. Même pattern AJAX que ``marchandise.AffectationSuperviseurForm`` :
+    ``agent_terrain`` est vide au GET, peuplé par changement de superviseur
+    côté client, puis filtré sur l'ID soumis en POST pour valider sans bloquer.
+    """
+
+    superviseur = forms.ModelChoiceField(
+        queryset=None,
+        label="Superviseur",
+        required=False,
+        empty_label="(inchangé)",
+        widget=forms.Select(attrs={'class': _SELECT_CLASS}),
+    )
+    agent_terrain = forms.ModelChoiceField(
+        queryset=None,
+        label="Agent destinataire",
+        required=False,
+        empty_label="(inchangé)",
+        widget=forms.Select(attrs={'class': _SELECT_CLASS}),
+    )
+    quantite = forms.DecimalField(
+        label="Quantité distribuée",
+        min_value=0.01,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
+    )
+    motif = forms.CharField(
+        label="Motif de la correction",
+        widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        from core.models import Agent
+
+        self.fields['superviseur'].queryset = Agent.objects.filter(
+            type_agent='entrepot'
+        ).select_related('user').order_by('user__first_name', 'user__username')
+
+        agent_id = self.data.get('agent_terrain') if self.is_bound else None
+        if agent_id:
+            self.fields['agent_terrain'].queryset = Agent.objects.filter(pk=agent_id)
+        else:
+            self.fields['agent_terrain'].queryset = Agent.objects.none()
+
+    def clean(self):
+        cleaned = super().clean()
+        if not any(
+            cleaned.get(champ) is not None
+            for champ in ('superviseur', 'agent_terrain', 'quantite')
+        ):
+            raise ValidationError(
+                "Indiquez au moins un agent, un superviseur ou une quantité corrigés."
+            )
+        return cleaned
+
+
+class CorrectionVenteForm(forms.Form):
+    """Correction d'une Vente déjà enregistrée — prix et/ou quantité."""
+
+    prix_vente_unitaire = forms.DecimalField(
+        label="Prix de vente unitaire",
+        min_value=0.01,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
+    )
+    quantite = forms.DecimalField(
+        label="Quantité vendue",
+        min_value=0.01,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
+    )
+    motif = forms.CharField(
+        label="Motif de la correction",
+        widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get('prix_vente_unitaire') and not cleaned.get('quantite'):
+            raise ValidationError("Indiquez au moins un prix ou une quantité corrigés.")
+
+        return cleaned

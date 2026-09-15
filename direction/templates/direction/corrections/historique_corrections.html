@@ -1,0 +1,72 @@
+{% extends "base_admin.html" %}
+{% block title %}Historique des corrections{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-8 px-4 space-y-6">
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Historique des corrections</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Corrections administratives (lot, distribution, vente) effectuées depuis l'application.
+        </p>
+    </div>
+
+    <form method="get" class="flex flex-wrap items-end gap-3">
+        <div class="form-control">
+            <label class="label"><span class="label-text text-xs">Type</span></label>
+            <select name="type" class="select select-bordered select-sm min-w-64" onchange="this.form.submit()">
+                <option value="">Tous</option>
+                {% for valeur, libelle in types_correction %}
+                <option value="{{ valeur }}" {% if type_filtre == valeur %}selected{% endif %}>{{ libelle }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <noscript><button class="btn btn-sm btn-primary" type="submit">Filtrer</button></noscript>
+    </form>
+
+    <div class="overflow-x-auto">
+        <table class="table w-full border-separate border-spacing-y-2">
+            <thead>
+                <tr class="text-gray-500 uppercase text-[10px] tracking-widest">
+                    <th class="bg-transparent text-left">Date</th>
+                    <th class="bg-transparent text-left">Type</th>
+                    <th class="bg-transparent text-left">Cible</th>
+                    <th class="bg-transparent text-left">Motif</th>
+                    <th class="bg-transparent text-left">Avant → Après</th>
+                    <th class="bg-transparent text-left">Par</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in page_obj %}
+                <tr class="shadow-sm border border-slate-100 align-top">
+                    <td class="text-xs whitespace-nowrap">{{ c.date_action|date:"d/m/Y H:i" }}</td>
+                    <td class="text-xs">{{ c.get_type_correction_display }}</td>
+                    <td class="text-xs">{{ c.content_type.model }} #{{ c.object_id }}</td>
+                    <td class="text-xs max-w-xs">{{ c.motif }}</td>
+                    <td class="text-xs">
+                        <span class="text-slate-400">{{ c.anciennes_valeurs }}</span>
+                        →
+                        <span class="font-medium">{{ c.nouvelles_valeurs }}</span>
+                    </td>
+                    <td class="text-xs">{{ c.utilisateur.username }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center py-16 bg-slate-50 rounded-xl text-slate-400 italic">Aucune correction enregistrée.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div class="flex justify-center gap-2 text-sm">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if type_filtre %}&type={{ type_filtre }}{% endif %}" class="btn btn-sm btn-ghost">« Précédent</a>
+        {% endif %}
+        <span class="px-2 py-1 text-slate-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if type_filtre %}&type={{ type_filtre }}{% endif %}" class="btn btn-sm btn-ghost">Suivant »</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

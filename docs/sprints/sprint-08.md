@@ -3,6 +3,8 @@
 **Statut** : 📋 cadré — vérifications faites le 12/08/2026, plusieurs points prêts à exécuter sans
 risque, d'autres nécessitent une décision de mdmaiga (aucun code écrit sur ce sprint).
 
+> Une fois ce sprint terminé, déplacer ce fichier dans `docs/sprints/archive/`.
+
 ## Contexte
 
 Deux audits (`docs/audit/audit-app-core.md`, `docs/audit/audit-app-agents.md`) et une comparaison

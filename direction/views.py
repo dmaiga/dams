@@ -42,7 +42,8 @@ from core.models import (
     JournalModificationDistribution,
     Recouvrement, VersementBancaire, RecuVersement,
     Depense,ClotureMensuelle,
-    TransfertPortefeuilleAgent, LigneTransfertAgent, Perte
+    TransfertPortefeuilleAgent, LigneTransfertAgent, Perte,
+    CorrectionAdministrative,
 )
 from django.db.models import OuterRef, Subquery, DateTimeField
 
@@ -1479,8 +1480,31 @@ def admin_create_agent(request):
 
 
 # ============================================================================
-# RÉAFFECTATION DES AGENTS  (accès restreint : mdmaiga)
+# ADMIN DIRECTION  (accès restreint : mdmaiga)
 # ============================================================================
+#
+# Garde partagée par toutes les vues réservées au seul compte mdmaiga :
+# réaffectation du portefeuille d'agents, et corrections administratives
+# auditées (sprint-13 — docs/sprints/sprint-13.md).
+
+from django.contrib.auth.decorators import user_passes_test
+from django.core.exceptions import ValidationError as _DjangoValidationError
+from direction.forms import (
+    ReaffectationAgentsForm,
+    TYPES_AGENTS_GERES,
+    CorrectionLotForm,
+    CorrectionDistributionForm,
+    CorrectionVenteForm,
+)
+
+
+def _acces_admin_mdmaiga(user):
+    return user.is_authenticated and user.username == "mdmaiga"
+
+
+# ----------------------------------------------------------------------------
+# RÉAFFECTATION DES AGENTS
+# ----------------------------------------------------------------------------
 #
 # Un superviseur quitte l'équipe / un nouveau superviseur arrive : il faut
 # pouvoir déplacer le portefeuille d'agents d'un superviseur vers un autre.
@@ -1492,13 +1516,6 @@ def admin_create_agent(request):
 #     superviseur cible (choix métier : le suivi produit courant suit l'agent),
 #     avec un instantané figé du stock encore en circulation et une entrée
 #     JournalModificationDistribution par distribution touchée.
-
-from django.contrib.auth.decorators import user_passes_test
-from direction.forms import ReaffectationAgentsForm, TYPES_AGENTS_GERES
-
-
-def _acces_reaffectation(user):
-    return user.is_authenticated and user.username == "mdmaiga"
 
 
 def _stock_ouvert_par_agent(agent_ids):
@@ -1561,7 +1578,7 @@ def _stock_ouvert_par_agent(agent_ids):
 
 
 @login_required
-@user_passes_test(_acces_reaffectation)
+@user_passes_test(_acces_admin_mdmaiga)
 def reaffectation_agents(request):
     source_id = request.POST.get('superviseur_source') or request.GET.get('source')
     source = None
@@ -1669,7 +1686,7 @@ def reaffectation_agents(request):
 
 
 @login_required
-@user_passes_test(_acces_reaffectation)
+@user_passes_test(_acces_admin_mdmaiga)
 def historique_reaffectation(request):
     transferts = (
         TransfertPortefeuilleAgent.objects
@@ -1679,6 +1696,163 @@ def historique_reaffectation(request):
     )
     return render(request, 'direction/agents/reaffectation_historique.html', {
         'transferts': transferts,
+    })
+
+
+# ----------------------------------------------------------------------------
+# CORRECTIONS ADMINISTRATIVES (sprint-13)
+# ----------------------------------------------------------------------------
+#
+# Corrections a posteriori de données déjà enregistrées par le terrain — lot,
+# distribution, vente — jusqu'ici faites sans trace via le Django admin.
+# Chaque correction passe par un service dédié (marchandise/vente) qui répercute
+# l'effet domino nécessaire et journalise dans CorrectionAdministrative (motif
+# obligatoire). Voir docs/sprints/sprint-13.md.
+
+def _erreurs_formulaire(exc):
+    return [str(m) for m in getattr(exc, 'messages', [str(exc)])]
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def corriger_lot(request, lot_id):
+    from marchandise.services import CorrectionLotService
+
+    lot = get_object_or_404(LotEntrepot, pk=lot_id)
+
+    if request.method == 'POST':
+        form = CorrectionLotForm(request.POST)
+        if form.is_valid():
+            kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
+            for champ in ('quantite_initiale', 'prix_achat_unitaire', 'date_reception'):
+                if form.cleaned_data.get(champ) is not None:
+                    kwargs[champ] = form.cleaned_data[champ]
+            try:
+                CorrectionLotService.corriger_lot(lot.id, **kwargs)
+            except _DjangoValidationError as exc:
+                for erreur in _erreurs_formulaire(exc):
+                    form.add_error(None, erreur)
+            else:
+                messages.success(request, f"Lot #{lot.id} corrigé.")
+                return redirect('historique_corrections')
+    else:
+        form = CorrectionLotForm(initial={
+            'quantite_initiale': lot.quantite_initiale,
+            'prix_achat_unitaire': lot.prix_achat_unitaire,
+            'date_reception': lot.date_reception.date(),
+        })
+
+    return render(request, 'direction/corrections/corriger_lot.html', {
+        'form': form,
+        'lot': lot,
+    })
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def corriger_distribution(request, detail_distribution_id):
+    from marchandise.services import CorrectionDistributionService
+
+    detail = get_object_or_404(
+        DetailDistribution.objects.select_related(
+            'distribution__superviseur__user', 'distribution__agent_terrain__user', 'lot__produit'
+        ),
+        pk=detail_distribution_id,
+    )
+    distribution = detail.distribution
+
+    if request.method == 'POST':
+        form = CorrectionDistributionForm(request.POST)
+        if form.is_valid():
+            kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
+            for champ in ('agent_terrain', 'superviseur', 'quantite'):
+                if form.cleaned_data.get(champ) is not None:
+                    kwargs[champ] = form.cleaned_data[champ]
+            try:
+                CorrectionDistributionService.corriger_distribution(detail.id, **kwargs)
+            except _DjangoValidationError as exc:
+                for erreur in _erreurs_formulaire(exc):
+                    form.add_error(None, erreur)
+            else:
+                messages.success(request, f"Distribution #{distribution.id} corrigée.")
+                return redirect('historique_corrections')
+    else:
+        form = CorrectionDistributionForm(initial={
+            'superviseur': distribution.superviseur_id,
+            'agent_terrain': distribution.agent_terrain_id,
+            'quantite': detail.quantite,
+        })
+        # Le champ agent_terrain est vide par défaut (pattern AJAX, cf.
+        # marchandise.AffectationSuperviseurForm) sauf ici : on préremplit
+        # avec l'agent actuel pour l'afficher sans clic supplémentaire.
+        if distribution.agent_terrain_id:
+            form.fields['agent_terrain'].queryset = Agent.objects.filter(
+                pk=distribution.agent_terrain_id
+            )
+
+    return render(request, 'direction/corrections/corriger_distribution.html', {
+        'form': form,
+        'detail': detail,
+        'distribution': distribution,
+    })
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def corriger_vente(request, vente_id):
+    from vente.services import CorrectionVenteService
+
+    vente = get_object_or_404(
+        Vente.objects.select_related('agent__user', 'detail_distribution__lot__produit'),
+        pk=vente_id, est_supprime=False,
+    )
+
+    if request.method == 'POST':
+        form = CorrectionVenteForm(request.POST)
+        if form.is_valid():
+            kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
+            for champ in ('prix_vente_unitaire', 'quantite'):
+                if form.cleaned_data.get(champ) is not None:
+                    kwargs[champ] = form.cleaned_data[champ]
+            try:
+                CorrectionVenteService.corriger_vente(vente.id, **kwargs)
+            except _DjangoValidationError as exc:
+                for erreur in _erreurs_formulaire(exc):
+                    form.add_error(None, erreur)
+            else:
+                messages.success(request, f"Vente #{vente.id} corrigée.")
+                return redirect('historique_corrections')
+    else:
+        form = CorrectionVenteForm(initial={
+            'prix_vente_unitaire': vente.prix_vente_unitaire,
+            'quantite': vente.quantite,
+        })
+
+    return render(request, 'direction/corrections/corriger_vente.html', {
+        'form': form,
+        'vente': vente,
+    })
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def historique_corrections(request):
+    corrections = (
+        CorrectionAdministrative.objects
+        .select_related('utilisateur', 'content_type')
+        .order_by('-date_action')
+    )
+    type_filtre = request.GET.get('type')
+    if type_filtre:
+        corrections = corrections.filter(type_correction=type_filtre)
+
+    paginator = Paginator(corrections, 30)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'direction/corrections/historique_corrections.html', {
+        'page_obj': page_obj,
+        'types_correction': CorrectionAdministrative.TYPE_CORRECTION,
+        'type_filtre': type_filtre,
     })
 
 

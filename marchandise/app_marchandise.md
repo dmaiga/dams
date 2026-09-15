@@ -155,6 +155,37 @@ Toutes les modifications sont exécutées dans une unique `transaction.atomic()`
 
 ---
 
+### `CorrectionLotService.corriger_lot(...)` — sprint-13, 2026-09-15
+
+Correction administrative d'un `LotEntrepot` à la réception (quantité initiale, prix d'achat,
+date de réception), distincte de `corriger_affectation` (qui corrige une `AffectationLotSuperviseur`
+déjà sortie vers un superviseur). Refuse une quantité initiale sous ce qui est déjà sorti du lot
+(`quantite_initiale - quantite_restante`). `lot.save()` recalcule `valeur_stock_initiale` et
+revalide les garde-fous existants. Une ligne `CorrectionAdministrative` par champ effectivement
+modifié (`motif` obligatoire). Accès réservé à `direction.views._acces_admin_mdmaiga`.
+
+### `CorrectionDistributionService.corriger_distribution(...)` — sprint-13, 2026-09-15
+
+Correction administrative d'une distribution déjà enregistrée (`DistributionAgent`/
+`DetailDistribution`) : agent destinataire, superviseur, et/ou quantité — cas remonté par mdmaiga
+(gestionnaire de stock qui se trompe d'agent, de superviseur ou de quantité).
+
+- **Agent/superviseur** : réaffecte `DistributionAgent.agent_terrain`/`superviseur`. Refuse si le
+  nouvel agent n'est pas rattaché (`Agent.superviseur`) au superviseur cible.
+- **Quantité** : même cascade que `corriger_affectation` (delta vers `AffectationLotSuperviseur.
+  quantite_initiale` et `LotEntrepot.quantite_restante`), refuse de descendre sous
+  `quantite_vendue` déjà enregistrée.
+
+**Limite connue, assumée** : le lien vers l'`AffectationLotSuperviseur` source n'est pas porté par
+une FK (même limite que `AffectationLotService._charger_distribution_directe`) — une correction de
+quantité n'est cascadée vers le stock que si cette source peut être identifiée sans ambiguïté
+(`_trouver_affectation_source`, matching lot + superviseur + `agent_terrain_direct`). Pour une
+distribution issue du flux d'exception `vente/` (sans affectation directe résolvable), seule la
+distribution elle-même est corrigée — pas de tentative de deviner la source, même discipline que
+le service existant.
+
+Une ligne `CorrectionAdministrative` par champ effectivement modifié.
+
 ## Endpoint AJAX propre à l'app
 
 `/marchandise/ajax/agents-par-superviseur/?superviseur_id=X` — retourne les agents actifs rattachés au superviseur, pour peupler `agent_terrain`.

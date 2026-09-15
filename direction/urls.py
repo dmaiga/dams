@@ -20,7 +20,9 @@ from direction.views import (
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
                                  RotDetailView,analyse_operationnelle ,
                                  suivi_distributions,
-                                 reaffectation_agents, historique_reaffectation
+                                 reaffectation_agents, historique_reaffectation,
+                                 corriger_lot, corriger_distribution, corriger_vente,
+                                 historique_corrections,
                               )
 
 
@@ -123,6 +125,12 @@ urlpatterns = [
     # Réaffectation du portefeuille d'agents entre superviseurs (accès mdmaiga)
     path('direction/agents/reaffectation/', reaffectation_agents, name='reaffectation_agents'),
     path('direction/agents/reaffectation/historique/', historique_reaffectation, name='historique_reaffectation'),
+
+    # Corrections administratives auditées (sprint-13, accès mdmaiga)
+    path('direction/corrections/lot/<int:lot_id>/', corriger_lot, name='corriger_lot'),
+    path('direction/corrections/distribution/<int:detail_distribution_id>/', corriger_distribution, name='corriger_distribution'),
+    path('direction/corrections/vente/<int:vente_id>/', corriger_vente, name='corriger_vente'),
+    path('direction/corrections/historique/', historique_corrections, name='historique_corrections'),
 
    # URLs pour les salaires
     path('salaires/', calcul_salaires, name='calcul_salaires'),

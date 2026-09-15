@@ -8,7 +8,14 @@
     <a href="{% url 'marchandise:liste_lots' %}" class="text-muted text-decoration-none small">
       <i class="fas fa-arrow-left me-1"></i> Stock central
     </a>
-    <h4 class="fw-bold mb-0 mt-1">{{ lot.produit.nom }}</h4>
+    <div class="d-flex align-items-center justify-content-between">
+      <h4 class="fw-bold mb-0 mt-1">{{ lot.produit.nom }}</h4>
+      {% if request.user.username == "mdmaiga" %}
+      <a href="{% url 'corriger_lot' lot.id %}" class="btn btn-sm btn-outline-secondary">
+        Corriger
+      </a>
+      {% endif %}
+    </div>
   </div>
 
   <!-- Fiche lot -->

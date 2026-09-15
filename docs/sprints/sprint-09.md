@@ -5,6 +5,9 @@ pendant les sprints 07 et 08 (12/08/2026). Aucune n'est urgente ni décidée : c
 lire, discuter, garder ou écarter librement, comme la section « Suggestions complémentaires » du
 sprint-06.
 
+> Une fois ce sprint terminé (ou ses notes tranchées et closes), déplacer ce fichier dans
+> `docs/sprints/archive/`.
+
 ## Contexte
 
 À la différence du sprint-08 (dette technique ponctuelle : code mort, liens cassés, doublons de

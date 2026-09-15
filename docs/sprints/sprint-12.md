@@ -2,6 +2,8 @@
 
 **Statut** : 🟡 en cours — demande de mdmaiga (08/09/2026).
 
+> Une fois ce sprint terminé, déplacer ce fichier dans `docs/sprints/archive/`.
+
 Fait le 08/09/2026 : investigation sur la base réelle (§ Résultats d'investigation),
 cause racine identifiée et corrigée (rappel 48 h sur `stock_superviseur`/`stock_agent`,
 format des messages Telegram enrichi via un helper partagé, migration `0120` qui clôt

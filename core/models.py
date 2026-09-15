@@ -1,6 +1,8 @@
 from django.db import models
 from django import forms
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 from environs import ValidationError
 from tinymce.models import HTMLField
@@ -1640,6 +1642,49 @@ class JournalModificationDistribution(models.Model):
         ordering = ['-date_action']
         verbose_name = "Journal des modifications"
         verbose_name_plural = "Journal des modifications"
+
+
+class CorrectionAdministrative(models.Model):
+    """
+    Journal générique des corrections a posteriori effectuées par la direction
+    (mdmaiga) sur des données déjà enregistrées par le terrain — lot, distribution,
+    vente. Voir docs/sprints/sprint-13.md.
+
+    Une seule table pour les trois cibles plutôt que trois journaux dédiés : même
+    forme (qui, quoi, avant/après, pourquoi) pour des cibles différentes — le
+    GenericForeignKey évite de dupliquer JournalModificationDistribution deux fois.
+    """
+
+    TYPE_CORRECTION = (
+        ('LOT_QUANTITE', "Quantité du lot"),
+        ('LOT_PRIX', "Prix d'achat du lot"),
+        ('LOT_DATE', "Date de réception du lot"),
+        ('DISTRIBUTION_AGENT', "Agent destinataire de la distribution"),
+        ('DISTRIBUTION_SUPERVISEUR', "Superviseur de la distribution"),
+        ('DISTRIBUTION_QUANTITE', "Quantité distribuée"),
+        ('VENTE_PRIX_QUANTITE', "Prix et/ou quantité de la vente"),
+    )
+
+    utilisateur = models.ForeignKey(User, on_delete=models.PROTECT)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    cible = GenericForeignKey('content_type', 'object_id')
+    type_correction = models.CharField(max_length=30, choices=TYPE_CORRECTION)
+    motif = models.TextField()
+    anciennes_valeurs = models.JSONField()
+    nouvelles_valeurs = models.JSONField()
+    date_action = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_action']
+        verbose_name = "Correction administrative"
+        verbose_name_plural = "Corrections administratives"
+
+    def __str__(self):
+        return (
+            f"{self.get_type_correction_display()} — {self.cible} "
+            f"par {self.utilisateur} le {self.date_action:%d/%m/%Y}"
+        )
 
 
 class SnapshotSuperviseurAgent(models.Model):

@@ -174,3 +174,31 @@ de signal, pas de lecture dans les rapports — **volontairement pas exploité p
 manuellement avant/après toute réaffectation dont on veut garder une trace ponctuelle. Quand le besoin
 de consultation deviendra prioritaire, prévoir un mouvement/table d'événements dédié plutôt qu'une
 réactivation de l'architecture signal abandonnée.
+
+## 11. Corrections administratives auditées (`CorrectionAdministrative`) — 2026-09-15, sprint-13
+
+Journal générique des corrections a posteriori effectuées par la direction (`mdmaiga`) sur des
+données déjà enregistrées par le terrain — `LotEntrepot`, `DistributionAgent`/`DetailDistribution`,
+`Vente`. Motivation : ces corrections se faisaient jusqu'ici via le Django admin, sans aucune
+trace (qui, quand, avant/après, pourquoi). Voir `docs/sprints/sprint-13.md`.
+
+Une seule table (`content_type`/`object_id`/`GenericForeignKey`) plutôt que trois journaux dédiés
+par cible — choix délibéré : les trois corrections partagent la même forme (qui, quoi, avant/
+après, pourquoi), et `JournalModificationDistribution` (§ ci-dessus, limité à `DistributionAgent`)
+sert de précédent à ne pas redupliquer deux fois de plus.
+
+Champs : `utilisateur` (FK `User`), `content_type`/`object_id`/`cible` (cible générique),
+`type_correction` (7 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `DISTRIBUTION_AGENT`,
+`DISTRIBUTION_SUPERVISEUR`, `DISTRIBUTION_QUANTITE`, `VENTE_PRIX_QUANTITE`), `motif` (obligatoire,
+non-nullable — toute correction doit être justifiée), `anciennes_valeurs`/`nouvelles_valeurs`
+(JSON), `date_action` (`auto_now_add`).
+
+Migration `core/migrations/0122_correction_administrative.py`. Accès aux vues de correction
+(`direction/`) : garde partagée `direction.views._acces_admin_mdmaiga` (généralisée depuis
+`_acces_reaffectation`, même principe — voir `direction/APP_DIRECTION.MD`).
+
+Sprint-13 complet (2026-09-15) : services `marchandise.services.CorrectionLotService`/
+`CorrectionDistributionService` et `vente.services.CorrectionVenteService`, formulaires/vues/
+templates dans `direction/`, section de menu « Admin » (mdmaiga uniquement) dans
+`base_admin.html`. Voir `marchandise/APP_MARCHANDISE.md`, `vente/APP_VENTE.md` et
+`direction/APP_DIRECTION.MD` pour le détail par app.

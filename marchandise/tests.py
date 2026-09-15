@@ -1,11 +1,25 @@
 import json
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
-from core.models import Agent, Fournisseur, LotEntrepot, MouvementStock, Produit, Vente
+from core.models import (
+    Agent,
+    AffectationLotSuperviseur,
+    CorrectionAdministrative,
+    DetailDistribution,
+    DistributionAgent,
+    Fournisseur,
+    LotEntrepot,
+    MouvementStock,
+    Produit,
+    Vente,
+)
+from marchandise.services import CorrectionDistributionService, CorrectionLotService
 
 API_KEY = 'test-dams-champs-key'
 URL = '/api/cessions/'
@@ -174,3 +188,188 @@ class CessionReceptionAPITests(TestCase):
         self._post(self._payload())
 
         self.assertEqual(Fournisseur.objects.filter(nom='Champ DAMS').count(), 1)
+
+
+class CorrectionLotServiceTests(TestCase):
+    """sprint-13 — correction administrative d'un LotEntrepot."""
+
+    def setUp(self):
+        self.produit = Produit.objects.create(nom='mil')
+        self.utilisateur = User.objects.create_user(username='mdmaiga', password='x')
+        self.lot = LotEntrepot.objects.create(
+            produit=self.produit,
+            quantite_initiale=Decimal('100.00'),
+            quantite_restante=Decimal('100.00'),
+            prix_achat_unitaire=Decimal('250.00'),
+        )
+
+    def test_corrige_quantite_et_recalcule_valeur_stock(self):
+        CorrectionLotService.corriger_lot(
+            self.lot.id,
+            quantite_initiale=Decimal('120.00'),
+            motif='Erreur de saisie du gestionnaire de stock',
+            utilisateur=self.utilisateur,
+        )
+        self.lot.refresh_from_db()
+
+        self.assertEqual(self.lot.quantite_initiale, Decimal('120.00'))
+        self.assertEqual(self.lot.quantite_restante, Decimal('120.00'))
+        self.assertEqual(self.lot.valeur_stock_initiale, Decimal('120.00') * Decimal('250.00'))
+
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'LOT_QUANTITE')
+        self.assertEqual(correction.utilisateur, self.utilisateur)
+        self.assertTrue(correction.motif)
+        self.assertEqual(correction.anciennes_valeurs['quantite_initiale'], '100.00')
+        self.assertEqual(correction.nouvelles_valeurs['quantite_initiale'], '120.00')
+
+    def test_refuse_quantite_sous_ce_qui_est_deja_distribue(self):
+        self.lot.quantite_restante = Decimal('10.00')
+        self.lot.save()
+
+        with self.assertRaises(ValidationError):
+            CorrectionLotService.corriger_lot(
+                self.lot.id,
+                quantite_initiale=Decimal('50.00'),
+                motif='test',
+                utilisateur=self.utilisateur,
+            )
+        self.assertEqual(CorrectionAdministrative.objects.count(), 0)
+
+    def test_motif_obligatoire(self):
+        with self.assertRaises(ValidationError):
+            CorrectionLotService.corriger_lot(
+                self.lot.id,
+                quantite_initiale=Decimal('120.00'),
+                motif='   ',
+                utilisateur=self.utilisateur,
+            )
+
+    def test_prix_corrige_est_repercute(self):
+        CorrectionLotService.corriger_lot(
+            self.lot.id,
+            prix_achat_unitaire=Decimal('300.00'),
+            motif='Prix erroné annoncé par le fournisseur',
+            utilisateur=self.utilisateur,
+        )
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.prix_achat_unitaire, Decimal('300.00'))
+        self.assertEqual(
+            CorrectionAdministrative.objects.get().type_correction, 'LOT_PRIX'
+        )
+
+
+class CorrectionDistributionServiceTests(TestCase):
+    """sprint-13 — correction administrative d'une distribution (agent,
+    superviseur, quantité)."""
+
+    def setUp(self):
+        produit = Produit.objects.create(nom='riz')
+        self.utilisateur = User.objects.create_user(username='mdmaiga', password='x')
+
+        sup_user = User.objects.create_user(username='sup1', password='x')
+        self.superviseur = Agent.objects.create(user=sup_user, type_agent='entrepot')
+
+        agent_user = User.objects.create_user(username='agent1', password='x')
+        self.agent = Agent.objects.create(
+            user=agent_user, type_agent='terrain', superviseur=self.superviseur
+        )
+        agent2_user = User.objects.create_user(username='agent2', password='x')
+        self.agent2 = Agent.objects.create(
+            user=agent2_user, type_agent='terrain', superviseur=self.superviseur
+        )
+
+        self.lot = LotEntrepot.objects.create(
+            produit=produit,
+            quantite_initiale=Decimal('200.00'),
+            quantite_restante=Decimal('150.00'),
+            prix_achat_unitaire=Decimal('100.00'),
+        )
+        self.affectation = AffectationLotSuperviseur.objects.create(
+            lot=self.lot,
+            superviseur=self.superviseur,
+            quantite_initiale=Decimal('50.00'),
+            quantite_restante=Decimal('0.00'),
+            agent_terrain_direct=self.agent,
+            date_affectation=date.today(),
+        )
+        self.distribution = DistributionAgent.objects.create(
+            superviseur=self.superviseur,
+            agent_terrain=self.agent,
+            quantite_totale=Decimal('50.00'),
+        )
+        self.detail = DetailDistribution.objects.create(
+            distribution=self.distribution, lot=self.lot, quantite=Decimal('50.00')
+        )
+
+    def test_corrige_quantite_et_cascade_vers_lot_et_affectation(self):
+        CorrectionDistributionService.corriger_distribution(
+            self.detail.id,
+            quantite=Decimal('40.00'),
+            motif='Le gestionnaire de stock a trop distribué',
+            utilisateur=self.utilisateur,
+        )
+        self.detail.refresh_from_db()
+        self.lot.refresh_from_db()
+        self.affectation.refresh_from_db()
+
+        self.assertEqual(self.detail.quantite, Decimal('40.00'))
+        self.assertEqual(self.affectation.quantite_initiale, Decimal('40.00'))
+        self.assertEqual(self.lot.quantite_restante, Decimal('160.00'))
+
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_QUANTITE')
+
+    def test_refuse_quantite_sous_les_ventes_deja_enregistrees(self):
+        Vente.objects.create(
+            agent=self.agent,
+            detail_distribution=self.detail,
+            quantite=Decimal('30.00'),
+            prix_vente_unitaire=Decimal('150.00'),
+            type_vente='detail',
+        )
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.corriger_distribution(
+                self.detail.id,
+                quantite=Decimal('20.00'),
+                motif='test',
+                utilisateur=self.utilisateur,
+            )
+
+    def test_change_agent_au_sein_du_meme_superviseur(self):
+        CorrectionDistributionService.corriger_distribution(
+            self.detail.id,
+            agent_terrain=self.agent2,
+            motif='Le gestionnaire de stock s\'est trompé d\'agent',
+            utilisateur=self.utilisateur,
+        )
+        self.distribution.refresh_from_db()
+        self.assertEqual(self.distribution.agent_terrain_id, self.agent2.id)
+
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_AGENT')
+
+    def test_refuse_agent_non_rattache_au_superviseur(self):
+        sup3_user = User.objects.create_user(username='sup3', password='x')
+        superviseur3 = Agent.objects.create(user=sup3_user, type_agent='entrepot')
+        agent3_user = User.objects.create_user(username='agent3', password='x')
+        agent3 = Agent.objects.create(
+            user=agent3_user, type_agent='terrain', superviseur=superviseur3
+        )
+
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.corriger_distribution(
+                self.detail.id,
+                agent_terrain=agent3,
+                motif='test',
+                utilisateur=self.utilisateur,
+            )
+
+    def test_motif_obligatoire(self):
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.corriger_distribution(
+                self.detail.id,
+                quantite=Decimal('40.00'),
+                motif='',
+                utilisateur=self.utilisateur,
+            )

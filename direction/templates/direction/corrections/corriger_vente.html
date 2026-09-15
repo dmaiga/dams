@@ -1,0 +1,56 @@
+{% extends "base_admin.html" %}
+{% block title %}Corriger une vente{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8 px-4 space-y-6">
+
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900">Corriger la vente #{{ vente.id }}</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            {{ vente.produit_nom }} — {{ vente.agent.full_name }} — {{ vente.date_vente|date:"d/m/Y" }}
+        </p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %} text-sm">
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-error text-sm">
+            {% for erreur in form.non_field_errors %}<span>{{ erreur }}</span>{% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card bg-white shadow-sm border border-slate-200">
+        <div class="card-body space-y-4">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Prix de vente unitaire (actuel : {{ vente.prix_vente_unitaire }})</span></label>
+                        {{ form.prix_vente_unitaire }}
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Quantité vendue (actuelle : {{ vente.quantite }})</span></label>
+                        {{ form.quantite }}
+                    </div>
+                </div>
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-xs">Motif de la correction *</span></label>
+                    {{ form.motif }}
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-sm w-full sticky bottom-2">
+                    Enregistrer la correction
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

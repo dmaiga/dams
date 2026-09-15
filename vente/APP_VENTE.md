@@ -97,6 +97,34 @@ Champs : `agent_terrain`, `detail_distribution` (peuplé par AJAX selon l'agent)
 
 ---
 
+## Services (`vente/services.py`) — sprint-13, 2026-09-15
+
+### `CorrectionVenteService.corriger_vente(...)`
+
+Correction administrative du prix et/ou de la quantité d'une `Vente` déjà enregistrée — cas
+récurrent remonté par mdmaiga : confusion du superviseur entre prix au sac (produit conditionné)
+et prix au kilo (produit vrac), ex. 800 FCFA saisi au lieu de 20 000 FCFA pour un sac de 25 kg.
+
+- Refuse si la vente porte une `Dette` (garde défensive — aucune vente à crédit en usage
+  actuellement, cf. § Invariants ci-dessous, donc pas de scénario réel pour tester un recalcul).
+- Quantité corrigée : vérifiée contre le disponible réel de la distribution (autres ventes non
+  supprimées + pertes déjà déclarées sur ce `DetailDistribution`), puis répercutée sur
+  `DetailDistribution.quantite_vendue` (champ stocké, mis à jour uniquement à la création par
+  `Vente.save()` — une correction doit donc l'ajuster elle-même par le delta).
+- Cascade : resynchronise `Recouvrement.montant_recouvre` sur le nouveau `vente.total_vente`
+  (`Vente.total_vente` est une property, toujours à jour — seul `Recouvrement.montant_recouvre`,
+  stocké à la création, doit être recalculé explicitement).
+- **Aucune garde liée à un recouvrement déjà remis au ROT/direction** : décision mdmaiga
+  (15/09/2026) — le recouvrement/versement réel est piloté par un agent dédié avec suivi sur un
+  groupe WhatsApp, hors système. `finance.services.solde_superviseur()` étant calculé
+  dynamiquement (jamais stocké), corriger `Recouvrement.montant_recouvre` suffit à tout
+  resynchroniser sans code supplémentaire. Voir mémoire projet
+  `project_reconciliation_recouvrement_terrain`.
+- Une ligne `CorrectionAdministrative` (`type_correction='VENTE_PRIX_QUANTITE'`) par correction,
+  `motif` obligatoire. Accès réservé à `direction.views._acces_admin_mdmaiga`.
+
+---
+
 ## Vues (`vente/views.py`)
 
 - `enregistrer_vente` : crée la `Vente` puis, systématiquement (toutes les ventes sont comptant), crée le `Recouvrement` dans le **même** `transaction.atomic()` — pas de saisie doublon.

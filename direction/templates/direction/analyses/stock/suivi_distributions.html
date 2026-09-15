@@ -276,6 +276,13 @@
                                     </div>
                                 </div>
                             {% endif %}
+                            {% if request.user.username == "mdmaiga" %}
+                                <div class="mt-1">
+                                    <a href="{% url 'corriger_distribution' d.id %}" class="text-[10px] text-blue-600 hover:underline">
+                                        Corriger
+                                    </a>
+                                </div>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

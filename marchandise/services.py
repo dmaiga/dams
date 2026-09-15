@@ -19,6 +19,7 @@ from core.models import (
     Produit,
     Vente,
 )
+from core.services.corrections import enregistrer_correction
 from core.services.lot_service import generer_reference_lot
 
 
@@ -283,6 +284,263 @@ class AffectationLotService:
         if not isinstance(valeur, date):
             raise ValidationError("La date d'affectation corrigee est invalide.")
         return valeur
+
+
+class CorrectionLotService:
+    """Correction administrative d'un LotEntrepot a la reception (sprint-13).
+
+    Distinct de AffectationLotService.corriger_affectation : corrige le lot
+    lui-meme (quantite initiale, prix d'achat, date de reception), pas une
+    affectation deja sortie vers un superviseur. Accès reserve a la direction
+    (mdmaiga) — voir direction.views._acces_admin_mdmaiga.
+    """
+
+    @classmethod
+    def corriger_lot(
+        cls,
+        lot_id,
+        *,
+        quantite_initiale=_NON_RENSEIGNE,
+        prix_achat_unitaire=_NON_RENSEIGNE,
+        date_reception=_NON_RENSEIGNE,
+        motif,
+        utilisateur,
+    ):
+        if not motif or not motif.strip():
+            raise ValidationError("Un motif est obligatoire pour toute correction.")
+
+        quantite_initiale = AffectationLotService._normaliser_quantite(quantite_initiale)
+        prix_achat_unitaire = cls._normaliser_prix(prix_achat_unitaire)
+
+        with transaction.atomic():
+            lot = LotEntrepot.objects.select_for_update().get(pk=lot_id)
+
+            corrections_a_logger = []  # (type_correction, anciennes, nouvelles)
+
+            if (
+                quantite_initiale is not _NON_RENSEIGNE
+                and quantite_initiale != lot.quantite_initiale
+            ):
+                quantite_sortie = lot.quantite_initiale - lot.quantite_restante
+                if quantite_initiale < quantite_sortie:
+                    raise ValidationError(
+                        "La quantite corrigee est inferieure a ce qui a deja ete "
+                        f"distribue depuis ce lot ({quantite_sortie})."
+                    )
+                ancienne_quantite = lot.quantite_initiale
+                delta = quantite_initiale - lot.quantite_initiale
+                lot.quantite_initiale = quantite_initiale
+                lot.quantite_restante = lot.quantite_restante + delta
+                corrections_a_logger.append((
+                    'LOT_QUANTITE',
+                    {'quantite_initiale': str(ancienne_quantite)},
+                    {'quantite_initiale': str(quantite_initiale)},
+                ))
+
+            if (
+                prix_achat_unitaire is not _NON_RENSEIGNE
+                and prix_achat_unitaire != lot.prix_achat_unitaire
+            ):
+                ancien_prix = lot.prix_achat_unitaire
+                lot.prix_achat_unitaire = prix_achat_unitaire
+                corrections_a_logger.append((
+                    'LOT_PRIX',
+                    {'prix_achat_unitaire': str(ancien_prix)},
+                    {'prix_achat_unitaire': str(prix_achat_unitaire)},
+                ))
+
+            if (
+                date_reception is not _NON_RENSEIGNE
+                and date_reception != lot.date_reception
+            ):
+                ancienne_date = lot.date_reception
+                lot.date_reception = date_reception
+                corrections_a_logger.append((
+                    'LOT_DATE',
+                    {'date_reception': ancienne_date.isoformat()},
+                    {'date_reception': date_reception.isoformat()},
+                ))
+
+            if not corrections_a_logger:
+                return lot
+
+            # save() recalcule valeur_stock_initiale et revalide les garde-fous
+            # existants (quantite_restante <= quantite_initiale, etc.).
+            lot.save()
+
+            for type_correction, anciennes_valeurs, nouvelles_valeurs in corrections_a_logger:
+                enregistrer_correction(
+                    cible=lot,
+                    type_correction=type_correction,
+                    motif=motif,
+                    utilisateur=utilisateur,
+                    anciennes_valeurs=anciennes_valeurs,
+                    nouvelles_valeurs=nouvelles_valeurs,
+                )
+
+        return lot
+
+    @staticmethod
+    def _normaliser_prix(valeur):
+        if valeur is _NON_RENSEIGNE:
+            return valeur
+        try:
+            prix = Decimal(str(valeur))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ValidationError(
+                "Le prix corrige doit etre un nombre decimal valide."
+            ) from exc
+        if not prix.is_finite() or prix <= Decimal("0.00"):
+            raise ValidationError("Le prix corrige doit etre strictement positif.")
+        return prix.quantize(Decimal("0.01"))
+
+
+class CorrectionDistributionService:
+    """Correction administrative d'une distribution deja enregistree (sprint-13) :
+    agent destinataire, superviseur, et/ou quantite distribuee.
+
+    Le lien vers l'AffectationLotSuperviseur source n'est pas porte par une FK
+    (meme limite que AffectationLotService._charger_distribution_directe) : une
+    correction de quantite n'est cascadee vers le stock (AffectationLotSuperviseur/
+    LotEntrepot) que si cette source peut etre identifiee sans ambiguite — sinon
+    la correction est refusee plutot que de deviner (meme discipline que
+    AffectationLotService).
+    """
+
+    @classmethod
+    def corriger_distribution(
+        cls,
+        detail_distribution_id,
+        *,
+        agent_terrain=_NON_RENSEIGNE,
+        superviseur=_NON_RENSEIGNE,
+        quantite=_NON_RENSEIGNE,
+        motif,
+        utilisateur,
+    ):
+        if not motif or not motif.strip():
+            raise ValidationError("Un motif est obligatoire pour toute correction.")
+
+        quantite = AffectationLotService._normaliser_quantite(quantite)
+
+        with transaction.atomic():
+            detail = DetailDistribution.objects.select_for_update().get(
+                pk=detail_distribution_id
+            )
+            distribution = DistributionAgent.objects.select_for_update().get(
+                pk=detail.distribution_id
+            )
+
+            corrections_a_logger = []  # (type_correction, anciennes, nouvelles)
+            superviseur_cible = (
+                superviseur if superviseur is not _NON_RENSEIGNE else distribution.superviseur
+            )
+
+            if (
+                agent_terrain is not _NON_RENSEIGNE
+                and agent_terrain.pk != distribution.agent_terrain_id
+            ):
+                if agent_terrain.superviseur_id != superviseur_cible.pk:
+                    raise ValidationError(
+                        f"{agent_terrain.full_name} n'est pas rattache au superviseur "
+                        f"{superviseur_cible.full_name}."
+                    )
+                ancien_agent = distribution.agent_terrain
+                distribution.agent_terrain = agent_terrain
+                corrections_a_logger.append((
+                    'DISTRIBUTION_AGENT',
+                    {
+                        'agent_terrain_id': ancien_agent.id if ancien_agent else None,
+                        'agent_terrain': ancien_agent.full_name if ancien_agent else None,
+                    },
+                    {'agent_terrain_id': agent_terrain.id, 'agent_terrain': agent_terrain.full_name},
+                ))
+
+            if superviseur is not _NON_RENSEIGNE and superviseur.pk != distribution.superviseur_id:
+                ancien_superviseur = distribution.superviseur
+                distribution.superviseur = superviseur
+                corrections_a_logger.append((
+                    'DISTRIBUTION_SUPERVISEUR',
+                    {'superviseur_id': ancien_superviseur.id, 'superviseur': ancien_superviseur.full_name},
+                    {'superviseur_id': superviseur.id, 'superviseur': superviseur.full_name},
+                ))
+
+            if any(t in ('DISTRIBUTION_AGENT', 'DISTRIBUTION_SUPERVISEUR') for t, _, _ in corrections_a_logger):
+                distribution.save()
+
+            if quantite is not _NON_RENSEIGNE and quantite != detail.quantite:
+                quantite_vendue = (
+                    Vente.objects.filter(
+                        detail_distribution=detail, est_supprime=False
+                    ).aggregate(total=Sum('quantite'))['total']
+                    or Decimal('0.00')
+                )
+                if quantite < quantite_vendue:
+                    raise ValidationError(
+                        "La quantite corrigee ne peut pas etre inferieure aux ventes "
+                        f"deja enregistrees ({quantite_vendue})."
+                    )
+
+                affectation = cls._trouver_affectation_source(detail, distribution)
+                delta = quantite - detail.quantite
+
+                if affectation is not None:
+                    lot = LotEntrepot.objects.select_for_update().get(pk=affectation.lot_id)
+                    quantite_restante_lot = lot.quantite_restante - delta
+                    if quantite_restante_lot < Decimal('0.00'):
+                        raise ValidationError(
+                            f"Stock central insuffisant ({lot.quantite_restante} disponible)."
+                        )
+                    if quantite_restante_lot > lot.quantite_initiale:
+                        raise ValidationError(
+                            "La correction restituerait plus de stock que la "
+                            "quantite initiale du lot."
+                        )
+                    lot.quantite_restante = quantite_restante_lot
+                    lot.save(update_fields=['quantite_restante'])
+
+                    affectation.quantite_initiale = affectation.quantite_initiale + delta
+                    affectation.save(update_fields=['quantite_initiale'])
+
+                ancienne_quantite = detail.quantite
+                detail.quantite = quantite
+                detail.save(update_fields=['quantite'])
+
+                distribution.quantite_totale = (
+                    DetailDistribution.objects.filter(distribution=distribution)
+                    .aggregate(total=Sum('quantite'))['total']
+                    or Decimal('0.00')
+                )
+                distribution.save(update_fields=['quantite_totale'])
+
+                corrections_a_logger.append((
+                    'DISTRIBUTION_QUANTITE',
+                    {'quantite': str(ancienne_quantite)},
+                    {'quantite': str(quantite)},
+                ))
+
+            for type_correction, anciennes_valeurs, nouvelles_valeurs in corrections_a_logger:
+                enregistrer_correction(
+                    cible=detail,
+                    type_correction=type_correction,
+                    motif=motif,
+                    utilisateur=utilisateur,
+                    anciennes_valeurs=anciennes_valeurs,
+                    nouvelles_valeurs=nouvelles_valeurs,
+                )
+
+        return detail
+
+    @staticmethod
+    def _trouver_affectation_source(detail, distribution):
+        candidats = list(
+            AffectationLotSuperviseur.objects.select_for_update().filter(
+                lot_id=detail.lot_id,
+                superviseur_id=distribution.superviseur_id,
+                agent_terrain_direct_id=distribution.agent_terrain_id,
+            )
+        )
+        return candidats[0] if len(candidats) == 1 else None
 
 
 class CessionReceptionService:

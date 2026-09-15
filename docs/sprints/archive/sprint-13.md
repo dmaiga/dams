@@ -1,6 +1,8 @@
 # Sprint 13 — Corrections administratives auditées (Lot, Distribution, Vente)
 
-**Statut** : 🟡 à démarrer — demande de mdmaiga (15/09/2026).
+**Statut** : ✅ terminé (15/09/2026) — les 3 corrections (Lot, Distribution, Vente),
+le journal d'audit générique, la section Admin du menu et les tests sont livrés.
+Suite complète (`python manage.py test`) verte : 101 tests.
 
 ---
 

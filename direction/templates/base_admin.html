@@ -126,16 +126,6 @@
                                         <span>Agents</span>
                                     </a>
                                 </li>
-                                {% if request.user.username == "mdmaiga" %}
-                                <li>
-                                    <a href="{% url 'reaffectation_agents' %}"
-                                       class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
-                                              {% if 'reaffectation' in request.resolver_match.url_name %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
-                                        <i class="fas fa-people-arrows text-sm w-4 text-center"></i>
-                                        <span>Réaffectation des agents</span>
-                                    </a>
-                                </li>
-                                {% endif %}
                                 <li>
                                     <a href="{% url 'product_list' %}"
                                        class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
@@ -271,6 +261,33 @@
                                 </li>
                             </ul>
                         </div>
+
+                        {% if request.user.username == "mdmaiga" %}
+                        <div>
+                            <!-- ================= ADMIN (mdmaiga uniquement) ================= -->
+                            <p class="dams-nav-section text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2 flex items-center gap-1.5">
+                                <span>ADMIN</span>
+                            </p>
+                            <ul class="space-y-0.5">
+                                <li>
+                                    <a href="{% url 'reaffectation_agents' %}"
+                                       class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
+                                              {% if 'reaffectation' in request.resolver_match.url_name %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                        <i class="fas fa-people-arrows text-sm w-4 text-center"></i>
+                                        <span>Réaffectation des agents</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{% url 'historique_corrections' %}"
+                                       class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
+                                              {% if request.resolver_match.url_name == 'historique_corrections' %}bg-slate-100/90 text-slate-900 font-semibold active{% endif %}">
+                                        <i class="fas fa-clock-rotate-left text-sm w-4 text-center"></i>
+                                        <span>Corrections administratives</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+                        {% endif %}
                     </nav>
                 </div>
 
