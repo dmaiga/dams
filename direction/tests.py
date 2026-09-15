@@ -53,6 +53,7 @@ class CorrectionsAdministrativesAccessTests(TestCase):
 
     def _urls(self):
         return [
+            reverse('corrections_hub'),
             reverse('corriger_lot', args=[self.lot.id]),
             reverse('corriger_distribution', args=[self.detail.id]),
             reverse('corriger_vente', args=[self.vente.id]),
@@ -111,3 +112,17 @@ class CorrectionsAdministrativesAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(CorrectionAdministrative.objects.count(), 0)
         self.assertFalse(response.context['form'].is_valid())
+
+    def test_hub_recherche_le_lot_par_produit(self):
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.get(reverse('corrections_hub'), {'q_lot': 'tomate'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.lot, response.context['lots'])
+
+    def test_hub_sans_recherche_ne_renvoie_aucun_resultat(self):
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.get(reverse('corrections_hub'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context['lots']), [])
+        self.assertEqual(list(response.context['distributions']), [])
+        self.assertEqual(list(response.context['ventes']), [])

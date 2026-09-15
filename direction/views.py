@@ -1836,6 +1836,73 @@ def corriger_vente(request, vente_id):
 
 @login_required
 @user_passes_test(_acces_admin_mdmaiga)
+def corrections_hub(request):
+    """Point d'entrée unique des corrections administratives : recherche un
+    lot / une distribution / une vente à corriger sans passer par le Django
+    admin ni par les écrans opérationnels d'autres apps.
+    """
+    from django.db.models import Q
+
+    q_lot = request.GET.get('q_lot', '').strip()
+    q_distribution = request.GET.get('q_distribution', '').strip()
+    q_vente = request.GET.get('q_vente', '').strip()
+
+    lots = LotEntrepot.objects.none()
+    if q_lot:
+        lots = (
+            LotEntrepot.objects.filter(
+                Q(produit__nom__icontains=q_lot) | Q(reference_lot__icontains=q_lot)
+            )
+            .select_related('produit', 'fournisseur')
+            .order_by('-date_reception')[:20]
+        )
+
+    distributions = DetailDistribution.objects.none()
+    if q_distribution:
+        distributions = (
+            DetailDistribution.objects.filter(
+                Q(lot__produit__nom__icontains=q_distribution)
+                | Q(distribution__agent_terrain__user__first_name__icontains=q_distribution)
+                | Q(distribution__agent_terrain__user__last_name__icontains=q_distribution)
+                | Q(distribution__agent_terrain__user__username__icontains=q_distribution)
+                | Q(distribution__superviseur__user__first_name__icontains=q_distribution)
+                | Q(distribution__superviseur__user__last_name__icontains=q_distribution)
+                | Q(distribution__superviseur__user__username__icontains=q_distribution)
+            )
+            .select_related(
+                'lot__produit',
+                'distribution__agent_terrain__user',
+                'distribution__superviseur__user',
+            )
+            .order_by('-distribution__date_distribution')[:20]
+        )
+
+    ventes = Vente.objects.none()
+    if q_vente:
+        ventes = (
+            Vente.objects.filter(
+                Q(detail_distribution__lot__produit__nom__icontains=q_vente)
+                | Q(agent__user__first_name__icontains=q_vente)
+                | Q(agent__user__last_name__icontains=q_vente)
+                | Q(agent__user__username__icontains=q_vente),
+                est_supprime=False,
+            )
+            .select_related('agent__user', 'detail_distribution__lot__produit')
+            .order_by('-date_vente')[:20]
+        )
+
+    return render(request, 'direction/corrections/hub.html', {
+        'q_lot': q_lot,
+        'q_distribution': q_distribution,
+        'q_vente': q_vente,
+        'lots': lots,
+        'distributions': distributions,
+        'ventes': ventes,
+    })
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
 def historique_corrections(request):
     corrections = (
         CorrectionAdministrative.objects

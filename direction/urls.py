@@ -22,7 +22,7 @@ from direction.views import (
                                  suivi_distributions,
                                  reaffectation_agents, historique_reaffectation,
                                  corriger_lot, corriger_distribution, corriger_vente,
-                                 historique_corrections,
+                                 corrections_hub, historique_corrections,
                               )
 
 
@@ -127,6 +127,7 @@ urlpatterns = [
     path('direction/agents/reaffectation/historique/', historique_reaffectation, name='historique_reaffectation'),
 
     # Corrections administratives auditées (sprint-13, accès mdmaiga)
+    path('direction/corrections/', corrections_hub, name='corrections_hub'),
     path('direction/corrections/lot/<int:lot_id>/', corriger_lot, name='corriger_lot'),
     path('direction/corrections/distribution/<int:detail_distribution_id>/', corriger_distribution, name='corriger_distribution'),
     path('direction/corrections/vente/<int:vente_id>/', corriger_vente, name='corriger_vente'),

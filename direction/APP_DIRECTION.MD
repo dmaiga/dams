@@ -223,15 +223,22 @@ superviseur mal identifié en distribution, confusion prix au sac / prix au kilo
 vente) — sans aucune trace (qui, quand, avant/après, motif). Ce sprint déplace ces
 corrections dans l'application, avec effet domino correct et audit obligatoire.
 
-**4 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
+**5 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
 menu) :
 
-| Vue | URL | Service appelé |
+| Vue | URL | Rôle |
 |---|---|---|
-| `corriger_lot` | `direction/corrections/lot/<lot_id>/` | `marchandise.services.CorrectionLotService.corriger_lot` |
-| `corriger_distribution` | `direction/corrections/distribution/<detail_distribution_id>/` | `marchandise.services.CorrectionDistributionService.corriger_distribution` |
-| `corriger_vente` | `direction/corrections/vente/<vente_id>/` | `vente.services.CorrectionVenteService.corriger_vente` |
-| `historique_corrections` | `direction/corrections/historique/` | lecture de `CorrectionAdministrative` (filtrable par type, paginée 30/page) |
+| `corrections_hub` | `direction/corrections/` | **Point d'entrée** — 3 recherches (produit/référence, agent/superviseur/produit, agent/produit) menant directement au formulaire de correction, sans passer par le Django admin ni par les écrans opérationnels d'autres apps. |
+| `corriger_lot` | `direction/corrections/lot/<lot_id>/` | Appelle `marchandise.services.CorrectionLotService.corriger_lot` |
+| `corriger_distribution` | `direction/corrections/distribution/<detail_distribution_id>/` | Appelle `marchandise.services.CorrectionDistributionService.corriger_distribution` |
+| `corriger_vente` | `direction/corrections/vente/<vente_id>/` | Appelle `vente.services.CorrectionVenteService.corriger_vente` |
+| `historique_corrections` | `direction/corrections/historique/` | Lecture de `CorrectionAdministrative` (filtrable par type, paginée 30/page) |
+
+Le lien de menu « Corrections administratives » pointe vers `corrections_hub` (ajouté
+2026-09-15, suite au besoin exprimé par mdmaiga de ne plus passer par le Django
+admin pour déclencher une correction) ; `historique_corrections` reste accessible
+depuis un lien dédié en haut du hub, sur le même modèle que
+« Historique » sur l'écran de réaffectation.
 
 **Formulaires** (`direction/forms.py`) : `CorrectionLotForm`, `CorrectionDistributionForm`,
 `CorrectionVenteForm` — tous avec `motif` obligatoire (`clean()` exige qu'au moins un
@@ -239,11 +246,11 @@ champ métier soit renseigné en plus). Les vues traduisent une `ValidationError
 par le service en erreur de formulaire (`form.add_error(None, ...)`) plutôt que de
 laisser remonter une 500.
 
-**Points d'entrée depuis l'existant** (liens « Corriger », visibles uniquement pour
-`mdmaiga`) : fiche lot (`marchandise/detail_lot.html`), tableau « Suivi des
-distributions » (`direction/analyses/stock/suivi_distributions.html`, un lien par
-ligne), liste des ventes (`direction/analyses/ventes/liste_ventes_admin.html`, un
-lien par ligne).
+**Points d'entrée secondaires depuis l'existant** (liens « Corriger », visibles
+uniquement pour `mdmaiga`, en plus du hub) : fiche lot (`marchandise/detail_lot.html`),
+tableau « Suivi des distributions » (`direction/analyses/stock/suivi_distributions.html`,
+un lien par ligne), liste des ventes
+(`direction/analyses/ventes/liste_ventes_admin.html`, un lien par ligne).
 
 **Journal générique** : `CorrectionAdministrative` (`core/models.py`, voir
 `core/APP_CORE.md` § 11) — une ligne par champ effectivement modifié, jamais une
