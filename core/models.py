@@ -1659,8 +1659,10 @@ class CorrectionAdministrative(models.Model):
         ('LOT_QUANTITE', "Quantité du lot"),
         ('LOT_PRIX', "Prix d'achat du lot"),
         ('LOT_DATE', "Date de réception du lot"),
+        ('LOT_FOURNISSEUR', "Fournisseur du lot"),
         ('DISTRIBUTION_AGENT', "Agent destinataire de la distribution"),
         ('DISTRIBUTION_SUPERVISEUR', "Superviseur de la distribution"),
+        ('DISTRIBUTION_PRODUIT', "Produit/lot distribué"),
         ('DISTRIBUTION_QUANTITE', "Quantité distribuée"),
         ('DISTRIBUTION_DATE', "Date de la distribution"),
         ('VENTE_PRIX_QUANTITE', "Prix et/ou quantité de la vente"),
@@ -1672,7 +1674,7 @@ class CorrectionAdministrative(models.Model):
     object_id = models.PositiveIntegerField()
     cible = GenericForeignKey('content_type', 'object_id')
     type_correction = models.CharField(max_length=30, choices=TYPE_CORRECTION)
-    motif = models.TextField()
+    motif = models.TextField(blank=True)
     anciennes_valeurs = models.JSONField()
     nouvelles_valeurs = models.JSONField()
     date_action = models.DateTimeField(auto_now_add=True)

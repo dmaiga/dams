@@ -171,7 +171,11 @@ _TEXTAREA_CLASS = 'textarea textarea-bordered textarea-sm w-full'
 
 
 class CorrectionLotForm(forms.Form):
-    """Correction d'un LotEntrepot à la réception — quantité, prix, date."""
+    """Correction d'un LotEntrepot à la réception — quantité, prix,
+    fournisseur, date. Le motif est facultatif (décision mdmaiga,
+    2026-09-15) : une correction reste tracée (qui/quand/avant/après) même
+    sans commentaire.
+    """
 
     quantite_initiale = forms.DecimalField(
         label="Quantité initiale",
@@ -187,47 +191,79 @@ class CorrectionLotForm(forms.Form):
         required=False,
         widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
     )
+    fournisseur = forms.ModelChoiceField(
+        queryset=None,
+        label="Fournisseur",
+        required=False,
+        empty_label="(inchangé)",
+        widget=forms.Select(attrs={'class': _SELECT_CLASS}),
+    )
     date_reception = forms.DateField(
         label="Date de réception",
         widget=forms.DateInput(attrs={'type': 'date', 'class': _INPUT_CLASS}),
         required=False,
     )
     motif = forms.CharField(
-        label="Motif de la correction",
+        label="Motif de la correction (facultatif)",
+        required=False,
         widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        from core.models import Fournisseur
+
+        self.fields['fournisseur'].queryset = Fournisseur.objects.order_by('nom')
 
     def clean(self):
         cleaned = super().clean()
         if not any(
             cleaned.get(champ) is not None
-            for champ in ('quantite_initiale', 'prix_achat_unitaire', 'date_reception')
+            for champ in ('quantite_initiale', 'prix_achat_unitaire', 'fournisseur', 'date_reception')
         ):
             raise ValidationError(
-                "Indiquez au moins une quantité, un prix ou une date corrigés."
+                "Indiquez au moins une quantité, un prix, un fournisseur ou une date corrigés."
             )
         return cleaned
 
 
 class CorrectionDistributionForm(forms.Form):
-    """Correction d'une distribution déjà enregistrée — agent, superviseur,
-    quantité. Même pattern AJAX que ``marchandise.AffectationSuperviseurForm`` :
-    ``agent_terrain`` est vide au GET, peuplé par changement de superviseur
-    côté client, puis filtré sur l'ID soumis en POST pour valider sans bloquer.
+    """Correction d'une distribution déjà enregistrée — superviseur, agent,
+    produit/lot distribué, quantité, date.
+
+    ``superviseur`` est toujours pré-sélectionné à la valeur courante par la
+    vue (``initial``), jamais vide — le champ ``agent_terrain`` en dépend
+    directement : sa liste ne contient que les agents de ce superviseur, et
+    se recharge par AJAX (``/marchandise/ajax/agents-par-superviseur/``)
+    dès que ``superviseur`` change côté client, pour ne jamais laisser
+    afficher un agent incohérent avec le superviseur affiché. Même logique
+    pour ``produit``/``lot`` (``/agents/ajax/lots-par-produit/``) : le lot
+    n'est jamais proposé sans son produit.
+
+    Le motif est facultatif (décision mdmaiga, 2026-09-15).
     """
 
     superviseur = forms.ModelChoiceField(
         queryset=None,
         label="Superviseur",
-        required=False,
-        empty_label="(inchangé)",
         widget=forms.Select(attrs={'class': _SELECT_CLASS}),
     )
     agent_terrain = forms.ModelChoiceField(
         queryset=None,
         label="Agent destinataire",
+        widget=forms.Select(attrs={'class': _SELECT_CLASS}),
+    )
+    produit = forms.ModelChoiceField(
+        queryset=None,
+        label="Produit",
         required=False,
-        empty_label="(inchangé)",
+        widget=forms.Select(attrs={'class': _SELECT_CLASS}),
+    )
+    lot = forms.ModelChoiceField(
+        queryset=None,
+        label="Lot",
+        required=False,
         widget=forms.Select(attrs={'class': _SELECT_CLASS}),
     )
     quantite = forms.DecimalField(
@@ -243,33 +279,46 @@ class CorrectionDistributionForm(forms.Form):
         required=False,
     )
     motif = forms.CharField(
-        label="Motif de la correction",
+        label="Motif de la correction (facultatif)",
+        required=False,
         widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        from core.models import Agent
+        from core.models import Agent, LotEntrepot, Produit
 
         self.fields['superviseur'].queryset = Agent.objects.filter(
             type_agent='entrepot'
         ).select_related('user').order_by('user__first_name', 'user__username')
+        self.fields['produit'].queryset = Produit.objects.order_by('nom')
 
-        agent_id = self.data.get('agent_terrain') if self.is_bound else None
+        # agent_terrain/lot : vides au GET (sauf préremplissage explicite par
+        # la vue via `initial`), peuplés côté client par AJAX au changement
+        # de superviseur/produit ; en POST, filtrés sur le seul ID soumis
+        # pour valider sans bloquer (même pattern que
+        # marchandise.AffectationSuperviseurForm).
+        agent_id = self.data.get('agent_terrain') if self.is_bound else self.initial.get('agent_terrain')
         if agent_id:
             self.fields['agent_terrain'].queryset = Agent.objects.filter(pk=agent_id)
         else:
             self.fields['agent_terrain'].queryset = Agent.objects.none()
 
+        lot_id = self.data.get('lot') if self.is_bound else self.initial.get('lot')
+        if lot_id:
+            self.fields['lot'].queryset = LotEntrepot.objects.filter(pk=lot_id)
+        else:
+            self.fields['lot'].queryset = LotEntrepot.objects.none()
+
     def clean(self):
         cleaned = super().clean()
-        if not any(
-            cleaned.get(champ) is not None
-            for champ in ('superviseur', 'agent_terrain', 'quantite', 'date_distribution')
-        ):
+        superviseur = cleaned.get('superviseur')
+        agent_terrain = cleaned.get('agent_terrain')
+        if superviseur and agent_terrain and agent_terrain.superviseur_id != superviseur.pk:
             raise ValidationError(
-                "Indiquez au moins un agent, un superviseur, une quantité ou une date corrigés."
+                f"{agent_terrain.full_name} n'est pas rattaché au superviseur "
+                f"{superviseur.full_name}."
             )
         return cleaned
 
@@ -297,7 +346,8 @@ class CorrectionVenteForm(forms.Form):
         required=False,
     )
     motif = forms.CharField(
-        label="Motif de la correction",
+        label="Motif de la correction (facultatif)",
+        required=False,
         widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
     )
 

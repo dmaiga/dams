@@ -27,9 +27,9 @@ class CorrectionsAdministrativesAccessTests(TestCase):
         Agent.objects.create(user=autre_user, type_agent='direction')
 
         sup_user = User.objects.create_user(username='sup1', password='x')
-        superviseur = Agent.objects.create(user=sup_user, type_agent='entrepot')
+        self.superviseur = Agent.objects.create(user=sup_user, type_agent='entrepot')
         agent_user = User.objects.create_user(username='agent1', password='x')
-        agent = Agent.objects.create(user=agent_user, type_agent='terrain', superviseur=superviseur)
+        self.agent = Agent.objects.create(user=agent_user, type_agent='terrain', superviseur=self.superviseur)
 
         self.lot = LotEntrepot.objects.create(
             produit=produit,
@@ -37,14 +37,14 @@ class CorrectionsAdministrativesAccessTests(TestCase):
             quantite_restante=Decimal('100.00'),
             prix_achat_unitaire=Decimal('250.00'),
         )
-        distribution = DistributionAgent.objects.create(
-            superviseur=superviseur, agent_terrain=agent, quantite_totale=Decimal('20.00')
+        self.distribution = DistributionAgent.objects.create(
+            superviseur=self.superviseur, agent_terrain=self.agent, quantite_totale=Decimal('20.00')
         )
         self.detail = DetailDistribution.objects.create(
-            distribution=distribution, lot=self.lot, quantite=Decimal('20.00')
+            distribution=self.distribution, lot=self.lot, quantite=Decimal('20.00')
         )
         self.vente = Vente.objects.create(
-            agent=agent,
+            agent=self.agent,
             detail_distribution=self.detail,
             quantite=Decimal('1.00'),
             prix_vente_unitaire=Decimal('800.00'),
@@ -100,20 +100,78 @@ class CorrectionsAdministrativesAccessTests(TestCase):
         self.assertEqual(correction.type_correction, 'LOT_QUANTITE')
         self.assertTrue(correction.motif)
 
-    def test_correction_lot_sans_motif_est_rejetee_par_le_formulaire(self):
+    def test_correction_lot_sans_motif_est_acceptee(self):
+        # Décision mdmaiga (2026-09-15) : le motif est facultatif.
         self.client.login(username='mdmaiga', password='x')
         response = self.client.post(
             reverse('corriger_lot', args=[self.lot.id]),
             {
                 'quantite_initiale': '120.00',
                 'prix_achat_unitaire': '',
+                'fournisseur': '',
                 'date_reception': '',
                 'motif': '',
+            },
+        )
+        self.assertRedirects(response, reverse('historique_corrections'))
+        self.assertEqual(CorrectionAdministrative.objects.count(), 1)
+        self.assertEqual(CorrectionAdministrative.objects.get().motif, '')
+
+    def test_correction_lot_sans_aucun_champ_est_rejetee_par_le_formulaire(self):
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.post(
+            reverse('corriger_lot', args=[self.lot.id]),
+            {
+                'quantite_initiale': '',
+                'prix_achat_unitaire': '',
+                'fournisseur': '',
+                'date_reception': '',
+                'motif': 'Un motif mais aucun champ à corriger',
             },
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(CorrectionAdministrative.objects.count(), 0)
         self.assertFalse(response.context['form'].is_valid())
+
+    def test_correction_distribution_via_formulaire_repercute_sur_le_stock(self):
+        # Bout en bout : "j'ai distribué 20, je corrige à 18" — le stock
+        # central doit recevoir la différence (2 restitués).
+        from core.models import AffectationLotSuperviseur
+        from datetime import date
+
+        # Les 20 déjà distribués sont déjà sortis du stock central.
+        self.lot.quantite_restante = Decimal('80.00')
+        self.lot.save()
+
+        AffectationLotSuperviseur.objects.create(
+            lot=self.lot,
+            superviseur=self.superviseur,
+            quantite_initiale=Decimal('20.00'),
+            quantite_restante=Decimal('0.00'),
+            agent_terrain_direct=self.agent,
+            date_affectation=date.today(),
+        )
+
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.post(
+            reverse('corriger_distribution', args=[self.detail.id]),
+            {
+                'superviseur': self.superviseur.id,
+                'agent_terrain': self.agent.id,
+                'produit': '',
+                'lot': '',
+                'quantite': '18.00',
+                'date_distribution': '',
+                'motif': '',
+            },
+        )
+        self.assertRedirects(response, reverse('historique_corrections'))
+        self.detail.refresh_from_db()
+        self.lot.refresh_from_db()
+        self.assertEqual(self.detail.quantite, Decimal('18.00'))
+        self.assertEqual(self.lot.quantite_restante, Decimal('82.00'))
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_QUANTITE')
 
     def test_liste_lots_filtre_par_produit_et_periode(self):
         self.client.login(username='mdmaiga', password='x')

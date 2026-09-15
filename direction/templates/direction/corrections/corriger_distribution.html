@@ -40,7 +40,21 @@
                         <label class="label"><span class="label-text text-xs">Agent destinataire (actuel : {{ distribution.agent_terrain.full_name|default:"—" }})</span></label>
                         {{ form.agent_terrain }}
                         <span class="label-text-alt text-slate-400 text-[10px] mt-1">
-                            Si vous changez le superviseur, resélectionnez aussi l'agent une fois la page rechargée.
+                            La liste se met à jour automatiquement selon le superviseur choisi.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Produit (actuel : {{ detail.lot.produit.nom }})</span></label>
+                        {{ form.produit }}
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Lot (actuel : reçu le {{ detail.lot.date_reception|date:"d/m/Y" }})</span></label>
+                        {{ form.lot }}
+                        <span class="label-text-alt text-slate-400 text-[10px] mt-1">
+                            À changer uniquement si le produit distribué était erroné.
                         </span>
                     </div>
                 </div>
@@ -57,7 +71,7 @@
                 </div>
 
                 <div class="form-control">
-                    <label class="label"><span class="label-text text-xs">Motif de la correction *</span></label>
+                    <label class="label"><span class="label-text text-xs">Motif de la correction (facultatif)</span></label>
                     {{ form.motif }}
                 </div>
 
@@ -68,4 +82,61 @@
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const superviseurSelect = document.getElementById('{{ form.superviseur.id_for_label }}');
+    const agentSelect = document.getElementById('{{ form.agent_terrain.id_for_label }}');
+    const produitSelect = document.getElementById('{{ form.produit.id_for_label }}');
+    const lotSelect = document.getElementById('{{ form.lot.id_for_label }}');
+
+    superviseurSelect.addEventListener('change', function () {
+        const superviseurId = this.value;
+        agentSelect.innerHTML = '<option value="">Chargement…</option>';
+        if (!superviseurId) {
+            agentSelect.innerHTML = '<option value="">—</option>';
+            return;
+        }
+        fetch(`/marchandise/ajax/agents-par-superviseur/?superviseur_id=${superviseurId}`)
+            .then(r => r.json())
+            .then(data => {
+                agentSelect.innerHTML = '';
+                if (data.length === 0) {
+                    agentSelect.innerHTML = '<option value="">Aucun agent pour ce superviseur</option>';
+                    return;
+                }
+                data.forEach(agent => {
+                    const opt = document.createElement('option');
+                    opt.value = agent.id;
+                    opt.textContent = agent.label;
+                    agentSelect.appendChild(opt);
+                });
+            });
+    });
+
+    produitSelect.addEventListener('change', function () {
+        const produitId = this.value;
+        lotSelect.innerHTML = '<option value="">Chargement…</option>';
+        if (!produitId) {
+            lotSelect.innerHTML = '<option value="">—</option>';
+            return;
+        }
+        fetch(`/agents/ajax/lots-par-produit/?produit_id=${produitId}`)
+            .then(r => r.json())
+            .then(data => {
+                lotSelect.innerHTML = '';
+                if (data.length === 0) {
+                    lotSelect.innerHTML = '<option value="">Aucun lot disponible pour ce produit</option>';
+                    return;
+                }
+                data.forEach(lot => {
+                    const opt = document.createElement('option');
+                    opt.value = lot.id;
+                    opt.textContent = lot.label;
+                    lotSelect.appendChild(opt);
+                });
+            });
+    });
+})();
+</script>
 {% endblock %}

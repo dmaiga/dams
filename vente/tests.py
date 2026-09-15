@@ -99,14 +99,14 @@ class CorrectionVenteServiceTests(TestCase):
             )
         self.assertEqual(CorrectionAdministrative.objects.count(), 0)
 
-    def test_motif_obligatoire(self):
-        with self.assertRaises(ValidationError):
-            CorrectionVenteService.corriger_vente(
-                self.vente.id,
-                prix_vente_unitaire=Decimal('900.00'),
-                motif='',
-                utilisateur=self.utilisateur,
-            )
+    def test_motif_facultatif(self):
+        CorrectionVenteService.corriger_vente(
+            self.vente.id,
+            prix_vente_unitaire=Decimal('900.00'),
+            motif='',
+            utilisateur=self.utilisateur,
+        )
+        self.assertEqual(CorrectionAdministrative.objects.get().motif, '')
 
     def test_corrige_date_conserve_heure_et_journalise(self):
         ancienne_date = self.vente.date_vente

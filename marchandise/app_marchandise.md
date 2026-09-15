@@ -155,39 +155,61 @@ Toutes les modifications sont exécutées dans une unique `transaction.atomic()`
 
 ---
 
-### `CorrectionLotService.corriger_lot(...)` — sprint-13, 2026-09-15
+### `CorrectionLotService.corriger_lot(...)` — sprint-13, 2026-09-15, révisé le même jour
 
 Correction administrative d'un `LotEntrepot` à la réception (quantité initiale, prix d'achat,
-date de réception), distincte de `corriger_affectation` (qui corrige une `AffectationLotSuperviseur`
-déjà sortie vers un superviseur). Refuse une quantité initiale sous ce qui est déjà sorti du lot
-(`quantite_initiale - quantite_restante`). `lot.save()` recalcule `valeur_stock_initiale` et
-revalide les garde-fous existants. Une ligne `CorrectionAdministrative` par champ effectivement
-modifié (`motif` obligatoire). Accès réservé à `direction.views._acces_admin_mdmaiga`.
+**fournisseur**, date de réception), distincte de `corriger_affectation` (qui corrige une
+`AffectationLotSuperviseur` déjà sortie vers un superviseur). Refuse une quantité initiale sous ce
+qui est déjà sorti du lot (`quantite_initiale - quantite_restante`). `lot.save()` recalcule
+`valeur_stock_initiale` et revalide les garde-fous existants. Une ligne `CorrectionAdministrative`
+par champ effectivement modifié. **`motif` facultatif** (décision mdmaiga, 2026-09-15 — la
+correction reste tracée qui/quand/avant/après sans lui). Accès réservé à
+`direction.views._acces_admin_mdmaiga`.
 
-### `CorrectionDistributionService.corriger_distribution(...)` — sprint-13, 2026-09-15
+### `CorrectionDistributionService.corriger_distribution(...)` — sprint-13, 2026-09-15, révisé le même jour
 
 Correction administrative d'une distribution déjà enregistrée (`DistributionAgent`/
-`DetailDistribution`) : agent destinataire, superviseur, et/ou quantité — cas remonté par mdmaiga
-(gestionnaire de stock qui se trompe d'agent, de superviseur ou de quantité).
+`DetailDistribution`) : superviseur, agent destinataire, **produit/lot distribué**, quantité et/ou
+date — cas remonté par mdmaiga, y compris le cas composé réel : *« j'ai voulu distribuer 5 ail à
+l'agent A du superviseur A, je me suis trompé en envoyant 4 oignon à l'agent B »* (agent **et**
+produit faux en même temps).
+
+Toutes les comparaisons se font contre les valeurs **originales** (avant toute correction de cette
+même requête), pas les unes contre les autres — un changement d'agent et un changement de produit
+dans la même soumission sont donc traités correctement ensemble, pas séquentiellement.
 
 - **Agent/superviseur** : réaffecte `DistributionAgent.agent_terrain`/`superviseur`. Refuse si le
   nouvel agent n'est pas rattaché (`Agent.superviseur`) au superviseur cible.
-- **Quantité** : même cascade que `corriger_affectation` (delta vers `AffectationLotSuperviseur.
-  quantite_initiale` et `LotEntrepot.quantite_restante`), refuse de descendre sous
-  `quantite_vendue` déjà enregistrée.
-- **Date** (`date_distribution`, ajouté 2026-09-15) : seul le jour est corrigé, l'heure d'origine
-  est conservée (`datetime.combine(nouvelle_date, ancienne_datetime.time())`) — aucun impact sur
-  les quantités.
+- **Produit/lot** (`lot`, ajouté 2026-09-15) : change `DetailDistribution.lot`. Traité comme un
+  **swap de stock entre deux lots**, pas un delta : l'ancien lot est intégralement crédité de la
+  quantité reprise, le nouveau lot est débité de la quantité corrigée (refuse si son
+  `quantite_restante` est insuffisant).
+- **Quantité** : si le produit ne change pas, delta classique (comme `corriger_affectation`) vers
+  `AffectationLotSuperviseur.quantite_initiale` et `LotEntrepot.quantite_restante` ; si le produit
+  change aussi, le delta est intégré au swap ci-dessus. Refuse de descendre sous `quantite_vendue`
+  déjà enregistrée.
+- **Date** (`date_distribution`) : seul le jour est corrigé, l'heure d'origine est conservée
+  (`datetime.combine(nouvelle_date, ancienne_datetime.time())`) — aucun impact sur les quantités.
 
-**Limite connue, assumée** : le lien vers l'`AffectationLotSuperviseur` source n'est pas porté par
-une FK (même limite que `AffectationLotService._charger_distribution_directe`) — une correction de
-quantité n'est cascadée vers le stock que si cette source peut être identifiée sans ambiguïté
-(`_trouver_affectation_source`, matching lot + superviseur + `agent_terrain_direct`). Pour une
-distribution issue du flux d'exception `vente/` (sans affectation directe résolvable), seule la
-distribution elle-même est corrigée — pas de tentative de deviner la source, même discipline que
-le service existant.
+**Garde-fou produit/agent** : si `DetailDistribution` porte déjà des `Vente` ou des `Perte`, changer
+le produit ou l'agent est **refusé** — au-delà de ce point, les ventes existantes doivent être
+corrigées séparément (`vente/services.py::CorrectionVenteService`), pas retargetées silencieusement
+vers un autre produit/agent. Seules la quantité et la date restent corrigeables dans ce cas.
 
-Une ligne `CorrectionAdministrative` par champ effectivement modifié.
+**`AffectationLotSuperviseur` maintenue en miroir** : quand la source peut être résolue
+(`_trouver_affectation_source`, matching lot + superviseur + `agent_terrain_direct` sur les valeurs
+**originales**), ses champs `lot`/`superviseur`/`agent_terrain_direct`/`quantite_initiale` sont
+resynchronisés à chaque correction qui les concerne — sinon une correction suivante ne la
+retrouverait plus (elle a été créée en même temps que la distribution par
+`AffectationSuperviseurForm.save()`, c'est la même « paire » logique). **Limite connue, assumée** :
+pas de FK explicite entre les deux (même limite que
+`AffectationLotService._charger_distribution_directe`) — une correction de produit/quantité est
+**refusée** si cette source ne peut pas être identifiée sans ambiguïté (flux d'exception `vente/`
+sans affectation directe résolvable), plutôt que de deviner.
+
+**`motif` facultatif** (décision mdmaiga, 2026-09-15). Une ligne `CorrectionAdministrative` par
+champ effectivement modifié (`DISTRIBUTION_AGENT`, `DISTRIBUTION_SUPERVISEUR`,
+`DISTRIBUTION_PRODUIT`, `DISTRIBUTION_QUANTITE`, `DISTRIBUTION_DATE`).
 
 ## Endpoint AJAX propre à l'app
 

@@ -236,14 +236,31 @@ class CorrectionLotServiceTests(TestCase):
             )
         self.assertEqual(CorrectionAdministrative.objects.count(), 0)
 
-    def test_motif_obligatoire(self):
-        with self.assertRaises(ValidationError):
-            CorrectionLotService.corriger_lot(
-                self.lot.id,
-                quantite_initiale=Decimal('120.00'),
-                motif='   ',
-                utilisateur=self.utilisateur,
-            )
+    def test_motif_facultatif(self):
+        # Décision mdmaiga (2026-09-15) : le motif n'est plus obligatoire,
+        # la correction reste tracée (qui/quand/avant/après) sans lui.
+        CorrectionLotService.corriger_lot(
+            self.lot.id,
+            quantite_initiale=Decimal('120.00'),
+            motif='',
+            utilisateur=self.utilisateur,
+        )
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.motif, '')
+
+    def test_corrige_fournisseur(self):
+        nouveau_fournisseur = Fournisseur.objects.create(nom='Nouveau Fournisseur')
+        CorrectionLotService.corriger_lot(
+            self.lot.id,
+            fournisseur=nouveau_fournisseur,
+            motif='Mauvais fournisseur enregistré',
+            utilisateur=self.utilisateur,
+        )
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.fournisseur, nouveau_fournisseur)
+        self.assertEqual(
+            CorrectionAdministrative.objects.get().type_correction, 'LOT_FOURNISSEUR'
+        )
 
     def test_prix_corrige_est_repercute(self):
         CorrectionLotService.corriger_lot(
@@ -365,12 +382,87 @@ class CorrectionDistributionServiceTests(TestCase):
                 utilisateur=self.utilisateur,
             )
 
-    def test_motif_obligatoire(self):
+    def test_motif_facultatif(self):
+        CorrectionDistributionService.corriger_distribution(
+            self.detail.id,
+            quantite=Decimal('40.00'),
+            motif='',
+            utilisateur=self.utilisateur,
+        )
+        self.assertEqual(CorrectionAdministrative.objects.get().motif, '')
+
+    def test_corrige_agent_et_produit_ensemble_cascade_le_stock(self):
+        # Cas réel : "j'ai voulu distribuer 5 ail à l'agent A, je me suis
+        # trompé en envoyant 4 oignon à l'agent B" — agent ET produit sont
+        # faux, la correction doit tout re-cibler et rendre le stock oignon
+        # tout en consommant le stock ail.
+        autre_produit = Produit.objects.create(nom='oignon')
+        autre_lot = LotEntrepot.objects.create(
+            produit=autre_produit,
+            quantite_initiale=Decimal('100.00'),
+            quantite_restante=Decimal('96.00'),
+            prix_achat_unitaire=Decimal('80.00'),
+        )
+        # simuler la distribution erronée : 4 oignon à agent2 au lieu de
+        # 5 ail (self.lot) à agent1.
+        self.detail.lot = autre_lot
+        self.detail.quantite = Decimal('4.00')
+        self.detail.save()
+        self.distribution.agent_terrain = self.agent2
+        self.distribution.save()
+        self.affectation.lot = autre_lot
+        self.affectation.agent_terrain_direct = self.agent2
+        self.affectation.quantite_initiale = Decimal('4.00')
+        self.affectation.save()
+
+        CorrectionDistributionService.corriger_distribution(
+            self.detail.id,
+            agent_terrain=self.agent,
+            lot=self.lot,
+            quantite=Decimal('5.00'),
+            motif='Mauvais produit et mauvais agent',
+            utilisateur=self.utilisateur,
+        )
+
+        self.detail.refresh_from_db()
+        self.distribution.refresh_from_db()
+        autre_lot.refresh_from_db()
+        self.lot.refresh_from_db()
+
+        self.assertEqual(self.detail.lot, self.lot)
+        self.assertEqual(self.detail.quantite, Decimal('5.00'))
+        self.assertEqual(self.distribution.agent_terrain, self.agent)
+        # le stock oignon (4) est restitué, le stock ail (5) est consommé
+        self.assertEqual(autre_lot.quantite_restante, Decimal('100.00'))
+        self.assertEqual(self.lot.quantite_restante, Decimal('145.00'))
+
+        types = set(
+            CorrectionAdministrative.objects.values_list('type_correction', flat=True)
+        )
+        self.assertIn('DISTRIBUTION_PRODUIT', types)
+        self.assertIn('DISTRIBUTION_AGENT', types)
+        self.assertIn('DISTRIBUTION_QUANTITE', types)
+
+    def test_refuse_changement_produit_si_ventes_existantes(self):
+        Vente.objects.create(
+            agent=self.agent,
+            detail_distribution=self.detail,
+            quantite=Decimal('5.00'),
+            prix_vente_unitaire=Decimal('150.00'),
+            type_vente='detail',
+        )
+        autre_produit = Produit.objects.create(nom='oignon')
+        autre_lot = LotEntrepot.objects.create(
+            produit=autre_produit,
+            quantite_initiale=Decimal('50.00'),
+            quantite_restante=Decimal('50.00'),
+            prix_achat_unitaire=Decimal('80.00'),
+        )
         with self.assertRaises(ValidationError):
             CorrectionDistributionService.corriger_distribution(
                 self.detail.id,
-                quantite=Decimal('40.00'),
-                motif='',
+                lot=autre_lot,
+                motif='test',
                 utilisateur=self.utilisateur,
             )
 

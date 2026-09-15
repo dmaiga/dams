@@ -35,11 +35,10 @@ class CorrectionVenteService:
         prix_vente_unitaire=_NON_RENSEIGNE,
         quantite=_NON_RENSEIGNE,
         date_vente=_NON_RENSEIGNE,
-        motif,
+        motif='',
         utilisateur,
     ):
-        if not motif or not motif.strip():
-            raise ValidationError("Un motif est obligatoire pour toute correction.")
+        motif = motif or ''
 
         prix_vente_unitaire = cls._normaliser_montant(prix_vente_unitaire, "Le prix corrigé")
         quantite = cls._normaliser_montant(quantite, "La quantité corrigée")

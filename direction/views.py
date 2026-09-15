@@ -1724,7 +1724,7 @@ def corriger_lot(request, lot_id):
         form = CorrectionLotForm(request.POST)
         if form.is_valid():
             kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
-            for champ in ('quantite_initiale', 'prix_achat_unitaire', 'date_reception'):
+            for champ in ('quantite_initiale', 'prix_achat_unitaire', 'fournisseur', 'date_reception'):
                 if form.cleaned_data.get(champ) is not None:
                     kwargs[champ] = form.cleaned_data[champ]
             try:
@@ -1739,6 +1739,7 @@ def corriger_lot(request, lot_id):
         form = CorrectionLotForm(initial={
             'quantite_initiale': lot.quantite_initiale,
             'prix_achat_unitaire': lot.prix_achat_unitaire,
+            'fournisseur': lot.fournisseur_id,
             'date_reception': lot.date_reception.date(),
         })
 
@@ -1765,7 +1766,7 @@ def corriger_distribution(request, detail_distribution_id):
         form = CorrectionDistributionForm(request.POST)
         if form.is_valid():
             kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
-            for champ in ('agent_terrain', 'superviseur', 'quantite', 'date_distribution'):
+            for champ in ('agent_terrain', 'superviseur', 'lot', 'quantite', 'date_distribution'):
                 if form.cleaned_data.get(champ) is not None:
                     kwargs[champ] = form.cleaned_data[champ]
             try:
@@ -1777,19 +1778,17 @@ def corriger_distribution(request, detail_distribution_id):
                 messages.success(request, f"Distribution #{distribution.id} corrigée.")
                 return redirect('historique_corrections')
     else:
+        # Superviseur/agent/produit/lot préremplis à la valeur courante — le
+        # formulaire pré-sélectionne toujours quelque chose de cohérent,
+        # jamais un champ vide en attente de sélection.
         form = CorrectionDistributionForm(initial={
             'superviseur': distribution.superviseur_id,
             'agent_terrain': distribution.agent_terrain_id,
+            'produit': detail.lot.produit_id,
+            'lot': detail.lot_id,
             'quantite': detail.quantite,
             'date_distribution': distribution.date_distribution.date(),
         })
-        # Le champ agent_terrain est vide par défaut (pattern AJAX, cf.
-        # marchandise.AffectationSuperviseurForm) sauf ici : on préremplit
-        # avec l'agent actuel pour l'afficher sans clic supplémentaire.
-        if distribution.agent_terrain_id:
-            form.fields['agent_terrain'].queryset = Agent.objects.filter(
-                pk=distribution.agent_terrain_id
-            )
 
     return render(request, 'direction/corrections/corriger_distribution.html', {
         'form': form,

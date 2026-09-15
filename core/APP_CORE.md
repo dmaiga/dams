@@ -188,12 +188,18 @@ après, pourquoi), et `JournalModificationDistribution` (§ ci-dessus, limité �
 sert de précédent à ne pas redupliquer deux fois de plus.
 
 Champs : `utilisateur` (FK `User`), `content_type`/`object_id`/`cible` (cible générique),
-`type_correction` (9 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `DISTRIBUTION_AGENT`,
-`DISTRIBUTION_SUPERVISEUR`, `DISTRIBUTION_QUANTITE`, `DISTRIBUTION_DATE`, `VENTE_PRIX_QUANTITE`,
-`VENTE_DATE` — les deux derniers ajoutés le 2026-09-15, migration `0123`, suite au constat que la
-date d'une distribution/vente est aussi une source d'erreur terrain récurrente), `motif`
-(obligatoire, non-nullable — toute correction doit être justifiée), `anciennes_valeurs`/`nouvelles_valeurs`
-(JSON), `date_action` (`auto_now_add`).
+`type_correction` (11 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `LOT_FOURNISSEUR`,
+`DISTRIBUTION_AGENT`, `DISTRIBUTION_SUPERVISEUR`, `DISTRIBUTION_PRODUIT`, `DISTRIBUTION_QUANTITE`,
+`DISTRIBUTION_DATE`, `VENTE_PRIX_QUANTITE`, `VENTE_DATE`), `motif` (`TextField(blank=True)` —
+**facultatif depuis le 2026-09-15**, décision mdmaiga ; une correction reste tracée
+qui/quand/avant/après sans lui), `anciennes_valeurs`/`nouvelles_valeurs` (JSON), `date_action`
+(`auto_now_add`).
+
+`LOT_FOURNISSEUR` et `DISTRIBUTION_PRODUIT` ajoutés le 2026-09-15, même migration `0124`
+(`correction_administrative_motif_facultatif`, qui alterne `type_correction` ET `motif` en un seul
+passage) : la correction de lot couvre aussi le fournisseur, et la correction de distribution
+couvre aussi le produit/lot distribué (pas seulement l'agent/la quantité) — voir
+`marchandise/APP_MARCHANDISE.md` pour le détail de la cascade (swap de stock entre deux lots).
 
 Migration `core/migrations/0122_correction_administrative.py`. Accès aux vues de correction
 (`direction/`) : garde partagée `direction.views._acces_admin_mdmaiga` (généralisée depuis

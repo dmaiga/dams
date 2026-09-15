@@ -252,10 +252,24 @@ principe que `VenteForm.save()` à la création). Deux nouveaux types d'audit :
 `DISTRIBUTION_DATE`, `VENTE_DATE` (migration `0123`).
 
 **Formulaires** (`direction/forms.py`) : `CorrectionLotForm`, `CorrectionDistributionForm`,
-`CorrectionVenteForm` — tous avec `motif` obligatoire (`clean()` exige qu'au moins un
-champ métier soit renseigné en plus). Les vues traduisent une `ValidationError` levée
-par le service en erreur de formulaire (`form.add_error(None, ...)`) plutôt que de
-laisser remonter une 500.
+`CorrectionVenteForm` — le `motif` est **facultatif** (décision mdmaiga, 2026-09-15 :
+« un point commun à tous, rendre le commentaire facultatif ») ; `clean()` exige
+seulement qu'au moins un champ métier soit renseigné. Les vues traduisent une
+`ValidationError` levée par le service en erreur de formulaire
+(`form.add_error(None, ...)`) plutôt que de laisser remonter une 500.
+
+**`CorrectionLotForm` porte aussi `fournisseur`** (ajouté 2026-09-15) — la correction
+du lot ne se limite plus à quantité/prix/date.
+
+**`CorrectionDistributionForm` révisé (2026-09-15)** — `superviseur` et `agent_terrain`
+sont désormais **toujours pré-sélectionnés** à la valeur courante (jamais de champ vide
+en attente de choix) ; `agent_terrain` se recharge par AJAX
+(`/marchandise/ajax/agents-par-superviseur/`) dès que `superviseur` change côté client,
+pour ne jamais laisser un agent incohérent avec le superviseur affiché. Le formulaire
+porte aussi **`produit`/`lot`** (cascade AJAX `/agents/ajax/lots-par-produit/`,
+identique) : la correction ne porte plus seulement sur l'agent ou la quantité, mais
+aussi sur le **produit distribué** — cas réel : gestionnaire de stock qui envoie le
+mauvais produit au mauvais agent en même temps.
 
 **Points d'entrée secondaires depuis l'existant** (liens « Corriger », visibles
 uniquement pour `mdmaiga`, en plus des 3 listes dédiées) : fiche lot
@@ -269,15 +283,19 @@ ligne "vide" si rien n'a changé. Voir `marchandise/APP_MARCHANDISE.md` et
 `vente/APP_VENTE.md` pour le détail des cascades par service.
 
 **Limite assumée** (`CorrectionDistributionService`) : le lien vers l'affectation
-source n'existe pas comme FK explicite — une correction de quantité de distribution
-n'est cascadée vers le stock (`AffectationLotSuperviseur`/`LotEntrepot`) que si cette
-source peut être identifiée sans ambiguïté ; sinon seule la distribution est corrigée
-(pas de correction silencieuse et potentiellement fausse du stock central).
+source n'existe pas comme FK explicite — une correction de produit/quantité de
+distribution n'est cascadée vers le stock (`AffectationLotSuperviseur`/`LotEntrepot`)
+que si cette source peut être identifiée sans ambiguïté ; sinon la correction est
+refusée (pas de correction silencieuse et potentiellement fausse du stock central).
+**Garde-fou** : changer le produit ou l'agent est refusé si la distribution porte déjà
+des ventes ou des pertes enregistrées — seules la quantité et la date restent
+corrigeables dans ce cas (voir `marchandise/APP_MARCHANDISE.md` pour le détail).
 
 **Tests** : `marchandise/tests.py` (`CorrectionLotServiceTests`,
-`CorrectionDistributionServiceTests`), `vente/tests.py`
-(`CorrectionVenteServiceTests`), `direction/tests.py`
-(`CorrectionsAdministrativesAccessTests` — accès, audit, motif obligatoire).
+`CorrectionDistributionServiceTests` — dont le scénario composé agent+produit),
+`vente/tests.py` (`CorrectionVenteServiceTests`), `direction/tests.py`
+(`CorrectionsAdministrativesAccessTests` — accès, audit, motif facultatif, bout en
+bout formulaire→service).
 
 **Périmètre non couvert** : `SuperviseurAgentsService.get_agents_ventes` (même fichier)
 liste le portefeuille **actuel** du superviseur (`Agent.objects.filter(superviseur=...)`)

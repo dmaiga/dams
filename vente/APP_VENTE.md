@@ -125,7 +125,8 @@ et prix au kilo (produit vrac), ex. 800 FCFA saisi au lieu de 20 000 FCFA pour u
   (`type_correction='VENTE_DATE'`), sans cascade sur `Recouvrement`.
 - Une ligne `CorrectionAdministrative` par correction effectivement appliquée
   (`type_correction='VENTE_PRIX_QUANTITE'` pour prix/quantité, `'VENTE_DATE'` pour la date),
-  `motif` obligatoire. Accès réservé à `direction.views._acces_admin_mdmaiga`.
+  `motif` facultatif (décision mdmaiga, 2026-09-15). Accès réservé à
+  `direction.views._acces_admin_mdmaiga`.
 
 ---
 
