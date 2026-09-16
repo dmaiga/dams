@@ -637,6 +637,102 @@ class CorrectionDistributionService:
 
         return detail
 
+    @classmethod
+    def supprimer_distribution(
+        cls,
+        detail_distribution_id,
+        *,
+        motif='',
+        utilisateur,
+    ):
+        """Supprime integralement une distribution erronee (doublon typique :
+        le gestionnaire de stock soumet deux fois la meme affectation) et
+        restitue le stock au LotEntrepot.
+
+        Refusee si la distribution porte deja des ventes ou des pertes —
+        meme discipline que le changement de produit/agent. Refusee aussi si
+        l'AffectationLotSuperviseur source ne peut pas etre identifiee sans
+        ambiguite (rien a restituer de facon fiable).
+
+        Supprime aussi l'AffectationLotSuperviseur source (creee comme la
+        meme "paire" logique par AffectationSuperviseurForm.save() — la
+        conserver a quantite figee laisserait une trace incoherente). Le
+        DistributionAgent est supprime s'il ne porte plus aucun autre detail,
+        sinon seul son quantite_totale est recalcule.
+        """
+        motif = motif or ''
+
+        with transaction.atomic():
+            detail = DetailDistribution.objects.select_for_update().get(
+                pk=detail_distribution_id
+            )
+            distribution = DistributionAgent.objects.select_for_update().get(
+                pk=detail.distribution_id
+            )
+
+            quantite_vendue = (
+                Vente.objects.filter(
+                    detail_distribution=detail, est_supprime=False
+                ).aggregate(total=Sum('quantite'))['total']
+                or Decimal('0.00')
+            )
+            if quantite_vendue > 0 or detail.pertes.exists():
+                raise ValidationError(
+                    "Cette distribution porte deja des ventes ou des pertes "
+                    "enregistrees — suppression refusee."
+                )
+
+            affectation = cls._trouver_affectation_source(detail, distribution)
+            if affectation is None:
+                raise ValidationError(
+                    "Impossible d'identifier sans ambiguite le stock source de "
+                    "cette distribution — suppression refusee."
+                )
+
+            lot = LotEntrepot.objects.select_for_update().get(pk=detail.lot_id)
+            quantite_restante = lot.quantite_restante + detail.quantite
+            if quantite_restante > lot.quantite_initiale:
+                raise ValidationError(
+                    "La suppression restituerait plus de stock que la "
+                    "quantite initiale du lot."
+                )
+            lot.quantite_restante = quantite_restante
+            lot.save(update_fields=['quantite_restante'])
+
+            anciennes_valeurs = {
+                'lot_id': detail.lot_id,
+                'produit': detail.lot.produit.nom,
+                'quantite': str(detail.quantite),
+                'superviseur_id': distribution.superviseur_id,
+                'superviseur': distribution.superviseur.full_name,
+                'agent_terrain_id': distribution.agent_terrain_id,
+                'agent_terrain': (
+                    distribution.agent_terrain.full_name
+                    if distribution.agent_terrain else None
+                ),
+            }
+            enregistrer_correction(
+                cible=detail,
+                type_correction='DISTRIBUTION_SUPPRESSION',
+                motif=motif,
+                utilisateur=utilisateur,
+                anciennes_valeurs=anciennes_valeurs,
+                nouvelles_valeurs={'supprime': True},
+            )
+
+            affectation.delete()
+            detail.delete()
+
+            autres_details = DetailDistribution.objects.filter(distribution=distribution)
+            if autres_details.exists():
+                distribution.quantite_totale = (
+                    autres_details.aggregate(total=Sum('quantite'))['total']
+                    or Decimal('0.00')
+                )
+                distribution.save(update_fields=['quantite_totale'])
+            else:
+                distribution.delete()
+
     @staticmethod
     def _trouver_affectation_source(detail, distribution):
         candidats = list(

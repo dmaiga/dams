@@ -211,6 +211,31 @@ sans affectation directe résolvable), plutôt que de deviner.
 champ effectivement modifié (`DISTRIBUTION_AGENT`, `DISTRIBUTION_SUPERVISEUR`,
 `DISTRIBUTION_PRODUIT`, `DISTRIBUTION_QUANTITE`, `DISTRIBUTION_DATE`).
 
+### `CorrectionDistributionService.supprimer_distribution(...)` — sprint-13, 2026-09-16
+
+Suppression intégrale d'une distribution erronée — cas typique : le gestionnaire de stock soumet
+deux fois la même affectation (doublon), ce que `corriger_distribution` ne couvrait pas (il corrige
+des champs, il ne supprime pas l'événement entier).
+
+- Même garde que le changement de produit/agent : refuse si `Vente`/`Perte` existent déjà sur le
+  `DetailDistribution` — une distribution déjà vendue ne se supprime pas, elle se corrige.
+- Refuse si l'`AffectationLotSuperviseur` source ne peut pas être identifiée sans ambiguïté
+  (`_trouver_affectation_source`) — rien à restituer de façon fiable sinon.
+- **Effet domino** : `LotEntrepot.quantite_restante` crédité de la quantité de la distribution
+  supprimée ; l'`AffectationLotSuperviseur` source est supprimée (créée comme la même « paire »
+  logique par `AffectationSuperviseurForm.save()`, la conserver figée laisserait une trace
+  incohérente) ; le `DetailDistribution` est supprimé ; le `DistributionAgent` est supprimé s'il ne
+  porte plus aucun autre détail, sinon seul `quantite_totale` est recalculé sur les détails
+  restants.
+- Une seule ligne `CorrectionAdministrative` (`type_correction='DISTRIBUTION_SUPPRESSION'`),
+  journalisée **avant** la suppression effective (elle capture un instantané — produit, quantité,
+  superviseur, agent — puisque la cible n'existe plus après coup).
+- Accès : `direction.views.supprimer_distribution_admin`, bouton « Zone dangereuse » sur l'écran
+  `corriger_distribution` — distinct de `core.views.supprimer_distribution` (soft delete
+  self-service superviseur, code legacy qui appelle `DistributionAgent.soft_delete()`/
+  `est_supprime`, **inexistants sur ce modèle** — vérifié en marge de ce sprint, cassé/mort,
+  hors périmètre de correction ici).
+
 ## Endpoint AJAX propre à l'app
 
 `/marchandise/ajax/agents-par-superviseur/?superviseur_id=X` — retourne les agents actifs rattachés au superviseur, pour peupler `agent_terrain`.

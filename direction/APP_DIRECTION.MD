@@ -223,7 +223,7 @@ superviseur mal identifié en distribution, confusion prix au sac / prix au kilo
 vente) — sans aucune trace (qui, quand, avant/après, motif). Ce sprint déplace ces
 corrections dans l'application, avec effet domino correct et audit obligatoire.
 
-**7 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
+**8 écrans, tous réservés à `mdmaiga`** (`_acces_admin_mdmaiga`, section ADMIN du
 menu — 4 entrées directes : Corriger un lot / une distribution / une vente,
 Historique) :
 
@@ -234,8 +234,21 @@ Historique) :
 | `liste_corrections_ventes` | `direction/corrections/ventes/` | Liste des ventes, filtrable par **agent**, **produit** et **période de vente** — point d'entrée de la correction de vente. |
 | `corriger_lot` | `direction/corrections/lot/<lot_id>/` | Appelle `marchandise.services.CorrectionLotService.corriger_lot` |
 | `corriger_distribution` | `direction/corrections/distribution/<detail_distribution_id>/` | Appelle `marchandise.services.CorrectionDistributionService.corriger_distribution` |
+| `supprimer_distribution_admin` | `direction/corrections/distribution/<detail_distribution_id>/supprimer/` | Appelle `marchandise.services.CorrectionDistributionService.supprimer_distribution` — bouton « Zone dangereuse » sur `corriger_distribution.html`, POST uniquement |
 | `corriger_vente` | `direction/corrections/vente/<vente_id>/` | Appelle `vente.services.CorrectionVenteService.corriger_vente` |
 | `historique_corrections` | `direction/corrections/historique/` | Lecture de `CorrectionAdministrative` (filtrable par type, paginée 30/page) |
+
+**Suppression de distribution (doublon)** — ajoutée 2026-09-16 : mdmaiga a signalé que la
+correction de distribution ne couvrait pas le cas du **doublon pur** (la même affectation soumise
+deux fois par le gestionnaire de stock) — corriger des champs ne suffit pas, il faut effacer
+l'événement en trop. `supprimer_distribution_admin` supprime le `DetailDistribution` (et le
+`DistributionAgent` s'il ne porte plus d'autre détail) et restitue la quantité au
+`LotEntrepot.quantite_restante`, avec la même garde que le changement de produit/agent (refusé si
+des ventes ou pertes existent déjà dessus). Voir `marchandise/APP_MARCHANDISE.md` pour le détail
+du service. **Distinct de `core.views.supprimer_distribution`** (route `/distribution/<id>/
+supprimer/`, réservée aux superviseurs, appelle `DistributionAgent.soft_delete()`/filtre
+`est_supprime` — **champ et méthode inexistants sur ce modèle**, constaté lors de ce sprint : code
+legacy cassé, non touché car hors périmètre).
 
 **Révision du 2026-09-15 (même jour)** : une première version regroupait les 3
 recherches sur un seul écran « hub » (`corrections_hub`) — remplacée à la demande de
@@ -292,10 +305,11 @@ des ventes ou des pertes enregistrées — seules la quantité et la date resten
 corrigeables dans ce cas (voir `marchandise/APP_MARCHANDISE.md` pour le détail).
 
 **Tests** : `marchandise/tests.py` (`CorrectionLotServiceTests`,
-`CorrectionDistributionServiceTests` — dont le scénario composé agent+produit),
-`vente/tests.py` (`CorrectionVenteServiceTests`), `direction/tests.py`
+`CorrectionDistributionServiceTests` — dont le scénario composé agent+produit et la
+suppression de doublon avec restitution de stock), `vente/tests.py`
+(`CorrectionVenteServiceTests`), `direction/tests.py`
 (`CorrectionsAdministrativesAccessTests` — accès, audit, motif facultatif, bout en
-bout formulaire→service).
+bout formulaire→service, y compris la suppression de distribution).
 
 **Périmètre non couvert** : `SuperviseurAgentsService.get_agents_ventes` (même fichier)
 liste le portefeuille **actuel** du superviseur (`Agent.objects.filter(superviseur=...)`)

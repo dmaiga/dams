@@ -188,12 +188,18 @@ après, pourquoi), et `JournalModificationDistribution` (§ ci-dessus, limité �
 sert de précédent à ne pas redupliquer deux fois de plus.
 
 Champs : `utilisateur` (FK `User`), `content_type`/`object_id`/`cible` (cible générique),
-`type_correction` (11 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `LOT_FOURNISSEUR`,
+`type_correction` (12 choix : `LOT_QUANTITE`, `LOT_PRIX`, `LOT_DATE`, `LOT_FOURNISSEUR`,
 `DISTRIBUTION_AGENT`, `DISTRIBUTION_SUPERVISEUR`, `DISTRIBUTION_PRODUIT`, `DISTRIBUTION_QUANTITE`,
-`DISTRIBUTION_DATE`, `VENTE_PRIX_QUANTITE`, `VENTE_DATE`), `motif` (`TextField(blank=True)` —
-**facultatif depuis le 2026-09-15**, décision mdmaiga ; une correction reste tracée
-qui/quand/avant/après sans lui), `anciennes_valeurs`/`nouvelles_valeurs` (JSON), `date_action`
-(`auto_now_add`).
+`DISTRIBUTION_DATE`, `DISTRIBUTION_SUPPRESSION`, `VENTE_PRIX_QUANTITE`, `VENTE_DATE`), `motif`
+(`TextField(blank=True)` — **facultatif depuis le 2026-09-15**, décision mdmaiga ; une correction
+reste tracée qui/quand/avant/après sans lui), `anciennes_valeurs`/`nouvelles_valeurs` (JSON),
+`date_action` (`auto_now_add`).
+
+`DISTRIBUTION_SUPPRESSION` ajouté le 2026-09-16 (migration `0125`) : cas du doublon pur — une
+distribution soumise deux fois par erreur ne se corrige pas champ par champ, elle s'efface
+entièrement, avec restitution du stock. `cible` (GenericForeignKey) pointe alors vers un
+`DetailDistribution` qui n'existe plus après coup (`enregistrer_correction` capture son instantané
+juste avant la suppression) — cas normal pour ce type, pas une anomalie.
 
 `LOT_FOURNISSEUR` et `DISTRIBUTION_PRODUIT` ajoutés le 2026-09-15, même migration `0124`
 (`correction_administrative_motif_facultatif`, qui alterne `type_correction` ET `motif` en un seul

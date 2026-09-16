@@ -1665,6 +1665,7 @@ class CorrectionAdministrative(models.Model):
         ('DISTRIBUTION_PRODUIT', "Produit/lot distribué"),
         ('DISTRIBUTION_QUANTITE', "Quantité distribuée"),
         ('DISTRIBUTION_DATE', "Date de la distribution"),
+        ('DISTRIBUTION_SUPPRESSION', "Suppression de la distribution (doublon)"),
         ('VENTE_PRIX_QUANTITE', "Prix et/ou quantité de la vente"),
         ('VENTE_DATE', "Date de la vente"),
     )

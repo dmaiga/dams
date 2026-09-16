@@ -1799,6 +1799,34 @@ def corriger_distribution(request, detail_distribution_id):
 
 @login_required
 @user_passes_test(_acces_admin_mdmaiga)
+def supprimer_distribution_admin(request, detail_distribution_id):
+    """Suppression d'une distribution erronee (doublon typique) — detail +
+    restitution du stock au LotEntrepot. Distinct de core.views.
+    supprimer_distribution (soft delete superviseur, hors perimetre ici).
+    """
+    from marchandise.services import CorrectionDistributionService
+
+    detail = get_object_or_404(DetailDistribution, pk=detail_distribution_id)
+
+    if request.method == 'POST':
+        motif = request.POST.get('motif', '')
+        try:
+            CorrectionDistributionService.supprimer_distribution(
+                detail.id, motif=motif, utilisateur=request.user
+            )
+        except _DjangoValidationError as exc:
+            for erreur in _erreurs_formulaire(exc):
+                messages.error(request, erreur)
+            return redirect('corriger_distribution', detail_distribution_id=detail.id)
+        else:
+            messages.success(request, "Distribution supprimée, stock restitué.")
+            return redirect('historique_corrections')
+
+    return redirect('corriger_distribution', detail_distribution_id=detail.id)
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
 def corriger_vente(request, vente_id):
     from vente.services import CorrectionVenteService
 

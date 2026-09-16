@@ -173,6 +173,50 @@ class CorrectionsAdministrativesAccessTests(TestCase):
         correction = CorrectionAdministrative.objects.get()
         self.assertEqual(correction.type_correction, 'DISTRIBUTION_QUANTITE')
 
+    def test_suppression_distribution_via_formulaire_restitue_le_stock(self):
+        from core.models import AffectationLotSuperviseur
+        from datetime import date
+
+        # Distribution en double : aucune vente dessus, cible du doublon.
+        doublon = DistributionAgent.objects.create(
+            superviseur=self.superviseur, agent_terrain=self.agent, quantite_totale=Decimal('10.00')
+        )
+        detail_doublon = DetailDistribution.objects.create(
+            distribution=doublon, lot=self.lot, quantite=Decimal('10.00')
+        )
+        self.lot.quantite_restante = Decimal('90.00')
+        self.lot.save()
+        AffectationLotSuperviseur.objects.create(
+            lot=self.lot,
+            superviseur=self.superviseur,
+            quantite_initiale=Decimal('10.00'),
+            quantite_restante=Decimal('0.00'),
+            agent_terrain_direct=self.agent,
+            date_affectation=date.today(),
+        )
+
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.post(
+            reverse('supprimer_distribution_admin', args=[detail_doublon.id]),
+            {'motif': 'Doublon'},
+        )
+        self.assertRedirects(response, reverse('historique_corrections'))
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.quantite_restante, Decimal('100.00'))
+        self.assertFalse(DetailDistribution.objects.filter(pk=detail_doublon.pk).exists())
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_SUPPRESSION')
+
+    def test_suppression_distribution_refusee_redirige_avec_message(self):
+        # self.detail porte déjà self.vente (créée dans setUp) — refusée.
+        self.client.login(username='mdmaiga', password='x')
+        response = self.client.post(
+            reverse('supprimer_distribution_admin', args=[self.detail.id]),
+            {'motif': ''},
+        )
+        self.assertRedirects(response, reverse('corriger_distribution', args=[self.detail.id]))
+        self.assertTrue(DetailDistribution.objects.filter(pk=self.detail.pk).exists())
+
     def test_liste_lots_filtre_par_produit_et_periode(self):
         self.client.login(username='mdmaiga', password='x')
         response = self.client.get(reverse('liste_corrections_lots'), {'produit': self.lot.produit_id})

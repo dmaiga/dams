@@ -483,3 +483,75 @@ class CorrectionDistributionServiceTests(TestCase):
 
         correction = CorrectionAdministrative.objects.get()
         self.assertEqual(correction.type_correction, 'DISTRIBUTION_DATE')
+
+    def test_supprime_distribution_restitue_le_stock(self):
+        # Cas doublon : la meme affectation a ete soumise deux fois par le
+        # gestionnaire de stock, il faut effacer l'evenement en trop et
+        # rendre le stock qu'il avait pris.
+        CorrectionDistributionService.supprimer_distribution(
+            self.detail.id,
+            motif='Doublon — même distribution saisie deux fois',
+            utilisateur=self.utilisateur,
+        )
+
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.quantite_restante, Decimal('200.00'))
+        self.assertFalse(DetailDistribution.objects.filter(pk=self.detail.pk).exists())
+        self.assertFalse(DistributionAgent.objects.filter(pk=self.distribution.pk).exists())
+        self.assertFalse(
+            AffectationLotSuperviseur.objects.filter(pk=self.affectation.pk).exists()
+        )
+
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_SUPPRESSION')
+        self.assertEqual(correction.anciennes_valeurs['quantite'], '50.00')
+
+    def test_supprime_distribution_garde_les_autres_details(self):
+        autre_produit = Produit.objects.create(nom='mil')
+        autre_lot = LotEntrepot.objects.create(
+            produit=autre_produit,
+            quantite_initiale=Decimal('30.00'),
+            quantite_restante=Decimal('30.00'),
+            prix_achat_unitaire=Decimal('60.00'),
+        )
+        autre_detail = DetailDistribution.objects.create(
+            distribution=self.distribution, lot=autre_lot, quantite=Decimal('10.00')
+        )
+
+        CorrectionDistributionService.supprimer_distribution(
+            self.detail.id,
+            motif='',
+            utilisateur=self.utilisateur,
+        )
+
+        self.assertTrue(DistributionAgent.objects.filter(pk=self.distribution.pk).exists())
+        self.distribution.refresh_from_db()
+        self.assertEqual(self.distribution.quantite_totale, autre_detail.quantite)
+
+    def test_refuse_suppression_si_ventes_existantes(self):
+        Vente.objects.create(
+            agent=self.agent,
+            detail_distribution=self.detail,
+            quantite=Decimal('5.00'),
+            prix_vente_unitaire=Decimal('150.00'),
+            type_vente='detail',
+        )
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.supprimer_distribution(
+                self.detail.id,
+                motif='test',
+                utilisateur=self.utilisateur,
+            )
+        self.assertTrue(DetailDistribution.objects.filter(pk=self.detail.pk).exists())
+
+    def test_refuse_suppression_si_affectation_source_introuvable(self):
+        # Distribution issue du flux d'exception vente/ : aucune
+        # AffectationLotSuperviseur en distribution directe ne matche.
+        self.affectation.delete()
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.supprimer_distribution(
+                self.detail.id,
+                motif='test',
+                utilisateur=self.utilisateur,
+            )
+        self.assertTrue(DetailDistribution.objects.filter(pk=self.detail.pk).exists())

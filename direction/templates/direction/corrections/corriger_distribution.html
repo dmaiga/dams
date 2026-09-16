@@ -81,6 +81,31 @@
             </form>
         </div>
     </div>
+
+    <div class="card bg-white shadow-sm border border-red-200">
+        <div class="card-body space-y-3">
+            <h2 class="text-sm font-semibold text-red-700 uppercase tracking-wide">
+                Zone dangereuse — doublon
+            </h2>
+            <p class="text-xs text-slate-500">
+                Supprime intégralement cette distribution (et son détail) et restitue la quantité
+                au stock central du lot. Réservé aux distributions en double ou totalement
+                erronées, sans aucune vente ni perte déjà enregistrées dessus.
+            </p>
+            <form method="post" action="{% url 'supprimer_distribution_admin' detail.id %}"
+                  onsubmit="return confirm('Supprimer définitivement cette distribution et restituer le stock ?');">
+                {% csrf_token %}
+                <div class="form-control mb-3">
+                    <label class="label"><span class="label-text text-xs">Motif (facultatif)</span></label>
+                    <textarea name="motif" rows="2" class="textarea textarea-bordered textarea-sm w-full"
+                              placeholder="ex. doublon — même distribution saisie deux fois"></textarea>
+                </div>
+                <button type="submit" class="btn btn-error btn-sm w-full">
+                    Supprimer cette distribution
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>

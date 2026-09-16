@@ -22,6 +22,7 @@ from direction.views import (
                                  suivi_distributions,
                                  reaffectation_agents, historique_reaffectation,
                                  corriger_lot, corriger_distribution, corriger_vente,
+                                 supprimer_distribution_admin,
                                  liste_corrections_lots, liste_corrections_distributions,
                                  liste_corrections_ventes, historique_corrections,
                               )
@@ -133,6 +134,7 @@ urlpatterns = [
     path('direction/corrections/ventes/', liste_corrections_ventes, name='liste_corrections_ventes'),
     path('direction/corrections/lot/<int:lot_id>/', corriger_lot, name='corriger_lot'),
     path('direction/corrections/distribution/<int:detail_distribution_id>/', corriger_distribution, name='corriger_distribution'),
+    path('direction/corrections/distribution/<int:detail_distribution_id>/supprimer/', supprimer_distribution_admin, name='supprimer_distribution_admin'),
     path('direction/corrections/vente/<int:vente_id>/', corriger_vente, name='corriger_vente'),
     path('direction/corrections/historique/', historique_corrections, name='historique_corrections'),
 
