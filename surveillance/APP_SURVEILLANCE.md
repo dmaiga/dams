@@ -6,6 +6,54 @@ L'application `surveillance` constitue la **tour de contrôle analytique et rég
 
 Elle offre aux profils de direction et de contrôle une visibilité à 360° sur l'activité des superviseurs d'entrepôts, des agents et sur la rentabilité des stocks de produits.
 
+Lecture seule sur la base `core`. Aucune mutation de données.
+
+---
+
+## 🔐 Accès et sécurité
+
+**Mixin :** `surveillance.mixins.SurveillanceAccessMixin`, hérité par toutes les CBV avant `TemplateView`.
+
+| Profil | Accès |
+|--------|-------|
+| Superutilisateur Django | Oui |
+| Agent `direction` | Oui |
+| Tout autre rôle (entrepôt, terrain, rot…) | Non — HTTP 403 |
+| Non connecté | Redirection `/login/` |
+
+---
+
+## 🧭 Constantes de référence & plancher stock
+
+Fichier : `surveillance/constants.py`
+
+| Constante | Valeur | Usage |
+|-----------|--------|-------|
+| `DATE_PLANCHER_VENTES` | `date(2026, 1, 1)` | Plancher global sur tous les volumes KG |
+| `DATE_PLANCHER_PRIX` | `date(2026, 6, 1)` | Plancher sur les anomalies de prix uniquement |
+| `DATE_PLANCHER_STOCK` | `date(2026, 7, 1)` | Plancher sur la détection de stock dormant (§ Suivi Durée de Vie du Stock) |
+| `DELAI_ACTIVITE_COMMERCIALE_JOURS` | `3` j | Agent sans vente valide depuis ce délai → alerte activité |
+| `DELAI_STOCK_DORMANT_JOURS` | `15` j | Stock non distribué à l'entrepôt central |
+| `DELAI_RETENTION_ACTEURS_JOURS` | `3` j | Stock détenu par un superviseur ou un agent sans être redistribué/vendu |
+| `SEUIL_MARGE_MINIMALE` | `45` FCFA | Marge minimale attendue par vente unitaire (source unique pour `PrixSurveillanceService`/`SurveillancePrixService`) |
+
+`DATE_PLANCHER_STOCK` est un choix **volontaire** pour ignorer un passé jugé peu fiable, pas un
+oubli — réexaminé puis confirmé inchangé lors de la clôture du sprint 12 (17/09/2026), malgré des
+affectations plus anciennes identifiées en cours d'investigation (voir
+`docs/sprints/archive/sprint-12.md` pour le détail du raisonnement).
+
+---
+
+## 🗓️ Utilitaires semaine — `surveillance/week_utils.py`
+
+| Fonction | Rôle |
+|----------|------|
+| `debut_semaine(d)` | Retourne le lundi de la semaine contenant `d` |
+| `fin_semaine(d)` | Retourne le dimanche |
+| `semaine_precedente(debut)` | `(lundi, dimanche)` de S-1 |
+| `parse_semaine(raw)` | Parse `"2026-W25"` → `date` ; fallback sur semaine courante ; bloque les dates futures |
+| `date_to_week_string(d)` | `date` → `"2026-W25"` |
+
 ---
 
 ## ⚙️ Architecture Applicative & Structure des Vues
@@ -134,6 +182,45 @@ distributions âgées en base.
 
 ---
 
+## 📇 Couche services — référence rapide
+
+Signatures principales, en complément de la narration par vue ci-dessus.
+
+| Service | Méthode | Rôle |
+|---------|---------|------|
+| `ComparaisonPeriodeService` | `semaine(debut)` / `semaine_prec(debut)` | `(lundi, dimanche)` de la semaine donnée / de S-1 |
+| | `semaine_actuelle()` / `semaine_precedente()` | Alias sur la semaine courante |
+| | `mois_actuel()` / `mois_precedent()` | Mois en cours / précédent |
+| `VenteSurveillanceService` | `kg_vendus(date_debut, date_fin, superviseur=None, produit=None)` | `Decimal`, applique `max(date_debut, DATE_PLANCHER_VENTES)` |
+| `ListeKgVenduService` | `get_kpis(debut, fin)` | KPI globaux |
+| | `get_superviseurs(debut, fin)` / `get_agents(debut, fin, superviseur=None, produit=None)` | Listes triées par kg décroissant, `DATE_PLANCHER_VENTES` appliqué |
+| `SuperviseurSurveillanceService` | `variations_semaine(debut_semaine=None)` | `{superviseur, kg_actuel, kg_prec, variation}`, semaine courante par défaut |
+| `ProduitSurveillanceService` | `variations_semaine(debut_semaine=None)` | `{produit, kg_actuel, kg_prec, variation}` |
+| `PrixSurveillanceService` | `ventes_a_perte(limit=None)` | Ventes sous `prix_achat_unitaire`, depuis `DATE_PLANCHER_PRIX` ; `limit` = `LIMIT` SQL |
+| | `count_anomalies()` | Nombre de lots distincts en anomalie (1 requête COUNT) |
+| `SurveillancePrixService` | `get_resume(order_by=None)` | `{stats, lignes}`, tri par `date_reception` ou écart |
+| | `get_detail_lot(lot)` | Détail complet d'un lot : ventes, résumé par agent |
+| `DetailSuperviseurService` / `DetailProduitService` | `get_data(objet, debut_semaine=None)` | KPIs + variations sur la semaine sélectionnée |
+
+---
+
+## 🖼️ Templates
+
+| Template | Rôle |
+|----------|------|
+| `partials/_filtre_semaine.html` | Widget `<input type="week">` réutilisable ; conserve les autres paramètres GET |
+| `partials/_filtre_periode.html` | Bascule Semaine/Mois (`liste_kg_vendu.html`, `detail_produit.html`) |
+| `partials/_nav_themes.html` | 4 onglets de premier niveau (voir § Navigation thématique commune) |
+| `dashboard_surveillance.html` | Vue d'ensemble : KG semaine/mois, ventes rouges (top 10), superviseurs, produits |
+| `kg_vendu/liste_kg_vendu.html` | Détail KG par superviseur et par agent |
+| `superviseur/detail_superviseur.html` | Fiche superviseur avec variation semaine |
+| `produits/detail_produit.html` | Fiche produit avec variation semaine |
+| `prix/surveillance_prix.html` | Liste lots en anomalie — tri interactif `date_reception` |
+| `prix/detail_prix.html` | Détail ventes d'un lot en anomalie |
+| `stock_rotation/dashboard_stock.html` | Stock dormant entrepôt (§ Suivi Durée de Vie du Stock) |
+
+---
+
 ## 🖨️ Commande de gestion : `agents_stock_dormant`
 
 `python manage.py agents_stock_dormant --date_debut AAAA-MM-JJ --date_fin AAAA-MM-JJ [--format texte|pdf] [--output CHEMIN]`
@@ -169,8 +256,30 @@ Le filtre semaine (`semaine_selectionnee` / `qs_semaine`) est propagé dans les 
 
 ---
 
+## ✅ Invariants
+
+- Les données antérieures au 01/01/2026 n'apparaissent jamais dans les volumes KG.
+- Les anomalies de prix antérieures au 01/06/2026 ne sont jamais affichées.
+- Les distributions/affectations antérieures au 01/07/2026 n'apparaissent jamais dans la
+  détection de stock dormant (§ Constantes de référence & plancher stock).
+- Le filtre `date_vente` porte sur la date de la vente, **pas** la date de réception du lot.
+- `parse_semaine` empêche toute sélection de semaine future (protection côté serveur).
+- Toutes les requêtes utilisent `est_supprime=False`.
+
+---
+
 ## 🧪 Points de Vigilance pour la Maintenance et le Code
 
 * **Couplage Fort avec l'application `core**` : Les vues effectuent des requêtes directes et des vérifications sur les modèles partagés `Produit`, `Agent` (notamment le champ `type_agent="entrepot"`) et `LotEntrepot`. Toute modification de structure sur ces modèles dans l'application `core` doit être répercutée et testée ici.
 * **Sécurisation des Identifiants (`kwargs`)** : Portez une attention particulière au nommage des paramètres capturés dans vos fichiers d'URLs (`urls.py`). La vue `DetailPrixView` recherche explicitement la clé `self.kwargs["lot_id"]` tandis que les vues de détails de produit et superviseur s'appuient sur la clé standard `self.kwargs["pk"]`.
 * **Performance des Requêtes (Slicing)** : Le tableau de bord et les listes effectuent des limitations rigoureuses en fin de traitement (ex: `ventes_rouges[:10]`, `superviseurs[:5]`). Pour optimiser la charge sur la base de données PostgreSQL en production, il conviendra de s'assurer que ces limites sont appliquées directement au niveau des requêtes SQL (via l'ORM dans les Services correspondants) plutôt que sur des listes Python déjà chargées en mémoire.
+
+---
+
+## 🗓️ Historique des sprints
+
+| Sprint | Périmètre |
+|--------|-----------|
+| [Sprint 01](../docs/sprints/archive/sprint-01.md) | Filtres semaine, dates planchers, sécurité (mixin), performance (SQL slicing) |
+| [Sprint 04](../docs/sprints/archive/sprint-04.md) | Suivi durée de vie du stock (`StockRotationView`, `StockAgeService`) |
+| [Sprint 12](../docs/sprints/archive/sprint-12.md) | Audit + durcissement du stock dormant (superviseurs/agents) : correction du renvoi Telegram (`reenvoi_heures`), enrichissement des messages, garde-fou `agent_terrain_direct`, confirmation du plancher `DATE_PLANCHER_STOCK` |
