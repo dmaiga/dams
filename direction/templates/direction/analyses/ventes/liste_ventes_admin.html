@@ -377,6 +377,9 @@ function togglePeriodFields(value) {
                                 <div class="font-medium  max-w-[120px]" title="{{ vente.agent.full_name }}">
                                     {{ vente.agent.full_name}}
                                 </div>
+                                <span class="text-[10px] text-gray-400" title="Superviseur">
+                                    {{ vente.agent.superviseur.full_name|default:"—" }}
+                                </span>
                             </div>
                         </td>
                         

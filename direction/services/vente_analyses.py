@@ -17,6 +17,8 @@ class VenteAnalyseService:
             .select_related(
                 "agent",
                 "agent__user",
+                "agent__superviseur",
+                "agent__superviseur__user",
                 "client",
                 "stagiaire",
                 "detail_distribution",

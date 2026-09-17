@@ -20,6 +20,8 @@ from direction.views import (
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
                                  RotDetailView,analyse_operationnelle ,
                                  suivi_distributions,
+                                 ExportProduitsInvestigationExcelView,
+                                 ExportProduitsInvestigationPDFView,
                                  reaffectation_agents, historique_reaffectation,
                                  corriger_lot, corriger_distribution, corriger_vente,
                                  supprimer_distribution_admin,
@@ -148,6 +150,16 @@ urlpatterns = [
          "suivi-distributions/",
          suivi_distributions,
          name="suivi_distributions"
+     ),
+     path(
+         "suivi-distributions/investigation/export/excel/",
+         ExportProduitsInvestigationExcelView.as_view(),
+         name="export_produits_investigation_excel"
+     ),
+     path(
+         "suivi-distributions/investigation/export/pdf/",
+         ExportProduitsInvestigationPDFView.as_view(),
+         name="export_produits_investigation_pdf"
      ),
 ]
 

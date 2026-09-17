@@ -327,3 +327,109 @@ exact après une réaffectation.
 Pour répondre aux besoins d'audits externes et de réunions comptables, le système délègue l'extraction de données filtrées au service `VenteExportService`.
 
 * **Héritage strict des filtres** : Les fonctions `ExportVentesExcelView` et `ExportVentesPDFView` réutilisent exactement le même moteur de filtrage normalisé (`VenteAnalyseService.filter_ventes`) que la vue web. Cela garantit une correspondance absolue au centime près entre les données affichées à l'écran et les documents téléchargés (`.xlsx` ou `.pdf`).
+
+**Superviseur affiché sous l'agent** (sprint-14, 17/09/2026) — `direction/ventes`
+(`ToutesLesVentesView`) est très consultée par la direction, qui ne pouvait pas identifier en un
+coup d'œil le superviseur responsable d'un agent listé. `VenteAnalyseService.filter_ventes`
+ajoute `agent__superviseur`/`agent__superviseur__user` au `select_related` (aucune requête
+supplémentaire) et le template affiche `vente.agent.superviseur.full_name` en `<span>` sous le
+nom de l'agent.
+
+---
+
+## 7. Suivi des distributions — traçabilité et investigation (sprint-14, 17/09/2026)
+
+**Besoin** : `direction/suivi-distributions/` doit servir d'outil d'investigation, pas seulement
+de traçabilité passive — mdmaiga observe qu'un produit sorti du dépôt sans vente enregistrée
+derrière lui plus d'une semaine est à surveiller, plus de deux semaines est suspect (perte/vol
+potentiel).
+
+**Bug corrigé — « None FCFA »** : la colonne Valorisation affichait `DetailDistribution.prix_detail`,
+qui est **structurellement toujours `None`** avant la vente (`rules/ARCHITECTURE.md` § invariants
+— aucun prix n'est fixé avant `Vente.prix_vente_unitaire`). Le prix de vente a été retiré de cette
+colonne ; elle affiche désormais la **valeur immobilisée réelle**
+(`quantite_restante × lot.prix_achat_unitaire`, connue dès la distribution).
+
+**Bug corrigé — indicateur de couleur sans valeur actionnable** : le texte "Sorti il y a…" était
+ambre dès qu'un produit était en circulation (condition `restant > 0` testée deux fois, la seconde
+toujours vraie). Remplacé par un statut réel basé sur l'ancienneté (`direction/constants.py`) :
+
+| Statut | Seuil | Rendu |
+|---|---|---|
+| `ok` | < 7 j | Neutre, badge "SUR LE TERRAIN" |
+| `attention` | 7-13 j | Ambre, badge "À SURVEILLER — N J" |
+| `critique` | ≥ 14 j (`SEUIL_CRITIQUE_JOURS`) | Rouge, badge "À INVESTIGUER — N J" |
+
+**Filtre par défaut** : `statut = request.GET.get("statut", "restant")` — un accès direct sans
+paramètre affiche désormais uniquement les produits en circulation (avant : tout mélangé). Le
+select porte 3 options explicites (`restant`/`ecoule`/`tous`), plus de placeholder ambigu.
+
+**Nouveau tableau « Produits à investiguer »** : tous les produits en circulation depuis plus de
+`SEUIL_ATTENTION_JOURS` (7 j) — pas seulement les cas critiques, décision mdmaiga : la liste doit
+capter le problème tôt. Indépendant du filtre `statut` de la table 1 (toujours restreint à
+`restant=True` + ancienneté).
+
+**Révision UX (même jour, 17/09/2026)** : la première version listait une ligne par
+`DetailDistribution` (produit, fournisseur, agent, superviseur, valorisation en FCFA). Retour de
+mdmaiga : ce n'est **pas un document comptable**, mais une checklist remise à un agent de
+vérification qui passe chez chaque agent lister confirmer la présence physique des produits —
+fournisseur et valorisation n'y ont pas leur place, et une ligne par produit noie l'information
+utile ("qui a quoi"). Reconstruit en vue **agrégée superviseur → agent → produits** :
+
+- Une carte par superviseur (`agents_a_investiguer` = `StockInvestigationService.
+  regrouper_par_superviseur()`), listant ses agents concernés.
+- Par agent : nom + liste compacte des produits en sa possession (`quantité produit — depuis le
+  date (N j)`) — pas de sous-table, pas de colonne fournisseur/valorisation.
+- **Couleur affinée (même jour, second retour mdmaiga)** : la première version encadrait chaque
+  ligne d'un badge plein rouge/ambre — inutile ici puisque *toute* la section est déjà la zone à
+  risque (uniquement des produits > `SEUIL_ATTENTION_JOURS` j) : peindre chaque ligne en rouge noie
+  le signal au lieu de le porter. Remplacé par un simple point de couleur (rouge si `critique`,
+  ambre si `attention`) en début de ligne, texte neutre sinon ; seul le compteur de jours des cas
+  `critique` (≥ `SEUIL_CRITIQUE_JOURS`) reste accentué en rouge — la seule distinction qui reste
+  actionnable une fois qu'on sait déjà être dans la liste à investiguer.
+- **Superviseurs inactifs exclus (même jour, troisième retour mdmaiga)** :
+  `StockInvestigationService.a_investiguer()` filtre désormais
+  `distribution__superviseur__est_actif=True` — un superviseur parti/désactivé n'est plus un
+  destinataire valable de la checklist terrain. Cohérent avec le select "Superviseur" du
+  formulaire de filtre, déjà restreint à `Agent.objects.filter(type_agent='entrepot',
+  est_actif=True)` avant ce correctif (aucun changement nécessaire côté filtre, seul le
+  regroupement du tableau 2 en manquait). Table 1 (traçabilité brute) non touchée — hors
+  demande, comportement historique conservé.
+- Boutons d'export **remontés en tête de page** (à côté du titre), pas dans la section elle-même —
+  c'est l'action la plus utile pour la direction, elle ne doit pas nécessiter de scroller.
+- Export Excel/PDF (`ExportProduitsInvestigationExcelView`/`PDFView`,
+  `direction/services/stock_investigation_export.py`) reflète la même structure groupée : une
+  ligne par agent (colonnes Superviseur / Agent / Produits en circulation), le détail produit tenant
+  dans une seule cellule à retour à la ligne (`Alignment(wrap_text=True)` Excel,
+  cellule `Paragraph` PDF). Même moteur de filtrage que l'écran
+  (`StockInvestigationService.filtrer`), sans plafond de lignes côté export (contrairement à
+  l'affichage écran, plafonné à `NB_MAX_PRODUITS_A_INVESTIGUER = 100` lignes avant regroupement).
+- Le seuil (`SEUIL_ATTENTION_JOURS`) n'est jamais recopié en dur dans les libellés : le texte de
+  la page et l'en-tête de colonne de l'export le lisent depuis `direction/constants.py`, pour que
+  l'écran et l'export restent alignés si le seuil change un jour.
+
+**Service** : `direction/services/stock_investigation_service.py::StockInvestigationService` —
+`base_queryset()` porte les annotations partagées (`total_vendu`, `restant`, `valeur_immobilisee`
+— toujours calculée, réservée à la table 1), `filtrer()` applique les filtres communs
+(superviseur/agent/produit/période), `a_investiguer()` restreint aux lignes > `SEUIL_ATTENTION_JOURS`
+jours, `annoter_statut()` calcule `jours_ecoules`/`statut_circulation` en Python (volume par page
+toujours faible), `regrouper_par_superviseur()` construit la structure imbriquée superviseur →
+agent → produits consommée par la table 2 et par l'export.
+
+**Formatage des quantités (même jour, quatrième retour mdmaiga)** : la colonne « Quantités (Dist. /
+Vendu / Reste) » de la table 1 et les quantités de la table 2 affichaient les `Decimal` bruts
+(`20.00`, `1.00`...). Passées au filtre `direction_filters::format_number` (déjà la convention
+établie ailleurs dans l'app — `agent_dashboard.html`, `analyse_operationnelle.html`,
+`dashboard.html`, `fournisseurs/detail.html` — séparateur de milliers, virgule française, zéros
+inutiles supprimés). mdmaiga avait suggéré `format_quantity` (même fichier) : non retenu, ce
+filtre produit un format anglo-saxon à point (`20.00`) et n'est utilisé nulle part ailleurs dans
+l'app — `format_number` reste la référence pour rester cohérent avec le reste de `direction`.
+
+**Hors périmètre (décision mdmaiga, 17/09/2026)** : un axe BI dédié « produits en circulation »
+a été envisagé puis écarté — cette page couvre déjà le besoin de valorisation, le dupliquer dans
+le BI serait une surcharge sans valeur ajoutée à ce stade. Voir `docs/sprints/archive/sprint-14.md`
+pour le détail de l'investigation BI (`fct_stock_agent.sql`).
+
+**Tests** : `direction/tests.py` — `SuiviDistributionsProduitsEnCirculationTests` (filtre par
+défaut, statut "tous", absence de "None FCFA", seuils de couleur, regroupement superviseur →
+agent → produits du tableau d'investigation, exports), `VentesSuperviseurAffichageTests`.

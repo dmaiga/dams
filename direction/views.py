@@ -2227,137 +2227,91 @@ def api_calcul_salaire_rapide(request):
 from decimal import Decimal
 
 from django.core.paginator import Paginator
-from django.db.models import (
-    F,
-    Q,
-    Sum,
-    Value,
-    DecimalField,
-    ExpressionWrapper
-)
-from django.db.models.functions import Coalesce
 from django.shortcuts import render
 
 from core.models import (
     Agent,
     Produit,
-    DetailDistribution,
 )
+from direction.constants import SEUIL_ATTENTION_JOURS, SEUIL_CRITIQUE_JOURS
+from direction.services.stock_investigation_service import StockInvestigationService
+from direction.services.stock_investigation_export import StockInvestigationExportService
+
+
+NB_MAX_PRODUITS_A_INVESTIGUER = 100
+
+
+def _params_suivi_distributions(request):
+    """Filtres communs à direction.suivi_distributions et aux deux exports
+    (traçabilité + investigation) — sprint-14, 17/09/2026."""
+    params = request.GET
+    return {
+        "superviseur_id": params.get("superviseur"),
+        "agent_id": params.get("agent"),
+        "produit_id": params.get("produit"),
+        "date_debut": params.get("date_debut"),
+        "date_fin": params.get("date_fin"),
+    }
 
 
 def suivi_distributions(request):
 
-    details = (
-        DetailDistribution.objects
-        .filter(
-            distribution__date_distribution__date__gte=DATE_DEBUT_SUIVI_TERRAIN
-        )
-        .select_related(
-            "lot",
-            "lot__produit",
-            "distribution",
-            "distribution__superviseur",
-            "distribution__agent_terrain",
-        )
-        .annotate(
+    filtres = _params_suivi_distributions(request)
+    # Défaut : "en circulation" (décision mdmaiga, 17/09/2026) — le direct
+    # sans paramètre doit montrer ce qui n'est pas encore vendu, pas tout
+    # mélangé. "tous" est un choix explicite de l'utilisateur, jamais le
+    # défaut au premier chargement.
+    statut_filtre = request.GET.get("statut", "restant")
 
-            # Total vendu RÉEL
-            total_vendu=Coalesce(
-                Sum(
-                    "vente__quantite",
-                    filter=Q(vente__est_supprime=False)
-                ),
-                Value(Decimal("0.00")),
-                output_field=DecimalField(
-                    max_digits=10,
-                    decimal_places=2
-                )
-            )
-        )
-        .annotate(
-
-            # Stock restant
-            restant=ExpressionWrapper(
-                F("quantite") - F("total_vendu"),
-                output_field=DecimalField(
-                    max_digits=10,
-                    decimal_places=2
-                )
-            )
-        )
+    details_base = StockInvestigationService.filtrer(
+        StockInvestigationService.base_queryset(DATE_DEBUT_SUIVI_TERRAIN),
+        **filtres,
     )
 
     # ==================================================
-    # FILTRES
+    # TABLE 1 — traçabilité (filtrable par statut)
     # ==================================================
 
-    superviseur_id = request.GET.get("superviseur")
-    agent_id = request.GET.get("agent")
-    produit_id = request.GET.get("produit")
-    statut = request.GET.get("statut")
-
-    date_debut = request.GET.get("date_debut")
-    date_fin = request.GET.get("date_fin")
-
-    if superviseur_id:
-        details = details.filter(
-            distribution__superviseur_id=superviseur_id
-        )
-
-    if agent_id:
-        details = details.filter(
-            distribution__agent_terrain_id=agent_id
-        )
-
-    if produit_id:
-        details = details.filter(
-            lot__produit_id=produit_id
-        )
-
-    if date_debut:
-        details = details.filter(
-            distribution__date_distribution__date__gte=date_debut
-        )
-
-    if date_fin:
-        details = details.filter(
-            distribution__date_distribution__date__lte=date_fin
-        )
-
-    # ==================================================
-    # STATUTS
-    # ==================================================
-
-    if statut == "restant":
+    details = details_base
+    if statut_filtre == "restant":
         details = details.filter(restant__gt=0)
-
-    elif statut == "ecoule":
+    elif statut_filtre == "ecoule":
         details = details.filter(restant__lte=0)
-
-    elif statut == "dormant":
-        details = details.filter(restant__gt=0)
-
-    # ==================================================
-    # PAGINATION
-    # ==================================================
+    # statut_filtre == "tous" (ou toute autre valeur) : pas de filtre.
 
     paginator = Paginator(
-        details.order_by(
-            "-distribution__date_distribution"
-        ),
+        details.order_by("-distribution__date_distribution"),
         20
     )
-
     page_number = request.GET.get("page")
-
     page_obj = paginator.get_page(page_number)
+    StockInvestigationService.annoter_statut(page_obj.object_list)
 
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
 
+    # ==================================================
+    # TABLE 2 — produits à investiguer (> 7 jours, quel que soit le statut
+    # choisi pour la table 1 — la fenêtre d'investigation ne dépend pas de
+    # ce filtre)
+    # ==================================================
+
+    lignes_a_investiguer = StockInvestigationService.annoter_statut(
+        list(
+            StockInvestigationService.a_investiguer(details_base)[:NB_MAX_PRODUITS_A_INVESTIGUER]
+        )
+    )
+    agents_a_investiguer = StockInvestigationService.regrouper_par_superviseur(lignes_a_investiguer)
+    nb_agents_a_investiguer = sum(g["nb_agents"] for g in agents_a_investiguer)
+
     context = {
         "page_obj": page_obj,
         "pagination_query": pagination_params.urlencode(),
+        "statut_filtre": statut_filtre,
+        "agents_a_investiguer": agents_a_investiguer,
+        "nb_agents_a_investiguer": nb_agents_a_investiguer,
+        "seuil_attention_jours": SEUIL_ATTENTION_JOURS,
+        "seuil_critique_jours": SEUIL_CRITIQUE_JOURS,
 
         "superviseurs": Agent.objects.filter(
             type_agent='entrepot',
@@ -2383,3 +2337,51 @@ def suivi_distributions(request):
         "direction/analyses/stock/suivi_distributions.html",
         context
     )
+
+
+def _lignes_a_investiguer_export(request):
+    """Pas de plafond ici (contrairement à l'affichage écran) : l'export est
+    la liste complète remise à l'agent de vérification."""
+    filtres = _params_suivi_distributions(request)
+    details_base = StockInvestigationService.filtrer(
+        StockInvestigationService.base_queryset(DATE_DEBUT_SUIVI_TERRAIN),
+        **filtres,
+    )
+    return StockInvestigationService.annoter_statut(
+        list(StockInvestigationService.a_investiguer(details_base))
+    )
+
+
+class ExportProduitsInvestigationExcelView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        agent = getattr(self.request.user, "agent", None)
+        return agent and (agent.est_direction or agent.est_superviseur)
+
+    def get(self, request, *args, **kwargs):
+        lignes = _lignes_a_investiguer_export(request)
+        buffer = StockInvestigationExportService.export_excel(lignes)
+
+        response = HttpResponse(
+            buffer,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = (
+            f"attachment; filename=produits_a_investiguer_{date.today()}.xlsx"
+        )
+        return response
+
+
+class ExportProduitsInvestigationPDFView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        agent = getattr(self.request.user, "agent", None)
+        return agent and (agent.est_direction or agent.est_superviseur)
+
+    def get(self, request, *args, **kwargs):
+        lignes = _lignes_a_investiguer_export(request)
+        buffer = StockInvestigationExportService.export_pdf(lignes)
+
+        response = HttpResponse(buffer, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f"attachment; filename=produits_a_investiguer_{date.today()}.pdf"
+        )
+        return response
