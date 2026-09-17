@@ -1,15 +1,21 @@
 # Sprint 12 — Audit du stock dormant (superviseurs + agents) et enrichissement des notifications Telegram
 
-**Statut** : 🟡 en cours — demande de mdmaiga (08/09/2026).
+**Statut** : 🟢 terminé — demande de mdmaiga (08/09/2026), clos le 17/09/2026.
 
 > Une fois ce sprint terminé, déplacer ce fichier dans `docs/sprints/archive/`.
 
 Fait le 08/09/2026 : investigation sur la base réelle (§ Résultats d'investigation),
 cause racine identifiée et corrigée (rappel 48 h sur `stock_superviseur`/`stock_agent`,
 format des messages Telegram enrichi via un helper partagé, migration `0120` qui clôt
-3 alertes obsolètes de type `stock`), tests `monitoring/tests.py` (+3). Restent ouverts :
-garde-fou `agent_terrain_direct`, décision sur `DATE_PLANCHER_STOCK`, réécriture SQL du
-calcul de rétention agent si le volume l'impose.
+3 alertes obsolètes de type `stock`), tests `monitoring/tests.py` (+3).
+
+Fait le 17/09/2026 (clôture) : garde-fou `agent_terrain_direct` ajouté (défensif — invariant
+prouvé structurel, pas un bug actif, voir décision n°3), `DATE_PLANCHER_STOCK` réexaminé puis
+confirmé inchangé (décision n°4), tests de non-régression Constat 2.3/2.4 ajoutés
+(`surveillance/tests.py`), `docs/features/app_surveillance.md` mis à jour. Reste ouvert, non
+bloquant : décision n°5 (`DELAI_RETENTION_ACTEURS_JOURS = 3` j, garder ou délai propre) et
+Constat 2.7 (réécriture SQL du calcul de rétention agent) si le volume grossit un jour —
+432 lignes scannées, stable entre le 08/09 et le 17/09/2026, aucune action requise à ce stade.
 
 ---
 
@@ -194,10 +200,31 @@ property par une agrégation SQL des ventes/pertes par `detail_distribution_id` 
    sans valeur immobilisée (aligné sur la commande `agents_stock_dormant` ; la valeur reste
    disponible dans la ligne si on la veut plus tard). Hiérarchie inchangée
    (superviseur → agent → produits). Pas de sous-total par superviseur pour l'instant.
-3. ⏳ **`agent_terrain_direct`** (Constat 2.3) : non observé aujourd'hui — garde-fou
-   `agent_terrain_direct__isnull=True` à ajouter par prudence, sans urgence.
-4. ⏳ **`DATE_PLANCHER_STOCK`** (Constat 2.5) : à trancher — garder 01/07/2026 / avancer / retirer.
+3. ✅ **`agent_terrain_direct`** (Constat 2.3, tranché le 17/09/2026) : garde-fou
+   `agent_terrain_direct__isnull=True` ajouté à `_queryset_lots_dormants_superviseur`. Ré-
+   investigation ce jour-là (`marchandise/forms.py` ligne ~173, `marchandise/services.py`
+   `_charger_distribution_directe`) : l'invariant « affectation en distribution directe ⇒
+   `quantite_restante == 0` » est en fait **garanti structurellement** par tous les chemins
+   d'écriture existants, pas seulement observé vide sur les données (0/12 les deux fois, à 9
+   jours d'écart) — le garde-fou est donc défensif (protège d'une régression future dans
+   `marchandise`), pas un correctif d'un bug actif. Décision mdmaiga : garder les deux
+   catégories distinctes (superviseur ET agent) — un superviseur peut avoir ses propres
+   affectations non redistribuées, différentes de ce qui est chez ses agents, "pas le même
+   niveau de sévérité mais keep both". Test de régression :
+   `surveillance/tests.py::test_affectation_en_distribution_directe_absente_de_la_retention_superviseur`.
+4. ✅ **`DATE_PLANCHER_STOCK`** (Constat 2.5, tranché le 17/09/2026) : **gardé à 01/07/2026**.
+   Rouvert un instant le même jour avec de nouvelles données (4 affectations superviseur en
+   rétention masquées, 63 125 FCFA, 83-94 jours d'ancienneté + 24 lignes agent), mais décision
+   finale de mdmaiga : le plancher a été posé **volontairement** pour faire abstraction d'un
+   passé jugé incertain, et la surveillance stock doit démarrer à cette date, pas avant. Les
+   24 lignes agent identifiées proviennent en outre de la **base de développement locale**, pas
+   de la production — les chiffres cités plus haut ne sont donc pas représentatifs de l'état
+   réel en prod. Aucun changement de code sur `DATE_PLANCHER_STOCK`.
 5. ⏳ **Seuil superviseur** : `DELAI_RETENTION_ACTEURS_JOURS = 3` j — garder ou délai propre ?
+   Contexte supplémentaire (sprint-14, 17/09/2026) : `direction/constants.py` porte désormais
+   des seuils distincts (7 j / 14 j) pour la checklist d'investigation direction — délibérément
+   séparés de ce seuil-ci (alerte opérationnelle rapide vs liste d'investigation à cadence plus
+   lente). Ça ne referme pas la question n°5 en soi, mais retire l'idée de fusionner les deux.
 
 ---
 
@@ -215,14 +242,13 @@ property par une agrégation SQL des ventes/pertes par `detail_distribution_id` 
   restées `ACTIVE`.
 - `monitoring/tests.py` : +3 tests (messages détaillés superviseur/agent, renvoi après 48 h).
 
-### 2. `StockAgeService` — corrections ciblées (reste à faire)
+### 2. `StockAgeService` — corrections ciblées
 
-- Constat 2.3 : selon décision n°3, ajouter `agent_terrain_direct__isnull=True` à
-  `_queryset_lots_dormants_superviseur` (ou re-router la ligne vers l'origine `agent`).
-- Constat 2.5 : selon décision n°4, ajuster/retirer `DATE_PLANCHER_STOCK` pour ce thème (attention :
-  la constante sert aussi `agents_sans_vente_recente` et l'entrepôt — si le plancher doit changer
-  seulement pour la rétention acteurs, introduire une constante dédiée plutôt que déplacer
-  l'existante).
+- ✅ Constat 2.3 : `agent_terrain_direct__isnull=True` ajouté à
+  `_queryset_lots_dormants_superviseur` (17/09/2026, voir décision n°3 — garde-fou défensif,
+  pas un bug actif).
+- ✅ Constat 2.5 : `DATE_PLANCHER_STOCK` gardé tel quel (décision n°4, 17/09/2026) — aucun
+  changement de code.
 - Constat 2.7 : si le volume l'impose, remplacer la boucle sur `quantite_restante_calculee` par
   une agrégation SQL `Sum` des ventes (`est_supprime=False`) et des pertes par
   `detail_distribution_id`, recombinée en Python — **sans** jointure croisée ventes×pertes.
@@ -244,28 +270,26 @@ property par une agrégation SQL des ventes/pertes par `detail_distribution_id` 
   potentiellement longs → si un bloc dépasse ~4000 caractères, prévoir un découpage (aujourd'hui
   non géré ; à noter si le volume réel s'en approche, sinon différer).
 
-### 4. Tests (`surveillance/tests.py`, `monitoring/tests.py`)
+### 4. Tests (`surveillance/tests.py`, `monitoring/tests.py`) — ✅ faite (17/09/2026)
 
 - `StockAgeService` :
-  - affectation en distribution directe (`agent_terrain_direct`) avec reliquat > 3 j → **absente**
-    de l'origine `superviseur` (ou présente sous `agent`, selon décision).
-  - non-régression Constat 2.4 : après réécriture de `DistributionAgent.superviseur` (réaffectation),
-    la ligne `agent` remonte sous le **nouveau** superviseur.
-  - le cas échéant, non-régression sur le nouveau plancher/seuil.
-- `moteur_alerte` :
-  - le message `stock_superviseur` contient la quantité restante (et la valeur si retenue).
-  - le message `stock_agent` contient produit + quantité + date + ancienneté, dans la hiérarchie
-    superviseur → agent.
-  - rafraîchissement : deux évaluations successives avec une composition différente → `Alerte.message`
-    mis à jour, `TelegramProvider.send` rappelé (mock).
+  - ✅ affectation en distribution directe (`agent_terrain_direct`) avec reliquat > 3 j → **absente**
+    de l'origine `superviseur` — `test_affectation_en_distribution_directe_absente_de_la_retention_superviseur`.
+  - ✅ non-régression Constat 2.4 : après réécriture d'`Agent.superviseur` (réaffectation, sans que
+    `DistributionAgent.superviseur` historique soit forcément réécrit), la ligne `agent` remonte
+    sous le **nouveau** superviseur —
+    `test_stock_chez_agent_suit_le_superviseur_courant_apres_reaffectation`.
+  - Pas de nouveau plancher/seuil (décisions n°4/n°5) → pas de test supplémentaire requis ici.
+- `moteur_alerte` : déjà couvert par les +3 tests du 08/09/2026 (message détaillé
+  superviseur/agent, renvoi après 48h) — voir Tâche 1bis.
 
-### 5. Documentation
+### 5. Documentation — ✅ faite (17/09/2026)
 
-- `docs/features/app_surveillance.md` : compléter la section stock dormant (3 origines, seuils,
-  ce qui va sur Telegram vs l'UI) et ajouter la ligne Sprint 12 au tableau des sprints.
-- `surveillance/APP_SURVEILLANCE.md` (si présent) / `monitoring` : refléter le nouveau format des
-  messages `stock_superviseur` / `stock_agent`.
-- Reporter ici les « Résultats d'investigation » (Tâche 1) et les décisions finales.
+- ✅ `docs/features/app_surveillance.md` : section « Stock dormant & alertes Telegram » ajoutée
+  (3 origines, seuils, UI vs Telegram, plancher) + ligne Sprint 12 au tableau des sprints.
+- ✅ `surveillance/APP_SURVEILLANCE.md` / `monitoring/APP_MONITORING.md` : déjà à jour depuis les
+  correctifs du 08/09/2026 (format `_ligne_stock`, `reenvoi_heures=48`).
+- ✅ « Résultats d'investigation » et décisions finales reportés ci-dessus.
 
 ---
 

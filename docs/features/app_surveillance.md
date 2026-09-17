@@ -147,8 +147,46 @@ Détecte les ventes dont `prix_vente_unitaire < prix_achat_unitaire` depuis `DAT
 
 ---
 
+## Stock dormant & alertes Telegram (Sprint 04, enrichi Sprint 12)
+
+Ce document est resté figé à l'état "après Sprint 01" ; cette section comble le trou le plus
+consulté (le stock dormant) sans réécrire l'historique complet — voir `surveillance/
+APP_SURVEILLANCE.md` (doc technique détaillée, tenue à jour à chaque sprint) et
+`monitoring/APP_MONITORING.md` (moteur d'alertes) pour le reste.
+
+`StockAgeService` (`surveillance/services/stock_age_service.py`) détecte un produit qui traîne
+trop longtemps sans être vendu, à **trois emplacements distincts**, chacun avec son propre seuil
+(`surveillance/constants.py`) :
+
+| Origine | Source | Seuil | Portée |
+|---------|--------|-------|--------|
+| `entrepot` | `LotEntrepot` non distribué | `DELAI_STOCK_DORMANT_JOURS = 15` j | UI (`/surveillance/stock-rotation/`) **et** Telegram (`stock_entrepot`) |
+| `superviseur` | `AffectationLotSuperviseur` pas redistribuée | `DELAI_RETENTION_ACTEURS_JOURS = 3` j | Telegram uniquement (`stock_superviseur`) |
+| `agent` | `DetailDistribution` détenu par un agent de vente | `DELAI_RETENTION_ACTEURS_JOURS = 3` j | Telegram uniquement (`stock_agent`) |
+
+Plancher commun : `DATE_PLANCHER_STOCK = date(2026, 7, 1)` — toute distribution/affectation
+antérieure est ignorée. Posé volontairement pour faire abstraction d'un passé jugé incertain ;
+confirmé (décision mdmaiga, sprint-12, 17/09/2026) après réexamen malgré des cas plus anciens
+identifiés en cours de route.
+
+**UI vs Telegram** : l'écran `/surveillance/stock-rotation/` n'affiche que l'origine `entrepot`
+(recadrage du 13/08/2026, incident de performance ~2400 requêtes SQL corrigé) — la rétention
+superviseur/agent, plus précise et filtrable, vit dans `direction.suivi_distributions`, pas ici.
+Les origines `superviseur` et `agent` ne remontent donc **que** par les notifications Telegram du
+moteur d'alertes (`monitoring`), pas de doublon d'UI.
+
+**Alertes Telegram** (`monitoring.services.moteur_alerte::AlerteMoteur.evaluer_stock_ancien`,
+exécuté chaque matin par la commande cron `evaluer_alertes`) : un message distinct par origine,
+`reenvoi_heures=48` pour `stock_superviseur`/`stock_agent` (sprint-12 — corrige un bug où l'alerte
+ne se renvoyait plus jamais après son premier envoi), chaque ligne produit au format
+`• {produit} — reste {quantité} — reçu le {date} — {jours} j`. Détail complet dans
+`monitoring/APP_MONITORING.md`.
+
+---
+
 ## Sprints
 
 | Sprint | Périmètre |
 |--------|-----------|
 | [Sprint 01](sprint-01.md) | Filtres semaine, dates planchers, sécurité (mixin), performance (SQL slicing) |
+| [Sprint 12](../sprints/sprint-12.md) | Audit + durcissement du stock dormant (superviseurs/agents) : correction du bug d'absence de renvoi Telegram (`reenvoi_heures`), enrichissement des messages (quantité + date + ancienneté), garde-fou `agent_terrain_direct`, confirmation du plancher `DATE_PLANCHER_STOCK` |

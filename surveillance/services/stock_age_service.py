@@ -109,10 +109,26 @@ class StockAgeService:
 
     @staticmethod
     def _queryset_lots_dormants_superviseur(seuil_date):
+        # agent_terrain_direct__isnull=True est un garde-fou défensif, pas un
+        # correctif d'un cas observé (sprint-12, Constat 2.3) : la création
+        # d'une distribution directe (marchandise/forms.py) force toujours
+        # quantite_restante à 0 sur l'affectation, et la seule correction qui
+        # touche une affectation déjà en distribution directe
+        # (CorrectionDistributionService, marchandise/services.py) ne remet
+        # jamais quantite_restante au-dessus de 0 — l'invariant "affectation
+        # en distribution directe ⇒ quantite_restante == 0" est donc garanti
+        # structurellement, pas seulement empiriquement (0/12 cas observés à
+        # ce jour). Conservé ici pour documenter l'invariant et se protéger
+        # d'une régression future dans marchandise, pas pour corriger un bug
+        # actif : un superviseur garde par ailleurs ses propres affectations
+        # non redistribuées, qui restent suivies séparément (décision
+        # mdmaiga, 17/09/2026 : les deux catégories sont utiles, pas au même
+        # niveau de sévérité).
         return AffectationLotSuperviseur.objects.filter(
             quantite_restante__gt=0,
             date_affectation__lte=seuil_date,
             date_affectation__gte=DATE_PLANCHER_STOCK,
+            agent_terrain_direct__isnull=True,
         )
 
     @staticmethod

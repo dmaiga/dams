@@ -285,6 +285,18 @@ class StockAgeServiceTestCase(TestCase):
         self.assertEqual(StockAgeService.lots_stock_dormant(), [])
         self.assertEqual(StockAgeService.count_lots_stock_dormant(), 0)
 
+    def test_affectation_en_distribution_directe_absente_de_la_retention_superviseur(self):
+        # sprint-12, Constat 2.3 (garde-fou défensif, invariant jamais violé
+        # en pratique : marchandise/forms.py force quantite_restante=0 dès
+        # qu'agent_terrain_direct est renseigné) — reste testé ici au cas où
+        # ce forçage serait un jour cassé par erreur dans marchandise.
+        affectation = self._affectation(100, 40, date.today() - timedelta(days=20))
+        affectation.agent_terrain_direct = self.agent_terrain
+        affectation.save(update_fields=["agent_terrain_direct"])
+
+        self.assertEqual(StockAgeService.lots_stock_dormant(), [])
+        self.assertEqual(StockAgeService.count_lots_stock_dormant(), 0)
+
     # -- Stock en rétention : agents de vente (3 jours, nouveau) -------------
 
     def test_stock_chez_agent_depuis_exactement_3_jours_present(self):
@@ -300,6 +312,35 @@ class StockAgeServiceTestCase(TestCase):
         self.assertEqual(resultats[0]["superviseur"], self.superviseur)
         self.assertEqual(resultats[0]["quantite_restante"], 20)
         self.assertEqual(StockAgeService.count_lots_stock_dormant(), 1)
+
+    def test_stock_chez_agent_suit_le_superviseur_courant_apres_reaffectation(self):
+        # sprint-12, Constat 2.4 (non-régression) : `direction.reaffectation_agents`
+        # rebascule Agent.superviseur mais ne réécrit pas forcément
+        # DistributionAgent.superviseur historique. `_lignes_stock_retenu_agents`
+        # doit continuer à regrouper par le superviseur COURANT de l'agent
+        # (`agent.superviseur`), pas par celui inscrit sur la distribution —
+        # sinon le stock dormant remonterait sous l'ancien superviseur après
+        # un transfert de portefeuille.
+        nouveau_superviseur = Agent.objects.create(
+            user=User.objects.create_user(username="nouveau_superviseur"),
+            type_agent="entrepot",
+        )
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=5))
+        # distribution.superviseur reste l'ANCIEN superviseur (non réécrit).
+        distribution = self._distribution(timezone.now() - timedelta(days=5))
+        DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=20)
+
+        # Réaffectation : seul Agent.superviseur change.
+        self.agent_terrain.superviseur = nouveau_superviseur
+        self.agent_terrain.save(update_fields=["superviseur"])
+
+        resultats = StockAgeService.lots_stock_dormant()
+
+        self.assertEqual(len(resultats), 1)
+        self.assertEqual(resultats[0]["origine"], "agent")
+        self.assertEqual(resultats[0]["agent"], self.agent_terrain)
+        self.assertEqual(resultats[0]["superviseur"], nouveau_superviseur)
+        self.assertNotEqual(resultats[0]["superviseur"], self.superviseur)
 
     def test_stock_chez_agent_depuis_2_jours_absent(self):
         lot = self._lot(100, 50, timezone.now() - timedelta(days=2))
