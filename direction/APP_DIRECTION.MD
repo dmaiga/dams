@@ -433,3 +433,36 @@ pour le détail de l'investigation BI (`fct_stock_agent.sql`).
 **Tests** : `direction/tests.py` — `SuiviDistributionsProduitsEnCirculationTests` (filtre par
 défaut, statut "tous", absence de "None FCFA", seuils de couleur, regroupement superviseur →
 agent → produits du tableau d'investigation, exports), `VentesSuperviseurAffichageTests`.
+
+---
+
+## 8. Corrélation réception → distribution → vente sur un produit soldé (23/09/2026)
+
+**Besoin** : mdmaiga signale qu'une fois un produit soldé (`restant <= 0`), la table 1 ne montrait
+plus que la date de distribution — plus aucun moyen de corréler avec la date de réception au dépôt,
+la date de vente déclarée par le superviseur (`Vente.date_vente`, rétroactive possible) et sa date
+d'enregistrement technique (`Vente.date_creation`). Les données n'étaient jamais perdues (FK
+permanente `Vente.detail_distribution`, `core/models.py:1845`) — seule la vue ne les affichait pas.
+
+**`StockInvestigationService.base_queryset()`** annote désormais chaque `DetailDistribution` avec
+`date_premiere_vente`/`date_derniere_vente` (`Min`/`Max` sur `Vente.date_vente`, ventes non
+supprimées) et `date_enregistrement_derniere_vente` (`Max` sur `Vente.date_creation`), et
+précharge `ventes_actives` (`Prefetch` sur `vente_set`, triées par `date_vente`) pour le détail
+ligne par ligne.
+
+**`annoter_statut()`** calcule en plus `etalement_vente_jours` (écart en jours entre première et
+dernière vente) — un produit peut être écoulé en plusieurs ventes partielles sur plusieurs jours
+plutôt qu'en une seule fois ; sans cet écart, "vendu le X" n'aurait montré que la dernière date et
+masqué un étalement anormalement lent.
+
+**Template** (colonne « Statut Distribution ») :
+- Ligne soldée : affiche "Distribué le" puis, selon `etalement_vente_jours`, soit "Vendu le [date]"
+  (vente unique) soit "Écoulé en N j (du ... au ...)" (ventes étalées) ; "Aucune vente liée" en
+  rouge si soldé sans `Vente` rattachée (incohérence à investiguer).
+- Ligne encore en circulation : signale une "Vente partielle le [date]" / "Vente en cours depuis
+  N j" si des ventes existent déjà avant l'épuisement complet.
+- **Détail complet en modale**, pas en `<details>` en ligne (retour mdmaiga : préférer une modale
+  pour ne pas déformer la hauteur des lignes du tableau quand plusieurs ventes sont listées) — même
+  pattern `<dialog class="modal">` + `showModal()` que la modale "Perte déclarée" de
+  `direction/templates/direction/analyses/ventes/liste_ventes_admin.html`. Liste chaque `Vente`
+  (quantité, date déclarée, date d'enregistrement) rattachée au `DetailDistribution`.

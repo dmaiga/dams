@@ -1,11 +1,11 @@
 # services/stock_investigation_service.py
 from decimal import Decimal
 
-from django.db.models import DecimalField, ExpressionWrapper, F, Q, Sum, Value
+from django.db.models import DecimalField, ExpressionWrapper, F, Max, Min, Prefetch, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from core.models import DetailDistribution
+from core.models import DetailDistribution, Vente
 from direction.constants import SEUIL_ATTENTION_JOURS, SEUIL_CRITIQUE_JOURS
 
 
@@ -49,6 +49,28 @@ class StockInvestigationService:
                 valeur_immobilisee=ExpressionWrapper(
                     F("restant") * F("lot__prix_achat_unitaire"),
                     output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            )
+            # Corrélation réception → distribution → vente (sprint suivi-distributions,
+            # 23/09/2026) : sans ces deux dates, un produit soldé ne montre plus que sa
+            # date de distribution — impossible de vérifier depuis cette page si la vente
+            # est arrivée vite ou tardivement, ni quand elle a été réellement saisie.
+            .annotate(
+                date_premiere_vente=Min(
+                    "vente__date_vente", filter=Q(vente__est_supprime=False)
+                ),
+                date_derniere_vente=Max(
+                    "vente__date_vente", filter=Q(vente__est_supprime=False)
+                ),
+                date_enregistrement_derniere_vente=Max(
+                    "vente__date_creation", filter=Q(vente__est_supprime=False)
+                ),
+            )
+            .prefetch_related(
+                Prefetch(
+                    "vente_set",
+                    queryset=Vente.objects.filter(est_supprime=False).order_by("date_vente"),
+                    to_attr="ventes_actives",
                 )
             )
         )
@@ -118,6 +140,15 @@ class StockInvestigationService:
             else:
                 d.jours_ecoules = None
                 d.statut_circulation = None
+
+            # Étalement de la vente dans le temps : un produit peut être écoulé en
+            # plusieurs fois sur plusieurs jours plutôt qu'en une seule vente — sans
+            # ça, "vendu le X" n'affiche que la dernière date et masque l'étalement
+            # réel (utile pour repérer un écoulement anormalement lent).
+            if d.date_premiere_vente and d.date_derniere_vente:
+                d.etalement_vente_jours = (d.date_derniere_vente - d.date_premiere_vente).days
+            else:
+                d.etalement_vente_jours = None
         return lignes
 
     # ------------------------------------------------------------------

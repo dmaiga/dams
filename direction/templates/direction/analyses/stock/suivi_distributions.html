@@ -301,6 +301,16 @@
                                 </span>
                                 {% endif %}
 
+                                {% if d.date_derniere_vente %}
+                                <div class="text-[9px] text-emerald-600 font-medium mt-1">
+                                    {% if d.etalement_vente_jours > 0 %}
+                                        Vente en cours depuis {{ d.etalement_vente_jours }} j
+                                    {% else %}
+                                        Vente partielle le {{ d.date_derniere_vente|date:"d/m/Y" }}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+
                             {% else %}
                                 <!-- LE PRODUIT EST TERMINÉ / SOLDÉ -->
                                 <div class="flex flex-col items-end">
@@ -308,9 +318,85 @@
                                         ✓ SOLDÉ
                                     </span>
                                     <div class="text-[10px] text-slate-400 mt-1">
-                                        Le {{ d.distribution.date_distribution|date:"d/m/Y" }}
+                                        Distribué le {{ d.distribution.date_distribution|date:"d/m/Y" }}
                                     </div>
+                                    {% if d.date_derniere_vente %}
+                                        {% if d.etalement_vente_jours > 0 %}
+                                        <div class="text-[10px] text-emerald-600 font-medium mt-0.5">
+                                            Écoulé en {{ d.etalement_vente_jours }} j
+                                        </div>
+                                        <div class="text-[9px] text-slate-400">
+                                            du {{ d.date_premiere_vente|date:"d/m/Y" }} au {{ d.date_derniere_vente|date:"d/m/Y" }}
+                                        </div>
+                                        {% else %}
+                                        <div class="text-[10px] text-emerald-600 font-medium mt-0.5">
+                                            Vendu le {{ d.date_derniere_vente|date:"d/m/Y" }}
+                                        </div>
+                                        {% endif %}
+                                    {% else %}
+                                    <div class="text-[9px] text-error italic">
+                                        Aucune vente liée
+                                    </div>
+                                    {% endif %}
                                 </div>
+                            {% endif %}
+
+                            <!-- CORRÉLATION COMPLÈTE : réception dépôt → distribution → chaque vente
+                                 déclarée/enregistrée — en modale plutôt qu'un dépliable en ligne, pour
+                                 lister proprement plusieurs ventes étalées sur plusieurs jours sans
+                                 déformer la hauteur de la ligne du tableau. -->
+                            {% if d.ventes_actives %}
+                            <button
+                                type="button"
+                                class="text-[9px] text-blue-600 hover:underline mt-1.5 inline-flex items-center gap-0.5"
+                                onclick="document.getElementById('ventes-detail-{{ d.id }}').showModal()"
+                            >
+                                Détail des ventes ({{ d.ventes_actives|length }})
+                                <i class="fas fa-arrow-up-right-from-square text-[8px]"></i>
+                            </button>
+                            <dialog id="ventes-detail-{{ d.id }}" class="modal">
+                                <div class="modal-box max-w-md text-left">
+                                    <h3 class="font-semibold text-sm mb-1">
+                                        {{ d.lot.produit.nom }} — {{ d.distribution.agent_terrain.full_name }}
+                                    </h3>
+                                    <p class="text-[11px] text-slate-500 mb-3">
+                                        Reçu le {{ d.lot.date_reception|date:"d/m/Y" }}
+                                        · distribué le {{ d.distribution.date_distribution|date:"d/m/Y" }}
+                                        {% if d.etalement_vente_jours > 0 %}
+                                        · écoulé en {{ d.etalement_vente_jours }} j
+                                        ({{ d.date_premiere_vente|date:"d/m/Y" }} → {{ d.date_derniere_vente|date:"d/m/Y" }})
+                                        {% endif %}
+                                    </p>
+                                    <div class="overflow-x-auto">
+                                        <table class="table table-xs w-full">
+                                            <thead>
+                                                <tr class="text-[10px] uppercase text-slate-400">
+                                                    <th>#</th>
+                                                    <th>Quantité</th>
+                                                    <th>Vendu le</th>
+                                                    <th>Enregistré le</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for v in d.ventes_actives %}
+                                                <tr class="text-xs">
+                                                    <td class="text-slate-400">{{ forloop.counter }}</td>
+                                                    <td class="font-medium">{{ v.quantite|format_number }}</td>
+                                                    <td>{{ v.date_vente|date:"d/m/Y H:i" }}</td>
+                                                    <td class="text-slate-400">{{ v.date_creation|date:"d/m/Y H:i" }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <form method="dialog" class="modal-action">
+                                        <button class="btn btn-sm">Fermer</button>
+                                    </form>
+                                </div>
+                                <form method="dialog" class="modal-backdrop">
+                                    <button>Fermer</button>
+                                </form>
+                            </dialog>
                             {% endif %}
                             {% if request.user.username == "mdmaiga" %}
                                 <div class="mt-1">
