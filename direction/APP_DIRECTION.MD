@@ -61,6 +61,30 @@ Utilisé par la vue de détail pour matérialiser les flux croisés au sein d'un
 * `get_flux(...)` : Reconstitue le journal des mouvements financiers opérationnels (cash physique encaissé versus versements effectués au ROT).
 * `get_matrice_distribution(...)` : Représente la matrice quantitative des produits alloués, vendus et en reliquat au sein du périmètre de l'entrepôt.
 
+### C bis. Export des ventes par fournisseur (`SuperviseurAgentsService.ventes_par_fournisseur`) — ajouté 24/09/2026
+
+Sur la fiche détail superviseur (`/direction/agents/superviseurs/<pk>`, `SuperviseurDetail`), deux
+boutons (Excel/PDF) exportent les ventes réalisées par **le superviseur et l'ensemble de ses
+agents** (`agent__superviseur=superviseur` OU `agent=superviseur`), sur la période déjà
+sélectionnée à l'écran (`SuperviseurAgentsService.resolve_period`).
+
+Organisation en deux niveaux, pour retracer un produit de sa réception jusqu'à sa vente :
+**fournisseur** (`LotEntrepot.fournisseur`, nullable — "Sans fournisseur" en repli) → **lot**
+(produit, prix d'achat, date de réception) → **ventes** (vendeur — agent ou superviseur lui-même
+— date, quantité, prix). Groupé par lot individuel, pas par nom de produit agrégé : deux
+réceptions du même produit à des prix/dates différents restent deux blocs distincts.
+
+Contrairement à `get_agents_ventes` (écran de pilotage courant, agents actifs non-stagiaires
+uniquement), cet export **n'exclut personne** sur le statut ou le type d'agent — c'est une trace
+historique, un agent parti depuis doit rester visible dans ce qu'il a vendu.
+
+Implémenté dans `direction/services/superviseur_ventes_fournisseur_export.py::
+SuperviseurVentesFournisseurExportService` (même pattern que `StockInvestigationExportService`) :
+`export_excel` — table plate, une ligne par vente, toutes les colonnes répétées (facilite le tri/
+filtre dans Excel) ; `export_pdf` — hiérarchie fournisseur → produit → tableau de ventes, fidèle à
+la structure demandée. Exposé par `ExportSuperviseurVentesFournisseurExcelView`/`PDFView`
+(`LoginRequiredMixin` uniquement, même niveau d'accès que `SuperviseurDetail`).
+
 ### C. Analyse Opérationnelle du Terrain (`AnalyseOperationnelleService`)
 
 * Offre un moteur de filtrage multidimensionnel croisant la temporalité (par défaut, du 1er janvier à la date du jour), l'identifiant unique de l'agent et la référence produit.

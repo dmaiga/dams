@@ -19,6 +19,8 @@ from direction.views import (
                                  liste_clotures,apercu_cloture,cloturer_periode,  
                                  api_calcul_salaire_rapide,export_salaires_excel,
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
+                                 ExportSuperviseurVentesFournisseurExcelView,
+                                 ExportSuperviseurVentesFournisseurPDFView,
                                  RotDetailView,analyse_operationnelle ,
                                  suivi_distributions,
                                  ExportProduitsInvestigationExcelView,
@@ -52,6 +54,16 @@ urlpatterns = [
     ),
 
     path('direction/agents/superviseurs/<int:pk>', SuperviseurDetail, name='direction_superviseur_detail'),
+    path(
+        'direction/agents/superviseurs/<int:pk>/export/ventes-fournisseur/excel/',
+        ExportSuperviseurVentesFournisseurExcelView.as_view(),
+        name='export_superviseur_ventes_fournisseur_excel'
+    ),
+    path(
+        'direction/agents/superviseurs/<int:pk>/export/ventes-fournisseur/pdf/',
+        ExportSuperviseurVentesFournisseurPDFView.as_view(),
+        name='export_superviseur_ventes_fournisseur_pdf'
+    ),
     path('direction/agents/rot/<int:pk>', RotDetailView, name='direction_rot_detail'),
     
     path('direction/produits/', ProductListView.as_view(), name='product_list'),

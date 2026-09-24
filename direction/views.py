@@ -63,6 +63,7 @@ from direction.services.agent_dashboard_service import DashboardAgentAnalysisSer
 from direction.services.agent_analysis_service import AgentAnalysisService
 
 from direction.services.agent_supervisseur_detail_analyse import SuperviseurAgentsService
+from direction.services.superviseur_ventes_fournisseur_export import SuperviseurVentesFournisseurExportService
 from direction.services.agent_supervisseur_liste_analyse import SuperviseurAnalysisService
 
 from direction.services.agent_terrain_service_liste import AgentTerrainListeService
@@ -191,6 +192,45 @@ def SuperviseurDetail(request, pk):
             **periode,
         }
     ) 
+
+class ExportSuperviseurVentesFournisseurExcelView(LoginRequiredMixin, View):
+    def get(self, request, pk, *args, **kwargs):
+        superviseur = get_object_or_404(Agent, pk=pk, type_agent='entrepot')
+        periode = SuperviseurAgentsService.resolve_period(request)
+        groupes = SuperviseurAgentsService.ventes_par_fournisseur(
+            superviseur, periode["date_debut"], periode["date_fin"]
+        )
+        buffer = SuperviseurVentesFournisseurExportService.export_excel(groupes)
+
+        response = HttpResponse(
+            buffer,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = (
+            f"attachment; filename=ventes_fournisseur_{superviseur.pk}_"
+            f"{periode['date_debut']}_{periode['date_fin']}.xlsx"
+        )
+        return response
+
+
+class ExportSuperviseurVentesFournisseurPDFView(LoginRequiredMixin, View):
+    def get(self, request, pk, *args, **kwargs):
+        superviseur = get_object_or_404(Agent, pk=pk, type_agent='entrepot')
+        periode = SuperviseurAgentsService.resolve_period(request)
+        groupes = SuperviseurAgentsService.ventes_par_fournisseur(
+            superviseur, periode["date_debut"], periode["date_fin"]
+        )
+        buffer = SuperviseurVentesFournisseurExportService.export_pdf(
+            superviseur, periode["date_debut"], periode["date_fin"], groupes
+        )
+
+        response = HttpResponse(buffer, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f"attachment; filename=ventes_fournisseur_{superviseur.pk}_"
+            f"{periode['date_debut']}_{periode['date_fin']}.pdf"
+        )
+        return response
+
 
 class AgentTerrainListView(LoginRequiredMixin, TemplateView):
     template_name = "direction/analyses/agents/agent_terrain_list.html"

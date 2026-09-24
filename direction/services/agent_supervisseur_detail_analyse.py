@@ -211,6 +211,59 @@ class SuperviseurAgentsService:
         }
 
     @staticmethod
+    def ventes_par_fournisseur(superviseur, debut, fin):
+        """Ventes réalisées par le superviseur et par l'ensemble de ses agents (rattachement
+        actuel via Agent.superviseur — pas de notion d'historique de réaffectation), organisées
+        par fournisseur puis par lot (produit + prix d'achat + date de réception), pour
+        retracer un produit de sa réception jusqu'à sa vente (demande mdmaiga, 24/09/2026).
+        Pas de filtre est_actif/type_agent ici, contrairement à get_agents_ventes : c'est un
+        export historique, pas un écran de pilotage courant — un agent parti depuis doit
+        rester visible dans la trace de ce qu'il a vendu."""
+        ventes = (
+            Vente.objects
+            .filter(
+                Q(agent__superviseur=superviseur) | Q(agent=superviseur),
+                date_vente__date__range=(debut, fin),
+                est_supprime=False,
+            )
+            .select_related(
+                "agent",
+                "detail_distribution__lot__produit",
+                "detail_distribution__lot__fournisseur",
+            )
+            .order_by(
+                "detail_distribution__lot__fournisseur__nom",
+                "detail_distribution__lot__date_reception",
+                "date_vente",
+            )
+        )
+
+        fournisseurs = {}
+        for vente in ventes:
+            lot = vente.detail_distribution.lot
+            fournisseur = lot.fournisseur
+            cle_fournisseur = fournisseur.id if fournisseur else None
+            bloc_fournisseur = fournisseurs.setdefault(
+                cle_fournisseur, {"fournisseur": fournisseur, "lots": {}}
+            )
+            bloc_lot = bloc_fournisseur["lots"].setdefault(lot.id, {
+                "lot": lot,
+                "produit": lot.produit,
+                "prix_achat": lot.prix_achat_unitaire,
+                "date_reception": lot.date_reception,
+                "ventes": [],
+            })
+            bloc_lot["ventes"].append(vente)
+
+        resultat = []
+        for bloc in fournisseurs.values():
+            resultat.append({
+                "fournisseur": bloc["fournisseur"],
+                "produits": list(bloc["lots"].values()),
+            })
+        return resultat
+
+    @staticmethod
     def build_kpis(totals, flux):
         ca_agents = flux["ventes_agents"]
         ca_superviseur = flux["ventes_perso"]

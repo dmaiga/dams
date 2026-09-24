@@ -21,12 +21,22 @@
 
   <!-- Actions -->
   <div class="flex gap-2">
+    <a href="{% url 'export_superviseur_ventes_fournisseur_excel' superviseur.pk %}?periode={{ periode }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}"
+       class="btn btn-sm btn-outline">
+      <i class="fas fa-file-excel"></i>
+      Ventes/fournisseur — Excel
+    </a>
+    <a href="{% url 'export_superviseur_ventes_fournisseur_pdf' superviseur.pk %}?periode={{ periode }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}"
+       class="btn btn-sm btn-outline">
+      <i class="fas fa-file-pdf"></i>
+      Ventes/fournisseur — PDF
+    </a>
     <a href="{% url 'agent_dashboard' %}" class="btn btn-sm btn-outline">
       <i class="fas fa-arrow-left"></i>
       Retour
     </a>
 
-    
+
   </div>
 
 </div>
