@@ -18,6 +18,11 @@ from surveillance.constants import (
 # mentionnés dans la demande métier.
 TYPES_AGENT_VENTE = ['terrain', 'agent_gros']
 
+# Superviseur actif, ou pas de superviseur assigné du tout — ne jamais exclure les agents
+# orphelins (cf. _grouper_par_superviseur/sans_superviseur dans monitoring), seulement les
+# situations rattachées à un superviseur qui ne travaille plus (demande mdmaiga, 24/09/2026).
+SUPERVISEUR_ACTIF_OU_ABSENT = Q(superviseur__isnull=True) | Q(superviseur__est_actif=True)
+
 
 class StockAgeService:
     @staticmethod
@@ -47,6 +52,7 @@ class StockAgeService:
         return (
             Agent.objects
             .filter(
+                SUPERVISEUR_ACTIF_OU_ABSENT,
                 type_agent__in=TYPES_AGENT_VENTE,
                 est_actif=True,
                 # Agent réellement entré en activité sur la fenêtre fiable —
@@ -129,6 +135,7 @@ class StockAgeService:
             date_affectation__lte=seuil_date,
             date_affectation__gte=DATE_PLANCHER_STOCK,
             agent_terrain_direct__isnull=True,
+            superviseur__est_actif=True,
         )
 
     @staticmethod
@@ -136,7 +143,10 @@ class StockAgeService:
         return (
             DetailDistribution.objects
             .filter(
+                Q(distribution__agent_terrain__superviseur__isnull=True)
+                | Q(distribution__agent_terrain__superviseur__est_actif=True),
                 distribution__agent_terrain__type_agent__in=TYPES_AGENT_VENTE,
+                distribution__agent_terrain__est_actif=True,
                 distribution__date_distribution__lte=seuil,
                 distribution__date_distribution__date__gte=DATE_PLANCHER_STOCK,
             )

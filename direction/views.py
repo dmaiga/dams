@@ -67,6 +67,7 @@ from direction.services.agent_supervisseur_liste_analyse import SuperviseurAnaly
 
 from direction.services.agent_terrain_service_liste import AgentTerrainListeService
 from direction.services.agent_detail_service import AgentDetailService
+from direction.services.agent_detail_export import AgentDetailExportService
 
 from direction.services.fournisseur_service import FournisseurAnalyseService
 from direction.services.vente_analyses import VenteAnalyseService
@@ -288,6 +289,41 @@ class AgentDetailView(LoginRequiredMixin, DetailView):
         })
 
         return context
+
+class ExportAgentDetailExcelView(LoginRequiredMixin, View):
+    def get(self, request, pk, *args, **kwargs):
+        agent = get_object_or_404(Agent, pk=pk)
+        periode_data = AgentDetailService.resolve_period(request)
+        buffer = AgentDetailExportService.export_excel(
+            agent, periode_data["date_debut"], periode_data["date_fin"]
+        )
+
+        response = HttpResponse(
+            buffer,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = (
+            f"attachment; filename=agent_{agent.pk}_{periode_data['date_debut']}_"
+            f"{periode_data['date_fin']}.xlsx"
+        )
+        return response
+
+
+class ExportAgentDetailPDFView(LoginRequiredMixin, View):
+    def get(self, request, pk, *args, **kwargs):
+        agent = get_object_or_404(Agent, pk=pk)
+        periode_data = AgentDetailService.resolve_period(request)
+        buffer = AgentDetailExportService.export_pdf(
+            agent, periode_data["date_debut"], periode_data["date_fin"]
+        )
+
+        response = HttpResponse(buffer, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f"attachment; filename=agent_{agent.pk}_{periode_data['date_debut']}_"
+            f"{periode_data['date_fin']}.pdf"
+        )
+        return response
+
 
 def RotDetailView(request, pk):
     rot = get_object_or_404(Agent, pk=pk, type_agent='rot')

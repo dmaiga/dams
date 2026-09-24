@@ -1,9 +1,17 @@
 from decimal import Decimal
 
-from django.db.models import Count, F, Min
+from django.db.models import Count, F, Min, Q
 
 from core.models import Agent, LotEntrepot, Vente
-from surveillance.constants import DATE_PLANCHER_PRIX, SEUIL_MARGE_MINIMALE
+from surveillance.constants import DATE_PLANCHER_PRIX, SEUIL_ECART_PRIX_ACHAT, SEUIL_MARGE_MINIMALE
+
+# Agent actif ET (pas de superviseur assigné OU superviseur actif) — ne jamais exclure les
+# agents orphelins (cf. _grouper_par_superviseur/sans_superviseur), seulement les agents ou
+# superviseurs qui ne travaillent plus (demande mdmaiga, 24/09/2026 : ces alertes n'ont
+# vocation qu'à signaler des situations sur lesquelles quelqu'un peut encore agir).
+FILTRE_ACTEURS_ACTIFS = Q(agent__est_actif=True) & (
+    Q(agent__superviseur__isnull=True) | Q(agent__superviseur__est_actif=True)
+)
 
 
 class PrixSurveillanceService:
@@ -12,6 +20,7 @@ class PrixSurveillanceService:
     # service définissait auparavant sa propre valeur locale, 45 FCFA, jamais
     # alignée sur la constante déclarée pour cet usage).
     SEUIL_MARGE_MINIMALE = Decimal(str(SEUIL_MARGE_MINIMALE))
+    SEUIL_ECART_PRIX_ACHAT = Decimal(str(SEUIL_ECART_PRIX_ACHAT))
 
     @staticmethod
     def ventes_a_perte(limit=None):
@@ -137,6 +146,7 @@ class PrixSurveillanceService:
         ventes = (
             Vente.objects
             .filter(
+                FILTRE_ACTEURS_ACTIFS,
                 est_supprime=False,
                 date_vente__date__gte=DATE_PLANCHER_PRIX,
                 prix_vente_unitaire__lt=(
@@ -159,6 +169,44 @@ class PrixSurveillanceService:
                 "produit": vente.detail_distribution.lot.produit,
                 "prix_vente": vente.prix_vente_unitaire,
                 "marge": vente.marge,
+            }
+            for vente in ventes
+        ]
+
+    @staticmethod
+    def ventes_ecart_prix_achat_suspect():
+        """Ventes individuelles dont le prix de vente dépasse le prix d'achat de plus de
+        SEUIL_ECART_PRIX_ACHAT — repli volontairement simple pour repérer une erreur de
+        saisie probable (ex. un zéro de trop) sur un prix anormalement HAUT, sans jugement
+        sur la rentabilité (cf. SEUIL_ECART_PRIX_ACHAT). Complémentaire de
+        ventes_sous_marge_minimale, qui ne couvre que les prix trop BAS."""
+        ventes = (
+            Vente.objects
+            .filter(
+                FILTRE_ACTEURS_ACTIFS,
+                est_supprime=False,
+                date_vente__date__gte=DATE_PLANCHER_PRIX,
+                prix_vente_unitaire__gt=(
+                    F('detail_distribution__lot__prix_achat_unitaire')
+                    + PrixSurveillanceService.SEUIL_ECART_PRIX_ACHAT
+                ),
+            )
+            .select_related('agent', 'agent__superviseur', 'detail_distribution__lot__produit')
+            .annotate(
+                ecart=F('prix_vente_unitaire') - F('detail_distribution__lot__prix_achat_unitaire')
+            )
+            .order_by('-ecart')
+        )
+
+        return [
+            {
+                "vente": vente,
+                "agent": vente.agent,
+                "superviseur": vente.agent.superviseur,
+                "produit": vente.detail_distribution.lot.produit,
+                "prix_achat": vente.detail_distribution.lot.prix_achat_unitaire,
+                "prix_vente": vente.prix_vente_unitaire,
+                "ecart": vente.ecart,
             }
             for vente in ventes
         ]

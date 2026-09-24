@@ -92,8 +92,18 @@
           </p>
         </div>
 
-        <div>
-          <a href="{% url 'agent_terrain_list' %}" 
+        <div class="flex flex-wrap gap-2 items-start">
+          <a href="{% url 'export_agent_detail_excel' agent.pk %}?periode={{ periode }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}"
+             class="btn btn-outline btn-sm gap-2">
+            <i class="fas fa-file-excel"></i>
+            Excel
+          </a>
+          <a href="{% url 'export_agent_detail_pdf' agent.pk %}?periode={{ periode }}&date_debut={{ date_debut|date:'Y-m-d' }}&date_fin={{ date_fin|date:'Y-m-d' }}"
+             class="btn btn-outline btn-sm gap-2">
+            <i class="fas fa-file-pdf"></i>
+            PDF
+          </a>
+          <a href="{% url 'agent_terrain_list' %}"
              class="btn btn-outline btn-sm gap-2">
             <i class="fas fa-arrow-left"></i>
             Retour liste

@@ -66,6 +66,30 @@ Utilisé par la vue de détail pour matérialiser les flux croisés au sein d'un
 * Offre un moteur de filtrage multidimensionnel croisant la temporalité (par défaut, du 1er janvier à la date du jour), l'identifiant unique de l'agent et la référence produit.
 * Permet d'isoler les comportements de vente et de déceler les anomalies de distribution à l'échelle de l'agent individuel.
 
+### D. Fiche détail agent (`AgentDetailView`, `/direction/agents/<pk>/`) et son export (24/09/2026)
+
+`AgentDetailService.get_agent_detail` calcule les KPI agrégés (kg vendus, CA, marge, incentive, ventes
+groupées par produit) sur la période résolue par `AgentDetailService.resolve_period` (`?periode=
+hebdo|mensuel|custom`, hebdo par défaut). Cette page n'affichait jusqu'ici que des agrégats — aucun
+export, aucune ligne de détail.
+
+**Ajout (demande mdmaiga, 24/09/2026)** : deux boutons (Excel/PDF) permettent d'extraire, sur la même
+période que celle sélectionnée à l'écran, le détail ligne à ligne de :
+- **Distributions reçues** par l'agent (`DetailDistribution` dont `distribution.agent_terrain` = cet
+  agent, filtrées sur `distribution.date_distribution`) — date, produit, quantité, superviseur
+  distributeur, type de distribution.
+- **Ventes réalisées** par l'agent (`Vente`, non supprimées, filtrées sur `date_vente`) — date, produit,
+  quantité, prix unitaire, montant, type de vente, mode de paiement. Contrairement à `ventes_par_produit`
+  (agrégat affiché à l'écran), l'export liste chaque vente individuellement, pas un total par produit.
+
+Implémenté dans `direction/services/agent_detail_export.py::AgentDetailExportService` (même pattern que
+`StockInvestigationExportService` : `export_excel` — un classeur à 2 feuilles — et `export_pdf` — un
+document à 2 tableaux), exposé par `ExportAgentDetailExcelView`/`ExportAgentDetailPDFView`
+(`direction/views.py`, `LoginRequiredMixin` uniquement, même niveau d'accès que `AgentDetailView` —
+aucun contrôle de rôle supplémentaire introduit). Les deux vues relisent `AgentDetailService.
+resolve_period(request)` à partir des mêmes paramètres GET que la page, pour ne jamais dupliquer la
+logique de résolution de période.
+
 ---
 
 ## 4. Performance & Optimisation du Tunnel des Ventes (`ToutesLesVentesView`)

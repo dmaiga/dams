@@ -153,3 +153,19 @@ Pour fluidifier l'activité quotidienne, deux mécanismes permettent de liquider
 ### B. Liquidation Instantanée (`vente_distribution_rapide`)
 
 * **Vente Totale Automatique** : Conçu pour solder d'un seul clic l'intégralité du stock restant (`reste = quantite - quantite_vendue`) aux conditions tarifaires par défaut de l'agent (Prix de gros pour un `agent_gros`, prix de détail pour les autres profils). Elle exécute de manière automatique la création couplée Vente + Recouvrement et met à jour le compteur de distribution.
+
+---
+
+## 7. Recouvrement ROT (`recouvrer_superviseur`) — chemin obsolète, non aligné sur la nouvelle période
+
+Écran par lequel un ROT recouvre le cash détenu par un superviseur. Le résumé affiché avant saisie
+vient de `RotDashboardService.get_cash_superviseur_post_cloture` (`agents/services/rot_dashboard_service.py`)
+— un calcul **distinct** de `finance.services.solde_superviseur`, basé sur la dernière `ClotureMensuelle`
+validée du superviseur. **Constat du 24/09/2026 (mdmaiga)** : ce mécanisme (ROT + `ClotureMensuelle`) est
+obsolète en pratique — `cloturer_mois` n'a plus été exécuté depuis juin 2026 (dernière `ClotureMensuelle`
+en base : 30/06/2026), la commande n'a jamais été corrigée pour tourner en routine. `finance.solde_superviseur`
+(calcul dynamique, sans clôture) reste le seul calcul de solde réellement à jour. Ce chemin est resté
+routé et lié dans `base.html`, encore accessible pour le ROT actif en base — **volontairement pas
+touché par la nouvelle borne `DATE_DEBUT_PERIODE_ACTUELLE`** (finance, 24/09/2026) : maintenir à jour un
+calcul déjà considéré obsolète n'a pas été jugé utile. Voir `finance/APP_FINANCE.md` pour le contexte
+plus large sur la duplication du calcul de solde.

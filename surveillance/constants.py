@@ -38,3 +38,13 @@ DELAI_RETENTION_ACTEURS_JOURS = 3
 # localement (dette historique corrigée le 2026-08-13 — les deux définissaient
 # chacun leur propre valeur, jamais alignée sur celle-ci).
 SEUIL_MARGE_MINIMALE = 45
+
+# Écart maximal accepté au-dessus du prix d'achat avant de signaler une vente comme
+# erreur de saisie probable (demande mdmaiga, 24/09/2026). Complémentaire de
+# SEUIL_MARGE_MINIMALE (qui ne détecte que les prix trop BAS, sous le coût) : un prix
+# de vente anormalement HAUT (ex. un superviseur qui tape 130000 au lieu de 12000) ne
+# déclenche jamais la marge minimale (marge positive, pas de perte), donc rien ne le
+# signalait jusqu'ici. Une vraie fourchette de prix acceptable par produit ("spectrum")
+# serait plus juste mais difficile à établir pour l'instant (variation de marché,
+# négociation) — ce seuil fixe et simple est un repli volontairement provisoire.
+SEUIL_ECART_PRIX_ACHAT = 2500

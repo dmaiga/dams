@@ -30,12 +30,13 @@ Fichier : `surveillance/constants.py`
 | Constante | Valeur | Usage |
 |-----------|--------|-------|
 | `DATE_PLANCHER_VENTES` | `date(2026, 1, 1)` | Plancher global sur tous les volumes KG |
-| `DATE_PLANCHER_PRIX` | `date(2026, 6, 1)` | Plancher sur les anomalies de prix uniquement |
+| `DATE_PLANCHER_PRIX` | `date(2026, 7, 1)` | Plancher sur les anomalies de prix uniquement (doc corrigée le 24/09/2026 — la valeur en code était déjà à 01/07/2026, la doc affichait encore l'ancienne 01/06/2026) |
 | `DATE_PLANCHER_STOCK` | `date(2026, 7, 1)` | Plancher sur la détection de stock dormant (§ Suivi Durée de Vie du Stock) |
 | `DELAI_ACTIVITE_COMMERCIALE_JOURS` | `3` j | Agent sans vente valide depuis ce délai → alerte activité |
 | `DELAI_STOCK_DORMANT_JOURS` | `15` j | Stock non distribué à l'entrepôt central |
 | `DELAI_RETENTION_ACTEURS_JOURS` | `3` j | Stock détenu par un superviseur ou un agent sans être redistribué/vendu |
 | `SEUIL_MARGE_MINIMALE` | `45` FCFA | Marge minimale attendue par vente unitaire (source unique pour `PrixSurveillanceService`/`SurveillancePrixService`) |
+| `SEUIL_ECART_PRIX_ACHAT` | `2500` FCFA | Ajouté 24/09/2026 — écart max au-dessus du prix d'achat avant de signaler une vente comme erreur de saisie probable (voir `ventes_ecart_prix_achat_suspect` ci-dessous) |
 
 `DATE_PLANCHER_STOCK` est un choix **volontaire** pour ignorer un passé jugé peu fiable, pas un
 oubli — réexaminé puis confirmé inchangé lors de la clôture du sprint 12 (17/09/2026), malgré des
@@ -171,6 +172,15 @@ différenciés entrepôt/superviseur/agent) et son calcul d'activité commercial
 (`agents_sans_vente_recente()`), mais **exclusivement pour le moteur d'alertes de `monitoring`** —
 plus aucune vue `surveillance` ne les appelle.
 
+**Acteurs actifs uniquement (24/09/2026)** : `_queryset_agents_sans_vente_recente` (activité),
+`_queryset_lots_dormants_superviseur` et `_queryset_stock_retenu_agents` (rétention
+superviseur/agent) excluent désormais les superviseurs désactivés (`superviseur__est_actif=True`,
+sauf agent sans superviseur assigné — jamais exclu) et, pour la rétention agent, les agents
+eux-mêmes désactivés (`agent_terrain__est_actif=True` déjà présent côté activité via
+`Agent.objects.filter(est_actif=True)`). But : ces alertes ne servent à rien pour quelqu'un qui ne
+travaille plus. `_queryset_lots_dormants_entrepot` (origine "entrepôt") n'est pas concernée —
+aucun agent/superviseur n'y intervient.
+
 **Incident de performance corrigé** : avant ce recadrage, `StockRotationView` appelait ces méthodes
 3-origines, dont le calcul de rétention agent (`_lignes_stock_retenu_agents`, N+1 sur
 `DetailDistribution.quantite_restante_calculee`, property à 2 requêtes par ligne) — répété 3 fois par
@@ -198,6 +208,15 @@ Signatures principales, en complément de la narration par vue ci-dessus.
 | `ProduitSurveillanceService` | `variations_semaine(debut_semaine=None)` | `{produit, kg_actuel, kg_prec, variation}` |
 | `PrixSurveillanceService` | `ventes_a_perte(limit=None)` | Ventes sous `prix_achat_unitaire`, depuis `DATE_PLANCHER_PRIX` ; `limit` = `LIMIT` SQL |
 | | `count_anomalies()` | Nombre de lots distincts en anomalie (1 requête COUNT) |
+| | `ventes_sous_marge_minimale()` | Ventes individuelles dont la marge < `SEUIL_MARGE_MINIMALE` — alimente l'alerte Telegram `prix`. Restreint à `FILTRE_ACTEURS_ACTIFS` (agent actif, superviseur actif ou absent — ajouté 24/09/2026) |
+| | `ventes_ecart_prix_achat_suspect()` | Ajouté 24/09/2026 — ventes individuelles dont le prix de vente dépasse `prix_achat_unitaire + SEUIL_ECART_PRIX_ACHAT`. Complémentaire de `ventes_sous_marge_minimale` : celle-ci ne détecte que les prix trop **bas** (perte), une saisie anormalement **haute** (ex. 130000 au lieu de 12000, un zéro de trop) a une marge positive et ne déclenche jamais l'alerte marge minimale. Repli volontairement simple (seuil fixe unique) en attendant une vraie fourchette de prix acceptable par produit, jugée difficile à établir pour l'instant (variation de marché, négociation) — alimente l'alerte Telegram `prix_ecart_achat`. Même restriction `FILTRE_ACTEURS_ACTIFS`. |
+
+`FILTRE_ACTEURS_ACTIFS` (`prix_service.py`) : ne garde que les ventes d'un agent actif dont le
+superviseur est actif ou absent (jamais exclure un agent orphelin, cf. `sans_superviseur` dans
+`monitoring`) — ces deux alertes Telegram n'ont vocation qu'à signaler des situations sur
+lesquelles quelqu'un peut encore agir (demande mdmaiga, 24/09/2026). Ne s'applique qu'à ces deux
+méthodes, pas à `ventes_a_perte`/`count_anomalies` (dashboard `surveillance`, vue d'audit
+historique qui n'a pas à exclure un agent parti depuis).
 | `SurveillancePrixService` | `get_resume(order_by=None)` | `{stats, lignes}`, tri par `date_reception` ou écart |
 | | `get_detail_lot(lot)` | Détail complet d'un lot : ventes, résumé par agent |
 | `DetailSuperviseurService` / `DetailProduitService` | `get_data(objet, debut_semaine=None)` | KPIs + variations sur la semaine sélectionnée |

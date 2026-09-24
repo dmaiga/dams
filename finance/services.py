@@ -30,12 +30,30 @@ CATEGORIES_ENGAGEMENT_CHAMP = ('AVANCE_CHAMP', 'DEPENSE_CHAMP')
 # RecouvrementSuperviseur/Depense/VersementBancaire antérieur est ignoré.
 DATE_DEBUT_FINANCE = date(2026, 8, 1)
 
+# Nouvelle période (demande mdmaiga, 24/09/2026) : à partir de cette date, les soldes
+# superviseurs repartent de zéro — aucun report d'ouverture (contrairement à la coupure
+# du 01/08/2026 ci-dessus, qui s'appuie sur Agent.ajustement_solde). Une consultation
+# portant sur une période antérieure au 01/10/2026 (ex. un mois déjà clos) continue
+# d'utiliser DATE_DEBUT_FINANCE et l'ajustement d'ouverture historique — voir
+# _date_debut_effective.
+DATE_DEBUT_PERIODE_ACTUELLE = date(2026, 10, 1)
+
+
+def _date_debut_effective(date_fin):
+    """Borne basse effective des calculs de solde : DATE_DEBUT_PERIODE_ACTUELLE si
+    `date_fin` s'y situe (nouvelle période, sans report), sinon DATE_DEBUT_FINANCE
+    (comportement historique inchangé pour consulter une période déjà close)."""
+    return DATE_DEBUT_PERIODE_ACTUELLE if date_fin >= DATE_DEBUT_PERIODE_ACTUELLE else DATE_DEBUT_FINANCE
+
 
 def solde_superviseur(superviseur, date_fin=None):
     """
     Cash actuellement détenu par CE superviseur, pas encore remis à un acteur
     admin (ROT ou direction). Calcul dynamique depuis DATE_DEBUT_FINANCE (pas
-    de clôture) — l'historique antérieur est ignoré, voir décision n°14. Le
+    de clôture) — l'historique antérieur est ignoré, voir décision n°14. Depuis
+    le 01/10/2026 (DATE_DEBUT_PERIODE_ACTUELLE, décision mdmaiga du 24/09/2026),
+    toute période interrogée à partir de cette date repart de zéro sans report
+    d'ouverture — voir `_date_debut_effective`. Le
     calcul mélangeait auparavant ce solde avec des Depense et VersementBancaire
     qui sont en réalité des événements de la caisse globale une fois l'argent
     mutualisé, pas des événements du superviseur (décision n°13,
@@ -74,27 +92,29 @@ def solde_superviseur(superviseur, date_fin=None):
     if date_fin is None:
         date_fin = timezone.localdate()
 
+    date_debut = _date_debut_effective(date_fin)
+
     encaissements = Recouvrement.objects.filter(
         superviseur=superviseur,
-        date_recouvrement__date__gte=DATE_DEBUT_FINANCE,
+        date_recouvrement__date__gte=date_debut,
         date_recouvrement__date__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant_recouvre"), Decimal("0.00")))["total"]
 
     depenses_perso = Depense.objects.filter(
         effectue_par=superviseur,
-        date_depense__gte=DATE_DEBUT_FINANCE,
+        date_depense__gte=date_debut,
         date_depense__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
     deja_remis = RecouvrementSuperviseur.objects.filter(
         superviseur=superviseur,
-        date_recouvrement__date__gte=DATE_DEBUT_FINANCE,
+        date_recouvrement__date__gte=date_debut,
         date_recouvrement__date__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
     remboursements_champ = RemboursementChamp.objects.filter(
         depense__effectue_par=superviseur,
-        date_remboursement__gte=DATE_DEBUT_FINANCE,
+        date_remboursement__gte=date_debut,
         date_remboursement__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
@@ -103,11 +123,18 @@ def solde_superviseur(superviseur, date_fin=None):
     engage_champ = Depense.objects.filter(
         effectue_par=superviseur,
         categorie__in=CATEGORIES_ENGAGEMENT_CHAMP,
-        date_depense__gte=DATE_DEBUT_FINANCE,
+        date_depense__gte=date_debut,
         date_depense__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
-    ajustement = superviseur.ajustement_solde or Decimal("0.00")
+    # Pas de report d'ouverture sur la nouvelle période (décision mdmaiga, 24/09/2026) :
+    # ajustement_solde ne représente que l'ouverture manuelle au 01/08/2026, elle ne
+    # s'applique plus une fois la borne basse déplacée à DATE_DEBUT_PERIODE_ACTUELLE.
+    ajustement = (
+        (superviseur.ajustement_solde or Decimal("0.00"))
+        if date_debut == DATE_DEBUT_FINANCE
+        else Decimal("0.00")
+    )
 
     solde = encaissements - depenses_perso - deja_remis + ajustement + remboursements_champ
 
@@ -160,20 +187,22 @@ def solde_caisse_globale(date_fin=None):
     if date_fin is None:
         date_fin = timezone.localdate()
 
+    date_debut = _date_debut_effective(date_fin)
+
     recouvre = RecouvrementSuperviseur.objects.filter(
-        date_recouvrement__date__gte=DATE_DEBUT_FINANCE,
+        date_recouvrement__date__gte=date_debut,
         date_recouvrement__date__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
     depenses = Depense.objects.filter(
-        date_depense__gte=DATE_DEBUT_FINANCE,
+        date_depense__gte=date_debut,
         date_depense__lte=date_fin,
     ).exclude(
         categorie__in=CATEGORIES_ENGAGEMENT_CHAMP
     ).aggregate(total=Coalesce(Sum("montant"), Decimal("0.00")))["total"]
 
     versements = VersementBancaire.objects.filter(
-        date_versement_reelle__date__gte=DATE_DEBUT_FINANCE,
+        date_versement_reelle__date__gte=date_debut,
         date_versement_reelle__date__lte=date_fin,
     ).aggregate(total=Coalesce(Sum("montant_vente"), Decimal("0.00")))["total"]
 

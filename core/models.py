@@ -79,6 +79,7 @@ class Alerte(models.Model):
         ("stock_superviseur", "Stock en rétention — superviseurs"),
         ("stock_agent", "Stock en rétention — agents"),
         ("prix", "Ventes sous la marge minimale"),
+        ("prix_ecart_achat", "Ventes à prix suspect (écart inhabituel avec le prix d'achat)"),
         ("activite", "Baisse d'activité commerciale"),
     ]
 

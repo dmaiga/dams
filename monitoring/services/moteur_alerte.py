@@ -3,6 +3,7 @@ from collections import defaultdict
 from core.models import RecouvrementSuperviseur
 from core.templatetags.format_fcfa import fcfa
 from finance.services import lister_soldes_superviseurs, solde_superviseur
+from monitoring.constants import DESCRIPTIONS_ALERTES
 from monitoring.providers.telegram import TelegramProvider
 from monitoring.services.deduplication_service import AlerteDeduplicationService
 from surveillance.services.prix_service import PrixSurveillanceService
@@ -89,8 +90,9 @@ class AlerteMoteur:
                     defaults={
                         "niveau": "critique",
                         "message": (
-                            f"Solde persistant chez {superviseur} : encore débiteur après "
-                            "3 cycles de remise consécutifs."
+                            f"⚠️ SOLDE PERSISTANT — {superviseur.full_name}\n"
+                            f"{DESCRIPTIONS_ALERTES['solde_persistant']}\n\n"
+                            f"Encore débiteur après 3 cycles de remise consécutifs."
                         ),
                     },
                     superviseur=superviseur.user,
@@ -105,7 +107,7 @@ class AlerteMoteur:
                 f"• {item['superviseur'].full_name} : {fcfa(item['solde'])} FCFA"
                 for item in situations_solde
             )
-            message = f"⚠️ SOLDES SUPERVISEURS\n\n{lignes}"
+            message = f"⚠️ SOLDES SUPERVISEURS\n{DESCRIPTIONS_ALERTES['solde']}\n\n{lignes}"
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
                 type_alerte="solde",
                 defaults={"niveau": "info", "message": message},
@@ -142,7 +144,7 @@ class AlerteMoteur:
                 f"• {ligne['produit'].nom}\n  reçu le {_fmt_date(ligne['date_reference'])}\n  {ligne['jours_ecoules']} jours"
                 for ligne in lignes
             )
-            message = f"⚠️ STOCK DORMANT — ENTREPÔT\n\n{corps}"
+            message = f"⚠️ STOCK DORMANT — ENTREPÔT\n{DESCRIPTIONS_ALERTES['stock_entrepot']}\n\n{corps}"
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
                 type_alerte="stock_entrepot",
                 defaults={"niveau": "warning", "message": message},
@@ -154,53 +156,63 @@ class AlerteMoteur:
 
     @staticmethod
     def _envoyer_stock_superviseurs(lignes):
+        # Un message Telegram distinct par superviseur (refonte du 24/09/2026, à la demande
+        # de mdmaiga — auparavant un seul message combinant tous les superviseurs), pour que
+        # chacun ne reçoive que ses propres produits en rétention. Une AffectationLotSuperviseur
+        # porte toujours un superviseur (FK non nullable) : _sans_superviseur est ici toujours
+        # vide, ignoré.
         groupes, _sans_superviseur = _grouper_par_superviseur(lignes)
-        # Une AffectationLotSuperviseur porte toujours un superviseur (FK non
-        # nullable) : _sans_superviseur est ici toujours vide, ignoré.
 
-        if groupes:
-            blocs = []
-            for superviseur, produits in groupes.items():
-                lignes_produits = "\n".join(_ligne_stock(p) for p in produits)
-                blocs.append(f"{superviseur.full_name}\n{lignes_produits}")
-            message = "⚠️ STOCK EN RÉTENTION — SUPERVISEURS\n\n" + "\n\n".join(blocs)
+        for superviseur, produits in groupes.items():
+            lignes_produits = "\n".join(_ligne_stock(p) for p in produits)
+            message = (
+                f"⚠️ STOCK EN RÉTENTION — {superviseur.full_name}\n"
+                f"{DESCRIPTIONS_ALERTES['stock_superviseur']}\n\n{lignes_produits}"
+            )
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
                 type_alerte="stock_superviseur",
                 defaults={"niveau": "warning", "message": message},
+                superviseur=superviseur.user,
             )
             if doit_envoyer:
                 TelegramProvider.send(alerte)
 
-        AlerteDeduplicationService.cloturer_si_resolue("stock_superviseur", [{}] if groupes else [])
+        AlerteDeduplicationService.cloturer_si_resolue(
+            "stock_superviseur", [{"superviseur": s.user} for s in groupes.keys()]
+        )
 
     @staticmethod
     def _envoyer_stock_agents(lignes):
+        # Même logique que _envoyer_stock_superviseurs (24/09/2026) : un message par
+        # superviseur, listant ses propres agents. Un agent de vente sans superviseur
+        # assigné ne devrait pas exister en pratique (Constat 9) ; s'il se présente, ses
+        # lignes de stock sont simplement ignorées ici plutôt que rattachées à un
+        # superviseur inventé — elles restent visibles depuis le dashboard surveillance.
         groupes, _sans_superviseur = _grouper_par_superviseur(lignes)
-        # Un agent de vente sans superviseur assigné ne devrait pas exister en
-        # pratique (Constat 9) ; s'il se présente, ses lignes de stock sont
-        # simplement ignorées ici plutôt que rattachées à un superviseur
-        # inventé — elles restent visibles depuis le dashboard surveillance.
 
-        if groupes:
-            blocs = []
-            for superviseur, produits_agents in groupes.items():
-                par_agent = defaultdict(list)
-                for p in produits_agents:
-                    par_agent[p["agent"]].append(p)
-                sous_blocs = []
-                for agent, produits in par_agent.items():
-                    lignes_produits = "\n".join(_ligne_stock(p) for p in produits)
-                    sous_blocs.append(f"{agent.full_name}\n{lignes_produits}")
-                blocs.append(f"{superviseur.full_name}\n\n" + "\n\n".join(sous_blocs))
-            message = "⚠️ STOCK CHEZ LES AGENTS\n\n" + "\n\n".join(blocs)
+        for superviseur, produits_agents in groupes.items():
+            par_agent = defaultdict(list)
+            for p in produits_agents:
+                par_agent[p["agent"]].append(p)
+            sous_blocs = []
+            for agent, produits in par_agent.items():
+                lignes_produits = "\n".join(_ligne_stock(p) for p in produits)
+                sous_blocs.append(f"{agent.full_name}\n{lignes_produits}")
+            message = (
+                f"⚠️ STOCK CHEZ LES AGENTS — {superviseur.full_name}\n"
+                f"{DESCRIPTIONS_ALERTES['stock_agent']}\n\n" + "\n\n".join(sous_blocs)
+            )
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
                 type_alerte="stock_agent",
                 defaults={"niveau": "warning", "message": message},
+                superviseur=superviseur.user,
             )
             if doit_envoyer:
                 TelegramProvider.send(alerte)
 
-        AlerteDeduplicationService.cloturer_si_resolue("stock_agent", [{}] if groupes else [])
+        AlerteDeduplicationService.cloturer_si_resolue(
+            "stock_agent", [{"superviseur": s.user} for s in groupes.keys()]
+        )
 
     # ------------------------------------------------------------------
     # Ventes sous la marge minimale — un seul message, groupé par
@@ -219,7 +231,10 @@ class AlerteMoteur:
             if sans_superviseur:
                 blocs.append(AlerteMoteur._bloc_marge_par_agent("Sans superviseur", sans_superviseur))
 
-            message = "⚠️ VENTES SOUS LA MARGE MINIMALE\n\n" + "\n\n".join(blocs)
+            message = (
+                f"⚠️ VENTES SOUS LA MARGE MINIMALE\n{DESCRIPTIONS_ALERTES['prix']}\n\n"
+                + "\n\n".join(blocs)
+            )
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
                 type_alerte="prix",
                 defaults={"niveau": "critique", "message": message},
@@ -246,43 +261,110 @@ class AlerteMoteur:
         return f"{titre}\n\n" + "\n\n".join(sous_blocs)
 
     # ------------------------------------------------------------------
-    # Baisse d'activité commerciale — dernière vente VALIDE de l'agent,
-    # décorrélée du stock/lot (StockAgeService.agents_sans_vente_recente).
+    # Ventes à prix suspect (écart inhabituel avec le prix d'achat) — ajouté
+    # 24/09/2026, complémentaire de "prix" (marge minimale) qui ne détecte que
+    # les prix trop BAS. Même structure de message (un seul message, groupé
+    # par superviseur puis par agent) que evaluer_variation_prix.
     # ------------------------------------------------------------------
 
     @staticmethod
-    def evaluer_baisse_activite():
-        situations = StockAgeService.agents_sans_vente_recente()
+    def evaluer_ecart_prix_achat():
+        situations = PrixSurveillanceService.ventes_ecart_prix_achat_suspect()
         groupes, sans_superviseur = _grouper_par_superviseur(situations)
 
         if groupes or sans_superviseur:
             blocs = []
-            for superviseur, agents in groupes.items():
-                lignes_agents = "\n".join(
-                    f"• {a['agent'].full_name} — dernière vente : "
-                    f"{_fmt_date(a['derniere_vente'].date()) if a['derniere_vente'] else 'jamais'} — "
-                    f"{a['jours_ecoules'] if a['jours_ecoules'] is not None else '—'} jours"
-                    for a in agents
-                )
-                blocs.append(f"{superviseur.full_name}\n\n{lignes_agents}")
-            message = "⚠️ BAISSE D'ACTIVITÉ COMMERCIALE\n\n" + "\n\n".join(blocs)
-
+            for superviseur, ventes in groupes.items():
+                blocs.append(AlerteMoteur._bloc_ecart_par_agent(superviseur.full_name, ventes))
             if sans_superviseur:
-                lignes_orphelins = "\n".join(
-                    f"• {a['agent'].full_name} — dernière vente : "
-                    f"{_fmt_date(a['derniere_vente'].date()) if a['derniere_vente'] else 'jamais'} — "
-                    f"{a['jours_ecoules'] if a['jours_ecoules'] is not None else '—'} jours"
-                    for a in sans_superviseur
-                )
-                message += f"\n\n⚠️ AGENTS SANS SUPERVISEUR\n\n{lignes_orphelins}"
+                blocs.append(AlerteMoteur._bloc_ecart_par_agent("Sans superviseur", sans_superviseur))
 
+            message = (
+                "⚠️ VENTES À PRIX SUSPECT (écart inhabituel avec le prix d'achat)\n"
+                f"{DESCRIPTIONS_ALERTES['prix_ecart_achat']}\n\n" + "\n\n".join(blocs)
+            )
             alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
-                type_alerte="activite",
+                type_alerte="prix_ecart_achat",
                 defaults={"niveau": "warning", "message": message},
             )
             if doit_envoyer:
                 TelegramProvider.send(alerte)
 
         AlerteDeduplicationService.cloturer_si_resolue(
-            "activite", [{}] if (groupes or sans_superviseur) else []
+            "prix_ecart_achat", [{}] if (groupes or sans_superviseur) else []
         )
+
+    @staticmethod
+    def _bloc_ecart_par_agent(titre, ventes):
+        par_agent = defaultdict(list)
+        for v in ventes:
+            par_agent[v["agent"]].append(v)
+
+        sous_blocs = []
+        for agent, ventes_agent in par_agent.items():
+            lignes_ventes = "\n".join(
+                f"• {v['produit'].nom} — acheté {fcfa(v['prix_achat'])} FCFA, "
+                f"vendu à {fcfa(v['prix_vente'])} FCFA\n  Écart : +{fcfa(v['ecart'])} FCFA"
+                for v in ventes_agent
+            )
+            sous_blocs.append(f"{agent.full_name}\n{lignes_ventes}")
+
+        return f"{titre}\n\n" + "\n\n".join(sous_blocs)
+
+    # ------------------------------------------------------------------
+    # Baisse d'activité commerciale — dernière vente VALIDE de l'agent,
+    # décorrélée du stock/lot (StockAgeService.agents_sans_vente_recente).
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _lignes_activite(agents):
+        return "\n".join(
+            f"• {a['agent'].full_name} — dernière vente : "
+            f"{_fmt_date(a['derniere_vente'].date()) if a['derniere_vente'] else 'jamais'} — "
+            f"{a['jours_ecoules'] if a['jours_ecoules'] is not None else '—'} jours"
+            for a in agents
+        )
+
+    @staticmethod
+    def evaluer_baisse_activite():
+        # Un message Telegram distinct par superviseur (refonte du 24/09/2026, à la demande
+        # de mdmaiga — auparavant un seul message combinant toutes les équipes), pour que
+        # chaque superviseur ne reçoive que ses propres agents en baisse d'activité. Les
+        # agents sans superviseur assigné restent regroupés dans un message à part (clé
+        # d'identification superviseur=None, distincte des messages par superviseur).
+        situations = StockAgeService.agents_sans_vente_recente()
+        groupes, sans_superviseur = _grouper_par_superviseur(situations)
+
+        for superviseur, agents in groupes.items():
+            message = (
+                f"⚠️ BAISSE D'ACTIVITÉ COMMERCIALE — {superviseur.full_name}\n"
+                f"{DESCRIPTIONS_ALERTES['activite']}\n\n"
+                f"{AlerteMoteur._lignes_activite(agents)}"
+            )
+            alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
+                type_alerte="activite",
+                defaults={"niveau": "warning", "message": message},
+                superviseur=superviseur.user,
+            )
+            if doit_envoyer:
+                TelegramProvider.send(alerte)
+
+        if sans_superviseur:
+            message = (
+                "⚠️ BAISSE D'ACTIVITÉ COMMERCIALE — AGENTS SANS SUPERVISEUR\n"
+                "Agents sans superviseur assigné, sans vente enregistrée depuis plus de 3 jours. "
+                "Envoyé chaque jour tant que la situation persiste.\n\n"
+                f"{AlerteMoteur._lignes_activite(sans_superviseur)}"
+            )
+            alerte, _cree, doit_envoyer = AlerteDeduplicationService.get_ou_creer(
+                type_alerte="activite",
+                defaults={"niveau": "warning", "message": message},
+                superviseur=None,
+            )
+            if doit_envoyer:
+                TelegramProvider.send(alerte)
+
+        situations_actives = [{"superviseur": s.user} for s in groupes.keys()]
+        if sans_superviseur:
+            situations_actives.append({"superviseur": None})
+        AlerteDeduplicationService.cloturer_si_resolue("activite", situations_actives)

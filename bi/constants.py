@@ -51,6 +51,11 @@ CA_MOYEN_AGENT_CIBLE = 500_000
 # --- Dashboard "Agents", volet agents (KPI-301 à 306) ---
 RENTABILITE_AGENT_CIBLE = 100_000
 
+# Seuil d'alerte "agent en dessous de la moyenne" (export PDF/Excel dashboard_agents,
+# demande mdmaiga 24/09/2026) — distinct de l'objectif individuel de 50 kg/jour : sert à
+# repérer les agents en grande difficulté, pas simplement sous l'objectif.
+SEUIL_KG_JOUR_FAIBLE = 8
+
 STATUT_OBJECTIF_LABELS = {
     "atteint": "✅ Atteint",
     "proche": "⚠️ Proche",

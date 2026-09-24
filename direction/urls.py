@@ -5,6 +5,7 @@ from direction import views as views_direction
 from direction.views import ( 
                                 
                                 DashboardView,AgentDetailView,SuperviseurListView,
+                                ExportAgentDetailExcelView, ExportAgentDetailPDFView,
                                 AgentDashboardView,AgentTerrainListView,
                                ProductListView, ProductDetailView,
                                 AnalyseFournisseursView,DetailFournisseurView,ToutesLesVentesView,
@@ -39,6 +40,16 @@ urlpatterns = [
     path('direction/agents/terrain/', AgentTerrainListView.as_view(), name='agent_terrain_list'),
     
     path('direction/agents/<int:pk>/', AgentDetailView.as_view(), name='agent_detail'),
+    path(
+        'direction/agents/<int:pk>/export/excel/',
+        ExportAgentDetailExcelView.as_view(),
+        name='export_agent_detail_excel'
+    ),
+    path(
+        'direction/agents/<int:pk>/export/pdf/',
+        ExportAgentDetailPDFView.as_view(),
+        name='export_agent_detail_pdf'
+    ),
 
     path('direction/agents/superviseurs/<int:pk>', SuperviseurDetail, name='direction_superviseur_detail'),
     path('direction/agents/rot/<int:pk>', RotDetailView, name='direction_rot_detail'),

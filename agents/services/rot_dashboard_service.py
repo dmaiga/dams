@@ -228,16 +228,16 @@ class RotDashboardService:
         """
         Cash réel du superviseur depuis la dernière clôture validée
         """
-    
+
         cloture = (
             ClotureMensuelle.objects
             .filter(superviseur=superviseur, est_cloture=True)
             .order_by('-date_fin_periode')
             .first()
         )
-    
+
         date_ref = cloture.date_fin_periode if cloture else None
-    
+
         # 1️⃣ Recouvrements agents
         recouvrements = Recouvrement.objects.filter(
             superviseur=superviseur

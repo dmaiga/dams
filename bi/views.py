@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, Max, Sum
 from django.db.models.functions import Coalesce
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
@@ -30,6 +31,7 @@ from bi.models import (
     VwVentesAgentProduit,
     VwVentesAgentProduitSemaine,
 )
+from bi.services.agents_sous_objectif_export import AgentsSousObjectifExportService
 from core.models import Agent, RegleSalaire, Vente
 from paie.services.salaire_calculator import CalculatorSalaire
 
@@ -613,6 +615,80 @@ def dashboard_agents(request):
         }
     )
     return render(request, "bi/dashboard_agents.html", context)
+
+
+def _agents_sous_objectif(request):
+    """Agents en dessous de SEUIL_KG_JOUR_FAIBLE, pour l'export PDF/Excel de dashboard_agents
+    (demande mdmaiga 24/09/2026). Uniquement en granularité mois (pas de sens à un seuil
+    "kg/jour/mois" en semaine) — mêmes filtres période/type_agent/superviseur que le dashboard,
+    calcul kg_par_jour identique à celui déjà stocké sur VwPerformanceAgent."""
+    annee, mois, _ = _parse_periode(request)
+    if not annee or not mois:
+        annee, mois = _dernier_mois_disponible()
+
+    agents_qs = VwPerformanceAgent.objects.filter(
+        mois__year=annee, mois__month=mois, kg_par_jour__lt=constants.SEUIL_KG_JOUR_FAIBLE
+    ).order_by("kg_par_jour")
+
+    type_agent_filtre = request.GET.get("type_agent")
+    if type_agent_filtre:
+        agents_qs = agents_qs.filter(type_agent=type_agent_filtre)
+
+    superviseur_filtre = request.GET.get("superviseur")
+    if superviseur_filtre:
+        agents_qs = agents_qs.filter(superviseur_id=superviseur_filtre)
+
+    agents = list(agents_qs)
+    for a in agents:
+        a.jours_label = f"{a.jours_actifs}/{a.jours_ouvres}" if a.jours_ouvres else "—"
+
+    # Ancienneté (demande mdmaiga 24/09/2026) : date_debut_fonction si renseignée, sinon
+    # date_creation de l'agent en repli — VwPerformanceAgent n'a que agent_id, une requête
+    # dédiée est nécessaire pour récupérer ces deux champs sur core.Agent.
+    dates_agents = {
+        agent_id: (date_debut_fonction, date_creation)
+        for agent_id, date_debut_fonction, date_creation in Agent.objects.filter(
+            id__in=[a.agent_id for a in agents]
+        ).values_list("id", "date_debut_fonction", "date_creation")
+    }
+    today = timezone.now().date()
+    for a in agents:
+        info = dates_agents.get(a.agent_id)
+        date_debut = None
+        if info:
+            date_debut_fonction, date_creation = info
+            date_debut = date_debut_fonction or (date_creation.date() if date_creation else None)
+        a.date_debut_fonction_export = date_debut
+        a.anciennete_jours = (today - date_debut).days if date_debut else None
+
+    return agents, annee, mois
+
+
+@bi_access_required
+def export_agents_sous_objectif_excel(request):
+    agents, annee, mois = _agents_sous_objectif(request)
+    buffer = AgentsSousObjectifExportService.export_excel(agents)
+
+    response = HttpResponse(
+        buffer,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = (
+        f"attachment; filename=agents_sous_objectif_{annee}-{mois:02d}.xlsx"
+    )
+    return response
+
+
+@bi_access_required
+def export_agents_sous_objectif_pdf(request):
+    agents, annee, mois = _agents_sous_objectif(request)
+    buffer = AgentsSousObjectifExportService.export_pdf(agents)
+
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f"attachment; filename=agents_sous_objectif_{annee}-{mois:02d}.pdf"
+    )
+    return response
 
 
 def _mois_moins_n(annee, mois, n):

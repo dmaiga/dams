@@ -435,6 +435,53 @@ class AlerteMoteurTestCase(TestCase):
         self.assertIn(lot.produit.nom, alerte.message)
         self.assertFalse(Alerte.objects.filter(type_alerte="stock_entrepot").exists())
 
+    def test_evaluer_stock_ancien_superviseur_un_message_distinct_par_superviseur(self):
+        # Refonte du 24/09/2026 (demande mdmaiga) : un message Telegram par
+        # superviseur, pas un seul message combiné pour tous.
+        autre_superviseur = Agent.objects.create(
+            user=User.objects.create_user(
+                username="superviseur_bravo", first_name="Bravo", last_name="Traore"
+            ),
+            type_agent="entrepot",
+        )
+        lot1 = self._lot(100, 30, timezone.now() - timedelta(days=1))
+        AffectationLotSuperviseur.objects.create(
+            lot=lot1,
+            superviseur=self.superviseur,
+            quantite_initiale=30,
+            quantite_restante=30,
+            attribue_par=self.rot,
+            date_affectation=date.today() - timedelta(days=4),
+        )
+        lot2 = self._lot(100, 40, timezone.now() - timedelta(days=1))
+        AffectationLotSuperviseur.objects.create(
+            lot=lot2,
+            superviseur=autre_superviseur,
+            quantite_initiale=40,
+            quantite_restante=40,
+            attribue_par=self.rot,
+            date_affectation=date.today() - timedelta(days=4),
+        )
+
+        AlerteMoteur.evaluer_stock_ancien()
+
+        alertes = Alerte.objects.filter(type_alerte="stock_superviseur", statut="ACTIVE")
+        self.assertEqual(alertes.count(), 2)
+
+        # self.superviseur.full_name retombe sur le username générique "superviseur" (pas de
+        # first/last name dans la fixture), qui apparaît aussi dans le texte de description
+        # ("Produits remis à ce superviseur...") — on distingue donc les deux messages par la
+        # quantité du lot (30 vs 40), propre à chaque superviseur, plutôt que par nom.
+        alerte_1 = alertes.get(superviseur=self.superviseur.user)
+        self.assertIn(self.superviseur.full_name, alerte_1.message)
+        self.assertIn("reste 30.00", alerte_1.message)
+        self.assertNotIn("reste 40.00", alerte_1.message)
+
+        alerte_2 = alertes.get(superviseur=autre_superviseur.user)
+        self.assertIn(autre_superviseur.full_name, alerte_2.message)
+        self.assertIn("reste 40.00", alerte_2.message)
+        self.assertNotIn("reste 30.00", alerte_2.message)
+
     def test_evaluer_stock_ancien_superviseur_moins_de_3_jours_absent(self):
         lot = self._lot(100, 30, timezone.now() - timedelta(days=1))
         AffectationLotSuperviseur.objects.create(
@@ -494,9 +541,9 @@ class AlerteMoteurTestCase(TestCase):
         self.assertIn("reçu le", message)
         self.assertIn("5 j", message)
 
-    def test_evaluer_stock_ancien_superviseur_renvoi_apres_48h(self):
-        # reenvoi_heures=48 (monitoring/constants.py) : l'alerte doit se
-        # renvoyer, la liste du stock dormant ne retombant jamais à zéro.
+    def test_evaluer_stock_ancien_superviseur_renvoi_apres_24h(self):
+        # reenvoi_heures=24 (monitoring/constants.py, quotidien depuis le 24/09/2026) :
+        # l'alerte doit se renvoyer, la liste du stock dormant ne retombant jamais à zéro.
         lot = self._lot(100, 30, timezone.now() - timedelta(days=1))
         AffectationLotSuperviseur.objects.create(
             lot=lot,
@@ -511,17 +558,17 @@ class AlerteMoteurTestCase(TestCase):
         alerte = Alerte.objects.get(type_alerte="stock_superviseur", statut="ACTIVE")
         self.assertEqual(alerte.nombre_envois, 1)
 
-        # Toujours dans la fenêtre de 48 h → pas de renvoi.
+        # Toujours dans la fenêtre de 24 h → pas de renvoi.
         Alerte.objects.filter(pk=alerte.pk).update(
-            date_dernier_envoi=timezone.now() - timedelta(hours=47)
+            date_dernier_envoi=timezone.now() - timedelta(hours=23)
         )
         AlerteMoteur.evaluer_stock_ancien()
         alerte.refresh_from_db()
         self.assertEqual(alerte.nombre_envois, 1)
 
-        # Au-delà de 48 h → renvoi.
+        # Au-delà de 24 h → renvoi.
         Alerte.objects.filter(pk=alerte.pk).update(
-            date_dernier_envoi=timezone.now() - timedelta(hours=49)
+            date_dernier_envoi=timezone.now() - timedelta(hours=25)
         )
         AlerteMoteur.evaluer_stock_ancien()
         alerte.refresh_from_db()
@@ -563,6 +610,74 @@ class AlerteMoteurTestCase(TestCase):
         AlerteMoteur.evaluer_variation_prix()
 
         self.assertFalse(Alerte.objects.filter(type_alerte="prix", statut="ACTIVE").exists())
+
+    # -- Règle "prix_ecart_achat" (écart inhabituel avec le prix d'achat) ----
+
+    def test_evaluer_ecart_prix_achat_prix_trop_haut_cree_alerte(self):
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=1), prix_achat_unitaire=12000)
+        distribution = self._distribution(timezone.now() - timedelta(days=1))
+        detail = DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=100)
+        self._vente(self.agent_terrain, detail, 10, prix_vente_unitaire=130000, date_vente=timezone.now())
+        # Écart = 118 000 FCFA > 2 500 (SEUIL_ECART_PRIX_ACHAT) : anomalie.
+
+        AlerteMoteur.evaluer_ecart_prix_achat()
+
+        alerte = Alerte.objects.get(type_alerte="prix_ecart_achat", statut="ACTIVE")
+        self.assertIn(self.superviseur.full_name, alerte.message)
+        self.assertIn(self.agent_terrain.full_name, alerte.message)
+        self.assertIn("PRIX SUSPECT", alerte.message)
+
+    def test_evaluer_ecart_prix_achat_dans_la_tolerance_pas_d_alerte(self):
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=1), prix_achat_unitaire=12000)
+        distribution = self._distribution(timezone.now() - timedelta(days=1))
+        detail = DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=100)
+        self._vente(self.agent_terrain, detail, 10, prix_vente_unitaire=14000, date_vente=timezone.now())
+        # Écart = 2 000 FCFA <= 2 500 : pas d'anomalie, bonne négociation possible.
+
+        AlerteMoteur.evaluer_ecart_prix_achat()
+
+        self.assertFalse(Alerte.objects.filter(type_alerte="prix_ecart_achat", statut="ACTIVE").exists())
+
+    def test_evaluer_ecart_prix_achat_prix_trop_bas_pas_capte_ici(self):
+        # Un prix trop bas (erreur de saisie du type 130 au lieu de 12000) est déjà couvert
+        # par la règle "prix" (marge minimale) — cette règle-ci ne couvre que les écarts
+        # positifs (prix trop haut), volontairement.
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=1), prix_achat_unitaire=12000)
+        distribution = self._distribution(timezone.now() - timedelta(days=1))
+        detail = DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=100)
+        self._vente(self.agent_terrain, detail, 10, prix_vente_unitaire=130, date_vente=timezone.now())
+
+        AlerteMoteur.evaluer_ecart_prix_achat()
+
+        self.assertFalse(Alerte.objects.filter(type_alerte="prix_ecart_achat", statut="ACTIVE").exists())
+
+    def test_evaluer_ecart_prix_achat_agent_inactif_ignore(self):
+        # Ne concerne que les agents/superviseurs actifs (demande mdmaiga, 24/09/2026) — un
+        # agent désactivé ne peut plus rien corriger, l'alerte ne sert à rien pour lui.
+        self.agent_terrain.est_actif = False
+        self.agent_terrain.save(update_fields=["est_actif"])
+
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=1), prix_achat_unitaire=12000)
+        distribution = self._distribution(timezone.now() - timedelta(days=1))
+        detail = DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=100)
+        self._vente(self.agent_terrain, detail, 10, prix_vente_unitaire=130000, date_vente=timezone.now())
+
+        AlerteMoteur.evaluer_ecart_prix_achat()
+
+        self.assertFalse(Alerte.objects.filter(type_alerte="prix_ecart_achat", statut="ACTIVE").exists())
+
+    def test_evaluer_ecart_prix_achat_superviseur_inactif_ignore(self):
+        self.superviseur.est_actif = False
+        self.superviseur.save(update_fields=["est_actif"])
+
+        lot = self._lot(100, 50, timezone.now() - timedelta(days=1), prix_achat_unitaire=12000)
+        distribution = self._distribution(timezone.now() - timedelta(days=1))
+        detail = DetailDistribution.objects.create(distribution=distribution, lot=lot, quantite=100)
+        self._vente(self.agent_terrain, detail, 10, prix_vente_unitaire=130000, date_vente=timezone.now())
+
+        AlerteMoteur.evaluer_ecart_prix_achat()
+
+        self.assertFalse(Alerte.objects.filter(type_alerte="prix_ecart_achat", statut="ACTIVE").exists())
 
     # -- Règle "activite" (dernière vente globale de l'agent) ----------------
 

@@ -69,7 +69,15 @@
 </div>
 
 <div class="bi-panel">
-    <h2>Kg/jour vs objectif (50 kg/jour)</h2>
+    <div class="flex justify-between items-center flex-wrap gap-2">
+        <h2>Kg/jour vs objectif (50 kg/jour)</h2>
+        {% if granularite == "mois" %}
+        <div class="flex gap-2">
+            <a class="btn btn-sm btn-outline" href="{% url 'bi:export_agents_sous_objectif_excel' %}?annee={{ annee }}&mois={{ mois }}&type_agent={{ type_agent_filtre|default:"" }}&superviseur={{ superviseur_filtre|default:"" }}">Agents sous 8 kg/j — Excel</a>
+            <a class="btn btn-sm btn-outline" href="{% url 'bi:export_agents_sous_objectif_pdf' %}?annee={{ annee }}&mois={{ mois }}&type_agent={{ type_agent_filtre|default:"" }}&superviseur={{ superviseur_filtre|default:"" }}">Agents sous 8 kg/j — PDF</a>
+        </div>
+        {% endif %}
+    </div>
     <div class="bi-barlist">
         {% for a in agents %}
         <a class="bi-barrow bi-barrow-link" href="{% url 'bi:agent_detail' a.agent_id %}?annee={{ annee }}&mois={{ mois }}&granularite={{ granularite }}&semaine={{ semaine_selectionnee|date:'Y-m-d' }}">
