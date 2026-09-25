@@ -6,6 +6,7 @@ from direction.views import (
                                 
                                 DashboardView,AgentDetailView,SuperviseurListView,
                                 ExportAgentDetailExcelView, ExportAgentDetailPDFView,
+                                ExportAgentPossessionExcelView, ExportAgentPossessionPDFView,
                                 AgentDashboardView,AgentTerrainListView,
                                ProductListView, ProductDetailView,
                                 AnalyseFournisseursView,DetailFournisseurView,ToutesLesVentesView,
@@ -51,6 +52,16 @@ urlpatterns = [
         'direction/agents/<int:pk>/export/pdf/',
         ExportAgentDetailPDFView.as_view(),
         name='export_agent_detail_pdf'
+    ),
+    path(
+        'direction/agents/<int:pk>/possession/export/excel/',
+        ExportAgentPossessionExcelView.as_view(),
+        name='export_agent_possession_excel'
+    ),
+    path(
+        'direction/agents/<int:pk>/possession/export/pdf/',
+        ExportAgentPossessionPDFView.as_view(),
+        name='export_agent_possession_pdf'
     ),
 
     path('direction/agents/superviseurs/<int:pk>', SuperviseurDetail, name='direction_superviseur_detail'),

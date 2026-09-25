@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 from core.models import Agent, Vente, Recouvrement, RegleSalaire
 from django.db.models import Value
 
+from direction.constants import DATE_DEBUT_SUIVI_TERRAIN
+from direction.services.stock_investigation_service import StockInvestigationService
+
 class AgentDetailService:
     """
     Service – Détail d’un agent (terrain / gros)
@@ -121,7 +124,8 @@ class AgentDetailService:
         superviseur = agent.superviseur
         type_agent = agent.type_agent
 
-    
+        produits_en_possession = AgentDetailService.get_produits_en_possession(agent)
+
         return {
             # Identité
             "agent": agent,
@@ -144,8 +148,31 @@ class AgentDetailService:
         
             # Détail
             "ventes_par_produit": ventes_par_produit,
+            "produits_en_possession": produits_en_possession,
         }
-        
+
+
+    @staticmethod
+    def get_produits_en_possession(agent):
+        """Produits actuellement chez cet agent (reste > 0), toute ancienneté
+        confondue — simple information « nous avons ce produit avec toi »,
+        à ne pas confondre avec la checklist d'investigation (> 7 jours) de
+        direction.suivi_distributions. Décision mdmaiga, 25/09/2026."""
+        details = list(
+            StockInvestigationService.base_queryset(DATE_DEBUT_SUIVI_TERRAIN)
+            .filter(distribution__agent_terrain=agent, restant__gt=0)
+            .order_by("-distribution__date_distribution")
+        )
+        StockInvestigationService.annoter_statut(details)
+        return [
+            {
+                "produit_nom": d.lot.produit.nom,
+                "quantite": d.restant,
+                "date_remise": d.distribution.date_distribution,
+                "jours_ecoules": d.jours_ecoules,
+            }
+            for d in details
+        ]
 
     @staticmethod
     def resolve_period(request):

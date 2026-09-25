@@ -89,9 +89,8 @@ class StockInvestigationExportService:
                 "<b>Produits à investiguer — checklist terrain</b>", styles["Title"]
             ),
             Paragraph(
-                f"Agents en circulation depuis plus de {SEUIL_ATTENTION_JOURS} jours sans vente "
-                "enregistrée. À parcourir superviseur par superviseur : vérifier la présence "
-                "physique de chaque produit chez l'agent listé.",
+                f"Produits en circulation depuis plus de {SEUIL_ATTENTION_JOURS} jours sans vente enregistrée "
+                ,
                 styles["Normal"],
             ),
             Spacer(1, 12),

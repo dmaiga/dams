@@ -81,8 +81,7 @@ from direction.services.analyse_operationnelle_service import AnalyseOperationne
 # core/views/dashboard.py
 
 from direction.services.DashboardSnapshotService import DashboardSnapshotService
-
-DATE_DEBUT_SUIVI_TERRAIN = date(2026, 7, 1)
+from direction.constants import DATE_DEBUT_SUIVI_TERRAIN
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'direction/analyses/dashboards/dashboard.html'
@@ -361,6 +360,33 @@ class ExportAgentDetailPDFView(LoginRequiredMixin, View):
         response["Content-Disposition"] = (
             f"attachment; filename=agent_{agent.pk}_{periode_data['date_debut']}_"
             f"{periode_data['date_fin']}.pdf"
+        )
+        return response
+
+
+class ExportAgentPossessionExcelView(LoginRequiredMixin, View):
+    def get(self, request, pk, *args, **kwargs):
+        agent = get_object_or_404(Agent, pk=pk)
+        buffer = AgentDetailExportService.export_excel_possession(agent)
+
+        response = HttpResponse(
+            buffer,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = (
+            f"attachment; filename=produits_possession_agent_{agent.pk}_{date.today()}.xlsx"
+        )
+        return response
+
+
+class ExportAgentPossessionPDFView(LoginRequiredMixin, View):
+    def get(self, request, pk, *args, **kwargs):
+        agent = get_object_or_404(Agent, pk=pk)
+        buffer = AgentDetailExportService.export_pdf_possession(agent)
+
+        response = HttpResponse(buffer, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f"attachment; filename=produits_possession_agent_{agent.pk}_{date.today()}.pdf"
         )
         return response
 

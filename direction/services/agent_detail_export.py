@@ -9,9 +9,11 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from core.models import DetailDistribution, Vente
+from direction.services.agent_detail_service import AgentDetailService
 
 HEADERS_DISTRIBUTIONS = ["Date", "Produit", "Quantité", "Superviseur", "Type distribution"]
 HEADERS_VENTES = ["Date", "Produit", "Quantité", "Prix unitaire", "Montant", "Type vente", "Mode paiement"]
+HEADERS_POSSESSION = ["Produit", "Quantité", "Remis le", "Depuis (j)"]
 
 
 class AgentDetailExportService:
@@ -68,6 +70,15 @@ class AgentDetailExportService:
         ]
 
     @staticmethod
+    def _ligne_possession(p):
+        return [
+            p["produit_nom"],
+            float(p["quantite"]),
+            p["date_remise"].strftime("%d/%m/%Y"),
+            p["jours_ecoules"],
+        ]
+
+    @staticmethod
     def export_excel(agent, date_debut, date_fin):
         distributions = AgentDetailExportService.distributions_recues(agent, date_debut, date_fin)
         ventes = AgentDetailExportService.ventes_realisees(agent, date_debut, date_fin)
@@ -93,8 +104,68 @@ class AgentDetailExportService:
         for col, largeur in zip("ABCDEFG", (18, 24, 12, 14, 14, 16, 16)):
             ws2.column_dimensions[col].width = largeur
 
+        # Produits actuellement chez l'agent (reste > 0), pas bornés à la période
+        # sélectionnée — état courant, à montrer à l'agent en personne (demande
+        # mdmaiga, 25/09/2026).
+        ws3 = wb.create_sheet("Produits en sa possession")
+        ws3.append(HEADERS_POSSESSION)
+        for col in range(1, len(HEADERS_POSSESSION) + 1):
+            ws3.cell(row=1, column=col).font = Font(bold=True)
+        for p in AgentDetailService.get_produits_en_possession(agent):
+            ws3.append(AgentDetailExportService._ligne_possession(p))
+        for col, largeur in zip("ABCD", (24, 12, 14, 12)):
+            ws3.column_dimensions[col].width = largeur
+
         buffer = BytesIO()
         wb.save(buffer)
+        buffer.seek(0)
+        return buffer
+
+    @staticmethod
+    def export_excel_possession(agent):
+        """Export dédié à la seule section « Produits en sa possession » — liste
+        simple à remettre à l'agent en personne, sans les onglets distributions/
+        ventes de l'export complet. Demande mdmaiga, 25/09/2026."""
+        produits = AgentDetailService.get_produits_en_possession(agent)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Produits en sa possession"
+        ws.append(HEADERS_POSSESSION)
+        for col in range(1, len(HEADERS_POSSESSION) + 1):
+            ws.cell(row=1, column=col).font = Font(bold=True)
+        for p in produits:
+            ws.append(AgentDetailExportService._ligne_possession(p))
+        for col, largeur in zip("ABCD", (24, 12, 14, 12)):
+            ws.column_dimensions[col].width = largeur
+
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer
+
+    @staticmethod
+    def export_pdf_possession(agent):
+        produits = AgentDetailService.get_produits_en_possession(agent)
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, title=f"Produits en sa possession — {agent.full_name}")
+        styles = getSampleStyleSheet()
+
+        elements = [
+            Paragraph(f"<b>{agent.full_name}</b> — produits en sa possession", styles["Title"]),
+            Paragraph(
+                "Produits reçus non encore soldés.",
+                styles["Normal"],
+            ),
+            Spacer(1, 12),
+            AgentDetailExportService._table(
+                HEADERS_POSSESSION,
+                [AgentDetailExportService._ligne_possession(p) for p in produits],
+            ),
+        ]
+
+        doc.build(elements)
         buffer.seek(0)
         return buffer
 
@@ -134,6 +205,15 @@ class AgentDetailExportService:
             AgentDetailExportService._table(
                 HEADERS_VENTES,
                 [AgentDetailExportService._ligne_vente(v) for v in ventes],
+            ),
+            Spacer(1, 20),
+            Paragraph("Produits en sa possession", styles["Heading2"]),
+            AgentDetailExportService._table(
+                HEADERS_POSSESSION,
+                [
+                    AgentDetailExportService._ligne_possession(p)
+                    for p in AgentDetailService.get_produits_en_possession(agent)
+                ],
             ),
         ]
 
