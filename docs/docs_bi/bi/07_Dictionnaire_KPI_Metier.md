@@ -577,6 +577,14 @@
   Exemples réels : « 71 unité(s) vendue(s) par les mamies × 25 FCFA/unité (taux dédié au produit)
   = 1 775 FCFA » (Oignon KG) ou « 90 kg vendus par les mamies × 25 FCFA/kg (repli au kilo, pas de
   taux dédié) = 2 250 FCFA » (KG pomme de terre).
+- 28/09/2026 (suite, retour mdmaiga) : le hover ci-dessus a rempli son rôle de vérification —
+  mdmaiga a constaté que « KG pomme de terre » affichait 90 kg dans la formule alors que la
+  colonne « Qté vendue (kg) » affiche 92, et a demandé de vérifier. **Pas un bug** : sur les 92
+  unités vendues en août 2026, 90 l'ont été par des agents `terrain` et 2 par un agent
+  `agent_polivalent` — seules les ventes des agents terrain génèrent cette incentive (périmètre
+  confirmé plus haut), l'écart de 2 est donc attendu. Le hover est retiré (son but était de
+  vérifier le calcul, pas de rester en usage courant) — `expliquer_incentive_terrain`
+  (`core/services/incentive_service.py`) est retirée avec lui, aucun autre appelant.
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

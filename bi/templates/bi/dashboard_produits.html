@@ -91,7 +91,7 @@
                     <td class="text-right bi-col-sep">{{ p.cout_achat|fcfa }}</td>
                     <td class="text-right">{{ p.ca|fcfa }}</td>
                     <td class="text-right">{{ p.marge|fcfa }}</td>
-                    <td class="text-right bi-col-sep" title="{{ p.incentive_formule }}" style="cursor: help;">{{ p.incentive_cedee|fcfa }}</td>
+                    <td class="text-right bi-col-sep">{{ p.incentive_cedee|fcfa }}</td>
                     <td class="text-right" style="font-weight: 700;">{{ p.marge_nette|fcfa }}</td>
                     <td class="text-right"><span class="bi-badge bi-{{ p.statut_nette }}">{{ p.marge_nette_pct|default_if_none:"—"|format_number }}</span></td>
                 </tr>

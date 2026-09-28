@@ -36,7 +36,6 @@ from core.models import Agent, RegleSalaire, Vente
 from core.services.incentive_service import (
     get_incentive_par_kg_terrain,
     calculer_incentive_terrain,
-    expliquer_incentive_terrain,
 )
 from paie.services.salaire_calculator import CalculatorSalaire
 
@@ -413,29 +412,20 @@ def dashboard_produits(request):
             ),
         )
     ):
-        incentive_par_produit_mois[(row["produit_id"], row["annee_v"], row["mois_v"])] = {
-            "montant": calculer_incentive_terrain(
+        incentive_par_produit_mois[(row["produit_id"], row["annee_v"], row["mois_v"])] = (
+            calculer_incentive_terrain(
                 quantite=row["qte_dediee"],
                 kg=row["kg_repli"],
                 taux_incentive=row["taux_dedie"],
                 incentive_par_kg=incentive_par_kg_terrain,
-            ),
-            "formule": expliquer_incentive_terrain(
-                quantite=row["qte_dediee"],
-                kg=row["kg_repli"],
-                taux_incentive=row["taux_dedie"],
-                incentive_par_kg=incentive_par_kg_terrain,
-            ),
-        }
+            )
+        )
 
     marge_max = produits[0].marge if produits[0].marge > 0 else None
     for p in produits:
-        incentive_info = incentive_par_produit_mois.get(
-            (p.produit_id, p.mois.year, p.mois.month),
-            {"montant": Decimal("0.00"), "formule": "Aucune vente par un agent terrain sur cette période."},
+        p.incentive_cedee = incentive_par_produit_mois.get(
+            (p.produit_id, p.mois.year, p.mois.month), Decimal("0.00")
         )
-        p.incentive_cedee = incentive_info["montant"]
-        p.incentive_formule = incentive_info["formule"]
         p.marge_nette = p.marge - p.incentive_cedee
         p.marge_nette_pct = (p.marge_nette / p.ca * 100) if p.ca else None
         # Statut de la colonne qui compte vraiment pour la lecture directe (retour mdmaiga,
