@@ -642,21 +642,60 @@ mdmaiga)** :
 - **Colonne « Écoulement » retirée** : son pourcentage était déjà affiché deux fois (dans la
   colonne dédiée avec barre de progression, ET dans la cellule Qté vendue) — la barre de progression
   disparaît, le pourcentage reste visible une seule fois, à côté de la quantité vendue.
-- **Colonne « Incentive cédée » (nouvelle)** : matérialise `Produit.taux_incentive × quantité
-  vendue` — la part reversée aux agents de vente pour ce produit. **Choix de périmètre assumé** :
-  seul le taux dédié au produit est compté ; le repli au kg (`RegleSalaire.incentive_par_kg`, cf.
-  `paie/services/salaire_calculator.py`) est volontairement exclu, car ce n'est pas une donnée "par
-  produit" — il dépend du type de l'agent qui a vendu (terrain vs gros vs autres), pas du produit
-  vendu, et n'a pas de sens dans un regroupement par produit fournisseur. Un produit sans taux dédié
-  affiche donc `0` sur cette colonne, même s'il génère réellement de l'incentive au kg côté paie —
-  écart documenté ici pour ne pas être lu comme un bug plus tard.
+- **Colonne « Incentive cédée » (nouvelle)** : la part reversée aux agents de vente pour ce
+  produit. **Choix de périmètre initial (28/09/2026, révisé le même jour)** : la première version
+  ne matérialisait que `Produit.taux_incentive × quantité vendue`, en excluant volontairement le
+  repli au kg (`RegleSalaire.incentive_par_kg`) — jugé à tort comme "pas une donnée par produit".
+  Conséquence observée par mdmaiga : la colonne affichait `0` pour la quasi-totalité des produits,
+  puisque la plupart n'ont pas de taux dédié et passent par le repli au kg en paie — colonne inutile
+  telle quelle. **Corrigé** : voir § « Incentive cédée — correction du périmètre » ci-dessous, qui
+  remplace ce choix.
 - **Colonne « Marge nette » (nouvelle)** : `marge_brute − incentive_cédée` — la marge réellement
   disponible après reversement aux agents. Vérifié sur données réelles (concombre, Champ DAMS,
   taux dédié 50 FCFA/unité × 74 vendues = 3 700 FCFA d'incentive, marge brute 274 250 → marge nette
-  270 550).
+  270 550) — cet exemple reste valide, le produit a un taux dédié donc son calcul n'a pas changé
+  avec la correction ci-dessous.
 - Calcul implémenté dans `FournisseurAnalyseService.get_detail_fournisseur` (`direction/services/
   fournisseur_service.py`) : `incentive_cedee` porté par lot dans `analyse_lots`, sommé par produit
   dans `produit_data`, puis `marge_nette` dérivée dans `produits_analyses`.
+
+---
+
+### Incentive cédée — correction du périmètre (28/09/2026, même jour, retour mdmaiga)
+
+**Constat** : la colonne « Incentive cédée » (ci-dessus, et son équivalent sur `bi/dashboard_stock`
+et `bi/dashboard_produits`) affichait `0` pour la plupart des produits. Cause : seul le taux dédié
+au produit (`Produit.taux_incentive`) était compté ; `paie/services/salaire_calculator.py::
+calcul_salaire_mamy` applique en réalité **deux règles** — taux dédié s'il existe, sinon repli au
+kilo (`RegleSalaire.incentive_par_kg`, taux général partagé par tous les produits sans taux dédié).
+La plupart des produits n'ont pas de taux dédié et passent par ce repli — d'où la colonne
+quasi-vide.
+
+**Périmètre confirmé** : seuls les agents `terrain` ("mamies") perçoivent une incentive liée au
+produit vendu — `agent_gros` a un taux fixe au carton indépendant du produit,
+les superviseurs n'ont pas d'incentive produit. La formule complète (taux dédié OU repli au kilo)
+n'a donc de sens qu'en filtrant les ventes aux agents `terrain`.
+
+**Centralisation** : logique extraite dans `core/services/incentive_service.py`
+(`get_incentive_par_kg_terrain()` + `calculer_incentive_terrain()`) pour que les 3 écrans
+(`direction` fiche fournisseur, `bi` dashboard stock, `bi` dashboard produits) ne divergent plus
+jamais sur la formule — la duplication précédente est exactement ce qui a produit ce bug.
+`fournisseur_service.py::get_detail_fournisseur` agrège désormais aussi les ventes terrain par lot
+(quantité + kg), `bi/views.py` agrège par produit (dashboard stock) et produit×mois (dashboard
+produits) avec une annotation conditionnelle (`Sum(..., filter=Q(taux_incentive__isnull=False))`
+pour la part à taux dédié, le complément pour la part au kilo).
+
+**Limite assumée, non couverte par cette correction** : la déduction des pertes
+(`Perte.kilo_perdu_incentive`, qui réduit l'incentive réellement versée en paie) n'est pas
+reproduite ici — l'incentive affichée sur ces 3 écrans est donc une **borne haute** légèrement
+optimiste par rapport à ce qui est réellement payé à l'agent après déduction des pertes déclarées.
+Jugé acceptable pour un écran d'analyse (pas un bulletin de paie) ; à revoir si la précision devient
+critique.
+
+**Vérifié sur données réelles (28/09/2026, `bi/dashboard_produits`, août 2026)** : produits sans
+taux dédié, jusqu'ici à `0` — "ail" (10 unités vendues) affiche désormais `250` FCFA d'incentive,
+"KG pomme de terre" (92 unités vendues) affiche `2 250` FCFA, tous deux via le repli au kilo
+(`RegleSalaire.incentive_par_kg`).
 
 **Tri du tableau « Détail des lots » (même jour, retour mdmaiga)** : en-têtes cliquables sur
 « Date réception » et « Reste à payer » (`?tri=date|reste&ordre=asc|desc`, défaut `date`/`desc` —

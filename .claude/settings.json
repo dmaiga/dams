@@ -83,7 +83,9 @@
       "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/c--Users-Admin-By-me-dams/68d679ca-12dd-4800-a006-85cac826f78d/scratchpad/check_refline.py\")",
       "Bash(lsof -ti:8020 -sTCP:LISTEN)",
       "Bash(xargs -r kill)",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('bi/views.py', encoding='utf-8'\\).read\\(\\)\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('bi/views.py', encoding='utf-8'\\).read\\(\\)\\)\")",
+      "Bash(python -m pytest bi/tests/test_views.py -k \"produits or stock\" -v)",
+      "Bash(python -m pytest bi/tests/test_views.py -v)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"

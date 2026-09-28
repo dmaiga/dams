@@ -553,6 +553,23 @@
   (`statut_marge_produit(marge_nette, marge_nette_pct)`, mêmes seuils que le badge produit
   existant, qui lui reste sur la marge brute) — un produit à marge brute saine peut afficher un
   badge net différent si l'incentive en mange une grosse part, c'est le signal recherché.
+- 28/09/2026 (correction de fond, retour mdmaiga) : la colonne « Incentive cédée »
+  (dashboard Stock ET dashboard Produits) affichait `0` pour la plupart des produits — le
+  périmètre du 28/09 (voir plus haut) ne comptait que le taux dédié au produit
+  (`Produit.taux_incentive`), en excluant le repli au kilo (`RegleSalaire.incentive_par_kg`) sous
+  prétexte que ce n'était "pas une donnée par produit". Faux dans les faits : la paie
+  (`paie/services/salaire_calculator.py::calcul_salaire_mamy`) applique bien les deux règles à
+  chaque vente, et la plupart des produits n'ont pas de taux dédié — d'où la colonne quasi-vide.
+  **Corrigé** : formule complète (taux dédié si renseigné, sinon `kg × incentive_par_kg`),
+  restreinte aux ventes des agents `terrain` (seuls concernés — `agent_gros` a un taux fixe au
+  carton indépendant du produit, les superviseurs n'ont pas d'incentive produit). Logique
+  extraite dans `core/services/incentive_service.py` (`get_incentive_par_kg_terrain()` +
+  `calculer_incentive_terrain()`), partagée avec `direction/services/fournisseur_service.py`, pour
+  que les 3 écrans ne divergent plus sur la formule — la duplication précédente est exactement ce
+  qui a produit ce bug. **Limite assumée** : ne déduit pas les pertes
+  (`Perte.kilo_perdu_incentive`), contrairement à la paie — l'incentive affichée ici est une borne
+  haute légèrement optimiste, jugé acceptable pour un écran d'analyse. Vérifié sur données réelles
+  (août 2026) : "ail" passe de `0` à `250` FCFA, "KG pomme de terre" de `0` à `2 250` FCFA.
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

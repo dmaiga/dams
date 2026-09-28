@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Count, F, Max, Sum
+from django.db.models import Count, F, Max, Q, Sum
 from django.db.models.functions import Coalesce, ExtractMonth, ExtractYear
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -33,6 +33,10 @@ from bi.models import (
 )
 from bi.services.agents_sous_objectif_export import AgentsSousObjectifExportService
 from core.models import Agent, RegleSalaire, Vente
+from core.services.incentive_service import (
+    get_incentive_par_kg_terrain,
+    calculer_incentive_terrain,
+)
 from paie.services.salaire_calculator import CalculatorSalaire
 
 
@@ -370,38 +374,52 @@ def dashboard_produits(request):
 
     nb_deficitaires = qs.filter(marge__lt=0).values("produit_id").distinct().count()
 
-    # Incentive cédée aux agents de vente ("les mamies"), par produit x mois — même périmètre que
-    # bi/dashboard_stock et direction/analyses/fournisseurs/detail.html : seul le taux dédié au
-    # produit (`Produit.taux_incentive`) est compté, pas le repli au kg par type d'agent. Grain
-    # produit x mois pour matcher `VwRentabiliteProduit` (une ligne par produit et par mois,
-    # plusieurs mois possibles si `mois` n'est pas filtré) — recalculé depuis `Vente`, qui seule
-    # porte la quantité vendue.
+    # Incentive cédée aux agents de vente ("les mamies"), par produit x mois — même logique que
+    # `core/services/incentive_service.py` (taux dédié au produit si renseigné, sinon repli au
+    # kilo), restreinte aux ventes des agents terrain (seuls concernés). Grain produit x mois pour
+    # matcher `VwRentabiliteProduit` (une ligne par produit et par mois, plusieurs mois possibles
+    # si `mois` n'est pas filtré) — recalculé depuis `Vente`, qui seule porte la quantité vendue.
     incentive_qs = Vente.objects.filter(
         est_supprime=False,
-        detail_distribution__lot__produit__taux_incentive__isnull=False,
+        agent__type_agent='terrain',
     )
     if annee:
         incentive_qs = incentive_qs.filter(date_vente__year=annee)
     if mois:
         incentive_qs = incentive_qs.filter(date_vente__month=mois)
 
-    incentive_par_produit_mois = {
-        (row["produit_id"], row["annee_v"], row["mois_v"]): row["incentive"]
-        for row in (
-            incentive_qs
-            .annotate(
-                produit_id=F("detail_distribution__lot__produit_id"),
-                annee_v=ExtractYear("date_vente"),
-                mois_v=ExtractMonth("date_vente"),
-            )
-            .values("produit_id", "annee_v", "mois_v")
-            .annotate(
-                incentive=Sum(
-                    F("quantite") * F("detail_distribution__lot__produit__taux_incentive")
-                )
+    a_taux_dedie = Q(detail_distribution__lot__produit__taux_incentive__isnull=False)
+    incentive_par_kg_terrain = get_incentive_par_kg_terrain()
+    incentive_par_produit_mois = {}
+    for row in (
+        incentive_qs
+        .annotate(
+            produit_id=F("detail_distribution__lot__produit_id"),
+            annee_v=ExtractYear("date_vente"),
+            mois_v=ExtractMonth("date_vente"),
+        )
+        .values("produit_id", "annee_v", "mois_v")
+        .annotate(
+            qte_dediee=Coalesce(Sum("quantite", filter=a_taux_dedie), Decimal("0.00")),
+            taux_dedie=Max("detail_distribution__lot__produit__taux_incentive"),
+            kg_repli=Coalesce(
+                Sum(
+                    F("quantite") *
+                    Coalesce(F("detail_distribution__lot__produit__poids_unitaire_kg"), Decimal("1")),
+                    filter=~a_taux_dedie
+                ),
+                Decimal("0.00")
+            ),
+        )
+    ):
+        incentive_par_produit_mois[(row["produit_id"], row["annee_v"], row["mois_v"])] = (
+            calculer_incentive_terrain(
+                quantite=row["qte_dediee"],
+                kg=row["kg_repli"],
+                taux_incentive=row["taux_dedie"],
+                incentive_par_kg=incentive_par_kg_terrain,
             )
         )
-    }
 
     marge_max = produits[0].marge if produits[0].marge > 0 else None
     for p in produits:
@@ -1492,16 +1510,15 @@ def dashboard_stock(request):
         for c in AjustementPrixAchat.objects.values("lot__produit_id").annotate(n=Count("id"))
     }
 
-    # Incentive cédée aux agents de vente, par produit (même logique/périmètre que
-    # direction/analyses/fournisseurs/detail.html § Analyse commerciale par produit) : seul le
-    # taux dédié au produit (`Produit.taux_incentive`, FCFA/unité) est compté, pas le repli au kg
-    # (`RegleSalaire.incentive_par_kg`, cf. `paie/services/salaire_calculator.py`), qui dépend du
-    # type de l'agent vendeur et non du produit. Recalculé directement depuis `Vente` (pas via
-    # `VwMargeFournisseur`, qui ne porte pas la quantité vendue) — mêmes filtres période/fournisseur/
-    # produit que `marge_qs` ci-dessus, pour rester cohérent avec les tableaux affichés.
+    # Incentive cédée aux agents de vente, par produit — même logique que `core/services/
+    # incentive_service.py` (taux dédié au produit si renseigné, sinon repli au kilo), restreinte
+    # aux ventes des agents terrain (seuls concernés par cette incentive, cf. module cité).
+    # Recalculé directement depuis `Vente` (pas via `VwMargeFournisseur`, qui ne porte pas la
+    # quantité vendue) — mêmes filtres période/fournisseur/produit que `marge_qs` ci-dessus, pour
+    # rester cohérent avec les tableaux affichés.
     incentive_qs = Vente.objects.filter(
         est_supprime=False,
-        detail_distribution__lot__produit__taux_incentive__isnull=False,
+        agent__type_agent='terrain',
     )
     if annee:
         incentive_qs = incentive_qs.filter(date_vente__year=annee)
@@ -1512,18 +1529,31 @@ def dashboard_stock(request):
     if produit_filtre:
         incentive_qs = incentive_qs.filter(detail_distribution__lot__produit_id=produit_filtre)
 
-    incentive_par_produit = {
-        row["detail_distribution__lot__produit_id"]: row["incentive"]
-        for row in (
-            incentive_qs
-            .values("detail_distribution__lot__produit_id")
-            .annotate(
-                incentive=Sum(
-                    F("quantite") * F("detail_distribution__lot__produit__taux_incentive")
-                )
-            )
+    a_taux_dedie = Q(detail_distribution__lot__produit__taux_incentive__isnull=False)
+    incentive_par_kg_terrain = get_incentive_par_kg_terrain()
+    incentive_par_produit = {}
+    for row in (
+        incentive_qs
+        .values("detail_distribution__lot__produit_id")
+        .annotate(
+            qte_dediee=Coalesce(Sum("quantite", filter=a_taux_dedie), Decimal("0.00")),
+            taux_dedie=Max("detail_distribution__lot__produit__taux_incentive"),
+            kg_repli=Coalesce(
+                Sum(
+                    F("quantite") *
+                    Coalesce(F("detail_distribution__lot__produit__poids_unitaire_kg"), Decimal("1")),
+                    filter=~a_taux_dedie
+                ),
+                Decimal("0.00")
+            ),
         )
-    }
+    ):
+        incentive_par_produit[row["detail_distribution__lot__produit_id"]] = calculer_incentive_terrain(
+            quantite=row["qte_dediee"],
+            kg=row["kg_repli"],
+            taux_incentive=row["taux_dedie"],
+            incentive_par_kg=incentive_par_kg_terrain,
+        )
 
     if not stock and not marge_par_fournisseur:
         context["est_vide"] = True

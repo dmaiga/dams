@@ -17,6 +17,10 @@ from core.models import (
     Perte,
     PaiementFournisseur,
 )
+from core.services.incentive_service import (
+    get_incentive_par_kg_terrain,
+    calculer_incentive_terrain,
+)
 
 # Constantes
 DEC_ZERO = Decimal('0.00')
@@ -189,6 +193,33 @@ class FournisseurAnalyseService:
         )
         ventes_par_lot = {v['detail_distribution__lot_id']: v for v in ventes_par_lot_qs}
 
+        # Ventes des agents terrain ("mamies") par lot — seuls agents concernés par l'incentive
+        # produit (cf. core/services/incentive_service.py ; agent_gros a un taux fixe au carton
+        # indépendant du produit, les superviseurs n'ont pas d'incentive produit). Nécessaire
+        # séparément de `ventes_par_lot_qs` : l'incentive ne porte que sur cette portion des
+        # ventes, pas sur le total toutes ventes confondues.
+        ventes_terrain_par_lot_qs = (
+            Vente.objects.filter(
+                detail_distribution__lot_id__in=lot_ids,
+                agent__type_agent='terrain',
+            )
+            .values('detail_distribution__lot_id')
+            .annotate(
+                total_qte_terrain=Coalesce(Sum('quantite'), DEC_ZERO),
+                total_kg_terrain=Coalesce(
+                    Sum(
+                        F('quantite') *
+                        Coalesce(F('detail_distribution__lot__produit__poids_unitaire_kg'), Decimal('1'))
+                    ),
+                    DEC_ZERO
+                ),
+            )
+        )
+        ventes_terrain_par_lot = {
+            v['detail_distribution__lot_id']: v for v in ventes_terrain_par_lot_qs
+        }
+        incentive_par_kg_terrain = get_incentive_par_kg_terrain()
+
         # Pertes agrégées par lot
         pertes_par_lot_qs = (
             Perte.objects.filter(lot_id__in=lot_ids)
@@ -239,13 +270,19 @@ class FournisseurAnalyseService:
             valeur_stock_restant_lot = lot.quantite_restante * lot.prix_achat_unitaire
             encours_stock_finance = min(total_paye_lot, valeur_stock_restant_lot)
 
-            # Incentive cédée aux agents de vente sur ce produit (réunion produits du
-            # 21/08/2026, cf. `paie/services/salaire_calculator.py`). On ne matérialise ici
-            # que le taux dédié au produit (`Produit.taux_incentive`, FCFA/unité) — pas le
-            # repli au kg (`RegleSalaire.incentive_par_kg`), qui est une règle générale par
-            # type d'agent et non une donnée "par produit" : elle dépend de qui a vendu, pas
-            # de ce qui a été vendu, et n'a pas sa place dans une analyse groupée par produit.
-            incentive_cedee = qte_vendue * (lot.produit.taux_incentive or DEC_ZERO)
+            # Incentive cédée aux agents de vente sur ce produit — réunion produits du
+            # 21/08/2026, cf. `core/services/incentive_service.py`. Taux dédié au produit
+            # (`Produit.taux_incentive`, FCFA/unité) si renseigné, sinon repli au kilo
+            # (`RegleSalaire.incentive_par_kg`, taux général) — c'est la même règle qu'en paie
+            # (`calcul_salaire_mamy`), restreinte aux ventes des agents terrain (seuls
+            # concernés par cette incentive).
+            v_terrain = ventes_terrain_par_lot.get(lot.id, {})
+            incentive_cedee = calculer_incentive_terrain(
+                quantite=v_terrain.get('total_qte_terrain', DEC_ZERO),
+                kg=v_terrain.get('total_kg_terrain', DEC_ZERO),
+                taux_incentive=lot.produit.taux_incentive,
+                incentive_par_kg=incentive_par_kg_terrain,
+            )
 
             # Survente (erreur opérationnelle)
             survente = max(qte_vendue - lot.quantite_initiale, DEC_ZERO)
