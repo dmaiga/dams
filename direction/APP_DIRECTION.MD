@@ -514,3 +514,155 @@ masqué un étalement anormalement lent.
   pattern `<dialog class="modal">` + `showModal()` que la modale "Perte déclarée" de
   `direction/templates/direction/analyses/ventes/liste_ventes_admin.html`. Liste chaque `Vente`
   (quantité, date déclarée, date d'enregistrement) rattachée au `DetailDistribution`.
+
+---
+
+## 9. Fiche fournisseur — tri par réception récente et paiement groupé (28/09/2026)
+
+**Besoin (mdmaiga)** : sur `direction/fournisseurs/<pk>/detail/`, retrouver en un coup d'œil les
+derniers lots reçus (ce sont eux qui portent le plus souvent la dette impayée), et pouvoir solder
+plusieurs lots impayés d'un fournisseur en une seule action plutôt qu'un paiement à la fois.
+
+**Tri de la table « Détail des lots »** : `FournisseurAnalyseService.get_detail_fournisseur`
+(`direction/services/fournisseur_service.py`) trie désormais `lots_qs` par `-date_reception` (au
+lieu de `date_reception` croissant) — les réceptions les plus récentes, donc les impayés les plus
+probables, remontent en tête de tableau. `analyse_lots` hérite de cet ordre puisqu'il est construit
+par itération directe sur `lots_qs`.
+
+**Paiement groupé** (`paiement_groupe_fournisseur`, `direction/views.py`) — réservé à
+`request.user.username == "mdmaiga"` (`_acces_admin_mdmaiga`, même garde que la réaffectation de
+portefeuille et les corrections administratives, § 6bis/6ter) :
+
+- URL `fournisseurs/<fournisseur_id>/paiements/groupe/`, bouton « Payer plusieurs lots » sur la
+  fiche fournisseur (visible uniquement pour mdmaiga).
+- Liste tous les lots du fournisseur dont `reste_contractuel > 0` (même source de vérité que le
+  tableau « Détail des lots » — `FournisseurAnalyseService.get_detail_fournisseur`, pas un calcul
+  parallèle) avec une case à cocher par lot.
+- À la soumission, chaque lot coché est **soldé intégralement** : `PaiementFournisseur.montant`
+  = `reste_contractuel` du lot (un lot à 125 FCFA de reste est soldé à 125, un lot à 250 à 250 —
+  pas de montant saisi par l'utilisateur), `date_paiement = timezone.now().date()`,
+  `cree_par = request.user`, création dans une transaction atomique.
+- Le `reste_contractuel` est **recalculé côté serveur** au moment du POST (nouvel appel à
+  `get_detail_fournisseur`, jamais une valeur transmise par le formulaire) — empêche un montant
+  soldé incohérent avec l'état réel de la dette au moment du clic.
+- Template `direction/analyses/fournisseurs/paiements/paiement_groupe.html` — case « tout
+  sélectionner », total de la sélection calculé en JS pour confirmation visuelle avant l'envoi,
+  confirmation JS avant soumission.
+
+**Allègement du tableau « Détail des lots » (même jour, retour mdmaiga)** : le tableau comptait
+11 colonnes, jugé trop chargé. Deux simplifications côté template uniquement (`detail.html`),
+aucun changement dans `FournisseurAnalyseService` :
+- **Qté reçue / vendue / restante fusionnées** en une seule colonne (3 lignes empilées dans une
+  cellule), le groupe d'en-tête « Stock / Opérations » passe de 4 à 2 colonnes.
+- **Colonne « Dette consommée » retirée** de la section « Finance fournisseur » (4 → 3 colonnes) :
+  cette notion supposait qu'on paie le fournisseur au fur et à mesure de ce qui est écoulé — logique
+  abandonnée depuis le paiement par lot entier (voir paiement groupé ci-dessus, on solde le lot reçu,
+  pas la portion vendue). mdmaiga garde en tête une utilité différente à cette donnée (un lot payé en
+  entier mais peu écoulé immobilise du capital sans le signaler — proche d'une perte silencieuse) et
+  veut l'exposer plus tard sous une autre forme au niveau des KPI, pas comme colonne du tableau de
+  détail. Le calcul (`dette_consommee` dans `analyse_lots`) et la carte KPI « Dette consommée » en
+  tête de page restent inchangés — seule la colonne du tableau disparaît.
+
+**Changement de paradigme « Dette consommée » → « Encours de stock financé » (même jour, mdmaiga)** :
+`kpi_fournisseur.dette_consommee` (fiche détail) et `kpi_globaux.dette_consommee_globale` / 
+`item.dette_consommee` (liste des fournisseurs) sont **retirés** — remplacés par
+`encours_stock_finance` / `encours_stock_finance_global`. Ce n'est pas un renommage : la formule
+change de nature.
+
+- **Ancienne logique** (« dette consommée ») : coût des produits vendus, bornée par la dette
+  contractuelle — supposait qu'on paie le fournisseur au fur et à mesure de l'écoulement.
+- **Nouvelle logique** : depuis le paiement groupé par lot entier (§9 ci-dessus), un lot payé mais
+  encore en stock n'est plus une dette — c'est du **capital déjà versé au fournisseur et encore
+  immobilisé dans du stock invendu** (exemple mdmaiga : lot de 10×20 000 payé en entier, 8 écoulées,
+  2 restantes → 40 000 FCFA ne sont pas une dette, ni un profit perdu, mais du capital qui n'est pas
+  encore revenu par la vente et reste exposé au risque d'invendu/dépréciation).
+- **Formule** (`FournisseurAnalyseService`) : par lot, `min(total_payé_lot, quantité_restante ×
+  prix_achat_unitaire)` — plafonné par ce qui a **réellement été payé sur CE lot**, pas par un total
+  fournisseur agrégé (un lot surpayé ne doit pas « couvrir » le stock invendu d'un autre lot pas
+  encore payé). Un lot pas encore payé ne contribue jamais à l'encours : ce n'est pas encore du
+  capital engagé, c'est toujours de la dette (`reste_contractuel`).
+- `get_detail_fournisseur` calcule ce plafond en Python dans la boucle `analyse_lots` existante
+  (donnée déjà en mémoire). `get_analyse_periode` (liste des fournisseurs) le calcule en SQL avec
+  `django.db.models.functions.Least` sur un queryset annoté par lot
+  (`Subquery` pour le total payé par lot, sans filtre `est_supprime` — même convention que
+  `total_paye_lot` du détail fournisseur, pour rester cohérent entre les deux écrans), puis regroupé
+  par fournisseur.
+- Templates touchés : `direction/analyses/fournisseurs/detail.html` (carte KPI « Encours de stock
+  financé »), `direction/analyses/fournisseurs/liste.html` (carte KPI globale + colonne du tableau).
+  **Hors périmètre, volontairement non touché** (même clé de nom mais services différents) :
+  `dashboard.html` (`direction/services/dashboard_service.py`) et `analyse_financiere.html`
+  (`direction/services/analyses_financiere.py`) gardent leur propre « dette consommée » — pas la
+  demande de ce jour, à traiter séparément si le même changement de paradigme doit s'y appliquer.
+
+**Passe UX/UI — couleur au service du statut, pas de la décoration (même jour, retour mdmaiga :
+« la liste est trop colorée, on ne peut pas se concentrer »)** : principe appliqué aux deux écrans —
+une couleur ne doit porter qu'un statut actionnable (payé/pas payé, marge positive/négative), jamais
+une simple catégorie d'information.
+
+- **Liste des fournisseurs** (`liste.html`) : les 4 cartes KPI et les colonnes du tableau portaient
+  chacune une couleur différente (jaune, vert, violet, bleu, rouge) sans rapport avec un statut réel
+  — désormais neutres (`text-gray-900`/`text-gray-700`) sauf **Reste à payer** (rouge si > 0, vert
+  sinon — la seule donnée réellement actionnable) et **Marge brute** (rouge uniquement si négative).
+  Carte "Reste à payer" remontée en première position (au lieu de 3ᵉ/4ᵉ) : c'est le chiffre que la
+  direction doit voir en premier. En-têtes de colonnes du tableau unifiés en gris neutre — seule la
+  colonne "Reste" garde sa coloration conditionnelle, elle devient de fait le seul repère visuel du
+  tableau, ce qui est le but recherché.
+- **Fiche détail fournisseur** (`detail.html`) : deux cartes KPI ("Encours de stock financé" en
+  bleu fixe, "Montant payé" en vert fixe) n'encodaient aucun statut — neutralisées en `text-gray-800`.
+  Carte "Reste à payer" remontée en première position, comme sur la liste. **Bug corrigé** : la
+  cellule "Reste à payer" du tableau "Détail des lots" était **rouge en permanence**, y compris pour
+  un lot déjà entièrement soldé (`reste_contractuel = 0`) — rendue conditionnelle (vert si soldé,
+  rouge sinon), cohérente avec la carte KPI équivalente qui l'était déjà. En-têtes de regroupement du
+  tableau des lots (« Lot » / « Stock / Opérations » / « Finance fournisseur » / « Action »)
+  unifiés en gris neutre (étaient gris/bleu/jaune/vert) — la couleur utile reste dans les cellules de
+  données (jaune = valeur de référence, vert/rouge = statut de paiement par lot), pas dans les
+  bandeaux de titre.
+
+**Pagination du tableau « Détail des lots » et retrait de « Factures récentes » (même jour,
+mdmaiga)** :
+- `DetailFournisseurView.get` pagine désormais `analyse_lots` (`django.core.paginator.Paginator`,
+  20/page) **après** tri — `detail_data['analyse_lots']` devient une `Page` Django directement
+  utilisée dans le contexte (itérable, porte `has_next`/`has_previous`/`paginator.num_pages`/
+  `paginator.count`), pas de clé de contexte séparée. Pagination par `?page=N`, liens "Précédent/
+  Suivant" du template qui préservent `date_debut`/`date_fin`/`tri`/`ordre`. `Paginator.get_page`
+  gère nativement une page hors limites (`?page=999` reflue sur la dernière page) — pas de garde
+  supplémentaire nécessaire.
+- Section « Factures récentes » retirée de la fiche fournisseur (redondante avec le bouton
+  « Factures » déjà présent dans la barre d'actions, qui renvoie vers
+  `factures_fournisseurs_direction?fournisseur=<id>`). `DetailFournisseurView.get` ne calcule plus
+  `nombre_factures`/`montant_total_factures`/`dernieres_factures` — code mort retiré, pas seulement
+  masqué côté template.
+
+**Tableau « Analyse commerciale par produit » — matérialisation de l'incentive et marge nette
+(même jour, mdmaiga)** :
+
+- **Quantités regroupées** (comme pour « Détail des lots ») : Qté livrée / vendue / restante
+  tiennent dans une seule colonne (3 lignes empilées) ; Qté perdue garde sa colonne dédiée (pas de
+  précédent pour la fusionner, et une perte mérite de rester visible isolément).
+- **Colonne « Écoulement » retirée** : son pourcentage était déjà affiché deux fois (dans la
+  colonne dédiée avec barre de progression, ET dans la cellule Qté vendue) — la barre de progression
+  disparaît, le pourcentage reste visible une seule fois, à côté de la quantité vendue.
+- **Colonne « Incentive cédée » (nouvelle)** : matérialise `Produit.taux_incentive × quantité
+  vendue` — la part reversée aux agents de vente pour ce produit. **Choix de périmètre assumé** :
+  seul le taux dédié au produit est compté ; le repli au kg (`RegleSalaire.incentive_par_kg`, cf.
+  `paie/services/salaire_calculator.py`) est volontairement exclu, car ce n'est pas une donnée "par
+  produit" — il dépend du type de l'agent qui a vendu (terrain vs gros vs autres), pas du produit
+  vendu, et n'a pas de sens dans un regroupement par produit fournisseur. Un produit sans taux dédié
+  affiche donc `0` sur cette colonne, même s'il génère réellement de l'incentive au kg côté paie —
+  écart documenté ici pour ne pas être lu comme un bug plus tard.
+- **Colonne « Marge nette » (nouvelle)** : `marge_brute − incentive_cédée` — la marge réellement
+  disponible après reversement aux agents. Vérifié sur données réelles (concombre, Champ DAMS,
+  taux dédié 50 FCFA/unité × 74 vendues = 3 700 FCFA d'incentive, marge brute 274 250 → marge nette
+  270 550).
+- Calcul implémenté dans `FournisseurAnalyseService.get_detail_fournisseur` (`direction/services/
+  fournisseur_service.py`) : `incentive_cedee` porté par lot dans `analyse_lots`, sommé par produit
+  dans `produit_data`, puis `marge_nette` dérivée dans `produits_analyses`.
+
+**Tri du tableau « Détail des lots » (même jour, retour mdmaiga)** : en-têtes cliquables sur
+« Date réception » et « Reste à payer » (`?tri=date|reste&ordre=asc|desc`, défaut `date`/`desc` —
+comportement inchangé pour qui ne clique rien). Le tri est appliqué dans `DetailFournisseurView.get`
+(`direction/views.py`), en Python sur la liste `analyse_lots` déjà construite par
+`FournisseurAnalyseService.get_detail_fournisseur` — pas en SQL, puisque `reste_contractuel` est une
+valeur calculée après agrégation (dette contractuelle moins paiements), inexistante comme colonne à
+trier côté base. Le formulaire de filtre par période conserve `tri`/`ordre` en champs cachés pour ne
+pas réinitialiser le tri choisi à chaque changement de période.

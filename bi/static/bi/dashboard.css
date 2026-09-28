@@ -282,6 +282,12 @@
 .bi-scope .bi-badge.bi-neutre { background: var(--surface-2); color: var(--ink-muted); }
 .bi-scope .bi-badge.bi-neutre::before { background: var(--ink-faint); }
 
+/* Point de statut compact (ex. calibration prix d'achat) : porte l'info par la couleur, sans
+   colonne dédiée — évite le scroll horizontal sur les tableaux à beaucoup de colonnes. */
+.bi-scope .bi-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; flex: none; }
+.bi-scope .bi-dot.bi-vert { background: var(--good); }
+.bi-scope .bi-dot.bi-neutre { background: var(--ink-faint); }
+
 .bi-scope .bi-comparaison { margin: 0 0 20px; font-size: 12.5px; color: var(--ink-muted); }
 .bi-scope .bi-comparaison b { color: var(--ink); font-family: var(--font-num); }
 

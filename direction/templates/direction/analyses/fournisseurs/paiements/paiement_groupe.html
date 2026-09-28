@@ -1,0 +1,131 @@
+{% extends 'base_admin.html' %}
+{% load format_fcfa %}
+
+{% block title %}Paiement groupé - {{ fournisseur.nom }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="mb-6">
+        <a href="{% url 'detail_fournisseur_direction' fournisseur.id %}"
+           class="inline-flex items-center text-blue-600 hover:text-blue-800 mb-2">
+            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Retour au fournisseur
+        </a>
+        <h1 class="text-2xl font-bold text-gray-900">Paiement groupé - {{ fournisseur.nom }}</h1>
+        <p class="text-gray-500 mt-1">
+            Sélectionnez les lots à solder. Chaque lot sélectionné est payé intégralement
+            (montant = reste à payer du lot), à la date du jour.
+        </p>
+    </div>
+
+    <form method="post" id="form-paiement-groupe">
+        {% csrf_token %}
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="w-10">
+                                <input type="checkbox" id="select-all" class="checkbox checkbox-sm">
+                            </th>
+                            <th>Produit</th>
+                            <th class="text-center">Date réception</th>
+                            <th class="text-right">Reste à payer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in lots_impayes %}
+                        <tr class="hover:bg-gray-50">
+                            <td>
+                                <input type="checkbox" name="lots" value="{{ item.lot.id }}"
+                                       class="checkbox checkbox-sm lot-checkbox"
+                                       data-montant="{{ item.reste_contractuel }}">
+                            </td>
+                            <td class="font-medium">{{ item.lot.produit.nom }}</td>
+                            <td class="text-center">{{ item.lot.date_reception|date:"d/m/Y" }}</td>
+                            <td class="text-right font-bold text-red-700">
+                                {{ item.reste_contractuel|fcfa }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-8 text-gray-500">
+                                Aucun lot impayé pour ce fournisseur.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if lots_impayes %}
+                    <tfoot>
+                        <tr class="bg-gray-50 font-bold">
+                            <td colspan="3" class="text-right">Total sélectionné</td>
+                            <td class="text-right" id="total-selection">0 FCFA</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        {% if lots_impayes %}
+        <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+                Total impayé (tous lots) : <span class="font-bold">{{ montant_total_impaye|fcfa }}</span>
+            </div>
+            <button type="submit" class="btn btn-success" id="btn-payer">
+                Solder les lots sélectionnés
+            </button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<script>
+(function () {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.lot-checkbox');
+    const totalEl = document.getElementById('total-selection');
+    const form = document.getElementById('form-paiement-groupe');
+
+    function updateTotal() {
+        let total = 0;
+        checkboxes.forEach((cb) => {
+            if (cb.checked) {
+                total += parseFloat(cb.dataset.montant || '0');
+            }
+        });
+        if (totalEl) {
+            totalEl.textContent = total.toLocaleString('fr-FR') + ' FCFA';
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            checkboxes.forEach((cb) => { cb.checked = selectAll.checked; });
+            updateTotal();
+        });
+    }
+
+    checkboxes.forEach((cb) => cb.addEventListener('change', updateTotal));
+
+    if (form) {
+        form.addEventListener('submit', (e) => {
+            const nbSelectionnes = Array.from(checkboxes).filter((cb) => cb.checked).length;
+            if (nbSelectionnes === 0) {
+                e.preventDefault();
+                alert('Sélectionnez au moins un lot à solder.');
+                return;
+            }
+            if (!confirm(`Confirmer le paiement complet de ${nbSelectionnes} lot(s) ?`)) {
+                e.preventDefault();
+            }
+        });
+    }
+
+    updateTotal();
+})();
+</script>
+{% endblock %}

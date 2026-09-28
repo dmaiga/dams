@@ -32,6 +32,13 @@
                     <i class="fas fa-money-bill-wave mr-2"></i>
                     Paiements
                 </a>
+                {% if request.user.username == "mdmaiga" %}
+                <a href="{% url 'paiement_groupe_fournisseur' fournisseur.id %}"
+                   class="btn btn-success">
+                    <i class="fas fa-layer-group mr-2"></i>
+                    Payer plusieurs lots
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -75,12 +82,14 @@
                     <span class="text-sm font-medium">Filtrer par période</span>
                 </div>
                 <form method="get" class="flex flex-col sm:flex-row gap-2">
+                    <input type="hidden" name="tri" value="{{ tri }}">
+                    <input type="hidden" name="ordre" value="{{ ordre }}">
                     <div class="flex-1">
-                        <input type="date" name="date_debut" value="{{ date_debut }}" 
+                        <input type="date" name="date_debut" value="{{ date_debut|default_if_none:'' }}"
                                class="input input-bordered input-sm w-full" placeholder="Début">
                     </div>
                     <div class="flex-1">
-                        <input type="date" name="date_fin" value="{{ date_fin }}" 
+                        <input type="date" name="date_fin" value="{{ date_fin|default_if_none:'' }}"
                                class="input input-bordered input-sm w-full" placeholder="Fin">
                     </div>
                     <div class="flex gap-2">
@@ -98,47 +107,9 @@
 
         <!-- KPIs principaux avec factures -->
         <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-8">
-    <!-- Dette contractuelle -->
-    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
-        <div class="text-sm text-gray-500 font-medium mb-1">
-            Dette contractuelle
-        </div>
-        <div class="text-2xl font-bold text-gray-800 mb-1">
-            {{ kpi_fournisseur.dette_contractuelle|fcfa }}
-        </div>
-        <div class="text-xs text-gray-400 mt-auto">
-            Basée sur les réceptions
-        </div>
-    </div>
-
-    <!-- Dette consommée -->
-    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
-        <div class="text-sm text-gray-500 font-medium mb-1">
-            Dette consommée
-        </div>
-        <div class="text-2xl font-bold text-blue-600 mb-1">
-            {{ kpi_fournisseur.dette_consommee|fcfa }}
-        </div>
-        <div class="text-xs text-gray-400 mt-auto">
-            Produits écoulés
-        </div>
-    </div>
-
-    <!-- Montant payé -->
-    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
-        <div class="text-sm text-gray-500 font-medium mb-1">
-            Montant payé
-        </div>
-        <div class="text-2xl font-bold text-green-600 mb-1">
-            {{ kpi_fournisseur.total_paye|fcfa }}
-        </div>
-        <div class="text-xs text-gray-400 mt-auto">
-            Paiements validés
-        </div>
-    </div>
-
-    <!-- Reste à payer -->
-    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
+    <!-- Reste à payer : l'indicateur qui compte le plus, mis en avant en premier -->
+    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full
+        {% if kpi_fournisseur.reste_contractuel > 0 %}border-red-200{% else %}border-green-200{% endif %}">
         <div class="text-sm text-gray-500 font-medium mb-1">
             Reste à payer
         </div>
@@ -152,6 +123,45 @@
         </div>
         <div class="text-xs text-gray-400 mt-auto">
             Engagement fournisseur
+        </div>
+    </div>
+
+    <!-- Montant payé -->
+    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
+        <div class="text-sm text-gray-500 font-medium mb-1">
+            Montant payé
+        </div>
+        <div class="text-2xl font-bold text-gray-800 mb-1">
+            {{ kpi_fournisseur.total_paye|fcfa }}
+        </div>
+        <div class="text-xs text-gray-400 mt-auto">
+            Paiements validés
+        </div>
+    </div>
+
+    <!-- Dette contractuelle -->
+    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
+        <div class="text-sm text-gray-500 font-medium mb-1">
+            Dette contractuelle
+        </div>
+        <div class="text-2xl font-bold text-gray-800 mb-1">
+            {{ kpi_fournisseur.dette_contractuelle|fcfa }}
+        </div>
+        <div class="text-xs text-gray-400 mt-auto">
+            Basée sur les réceptions
+        </div>
+    </div>
+
+    <!-- Encours de stock financé -->
+    <div class="bg-white rounded-xl p-4 shadow-sm border flex flex-col h-full">
+        <div class="text-sm text-gray-500 font-medium mb-1">
+            Encours de stock financé
+        </div>
+        <div class="text-2xl font-bold text-gray-800 mb-1">
+            {{ kpi_fournisseur.encours_stock_finance|fcfa }}
+        </div>
+        <div class="text-xs text-gray-400 mt-auto">
+            Déjà payé, encore en stock non écoulé
         </div>
     </div>
 
@@ -186,81 +196,6 @@
 </div>
     </div>
 
-    <!-- Dernières factures -->
-    {% if dernieres_factures %}
-    <div class="mb-8">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <i class="fas fa-file-invoice text-purple-500"></i>
-                Factures récentes
-            </h2>
-            <a href="{% url 'factures_fournisseurs_direction' %}?fournisseur={{ fournisseur.id }}"
-               class="btn btn-xs btn-outline btn-neutral">
-                <i class="fas fa-list mr-1"></i>
-                Voir toutes ({{ nombre_factures }})
-            </a>
-        </div>
-        
-        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-            <div class="overflow-x-auto">
-                <table class="table table-sm">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="text-sm">Date</th>
-                            <th class="text-sm">Produit</th>
-                            <th class="text-sm">Lot</th>
-                            <th class="text-sm text-right">Montant</th>
-                            <th class="text-sm">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for facture in dernieres_factures %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="whitespace-nowrap">
-                                {{ facture.date_upload|date:"d/m/Y" }}
-                            </td>
-                            <td>
-                                {{ facture.lot.produit.nom|truncatechars:20 }}
-                            </td>
-                            <td>
-                               
-                                   
-                                    {{ facture.lot.reference_lot }}
-                                
-                            </td>
-                            <td class="text-right font-medium">
-                                {% if facture.montant %}
-                                {{ facture.montant|fcfa }} FCFA
-                                {% else %}
-                                <span class="text-gray-400 text-xs">Non précisé</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if facture.fichier %}
-                                <div class="flex gap-1">
-                                    <a href="{{ facture.fichier.url }}" target="_blank"
-                                       class="btn btn-xs btn-outline btn-primary" title="Voir">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                
-                                    <a href="{{ facture.fichier.url }}" download
-                                       class="btn btn-xs btn-outline btn-secondary" title="Télécharger">
-                                        <i class="fas fa-download"></i>
-                                    </a>
-                                </div>
-                                {% else %}
-                                    <span class="text-gray-400 text-xs">Aucun fichier</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <!-- Tableau des lots avec actions de paiement -->
     <div class="mb-8">
         <div class="flex justify-between items-center mb-4">
@@ -269,10 +204,10 @@
                 Détail des lots
             </h2>
             <div class="text-sm text-gray-500">
-                {{ analyse_lots|length }} lot{{ analyse_lots|pluralize }}
+                {{ analyse_lots.paginator.count }} lot{{ analyse_lots.paginator.count|pluralize }}
             </div>
         </div>
-        
+
         <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
             <div class="overflow-x-auto">
                 <table class="table">
@@ -280,23 +215,40 @@
                         <!-- Ligne de regroupement -->
                         <tr class="text-xs uppercase tracking-wider text-gray-600">
                             <th colspan="2" class="bg-gray-100 text-center border-r">Lot</th>
-                            <th colspan="4" class="bg-blue-50 text-center border-r">Stock / Opérations</th>
-                            <th colspan="4" class="bg-yellow-50 text-center border-r">Finance fournisseur</th>
-                            <th class="bg-green-50 text-center">Action</th>
+                            <th colspan="2" class="bg-gray-100 text-center border-r">Stock / Opérations</th>
+                            <th colspan="3" class="bg-gray-100 text-center border-r">Finance fournisseur</th>
+                            <th class="bg-gray-100 text-center">Action</th>
                         </tr>
 
                         <!-- Ligne des colonnes -->
                         <tr class="bg-gray-50">
                             <th>Produit</th>
-                            <th class="text-center">Date réception</th>
+                            <th class="text-center">
+                                <a href="?date_debut={{ date_debut|default_if_none:'' }}&date_fin={{ date_fin|default_if_none:'' }}&tri=date&ordre={% if tri == 'date' %}{{ ordre_inverse }}{% else %}desc{% endif %}"
+                                   class="inline-flex items-center gap-1 hover:text-blue-600">
+                                    Date réception
+                                    {% if tri == 'date' %}
+                                        <span class="text-blue-600">{% if ordre == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                    {% else %}
+                                        <span class="text-gray-300">⇅</span>
+                                    {% endif %}
+                                </a>
+                            </th>
                             <th class="text-right">Prix unitaire</th>
-                            <th class="text-right">Qté reçue</th>
-                            <th class="text-right">Qté vendue</th>
-                            <th class="text-right border-r">Qté restante</th>
+                            <th class="text-right border-r">Qté (reçue / vendue / restante)</th>
                             <th class="text-right">Dette contractuelle</th>
-                            <th class="text-right">Dette consommée</th>
                             <th class="text-right">Montant payé</th>
-                            <th class="text-right border-r">Reste à payer</th>
+                            <th class="text-right border-r">
+                                <a href="?date_debut={{ date_debut|default_if_none:'' }}&date_fin={{ date_fin|default_if_none:'' }}&tri=reste&ordre={% if tri == 'reste' %}{{ ordre_inverse }}{% else %}desc{% endif %}"
+                                   class="inline-flex items-center gap-1 hover:text-blue-600">
+                                    Reste à payer
+                                    {% if tri == 'reste' %}
+                                        <span class="text-blue-600">{% if ordre == 'asc' %}▲{% else %}▼{% endif %}</span>
+                                    {% else %}
+                                        <span class="text-gray-300">⇅</span>
+                                    {% endif %}
+                                </a>
+                            </th>
                             <th class="text-center">Actions</th>
                         </tr>
                     </thead>
@@ -324,46 +276,29 @@
                                 <span class="font-semibold">{{ lot.lot.prix_achat_unitaire|fcfa }}</span>
                             </td>
                             
-                            <!-- Quantité reçue -->
-                            <td class="text-right">
-                                <span class="font-semibold">{{ lot.quantite_recue|format_number }}</span>
-                            </td>
-                            
-                            <!-- Quantité vendue -->
-                            <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="font-semibold">{{ lot.quantite_vendue|format_number }}</span>
-                                    <span class="text-xs {% if lot.ecoulement_pct >= 80 %}text-green-600
-                                                        {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
-                                                        {% else %}text-red-600{% endif %}">
-                                        {{ lot.ecoulement_pct }}%
+                            <!-- Quantités regroupées : reçue / vendue / restante -->
+                            <td class="text-right border-r">
+                                <div class="flex flex-col items-end gap-0.5 text-xs text-gray-500">
+                                    <span>Reçue : <span class="font-semibold text-gray-800 text-sm">{{ lot.quantite_recue|format_number }}</span></span>
+                                    <span>Vendue : <span class="font-semibold text-gray-800 text-sm">{{ lot.quantite_vendue|format_number }}</span>
+                                        <span class="{% if lot.ecoulement_pct >= 80 %}text-green-600
+                                                    {% elif lot.ecoulement_pct >= 50 %}text-yellow-600
+                                                    {% else %}text-red-600{% endif %}">({{ lot.ecoulement_pct }}%)</span>
                                     </span>
+                                    <span>Restante : <span class="{{ lot.quantite_classe }} text-sm">{{ lot.quantite_restante|format_number }}</span></span>
                                 </div>
                             </td>
-                            
-                            <!-- Quantité restante -->
-                            <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="{{ lot.quantite_classe }}">
-                                        {{ lot.quantite_restante|format_number }}
-                                    </span>
-                                </div>
-                            </td>
-                            
+
                             <!-- Dette réelle -->
                             <td class="text-right font-bold bg-yellow-50">
                                 {{ lot.lot.valeur_stock_initiale|fcfa }}
-                            </td>
-
-                            <td class="text-right font-bold bg-yellow-50">
-                                {{ lot.dette_consommee|fcfa }}
                             </td>
 
                             <td class="text-right font-bold bg-green-50 text-green-700">
                                 {{ lot.total_paye_lot|fcfa }}
                             </td>
 
-                            <td class="text-right font-bold bg-red-50 text-red-700">
+                            <td class="text-right font-bold {% if lot.reste_contractuel > 0 %}bg-red-50 text-red-700{% else %}bg-green-50 text-green-700{% endif %}">
                                 {{ lot.reste_contractuel|fcfa }}
                             </td>
                             
@@ -396,7 +331,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="11" class="text-center py-8 text-gray-500">
+                            <td colspan="8" class="text-center py-8 text-gray-500">
                                 <div class="flex flex-col items-center justify-center py-8">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -409,6 +344,29 @@
                     </tbody>
                 </table>
             </div>
+
+            {% if analyse_lots.paginator.num_pages > 1 %}
+            <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <div class="text-sm text-gray-500">
+                    Page {{ analyse_lots.number }} sur {{ analyse_lots.paginator.num_pages }}
+                </div>
+                <div class="flex gap-2">
+                    {% if analyse_lots.has_previous %}
+                    <a href="?date_debut={{ date_debut|default_if_none:'' }}&date_fin={{ date_fin|default_if_none:'' }}&tri={{ tri }}&ordre={{ ordre }}&page={{ analyse_lots.previous_page_number }}"
+                       class="btn btn-sm btn-outline btn-neutral">Précédent</a>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline btn-neutral" disabled>Précédent</button>
+                    {% endif %}
+
+                    {% if analyse_lots.has_next %}
+                    <a href="?date_debut={{ date_debut|default_if_none:'' }}&date_fin={{ date_fin|default_if_none:'' }}&tri={{ tri }}&ordre={{ ordre }}&page={{ analyse_lots.next_page_number }}"
+                       class="btn btn-sm btn-outline btn-neutral">Suivant</a>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline btn-neutral" disabled>Suivant</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -430,13 +388,12 @@
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="font-semibold text-gray-700">Produit</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté livrée</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté vendue</th>
-                            <th class="font-semibold text-gray-700 text-right">Qté restante</th>
+                            <th class="font-semibold text-gray-700 text-right">Qté (livrée / vendue / restante)</th>
                             <th class="font-semibold text-gray-700 text-right">Qté perdue</th>
                             <th class="font-semibold text-gray-700 text-right">CA généré</th>
+                            <th class="font-semibold text-gray-700 text-right">Incentive cédée</th>
                             <th class="font-semibold text-gray-700 text-right">Marge brute</th>
-                            <th class="font-semibold text-gray-700 text-right">Écoulement</th>
+                            <th class="font-semibold text-gray-700 text-right">Marge nette</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -448,34 +405,26 @@
                                     {{ produit.nombre_lots }} lot{{ produit.nombre_lots|pluralize }}
                                 </div>
                             </td>
-                            
-                            <!-- Quantité livrée -->
-                            <td class="text-right font-semibold">{{ produit.quantite_livree|format_number }}</td>
-                            
-                            <!-- Quantité vendue -->
+
+                            <!-- Quantités regroupées : livrée / vendue / restante -->
                             <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="font-semibold">{{ produit.quantite_vendue|format_number }}</span>
-                                    <span class="text-xs {% if produit.pourcentage_ecoulement >= 80 %}text-green-600
-                                                        {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
-                                                        {% else %}text-red-600{% endif %}">
-                                        {{ produit.pourcentage_ecoulement }}%
+                                <div class="flex flex-col items-end gap-0.5 text-xs text-gray-500">
+                                    <span>Livrée : <span class="font-semibold text-gray-800 text-sm">{{ produit.quantite_livree|format_number }}</span></span>
+                                    <span>Vendue : <span class="font-semibold text-gray-800 text-sm">{{ produit.quantite_vendue|format_number }}</span>
+                                        <span class="{% if produit.pourcentage_ecoulement >= 80 %}text-green-600
+                                                    {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
+                                                    {% else %}text-red-600{% endif %}">({{ produit.pourcentage_ecoulement }}%)</span>
+                                    </span>
+                                    <span>Restante :
+                                        <span class="text-sm {% if produit.quantite_restante == 0 %}text-green-600 font-semibold
+                                                    {% elif produit.pourcentage_restant > 50 %}text-orange-600 font-semibold
+                                                    {% else %}font-semibold text-gray-800{% endif %}">
+                                            {{ produit.quantite_restante|floatformat:2 }}
+                                        </span>
                                     </span>
                                 </div>
                             </td>
-                            
-                            <!-- Quantité restante -->
-                            <td class="text-right">
-                                <div class="flex flex-col items-end">
-                                    <span class="{% if produit.quantite_restante == 0 %}text-green-600 font-semibold
-                                                {% elif produit.pourcentage_restant > 50 %}text-orange-600 font-semibold
-                                                {% else %}font-semibold{% endif %}">
-                                        {{ produit.quantite_restante|floatformat:2 }}
-                                    </span>
-                                    <span class="text-xs text-gray-500">{{ produit.pourcentage_restant }}%</span>
-                                </div>
-                            </td>
-                            
+
                             <!-- Quantité perdue -->
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
@@ -487,12 +436,17 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            
+
                             <!-- CA généré -->
                             <td class="text-right">
-                                <span class="font-semibold">{{ produit.ca_genere|fcfa }}</span>
+                                <span class="font-semibold text-gray-900">{{ produit.ca_genere|fcfa }}</span>
                             </td>
-                            
+
+                            <!-- Incentive cédée aux agents de vente -->
+                            <td class="text-right text-gray-700">
+                                {{ produit.incentive_cedee|fcfa }}
+                            </td>
+
                             <!-- Marge brute -->
                             <td class="text-right">
                                 <div class="flex flex-col items-end">
@@ -506,28 +460,17 @@
                                     </span>
                                 </div>
                             </td>
-                            
-                            <!-- Écoulement avec barre de progression -->
+
+                            <!-- Marge nette (marge brute − incentive cédée) -->
                             <td class="text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <span class="text-sm {% if produit.pourcentage_ecoulement >= 80 %}text-green-600
-                                                        {% elif produit.pourcentage_ecoulement >= 50 %}text-yellow-600
-                                                        {% else %}text-red-600{% endif %}">
-                                        {{ produit.pourcentage_ecoulement }}%
-                                    </span>
-                                    <progress 
-                                        class="progress w-16 h-2 {% if produit.pourcentage_ecoulement >= 80 %}progress-success
-                                                               {% elif produit.pourcentage_ecoulement >= 50 %}progress-warning
-                                                               {% else %}progress-error{% endif %}" 
-                                        value="{{ produit.pourcentage_ecoulement }}" 
-                                        max="100">
-                                    </progress>
-                                </div>
+                                <span class="{% if produit.marge_nette > 0 %}text-green-700 font-bold{% else %}text-red-700 font-bold{% endif %}">
+                                    {{ produit.marge_nette|fcfa }}
+                                </span>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-8 text-gray-500">
+                            <td colspan="7" class="text-center py-8 text-gray-500">
                                 <div class="flex flex-col items-center justify-center py-8">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

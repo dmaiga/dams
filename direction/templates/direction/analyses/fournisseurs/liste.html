@@ -9,65 +9,54 @@
         <h1 class="text-2xl font-semibold text-gray-800 mb-4">Analyse des Fournisseurs</h1>
 
         
-        <!-- KPIs avec couleurs sobres -->
+        <!-- KPIs : une seule couleur porte un vrai statut (Reste à payer), le reste est neutre -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-       
-                            <!-- Dette consommée -->
-                <div class="bg-white p-5 rounded-lg border shadow-sm">
-                    <div class="flex items-center mb-2">
-                        <div class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-                        <h3 class="text-sm font-medium text-gray-700">Dette consommée</h3>
-                    </div>
-                    <p class="text-2xl font-semibold text-yellow-700">
-                        {{ kpi_globaux.dette_consommee_globale|fcfa }} FCFA
-                    </p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        Basée sur les ventes
-                    </p>
-                </div>
-                
-                            
-                            <!-- Payé -->
-                <div class="bg-white p-5 rounded-lg border shadow-sm">
-                    <div class="flex items-center mb-2">
-                        <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                        <h3 class="text-sm font-medium text-gray-700">Total payé</h3>
-                    </div>
-                    <p class="text-2xl font-semibold text-green-600">
-                        {{ kpi_globaux.total_paye|fcfa }} FCFA
-                    </p>
-                
-                   
-                </div>
-                
-                            
-                            <!-- Reste à payer -->
-                <div class="bg-white p-5 rounded-lg border shadow-sm">
-                    <div class="flex items-center mb-2">
-                        <div class="w-3 h-3 {% if kpi_globaux.reste_contractuel_global > 0 %}bg-red-500{% else %}bg-green-500{% endif %} rounded-full mr-2"></div>
-                        <h3 class="text-sm font-medium text-gray-700">Reste à payer</h3>
-                    </div>
-                    <p class="text-2xl font-semibold
-                        {% if kpi_globaux.reste_contractuel_global > 0 %}
-                            text-red-600
-                        {% else %}
-                            text-green-600
-                        {% endif %}">
-                        {{ kpi_globaux.reste_contractuel_global|fcfa }} FCFA
-                    </p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        Situation fournisseur
-                    </p>
-                </div>
-                
-                            
-                <!-- Marge brute -->
-                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                <div class="flex items-center mb-2">
-                    <div class="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-                    <h3 class="text-sm font-medium text-gray-700">Marge brute</h3>
-                </div>
-                <p class="text-2xl font-semibold text-gray-900">{{ kpi_globaux.marge_brute_totale|fcfa }} FCFA</p>
+
+            <!-- Reste à payer : l'indicateur qui compte le plus, mis en avant en premier -->
+            <div class="bg-white p-5 rounded-lg border shadow-sm
+                {% if kpi_globaux.reste_contractuel_global > 0 %}border-red-200{% else %}border-green-200{% endif %}">
+                <h3 class="text-sm font-medium text-gray-500 mb-2">Reste à payer</h3>
+                <p class="text-2xl font-semibold
+                    {% if kpi_globaux.reste_contractuel_global > 0 %}
+                        text-red-600
+                    {% else %}
+                        text-green-600
+                    {% endif %}">
+                    {{ kpi_globaux.reste_contractuel_global|fcfa }} FCFA
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    Situation fournisseurs
+                </p>
+            </div>
+
+            <!-- Payé -->
+            <div class="bg-white p-5 rounded-lg border shadow-sm">
+                <h3 class="text-sm font-medium text-gray-500 mb-2">Total payé</h3>
+                <p class="text-2xl font-semibold text-gray-900">
+                    {{ kpi_globaux.total_paye|fcfa }} FCFA
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    {{ kpi_globaux.pourcentage_paye_global }} % de la dette contractuelle
+                </p>
+            </div>
+
+            <!-- Encours de stock financé -->
+            <div class="bg-white p-5 rounded-lg border shadow-sm">
+                <h3 class="text-sm font-medium text-gray-500 mb-2">Encours de stock financé</h3>
+                <p class="text-2xl font-semibold text-gray-900">
+                    {{ kpi_globaux.encours_stock_finance_global|fcfa }} FCFA
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                    Déjà payé, encore en stock non écoulé
+                </p>
+            </div>
+
+            <!-- Marge brute -->
+            <div class="bg-white p-5 rounded-lg border shadow-sm">
+                <h3 class="text-sm font-medium text-gray-500 mb-2">Marge brute</h3>
+                <p class="text-2xl font-semibold {% if kpi_globaux.marge_brute_totale < 0 %}text-red-600{% else %}text-gray-900{% endif %}">
+                    {{ kpi_globaux.marge_brute_totale|fcfa }} FCFA
+                </p>
                 <p class="text-xs text-gray-500 mt-1">Cumulée sur la période</p>
             </div>
         </div>
@@ -92,20 +81,20 @@
                     </th>
 
                     
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-blue-600 uppercase border-l">
+                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase border-l">
                         Dette contractuelle
                     </th>
 
 
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-purple-600 uppercase">
-                        Dette consommée
+                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
+                        Encours de stock financé
                     </th>
 
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-green-600 uppercase">
+                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
                         Payé
                     </th>
 
-                    <th class="px-6 py-3 text-right text-xs font-semibold text-red-600 uppercase">
+                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
                         Reste
                     </th>
 
@@ -152,21 +141,21 @@
                     
 
                     <!-- Dette contractuelle -->
-                    <td class="px-6 py-4 text-right font-semibold text-blue-700 border-l">
+                    <td class="px-6 py-4 text-right font-semibold text-gray-900 border-l">
                          {{ item.dette_contractuelle|fcfa }}
                     </td>
 
-                    <!-- Dette consommée -->
-                    <td class="px-6 py-4 text-right font-semibold text-purple-700">
-                        {{ item.dette_consommee|fcfa }}
+                    <!-- Encours de stock financé -->
+                    <td class="px-6 py-4 text-right text-gray-700">
+                        {{ item.encours_stock_finance|fcfa }}
                     </td>
 
                     <!-- Payé -->
                     <td class="px-6 py-4 text-right">
-                        <div class="font-semibold text-green-600">
+                        <div class="font-semibold text-gray-900">
                             {{ item.total_paye|fcfa }}
                         </div>
-                      
+
                     </td>
 
                     <!-- Reste contractuel -->
@@ -210,14 +199,14 @@
             <div class="flex gap-8">
                 <div class="text-right">
                     <p class="text-sm text-gray-500">Dette contractuelle totale</p>
-                    <p class="text-lg font-semibold text-blue-700">
+                    <p class="text-lg font-semibold text-gray-900">
                         {{ kpi_globaux.dette_contractuelle_globale|fcfa }}
                     </p>
                 </div>
 
                 <div class="text-right">
                     <p class="text-sm text-gray-500">Total payé</p>
-                    <p class="text-lg font-semibold text-green-600">
+                    <p class="text-lg font-semibold text-gray-900">
                         {{ kpi_globaux.total_paye|fcfa }}
                     </p>
                     <p class="text-xs text-gray-500">

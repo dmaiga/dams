@@ -1195,9 +1195,15 @@ class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
     
     def get(self, request, pk):
         # Récupération des paramètres de filtre
-        date_debut = request.GET.get('date_debut')
-        date_fin = request.GET.get('date_fin')
-        
+        # (un lien déjà généré avec date_debut/date_fin absents produit la chaîne
+        # littérale "None" côté template — traitée ici comme "pas de filtre")
+        date_debut = request.GET.get('date_debut') or None
+        date_fin = request.GET.get('date_fin') or None
+        if date_debut == 'None':
+            date_debut = None
+        if date_fin == 'None':
+            date_fin = None
+
         # Conversion des dates si fournies
         date_debut_obj = None
         date_fin_obj = None
@@ -1211,32 +1217,36 @@ class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
         detail_data = FournisseurAnalyseService.get_detail_fournisseur(
             pk, date_debut_obj, date_fin_obj
         )
-        
-        # Ajouter les informations sur les factures
+
+        # Tri du tableau « Détail des lots » (demande mdmaiga, 28/09/2026) :
+        # par date de réception (défaut) ou par reste à payer, chacun asc/desc.
+        tri = request.GET.get('tri', 'date')
+        ordre = request.GET.get('ordre', 'desc')
+        cle_tri = {
+            'date': 'date_reception',
+            'reste': 'reste_contractuel',
+        }.get(tri, 'date_reception')
+        detail_data['analyse_lots'] = sorted(
+            detail_data['analyse_lots'],
+            key=lambda item: item[cle_tri],
+            reverse=(ordre != 'asc'),
+        )
+
         fournisseur = Fournisseur.objects.get(pk=pk)
-        
-        # Nombre de factures pour ce fournisseur
-        nombre_factures = FactureLotEntrepot.objects.filter(
-            lot__fournisseur=fournisseur
-        ).count()
-        
-        # Montant total facturé
-        montant_total_factures = FactureLotEntrepot.objects.filter(
-            lot__fournisseur=fournisseur
-        ).aggregate(total=Sum('montant'))['total'] or Decimal('0')
-        
-        # Dernières factures (5 max)
-        dernieres_factures = FactureLotEntrepot.objects.filter(
-            lot__fournisseur=fournisseur
-        ).select_related('lot', 'lot__produit').order_by('-date_upload')[:5]
-        
+
+        # Pagination du tableau « Détail des lots » (demande mdmaiga, 28/09/2026) : 20/page.
+        # `analyse_lots` devient une Page Django (itérable, porte has_next/has_previous/
+        # paginator.num_pages) — le template n'a pas besoin d'une clé de contexte séparée.
+        paginator = Paginator(detail_data['analyse_lots'], 20)
+        detail_data['analyse_lots'] = paginator.get_page(request.GET.get('page'))
+
         context = {
             **detail_data,
             'date_debut': date_debut,
             'date_fin': date_fin,
-            'nombre_factures': nombre_factures,
-            'montant_total_factures': montant_total_factures,
-            'dernieres_factures': dernieres_factures,
+            'tri': tri,
+            'ordre': ordre,
+            'ordre_inverse': 'asc' if ordre == 'desc' else 'desc',
         }
         
         return render(
@@ -1602,6 +1612,72 @@ from direction.forms import (
 
 def _acces_admin_mdmaiga(user):
     return user.is_authenticated and user.username == "mdmaiga"
+
+
+# ----------------------------------------------------------------------------
+# PAIEMENT GROUPÉ FOURNISSEUR (accès restreint : mdmaiga)
+# ----------------------------------------------------------------------------
+#
+# Solder en un clic tous les lots impayés d'un fournisseur : chaque lot
+# sélectionné est soldé intégralement (montant = reste_contractuel du lot),
+# à la date du jour, par l'utilisateur connecté. Le reste_contractuel est
+# recalculé côté serveur à partir de la même source (FournisseurAnalyseService)
+# que celle affichée sur la fiche fournisseur, pour éviter tout montant soumis
+# par le client.
+
+@user_passes_test(_acces_admin_mdmaiga)
+def paiement_groupe_fournisseur(request, fournisseur_id):
+    fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
+
+    detail_data = FournisseurAnalyseService.get_detail_fournisseur(fournisseur.id)
+    lots_impayes = [
+        item for item in detail_data['analyse_lots']
+        if item['reste_contractuel'] > 0
+    ]
+
+    if request.method == 'POST':
+        lot_ids_selectionnes = set(request.POST.getlist('lots'))
+        lots_a_payer = [
+            item for item in lots_impayes
+            if str(item['lot'].id) in lot_ids_selectionnes
+        ]
+
+        if not lots_a_payer:
+            messages.warning(request, "Aucun lot sélectionné.")
+            return redirect('paiement_groupe_fournisseur', fournisseur_id=fournisseur.id)
+
+        aujourdhui = timezone.now().date()
+        montant_total = Decimal('0.00')
+
+        with transaction.atomic():
+            for item in lots_a_payer:
+                PaiementFournisseur.objects.create(
+                    fournisseur=fournisseur,
+                    lot=item['lot'],
+                    montant=item['reste_contractuel'],
+                    date_paiement=aujourdhui,
+                    cree_par=request.user,
+                )
+                montant_total += item['reste_contractuel']
+
+        messages.success(
+            request,
+            f"{len(lots_a_payer)} lot(s) soldé(s) pour un total de {montant_total} FCFA."
+        )
+        return redirect('detail_fournisseur_direction', pk=fournisseur.id)
+
+    return render(
+        request,
+        'direction/analyses/fournisseurs/paiements/paiement_groupe.html',
+        {
+            'fournisseur': fournisseur,
+            'lots_impayes': lots_impayes,
+            'montant_total_impaye': sum(
+                (item['reste_contractuel'] for item in lots_impayes),
+                Decimal('0.00')
+            ),
+        }
+    )
 
 
 # ----------------------------------------------------------------------------

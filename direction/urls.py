@@ -16,7 +16,8 @@ from direction.views import (
                                 modifier_paiement_fournisseur,
                                 supprimer_paiement_fournisseur,
                                 restaurer_paiement_fournisseur,
-                                detail_paiement_fournisseur, 
+                                detail_paiement_fournisseur,
+                                paiement_groupe_fournisseur,
                                  liste_clotures,apercu_cloture,cloturer_periode,  
                                  api_calcul_salaire_rapide,export_salaires_excel,
                                  detail_salaire_agent,calcul_salaires,SuperviseurDetail,
@@ -92,9 +93,14 @@ urlpatterns = [
          DetailFournisseurView.as_view(), 
          name='detail_fournisseur_direction'),
     
-    path('fournisseurs/<int:fournisseur_id>/paiements/', 
-         liste_paiements_fournisseur, 
+    path('fournisseurs/<int:fournisseur_id>/paiements/',
+         liste_paiements_fournisseur,
          name='liste_paiements_fournisseur'),
+
+    # Paiement groupé (solder plusieurs lots en un clic, accès mdmaiga)
+    path('fournisseurs/<int:fournisseur_id>/paiements/groupe/',
+         paiement_groupe_fournisseur,
+         name='paiement_groupe_fournisseur'),
     
     path('fournisseurs/<int:fournisseur_id>/paiements/nouveau/', 
          creer_paiement_fournisseur, 

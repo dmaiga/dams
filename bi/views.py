@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Count, Max, Sum
+from django.db.models import Count, F, Max, Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -1438,6 +1438,39 @@ def dashboard_stock(request):
         for c in AjustementPrixAchat.objects.values("lot__produit_id").annotate(n=Count("id"))
     }
 
+    # Incentive cédée aux agents de vente, par produit (même logique/périmètre que
+    # direction/analyses/fournisseurs/detail.html § Analyse commerciale par produit) : seul le
+    # taux dédié au produit (`Produit.taux_incentive`, FCFA/unité) est compté, pas le repli au kg
+    # (`RegleSalaire.incentive_par_kg`, cf. `paie/services/salaire_calculator.py`), qui dépend du
+    # type de l'agent vendeur et non du produit. Recalculé directement depuis `Vente` (pas via
+    # `VwMargeFournisseur`, qui ne porte pas la quantité vendue) — mêmes filtres période/fournisseur/
+    # produit que `marge_qs` ci-dessus, pour rester cohérent avec les tableaux affichés.
+    incentive_qs = Vente.objects.filter(
+        est_supprime=False,
+        detail_distribution__lot__produit__taux_incentive__isnull=False,
+    )
+    if annee:
+        incentive_qs = incentive_qs.filter(date_vente__year=annee)
+    if mois:
+        incentive_qs = incentive_qs.filter(date_vente__month=mois)
+    if fournisseur_filtre:
+        incentive_qs = incentive_qs.filter(detail_distribution__lot__fournisseur_id=fournisseur_filtre)
+    if produit_filtre:
+        incentive_qs = incentive_qs.filter(detail_distribution__lot__produit_id=produit_filtre)
+
+    incentive_par_produit = {
+        row["detail_distribution__lot__produit_id"]: row["incentive"]
+        for row in (
+            incentive_qs
+            .values("detail_distribution__lot__produit_id")
+            .annotate(
+                incentive=Sum(
+                    F("quantite") * F("detail_distribution__lot__produit__taux_incentive")
+                )
+            )
+        )
+    }
+
     if not stock and not marge_par_fournisseur:
         context["est_vide"] = True
         context.update(
@@ -1462,6 +1495,8 @@ def dashboard_stock(request):
         p["marge_pct"] = (p["marge"] / p["ca"] * 100) if p["ca"] else None
         p["statut"] = constants.statut_marge(p["marge"], p["marge_pct"])
         p["nb_ajustements"] = ajustements_par_produit.get(p["produit_id"], 0)
+        p["marge_cedee"] = incentive_par_produit.get(p["produit_id"], Decimal("0.00"))
+        p["marge_nette"] = p["marge"] - p["marge_cedee"]
 
     context.update(
         {

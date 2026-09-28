@@ -4,9 +4,9 @@ from collections import defaultdict
 from decimal import Decimal
 
 from django.db.models import (
-    Sum, F, Q, Value, OuterRef, Subquery,Count
+    Sum, F, Q, Value, OuterRef, Subquery, Count, DecimalField
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Least
 from django.utils import timezone
 from datetime import datetime, timedelta
 
@@ -172,8 +172,8 @@ class FournisseurAnalyseService:
             fournisseur=fournisseur,
             date_reception__gte=date_debut,
             date_reception__lte=date_fin
-        ).select_related('produit').order_by('date_reception')
-        
+        ).select_related('produit').order_by('-date_reception')
+
 
         lot_ids = list(lots_qs.values_list('id', flat=True))
 
@@ -226,11 +226,26 @@ class FournisseurAnalyseService:
             # Dette contractuelle (réception)
             dette_contractuelle = lot.valeur_stock_initiale
 
-            # Dette consommée (bornée par la réception)
-            dette_consommee = min(dette_contractuelle, cout_vendue)
-
             # Reste contractuel à payer (SEULE RÉFÉRENCE POUR LE FOURNISSEUR)
             reste_contractuel = max(dette_contractuelle - total_paye_lot, DEC_ZERO)
+
+            # Encours de stock financé : part de ce qui a déjà été PAYÉ au fournisseur
+            # qui correspond à du stock encore invendu. Paiement par lot entier oblige,
+            # "dette consommée" (coût des ventes) n'a plus de sens : un lot payé en
+            # entier mais peu écoulé n'est plus une dette, c'est du capital déjà engagé
+            # et encore immobilisé dans le stock restant — borné par ce qui a été payé,
+            # car un lot pas encore payé n'immobilise aucun capital, c'est encore de la
+            # dette (voir `reste_contractuel`).
+            valeur_stock_restant_lot = lot.quantite_restante * lot.prix_achat_unitaire
+            encours_stock_finance = min(total_paye_lot, valeur_stock_restant_lot)
+
+            # Incentive cédée aux agents de vente sur ce produit (réunion produits du
+            # 21/08/2026, cf. `paie/services/salaire_calculator.py`). On ne matérialise ici
+            # que le taux dédié au produit (`Produit.taux_incentive`, FCFA/unité) — pas le
+            # repli au kg (`RegleSalaire.incentive_par_kg`), qui est une règle générale par
+            # type d'agent et non une donnée "par produit" : elle dépend de qui a vendu, pas
+            # de ce qui a été vendu, et n'a pas sa place dans une analyse groupée par produit.
+            incentive_cedee = qte_vendue * (lot.produit.taux_incentive or DEC_ZERO)
 
             # Survente (erreur opérationnelle)
             survente = max(qte_vendue - lot.quantite_initiale, DEC_ZERO)
@@ -281,8 +296,8 @@ class FournisseurAnalyseService:
 
                 # Dettes (BIEN SÉPARÉES)
                 'dette_contractuelle': dette_contractuelle,
-                'dette_consommee': dette_consommee,
                 'reste_contractuel': reste_contractuel,
+                'encours_stock_finance': encours_stock_finance,
 
                 # Paiements
                 'total_paye_lot': total_paye_lot,
@@ -294,6 +309,7 @@ class FournisseurAnalyseService:
                 'prix_achat': lot.prix_achat_unitaire,
                 'ca_vendue': ca_vendue,
                 'cout_vendue': cout_vendue,
+                'incentive_cedee': incentive_cedee,
 
                 # Métadonnées
                 'date_reception': lot.date_reception,
@@ -322,6 +338,7 @@ class FournisseurAnalyseService:
             'valeur_livree': DEC_ZERO,
             'lots': [],
             'cout_vendu': DEC_ZERO,
+            'incentive_cedee': DEC_ZERO,
         })
 
         for lot_info in analyse_lots:
@@ -336,6 +353,7 @@ class FournisseurAnalyseService:
             produit_data[pid]['valeur_livree'] += (lot_info['quantite_recue'] * lot_info['prix_achat'])
             produit_data[pid]['lots'].append(lot_info)
             produit_data[pid]['cout_vendu'] += lot_info['cout_vendue']
+            produit_data[pid]['incentive_cedee'] += lot_info['incentive_cedee']
 
         produits_analyses = []
         for data in produit_data.values():
@@ -348,6 +366,8 @@ class FournisseurAnalyseService:
 
             cout_produits_vendus = cout_vendu
             marge_brute = ca - cout_produits_vendus
+            incentive_cedee = data['incentive_cedee']
+            marge_nette = marge_brute - incentive_cedee
 
             # Pourcentage d'écoulement (vendue / livrée)
             pourcentage_ecoulement = (qv / qlv * 100) if qlv and qlv != 0 else 0
@@ -374,6 +394,8 @@ class FournisseurAnalyseService:
                 'quantite_perdue': qp,
                 'ca_genere': ca,
                 'marge_brute': marge_brute,
+                'incentive_cedee': incentive_cedee,
+                'marge_nette': marge_nette,
                 'pourcentage_ecoulement': round(pourcentage_ecoulement, 2),
                 'pourcentage_restant': round(pourcentage_restant, 2),
                 'pourcentage_perte': round(pourcentage_perte, 2),
@@ -395,8 +417,8 @@ class FournisseurAnalyseService:
             item['dette_contractuelle'] for item in analyse_lots
         ) if analyse_lots else DEC_ZERO
 
-        dette_consommee_totale = sum(
-            item['dette_consommee'] for item in analyse_lots
+        encours_stock_finance_total = sum(
+            item['encours_stock_finance'] for item in analyse_lots
         ) if analyse_lots else DEC_ZERO
 
         total_paye_fournisseur = sum(
@@ -438,7 +460,7 @@ class FournisseurAnalyseService:
         kpi_fournisseur = {
             # FINANCE (clair et non discutable)
             'dette_contractuelle': dette_contractuelle_totale,
-            'dette_consommee': dette_consommee_totale,
+            'encours_stock_finance': encours_stock_finance_total,
             'total_paye': total_paye_fournisseur,
             'reste_contractuel': reste_contractuel_global,
             'pourcentage_paye': round(
@@ -569,7 +591,8 @@ class FournisseurAnalyseService:
         """
         LOGIQUE CORRIGÉE :
         - Dette contractuelle = réceptions (lots)
-        - Dette consommée = ventes liées aux lots
+        - Encours de stock financé = part payée au fournisseur encore immobilisée
+          dans du stock invendu (bornée lot par lot, voir plus bas)
         - Paiements = UNIQUEMENT paiements rattachés aux lots
         => cohérence parfaite avec le détail fournisseur
         """
@@ -657,7 +680,41 @@ class FournisseurAnalyseService:
             p['lot__fournisseur']: p['total_paye']
             for p in paiements_lots_agg
         }
-    
+
+        # =========================
+        # ENCOURS DE STOCK FINANCÉ (remplace l'ancienne "dette consommée")
+        # =========================
+        # Paiement par lot entier oblige : un lot payé mais encore en stock n'est
+        # plus une dette, c'est du capital déjà versé au fournisseur et immobilisé
+        # dans du stock invendu. Doit être borné PAR LOT (pas au global du
+        # fournisseur) : un lot surpayé ne doit pas "couvrir" le stock invendu d'un
+        # autre lot pas encore payé.
+        paiement_lot_subquery = (
+            PaiementFournisseur.objects.filter(
+                lot=OuterRef('pk')
+            )
+            .values('lot')
+            .annotate(total=Sum('montant'))
+            .values('total')
+        )
+        encours_agg = (
+            lots_qs
+            .annotate(
+                total_paye_lot=Coalesce(
+                    Subquery(paiement_lot_subquery, output_field=DecimalField()),
+                    DEC_ZERO
+                ),
+                valeur_stock_restant_lot=F('quantite_restante') * F('prix_achat_unitaire'),
+                encours_lot=Least('total_paye_lot', 'valeur_stock_restant_lot'),
+            )
+            .values('fournisseur')
+            .annotate(encours_stock_finance=Coalesce(Sum('encours_lot'), DEC_ZERO))
+        )
+        encours_by_fournisseur = {
+            e['fournisseur']: e['encours_stock_finance']
+            for e in encours_agg
+        }
+
         # =========================
         # CONSTRUCTION ANALYSE
         # =========================
@@ -681,11 +738,8 @@ class FournisseurAnalyseService:
             total_paye = paiements_by_fournisseur.get(fid, DEC_ZERO)
     
             dette_contractuelle = lot.get('dette_contractuelle', DEC_ZERO)
-            dette_consommee = min(
-                vente.get('dette_consommee', DEC_ZERO),
-                dette_contractuelle
-            )
-    
+            encours_stock_finance = encours_by_fournisseur.get(fid, DEC_ZERO)
+
             reste_contractuel = max(dette_contractuelle - total_paye, DEC_ZERO)
     
             quantite_livree = lot.get('quantite_livree', DEC_ZERO)
@@ -716,7 +770,7 @@ class FournisseurAnalyseService:
     
                 # Dettes (ALIGNÉES DÉTAIL)
                 'dette_contractuelle': dette_contractuelle,
-                'dette_consommee': dette_consommee,
+                'encours_stock_finance': encours_stock_finance,
                 'total_paye': total_paye,
                 'reste_contractuel': reste_contractuel,
     
@@ -730,12 +784,12 @@ class FournisseurAnalyseService:
         # KPI GLOBAUX
         # =========================
         dette_contractuelle_globale = sum(i['dette_contractuelle'] for i in analyse_data)
-        dette_consommee_globale = sum(i['dette_consommee'] for i in analyse_data)
+        encours_stock_finance_global = sum(i['encours_stock_finance'] for i in analyse_data)
         total_paye_global = sum(i['total_paye'] for i in analyse_data)
-    
+
         kpi_globaux = {
             'dette_contractuelle_globale': dette_contractuelle_globale,
-            'dette_consommee_globale': dette_consommee_globale,
+            'encours_stock_finance_global': encours_stock_finance_global,
             'total_paye': total_paye_global,
             'reste_contractuel_global': max(
                 dette_contractuelle_globale - total_paye_global,

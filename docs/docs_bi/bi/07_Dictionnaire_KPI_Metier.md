@@ -493,6 +493,21 @@
   sous-jacente à KPI-401/402) et marge brute (KPI-302) côte à côte, marge brute 6 derniers mois
   (tendance fixe), Top 10 produits CA (KPI-101 Dashboard 2) — pas de nouveaux codes KPI,
   réaffichage classé de métriques existantes sur le mois de référence de la période sélectionnée
+- 28/09/2026 (post-v1, demande mdmaiga) : « Marge par produit » (dashboard Stock/Fournisseur,
+  KPI-506/507) gagne deux colonnes — **Incentive cédée** (`Produit.taux_incentive × quantité
+  vendue`, recalculée depuis `Vente` en Python, pas via `vw_marge_fournisseur` qui ne porte pas la
+  quantité) et **Marge nette** (`marge − incentive cédée`) — la marge réellement disponible après
+  reversement aux agents de vente. Même périmètre assumé que sur la fiche fournisseur direction
+  (`direction/analyses/fournisseurs/detail.html`) : seul le taux dédié au produit est compté, pas
+  le repli au kg (`RegleSalaire.incentive_par_kg`), qui dépend du type d'agent vendeur et non du
+  produit — un produit sans taux dédié affiche 0 sur cette colonne. Implémenté dans
+  `bi/views.py::dashboard_stock`.
+- 28/09/2026 (suite, retour mdmaiga) : les 2 colonnes ajoutées ci-dessus faisaient déborder le
+  tableau « Marge par produit » (scroll horizontal). Colonne « Calibration » retirée des deux
+  tableaux (fournisseur et produit) — le statut (`nb_ajustements`) n'est plus une colonne texte
+  mais un point de couleur (`.bi-dot`, `bi/static/bi/dashboard.css`) devant le nom, vert si
+  calibré/gris sinon (`title=` au survol pour le détail). Même logique de couleur que l'ancien
+  badge, sans la place occupée par le texte.
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de
