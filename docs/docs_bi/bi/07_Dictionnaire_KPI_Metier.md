@@ -508,6 +508,32 @@
   mais un point de couleur (`.bi-dot`, `bi/static/bi/dashboard.css`) devant le nom, vert si
   calibré/gris sinon (`title=` au survol pour le détail). Même logique de couleur que l'ancien
   badge, sans la place occupée par le texte.
+- 28/09/2026 (suite, demande mdmaiga) : même ajout **Incentive cédée / Marge nette** sur le
+  dashboard Produits (`/bi/produits/`, KPI-101 à 106) — grain produit × mois cette fois (pas
+  produit seul), pour matcher `VwRentabiliteProduit` ; recalculé depuis `Vente` groupée par
+  `(produit_id, année, mois)` via `ExtractYear`/`ExtractMonth`, même périmètre assumé (taux dédié
+  uniquement). Colonne « Marge » renommée « Marge brute » pour lever l'ambiguïté avec la nouvelle
+  colonne « Marge nette ».
+  **Barre « Classement des produits par marge » recolorée** : chaque barre (auparavant une seule
+  couleur pleine, proportionnelle à la marge brute) est désormais scindée en 2 segments empilés —
+  marge nette conservée (couleur par défaut) et incentive cédée aux agents « mamies » (`var(
+  --warning)`, orange) — avec une légende au-dessus du graphe. Objectif : rendre visible en un
+  coup d'œil la part de la marge de chaque produit qui part en incentive plutôt que d'être
+  conservée. **Piège technique évité** : les pourcentages de largeur (`bar_pct`, `bar_pct_nette`,
+  `bar_pct_incentive`) sont calculés en Python et formatés en chaîne à point décimal (`f"{x:.2f}"`)
+  avant d'être injectés dans un `style="width:...%"` — les afficher via `{{ }}` sans ce formatage
+  les fait passer par le rendu localisé français de Django (virgule décimale), qui casse
+  silencieusement la valeur CSS (`width:99,70%` invalide, la barre reste vide sans erreur visible).
+  `chart_data`/`_chart_json` de `dashboard_produits` (jamais consommé côté template, code mort)
+  supprimé au passage.
+- 28/09/2026 (suite, retour mdmaiga) : `/bi/produits/` n'avait **aucun filtre période dans
+  l'interface** — `annee`/`mois` ne se pilotaient qu'en tapant l'URL à la main, contrairement à
+  `/bi/stock/` et `/bi/sante/`. Bloc `filtre_periode` ajouté (année + mois, "Toutes périodes"),
+  même gabarit que les autres dashboards. Une fois ce filtre en place, répéter le mois sur chaque
+  ligne du tableau "Détail par produit" est redondant (toutes les lignes partagent le même mois dès
+  qu'un filtre est actif) — colonne "Mois" retirée du tableau, la valeur reste affichée en petit
+  texte gris sous le nom du produit (purement informatif, utile surtout en "Toutes périodes" où
+  plusieurs mois peuvent coexister pour un même produit).
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

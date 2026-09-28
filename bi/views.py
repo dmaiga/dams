@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, F, Max, Sum
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, ExtractMonth, ExtractYear
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -370,18 +370,67 @@ def dashboard_produits(request):
 
     nb_deficitaires = qs.filter(marge__lt=0).values("produit_id").distinct().count()
 
-    chart_data = _chart_json(
-        {
-            "labels": [f"{p.produit_nom} ({p.mois.month:02d}/{p.mois.year})" for p in produits],
-            "marge": [p.marge for p in produits],
-        }
+    # Incentive cédée aux agents de vente ("les mamies"), par produit x mois — même périmètre que
+    # bi/dashboard_stock et direction/analyses/fournisseurs/detail.html : seul le taux dédié au
+    # produit (`Produit.taux_incentive`) est compté, pas le repli au kg par type d'agent. Grain
+    # produit x mois pour matcher `VwRentabiliteProduit` (une ligne par produit et par mois,
+    # plusieurs mois possibles si `mois` n'est pas filtré) — recalculé depuis `Vente`, qui seule
+    # porte la quantité vendue.
+    incentive_qs = Vente.objects.filter(
+        est_supprime=False,
+        detail_distribution__lot__produit__taux_incentive__isnull=False,
     )
+    if annee:
+        incentive_qs = incentive_qs.filter(date_vente__year=annee)
+    if mois:
+        incentive_qs = incentive_qs.filter(date_vente__month=mois)
+
+    incentive_par_produit_mois = {
+        (row["produit_id"], row["annee_v"], row["mois_v"]): row["incentive"]
+        for row in (
+            incentive_qs
+            .annotate(
+                produit_id=F("detail_distribution__lot__produit_id"),
+                annee_v=ExtractYear("date_vente"),
+                mois_v=ExtractMonth("date_vente"),
+            )
+            .values("produit_id", "annee_v", "mois_v")
+            .annotate(
+                incentive=Sum(
+                    F("quantite") * F("detail_distribution__lot__produit__taux_incentive")
+                )
+            )
+        )
+    }
+
+    marge_max = produits[0].marge if produits[0].marge > 0 else None
+    for p in produits:
+        p.incentive_cedee = incentive_par_produit_mois.get(
+            (p.produit_id, p.mois.year, p.mois.month), Decimal("0.00")
+        )
+        p.marge_nette = p.marge - p.incentive_cedee
+
+        # Pré-calcul du graphe empilé : largeur totale de la barre (proportionnelle à la marge
+        # brute max affichée, comme avant), puis répartition en 2 segments — marge nette conservée
+        # vs incentive cédée — pour visualiser la part de la marge qui part aux agents de vente.
+        # Formaté en chaîne à point décimal ("." pas ",") : injecté tel quel dans un style="width:
+        # ...%" CSS, le rendu localisé français de Django (virgule) casserait la valeur CSS.
+        if p.marge > 0 and marge_max:
+            bar_pct = float(p.marge / marge_max * 100)
+            bar_pct_incentive = float(p.incentive_cedee / p.marge) * bar_pct if p.marge else 0
+        else:
+            bar_pct = 2
+            bar_pct_incentive = 0
+        bar_pct_nette = bar_pct - bar_pct_incentive
+        p.a_incentive = bar_pct_incentive > 0
+        p.bar_pct = f"{bar_pct:.2f}"
+        p.bar_pct_incentive = f"{bar_pct_incentive:.2f}"
+        p.bar_pct_nette = f"{bar_pct_nette:.2f}"
 
     context.update(
         {
             "produits": produits,
             "nb_deficitaires": nb_deficitaires,
-            "chart_data": chart_data,
         }
     )
     return render(request, "bi/dashboard_produits.html", context)
