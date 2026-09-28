@@ -48,10 +48,21 @@
                 {% if p.marge < 0 %}
                 <div class="bi-fill bi-rouge" style="width:{{ p.bar_pct }}%" title="Marge : {{ p.marge|fcfa }}"></div>
                 {% else %}
-                <div class="bi-fill" style="width:{{ p.bar_pct_nette }}%" title="Marge nette conservée : {{ p.marge_nette|fcfa }}"></div>
+                <div class="bi-fill" style="width:{{ p.bar_pct_nette }}%; display:flex; align-items:center; justify-content:center; overflow:visible;"
+                     title="Marge nette conservée : {{ p.marge_nette|fcfa }} ({{ p.pct_nette_reel }}%)">
+                    {% if p.label_nette_visible %}
+                    <span style="font-size:9px; font-weight:700; color:#fff; white-space:nowrap;">{{ p.pct_nette_reel }}%</span>
+                    {% endif %}
+                </div>
                 {% if p.a_incentive %}
-                <div class="bi-fill" style="left:{{ p.bar_pct_nette }}%; width:{{ p.bar_pct_incentive }}%; background:var(--warning);"
-                     title="Incentive cédée aux agents : {{ p.incentive_cedee|fcfa }}"></div>
+                <div class="bi-fill" style="left:{{ p.bar_pct_nette }}%; width:{{ p.bar_pct_incentive }}%; background:var(--warning); display:flex; align-items:center; justify-content:center; overflow:visible;"
+                     title="Incentive cédée aux agents : {{ p.incentive_cedee|fcfa }} ({{ p.pct_cedee_reel }}%)">
+                    {% if p.label_incentive_visible %}
+                    <span style="font-size:9px; font-weight:700; color:#fff; white-space:nowrap;">{{ p.pct_cedee_reel }}%</span>
+                    {% else %}
+                    <span style="font-size:9px; font-weight:700; color:var(--warning); white-space:nowrap; position:absolute; left:100%; margin-left:4px;">{{ p.pct_cedee_reel }}%</span>
+                    {% endif %}
+                </div>
                 {% endif %}
                 {% endif %}
             </div>

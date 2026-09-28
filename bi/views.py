@@ -450,6 +450,15 @@ def dashboard_produits(request):
         p.bar_pct_incentive = f"{bar_pct_incentive:.2f}"
         p.bar_pct_nette = f"{bar_pct_nette:.2f}"
 
+        # Pourcentage de la marge cédée en incentive (part réelle, pas la largeur de barre — deux
+        # choses différentes : un petit produit peut céder une grosse part de sa faible marge sans
+        # que son segment soit large à l'écran). Affiché en texte dans le segment quand il est
+        # assez large pour être lisible (seuil sur la largeur réelle du segment, pas sur ce ratio).
+        p.pct_cedee_reel = round(float(p.incentive_cedee / p.marge * 100), 1) if p.marge > 0 else 0
+        p.pct_nette_reel = round(100 - p.pct_cedee_reel, 1) if p.marge > 0 else 0
+        p.label_nette_visible = bar_pct_nette >= 6
+        p.label_incentive_visible = bar_pct_incentive >= 6
+
     context.update(
         {
             "produits": produits,

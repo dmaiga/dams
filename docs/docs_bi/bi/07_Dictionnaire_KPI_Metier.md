@@ -590,6 +590,14 @@
   temps que ceux du tableau — mdmaiga ne visait que le hover du **tableau** (celui-là un test de
   vérification côté calcul) ; celui du **graphe** est un élément de lecture utile et reste en
   place. Seul le hover de la cellule « Cédée » du tableau « Détail par produit » est retiré.
+- 28/09/2026 (suite, retour mdmaiga) : pourcentages affichés **dans** les segments du graphe
+  (pas seulement au survol) — `pct_nette_reel`/`pct_cedee_reel` (`bi/views.py::dashboard_produits`)
+  sont la part réelle de la marge (incentive cédée ÷ marge brute), distincte de la largeur du
+  segment à l'écran (qui dépend de `marge_max`, un petit produit peut céder une grosse part de sa
+  faible marge sans que son segment soit large). Le libellé s'affiche en blanc à l'intérieur du
+  segment quand il est assez large pour rester lisible (seuil 6% de largeur de barre) ; sinon,
+  pour le segment incentive (le chiffre le plus utile), il s'affiche juste après le segment plutôt
+  que d'être supprimé — toujours visible, jamais clippé.
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de
