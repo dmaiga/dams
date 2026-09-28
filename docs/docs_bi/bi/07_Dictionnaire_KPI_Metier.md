@@ -570,6 +570,13 @@
   (`Perte.kilo_perdu_incentive`), contrairement à la paie — l'incentive affichée ici est une borne
   haute légèrement optimiste, jugé acceptable pour un écran d'analyse. Vérifié sur données réelles
   (août 2026) : "ail" passe de `0` à `250` FCFA, "KG pomme de terre" de `0` à `2 250` FCFA.
+- 28/09/2026 (suite, retour mdmaiga) : hover (`title=`, curseur `help`) sur la cellule « Cédée »
+  du tableau « Détail par produit » (`/bi/produits/`) — affiche la formule exacte
+  (`core/services/incentive_service.py::expliquer_incentive_terrain`, appelée avec les mêmes
+  arguments que le calcul du montant, pour qu'elle ne puisse jamais diverger du chiffre affiché).
+  Exemples réels : « 71 unité(s) vendue(s) par les mamies × 25 FCFA/unité (taux dédié au produit)
+  = 1 775 FCFA » (Oignon KG) ou « 90 kg vendus par les mamies × 25 FCFA/kg (repli au kilo, pas de
+  taux dédié) = 2 250 FCFA » (KG pomme de terre).
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

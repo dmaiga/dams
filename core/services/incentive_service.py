@@ -46,3 +46,29 @@ def calculer_incentive_terrain(quantite, kg, taux_incentive, incentive_par_kg):
     if taux_incentive:
         return quantite * taux_incentive
     return kg * incentive_par_kg
+
+
+def _fmt(nombre):
+    """Nombre lisible pour une formule affichee en hover : pas de zeros inutiles, separateur
+    de milliers a l'espace (convention deja utilisee par direction_filters::format_number)."""
+    texte = f"{nombre:,.2f}".rstrip('0').rstrip('.')
+    return texte.replace(',', ' ')
+
+
+def expliquer_incentive_terrain(quantite, kg, taux_incentive, incentive_par_kg):
+    """
+    Formule lisible (pour un `title=` de hover) expliquant le resultat de
+    `calculer_incentive_terrain()` avec les memes arguments — pour que la formule affichee ne
+    puisse jamais diverger du calcul reel.
+    """
+    if taux_incentive:
+        montant = quantite * taux_incentive
+        return (
+            f"{_fmt(quantite)} unite(s) vendue(s) par les mamies x {_fmt(taux_incentive)} "
+            f"FCFA/unite (taux dedie au produit) = {_fmt(montant)} FCFA"
+        )
+    montant = kg * incentive_par_kg
+    return (
+        f"{_fmt(kg)} kg vendus par les mamies x {_fmt(incentive_par_kg)} FCFA/kg "
+        f"(repli au kilo, pas de taux dedie) = {_fmt(montant)} FCFA"
+    )

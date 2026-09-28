@@ -85,7 +85,8 @@
       "Bash(xargs -r kill)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('bi/views.py', encoding='utf-8'\\).read\\(\\)\\)\")",
       "Bash(python -m pytest bi/tests/test_views.py -k \"produits or stock\" -v)",
-      "Bash(python -m pytest bi/tests/test_views.py -v)"
+      "Bash(python -m pytest bi/tests/test_views.py -v)",
+      "Bash(python -m pytest bi/tests/test_views.py -k \"produits\" -v)"
     ],
     "additionalDirectories": [
       "C:\\Users\\Admin\\.local\\bin"
