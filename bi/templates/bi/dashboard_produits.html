@@ -46,12 +46,12 @@
             <div class="bi-rlabel">{{ p.produit_nom }}</div>
             <div class="bi-track">
                 {% if p.marge < 0 %}
-                <div class="bi-fill bi-rouge" style="width:{{ p.bar_pct }}%"></div>
+                <div class="bi-fill bi-rouge" style="width:{{ p.bar_pct }}%" title="Marge : {{ p.marge|fcfa }}"></div>
                 {% else %}
-                <div class="bi-fill" style="width:{{ p.bar_pct_nette }}%"></div>
+                <div class="bi-fill" style="width:{{ p.bar_pct_nette }}%" title="Marge nette conservée : {{ p.marge_nette|fcfa }}"></div>
                 {% if p.a_incentive %}
                 <div class="bi-fill" style="left:{{ p.bar_pct_nette }}%; width:{{ p.bar_pct_incentive }}%; background:var(--warning);"
-                     title="Incentive cédée : {{ p.incentive_cedee|fcfa }}"></div>
+                     title="Incentive cédée aux agents : {{ p.incentive_cedee|fcfa }}"></div>
                 {% endif %}
                 {% endif %}
             </div>
@@ -68,14 +68,13 @@
             <thead>
                 <tr>
                     <th>Produit</th>
-                    <th class="text-right">CA</th>
-                    <th class="text-right">Coût d'achat</th>
-                    <th class="text-right">Marge brute</th>
-                    <th class="text-right">Marge %</th>
-                    <th class="text-right">Incentive cédée</th>
-                    <th class="text-right">Marge nette</th>
                     <th class="text-right">Qté vendue (kg)</th>
-                    <th class="text-right">Rotation stock</th>
+                    <th class="text-right bi-col-sep">Coût d'achat</th>
+                    <th class="text-right">CA</th>
+                    <th class="text-right">Marge brute</th>
+                    <th class="text-right bi-col-sep">Cédée</th>
+                    <th class="text-right">Nette</th>
+                    <th class="text-right">Marge nette %</th>
                 </tr>
             </thead>
             <tbody>
@@ -88,14 +87,13 @@
                         </div>
                         <div class="text-xs" style="color: var(--ink-faint);">{{ p.mois|date:"m/Y" }}</div>
                     </td>
-                    <td class="text-right">{{ p.ca|fcfa }}</td>
-                    <td class="text-right">{{ p.cout_achat|fcfa }}</td>
-                    <td class="text-right">{{ p.marge|fcfa }}</td>
-                    <td class="text-right">{{ p.marge_pct|default_if_none:"—"|format_number }}</td>
-                    <td class="text-right">{{ p.incentive_cedee|fcfa }}</td>
-                    <td class="text-right">{{ p.marge_nette|fcfa }}</td>
                     <td class="text-right">{{ p.quantite_vendue_kg|format_number }}</td>
-                    <td class="text-right">{{ p.rotation_stock|default_if_none:"—"|format_number }}</td>
+                    <td class="text-right bi-col-sep">{{ p.cout_achat|fcfa }}</td>
+                    <td class="text-right">{{ p.ca|fcfa }}</td>
+                    <td class="text-right">{{ p.marge|fcfa }}</td>
+                    <td class="text-right bi-col-sep">{{ p.incentive_cedee|fcfa }}</td>
+                    <td class="text-right" style="font-weight: 700;">{{ p.marge_nette|fcfa }}</td>
+                    <td class="text-right"><span class="bi-badge bi-{{ p.statut_nette }}">{{ p.marge_nette_pct|default_if_none:"—"|format_number }}</span></td>
                 </tr>
                 {% endfor %}
             </tbody>

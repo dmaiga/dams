@@ -339,6 +339,11 @@
 }
 
 .bi-scope table.table tbody tr:last-child td { border-bottom: none; }
+
+/* Sépare visuellement des blocs de colonnes liés (ex. construction du CA vs déductions vs
+   résultat net) sans ajouter de couleur — juste un repère de lecture. */
+.bi-scope table.table th.bi-col-sep,
+.bi-scope table.table td.bi-col-sep { border-left: 1px solid var(--border); }
 .bi-scope table.table tbody tr:nth-child(even) { background: transparent; }
 .bi-scope table.table tbody tr:hover { background: var(--surface); }
 .bi-scope table.table td.text-right, .bi-scope table.table th.text-right { text-align: right; font-family: var(--font-num); }

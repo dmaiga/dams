@@ -534,6 +534,25 @@
   qu'un filtre est actif) — colonne "Mois" retirée du tableau, la valeur reste affichée en petit
   texte gris sous le nom du produit (purement informatif, utile surtout en "Toutes périodes" où
   plusieurs mois peuvent coexister pour un même produit).
+- 28/09/2026 (suite, retour mdmaiga) : graphe "Classement des produits par marge" — un
+  `title=` (hover natif) sur chaque segment de la barre précise marge nette conservée / incentive
+  cédée. Le montant cédé avait d'abord été affiché en clair sous la valeur de marge (deuxième
+  ligne "− X cédés") en plus du hover, puis retiré le jour même sur retour mdmaiga : le total de
+  marge brute suffit en lecture directe, le hover est suffisant pour le détail. Tableau « Détail
+  par produit » réordonné et resserré à la
+  demande de mdmaiga : **Produit, Qté vendue, Coût d'achat, CA, Marge brute, Cédée, Nette, Marge
+  nette %** — colonnes « Marge % » (brute) et « Rotation stock » retirées (pas dans la liste
+  demandée). « Marge nette % » est un nouveau calcul (`marge_nette / ca × 100`), distinct de
+  l'ancien « Marge % » qui rapportait la marge brute au CA.
+- 28/09/2026 (suite, retour mdmaiga — « le tableau n'est pas facile à lire ») : filets verticaux
+  (`.bi-col-sep`, `bi/static/bi/dashboard.css`) séparant 3 blocs logiques — identité/volume,
+  construction du CA (coût → CA → marge brute), puis déduction et résultat net (cédée → nette →
+  %) — sans ajouter de couleur, juste un repère de lecture. Colonne « Nette » en gras (c'est le
+  chiffre qui compte le plus pour la direction, plus que la marge brute qui surestime ce qui est
+  réellement conservé). Badge coloré sur « Marge nette % » recalculé sur la marge **nette**
+  (`statut_marge_produit(marge_nette, marge_nette_pct)`, mêmes seuils que le badge produit
+  existant, qui lui reste sur la marge brute) — un produit à marge brute saine peut afficher un
+  badge net différent si l'incentive en mange une grosse part, c'est le signal recherché.
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

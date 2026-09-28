@@ -409,6 +409,11 @@ def dashboard_produits(request):
             (p.produit_id, p.mois.year, p.mois.month), Decimal("0.00")
         )
         p.marge_nette = p.marge - p.incentive_cedee
+        p.marge_nette_pct = (p.marge_nette / p.ca * 100) if p.ca else None
+        # Statut de la colonne qui compte vraiment pour la lecture directe (retour mdmaiga,
+        # 28/09/2026) : un produit peut avoir une marge brute saine mais une marge nette dégradée
+        # une fois l'incentive déduite — le badge doit refléter ça, pas la seule marge brute.
+        p.statut_nette = constants.statut_marge_produit(p.marge_nette, p.marge_nette_pct)
 
         # Pré-calcul du graphe empilé : largeur totale de la barre (proportionnelle à la marge
         # brute max affichée, comme avant), puis répartition en 2 segments — marge nette conservée
