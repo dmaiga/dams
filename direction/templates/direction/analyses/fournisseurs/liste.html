@@ -119,17 +119,16 @@
                     </td>
 
                     <!-- Livré -->
-                    <!-- Livré -->
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">
                             {{ item.quantite_livree|floatformat:0 }} <span class="text-xs text-gray-400">Qté</span>
                         </div>
-                    
+
                     </td>
 
 
-                                        <!-- Vendu -->
-                    <td class="px-6 py-4 text-right">
+                    <!-- Vendu -->
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">
                         {{ item.quantite_ecoulee|floatformat:0 }} <span class="text-xs text-gray-400">Qté</span>
                     </div>
@@ -141,17 +140,17 @@
                     
 
                     <!-- Dette contractuelle -->
-                    <td class="px-6 py-4 text-right font-semibold text-gray-900 border-l">
+                    <td class="px-6 py-4 text-right font-semibold text-gray-900 border-l whitespace-nowrap">
                          {{ item.dette_contractuelle|fcfa }}
                     </td>
 
                     <!-- Encours de stock financé -->
-                    <td class="px-6 py-4 text-right text-gray-700">
+                    <td class="px-6 py-4 text-right text-gray-700 whitespace-nowrap">
                         {{ item.encours_stock_finance|fcfa }}
                     </td>
 
                     <!-- Payé -->
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
                         <div class="font-semibold text-gray-900">
                             {{ item.total_paye|fcfa }}
                         </div>
@@ -159,7 +158,7 @@
                     </td>
 
                     <!-- Reste contractuel -->
-                    <td class="px-6 py-4 text-right">
+                    <td class="px-6 py-4 text-right whitespace-nowrap">
                         <div class="font-semibold {% if item.reste_contractuel > 0 %}text-red-600{% else %}text-green-600{% endif %}">
                             {{ item.reste_contractuel|fcfa }}
                         </div>

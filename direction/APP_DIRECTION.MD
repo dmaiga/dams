@@ -705,3 +705,10 @@ comportement inchangé pour qui ne clique rien). Le tri est appliqué dans `Deta
 valeur calculée après agrégation (dette contractuelle moins paiements), inexistante comme colonne à
 trier côté base. Le formulaire de filtre par période conserve `tri`/`ordre` en champs cachés pour ne
 pas réinitialiser le tri choisi à chaque changement de période.
+
+**Bug corrigé — montants qui retombent sur 2 lignes (28/09/2026, retour mdmaiga)** : sur
+`direction/analyses/fournisseurs/liste.html`, les colonnes Livré/Vendu/Dette contractuelle/Encours
+de stock financé/Payé/Reste n'avaient pas `whitespace-nowrap` — un montant FCFA élevé (le filtre
+`fcfa` insère des espaces comme séparateur de milliers) pouvait donc se couper sur deux lignes dans
+une cellule de tableau Tailwind (`px-6 py-4`, pas de `nowrap` par défaut contrairement au CSS des
+tableaux BI qui l'applique globalement). Classe `whitespace-nowrap` ajoutée à ces 6 colonnes.

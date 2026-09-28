@@ -585,6 +585,9 @@
   confirmé plus haut), l'écart de 2 est donc attendu. Le hover est retiré (son but était de
   vérifier le calcul, pas de rester en usage courant) — `expliquer_incentive_terrain`
   (`core/services/incentive_service.py`) est retirée avec lui, aucun autre appelant.
+- 28/09/2026 (suite) : les `title=` restants sur le graphe "Classement des produits par marge"
+  (segments de barre marge nette / incentive cédée) retirés au même titre — même retour mdmaiga,
+  c'était un test de vérification côté calcul, pas un élément d'UI à garder.
 
 Ces KPI changent la façon de voir la performance : on n'aura pas juste "qui vend", mais "qui
 atteint l'objectif fixe de l'entreprise" — et, depuis le 24/07, "quelle équipe vend le plus de

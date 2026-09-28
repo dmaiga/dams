@@ -46,12 +46,11 @@
             <div class="bi-rlabel">{{ p.produit_nom }}</div>
             <div class="bi-track">
                 {% if p.marge < 0 %}
-                <div class="bi-fill bi-rouge" style="width:{{ p.bar_pct }}%" title="Marge : {{ p.marge|fcfa }}"></div>
+                <div class="bi-fill bi-rouge" style="width:{{ p.bar_pct }}%"></div>
                 {% else %}
-                <div class="bi-fill" style="width:{{ p.bar_pct_nette }}%" title="Marge nette conservée : {{ p.marge_nette|fcfa }}"></div>
+                <div class="bi-fill" style="width:{{ p.bar_pct_nette }}%"></div>
                 {% if p.a_incentive %}
-                <div class="bi-fill" style="left:{{ p.bar_pct_nette }}%; width:{{ p.bar_pct_incentive }}%; background:var(--warning);"
-                     title="Incentive cédée aux agents : {{ p.incentive_cedee|fcfa }}"></div>
+                <div class="bi-fill" style="left:{{ p.bar_pct_nette }}%; width:{{ p.bar_pct_incentive }}%; background:var(--warning);"></div>
                 {% endif %}
                 {% endif %}
             </div>
