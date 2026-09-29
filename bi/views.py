@@ -699,7 +699,17 @@ def dashboard_agents(request):
     return render(request, "bi/dashboard_agents.html", context)
 
 
-DATE_DEBUT_SOUS_PERFORMANCE = date(2026, 8, 1)
+NB_MOIS_SOUS_PERFORMANCE = 4
+
+
+def _derniers_mois(n, aujourdhui):
+    """Les n derniers mois (annee, mois), du plus ancien au plus récent, mois en cours inclus."""
+    resultat = []
+    annee, mois = aujourdhui.year, aujourdhui.month
+    for _ in range(n):
+        resultat.append((annee, mois))
+        annee, mois = (annee - 1, 12) if mois == 1 else (annee, mois - 1)
+    return list(reversed(resultat))
 
 
 def _anciennete_libelle(date_debut, aujourdhui):
@@ -720,19 +730,25 @@ def _anciennete_libelle(date_debut, aujourdhui):
 
 
 def _agents_sous_performants_par_superviseur(request):
-    """Agents sous-performants (moyenne < SEUIL_KG_JOUR_FAIBLE kg/jour), regroupés par
-    superviseur, sur la période fixe DATE_DEBUT_SOUS_PERFORMANCE → aujourd'hui (correction
-    29/09/2026 : la moyenne doit porter sur toute la période, pas sur un seul mois choisi via le
-    filtre du dashboard). VwPerformanceAgent est à grain agent x mois ; on agrège kg_vendus et
-    jours_ouvres sur tous les mois de la période pour chaque agent. Pour le mois en cours
-    (encore partiel), jours_ouvres stocké sur la vue compte tout le mois calendaire, y compris
-    les jours futurs — on le recalcule donc sur les seuls jours écoulés (_jours_ouvres_dans_periode)
-    pour ne pas fausser la moyenne à la baisse en cours de mois."""
+    """Agents sous-performants sur le mois en cours (< SEUIL_KG_JOUR_FAIBLE kg/jour), regroupés
+    par superviseur, avec la tendance des NB_MOIS_SOUS_PERFORMANCE-1 mois précédents pour le
+    contexte (correction 30/09/2026, demande mdmaiga — remplace la moyenne unique sur toute la
+    période par une vue mois par mois : le but est de voir si une sous-performance est
+    ponctuelle ou installée, pas de la masquer dans une moyenne). L'objectif individuel de
+    référence reste 50 kg/jour (statut_objectif_50kg) ; le seuil de 8 kg/jour ne sert qu'à
+    repérer les cas de grande difficulté sur le mois en cours.
+    jours_ouvres du mois en cours (encore partiel) est recalculé sur les seuls jours écoulés
+    (_jours_ouvres_dans_periode), pas celui stocké sur VwPerformanceAgent qui compte tout le mois
+    calendaire — sinon sa moyenne serait faussée à la baisse en cours de mois. Un mois antérieur à
+    l'embauche de l'agent (date_debut_fonction) est affiché "—", pas 0 : VwPerformanceAgent
+    produit quand même une ligne à 0 pour ces mois (produit cartésien agents actifs x mois
+    actifs de l'entreprise), qui ne reflète pas une sous-performance réelle de l'agent."""
     aujourdhui = timezone.now().date()
+    mois_periode = _derniers_mois(NB_MOIS_SOUS_PERFORMANCE, aujourdhui)
+    mois_courant_cle = (aujourdhui.year, aujourdhui.month)
 
     agents_qs = VwPerformanceAgent.objects.filter(
-        mois__gte=DATE_DEBUT_SOUS_PERFORMANCE,
-        mois__lte=date(aujourdhui.year, aujourdhui.month, 1),
+        mois__in=[date(annee, mois, 1) for annee, mois in mois_periode]
     )
 
     type_agent_filtre = request.GET.get("type_agent")
@@ -753,48 +769,62 @@ def _agents_sous_performants_par_superviseur(request):
             "agent_id": ligne.agent_id,
             "nom_complet": ligne.nom_complet,
             "superviseur_nom": ligne.superviseur_nom,
-            "kg_vendus_total": Decimal("0"),
-            "jours_ouvres_total": 0,
+            "kg_par_jour_par_mois": {},
         })
-        est_mois_courant = (
-            ligne.mois.year == aujourdhui.year and ligne.mois.month == aujourdhui.month
-        )
+        cle_mois = (ligne.mois.year, ligne.mois.month)
         jours_ouvres_mois = (
-            jours_ouvres_mois_courant if est_mois_courant else (ligne.jours_ouvres or 0)
+            jours_ouvres_mois_courant if cle_mois == mois_courant_cle else (ligne.jours_ouvres or 0)
         )
-        bloc["kg_vendus_total"] += ligne.kg_vendus or Decimal("0")
-        bloc["jours_ouvres_total"] += jours_ouvres_mois
-
-    agents = []
-    for bloc in agg.values():
         kg_par_jour = (
-            bloc["kg_vendus_total"] / bloc["jours_ouvres_total"]
-            if bloc["jours_ouvres_total"] > 0
+            (ligne.kg_vendus or Decimal("0")) / jours_ouvres_mois
+            if jours_ouvres_mois > 0
             else Decimal("0")
         )
-        if kg_par_jour >= constants.SEUIL_KG_JOUR_FAIBLE:
-            continue
-        bloc["kg_par_jour"] = kg_par_jour
-        agents.append(bloc)
+        bloc["kg_par_jour_par_mois"][cle_mois] = kg_par_jour
 
-    agents.sort(key=lambda a: a["kg_par_jour"])
-
-    # Ancienneté : date_debut_fonction si renseignée, sinon date_creation de l'agent en repli —
-    # VwPerformanceAgent n'a que agent_id, une requête dédiée est nécessaire sur core.Agent.
+    # Ancienneté / date de début : date_debut_fonction si renseignée, sinon date_creation de
+    # l'agent en repli — VwPerformanceAgent n'a que agent_id, une requête dédiée est nécessaire
+    # sur core.Agent.
     dates_agents = {
         agent_id: (date_debut_fonction, date_creation)
         for agent_id, date_debut_fonction, date_creation in Agent.objects.filter(
-            id__in=[a["agent_id"] for a in agents]
+            id__in=list(agg.keys())
         ).values_list("id", "date_debut_fonction", "date_creation")
     }
-    for a in agents:
-        info = dates_agents.get(a["agent_id"])
+
+    agents = []
+    for bloc in agg.values():
+        kg_par_jour_courant = bloc["kg_par_jour_par_mois"].get(mois_courant_cle)
+        if kg_par_jour_courant is None or kg_par_jour_courant >= constants.SEUIL_KG_JOUR_FAIBLE:
+            continue
+
+        info = dates_agents.get(bloc["agent_id"])
         date_debut = None
         if info:
             date_debut_fonction, date_creation = info
             date_debut = date_debut_fonction or (date_creation.date() if date_creation else None)
-        a["date_debut"] = date_debut
-        a["anciennete_libelle"] = _anciennete_libelle(date_debut, aujourdhui)
+
+        colonnes_mois = []
+        for annee, mois in mois_periode:
+            fin_mois = date(annee, mois, calendar.monthrange(annee, mois)[1])
+            avant_embauche = date_debut and date_debut > fin_mois
+            valeur = None if avant_embauche else bloc["kg_par_jour_par_mois"].get((annee, mois))
+            colonnes_mois.append({
+                "libelle": f"{MOIS_FR[mois]} {annee}",
+                "kg_par_jour": valeur,
+            })
+
+        agents.append({
+            "agent_id": bloc["agent_id"],
+            "nom_complet": bloc["nom_complet"],
+            "superviseur_nom": bloc["superviseur_nom"],
+            "date_debut": date_debut,
+            "anciennete_libelle": _anciennete_libelle(date_debut, aujourdhui),
+            "kg_par_jour_courant": kg_par_jour_courant,
+            "colonnes_mois": colonnes_mois,
+        })
+
+    agents.sort(key=lambda a: a["kg_par_jour_courant"])
 
     groupes_par_superviseur = {}
     for a in agents:
@@ -805,32 +835,39 @@ def _agents_sous_performants_par_superviseur(request):
         {"superviseur_nom": nom, "agents": agents_du_groupe}
         for nom, agents_du_groupe in sorted(groupes_par_superviseur.items(), key=lambda kv: kv[0])
     ]
-    return groupes, DATE_DEBUT_SOUS_PERFORMANCE, aujourdhui
+    libelles_mois = [f"{MOIS_FR[mois]} {annee}" for annee, mois in mois_periode]
+    return groupes, libelles_mois, mois_periode
 
 
 @bi_access_required
 def export_agents_sous_objectif_excel(request):
-    groupes, date_debut, date_fin = _agents_sous_performants_par_superviseur(request)
-    buffer = AgentsSousObjectifExportService.export_excel(groupes, date_debut, date_fin)
+    groupes, libelles_mois, mois_periode = _agents_sous_performants_par_superviseur(request)
+    buffer = AgentsSousObjectifExportService.export_excel(groupes, libelles_mois)
 
+    annee_debut, mois_debut = mois_periode[0]
+    annee_fin, mois_fin = mois_periode[-1]
     response = HttpResponse(
         buffer,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = (
-        f"attachment; filename=agents_sous_performants_{date_debut}_{date_fin}.xlsx"
+        f"attachment; filename=agents_sous_performants_{annee_debut}-{mois_debut:02d}_"
+        f"{annee_fin}-{mois_fin:02d}.xlsx"
     )
     return response
 
 
 @bi_access_required
 def export_agents_sous_objectif_pdf(request):
-    groupes, date_debut, date_fin = _agents_sous_performants_par_superviseur(request)
-    buffer = AgentsSousObjectifExportService.export_pdf(groupes, date_debut, date_fin)
+    groupes, libelles_mois, mois_periode = _agents_sous_performants_par_superviseur(request)
+    buffer = AgentsSousObjectifExportService.export_pdf(groupes, libelles_mois)
 
+    annee_debut, mois_debut = mois_periode[0]
+    annee_fin, mois_fin = mois_periode[-1]
     response = HttpResponse(buffer, content_type="application/pdf")
     response["Content-Disposition"] = (
-        f"attachment; filename=agents_sous_performants_{date_debut}_{date_fin}.pdf"
+        f"attachment; filename=agents_sous_performants_{annee_debut}-{mois_debut:02d}_"
+        f"{annee_fin}-{mois_fin:02d}.pdf"
     )
     return response
 

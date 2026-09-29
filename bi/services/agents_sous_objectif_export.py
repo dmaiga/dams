@@ -10,7 +10,13 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from bi.constants import SEUIL_KG_JOUR_FAIBLE
 
-HEADERS = ["Agent", "Date de début", "Ancienneté", "Kg/jour"]
+HEADERS_FIXES = ["Agent", "Date de début", "Ancienneté"]
+
+
+def _valeur_kg_jour(kg_par_jour):
+    if kg_par_jour is None:
+        return "—"
+    return round(float(kg_par_jour), 2)
 
 
 def _ligne(agent):
@@ -18,18 +24,23 @@ def _ligne(agent):
         agent["nom_complet"],
         agent["date_debut"].strftime("%d/%m/%Y") if agent["date_debut"] else "—",
         agent["anciennete_libelle"],
-        round(float(agent["kg_par_jour"]), 2),
-    ]
+    ] + [_valeur_kg_jour(col["kg_par_jour"]) for col in agent["colonnes_mois"]]
 
 
 class AgentsSousObjectifExportService:
-    """Export des agents sous-performants (moyenne < SEUIL_KG_JOUR_FAIBLE kg/jour sur la
-    période sélectionnée), regroupés par superviseur (correction 29/09/2026, demande mdmaiga) —
-    `groupes` vient de bi.views._agents_sous_performants_par_superviseur, déjà trié par
-    superviseur puis par kg/jour croissant à l'intérieur de chaque groupe."""
+    """Export des agents sous-performants sur le mois en cours (< SEUIL_KG_JOUR_FAIBLE kg/jour),
+    regroupés par superviseur, avec une colonne kg/jour par mois sur les NB_MOIS_SOUS_PERFORMANCE
+    derniers mois pour voir l'évolution plutôt qu'une seule moyenne (correction 30/09/2026,
+    demande mdmaiga). `groupes` et `libelles_mois` viennent de
+    bi.views._agents_sous_performants_par_superviseur — libelles_mois est déjà dans l'ordre du
+    plus ancien au plus récent (mois en cours en dernier), même ordre que
+    agent["colonnes_mois"]. "—" = agent pas encore embauché ce mois-là (à distinguer de 0 kg/j,
+    une vraie sous-performance)."""
 
     @staticmethod
-    def export_excel(groupes, date_debut, date_fin):
+    def export_excel(groupes, libelles_mois):
+        headers = HEADERS_FIXES + [f"{libelle} (kg/j)" for libelle in libelles_mois]
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Agents sous seuil"
@@ -38,19 +49,22 @@ class AgentsSousObjectifExportService:
             ws.append([f"Superviseur : {groupe['superviseur_nom']}"])
             ws.cell(row=ws.max_row, column=1).font = Font(bold=True, size=12)
 
-            ws.append(HEADERS)
-            for col in range(1, len(HEADERS) + 1):
+            ws.append(headers)
+            for col in range(1, len(headers) + 1):
                 ws.cell(row=ws.max_row, column=col).font = Font(bold=True)
 
             for agent in groupe["agents"]:
                 ws.append(_ligne(agent))
-                ws.cell(row=ws.max_row, column=len(HEADERS)).number_format = "0.00"
+                for col in range(len(HEADERS_FIXES) + 1, len(headers) + 1):
+                    cellule = ws.cell(row=ws.max_row, column=col)
+                    if isinstance(cellule.value, (int, float)):
+                        cellule.number_format = "0.00"
 
             ws.append([])
 
-        largeurs = (28, 16, 22, 12)
-        for col, largeur in zip("ABCD", largeurs):
-            ws.column_dimensions[col].width = largeur
+        largeurs = [28, 16, 22] + [16] * len(libelles_mois)
+        for col, largeur in zip(ws.columns, largeurs):
+            ws.column_dimensions[col[0].column_letter].width = largeur
 
         buffer = BytesIO()
         wb.save(buffer)
@@ -58,7 +72,9 @@ class AgentsSousObjectifExportService:
         return buffer
 
     @staticmethod
-    def export_pdf(groupes, date_debut, date_fin):
+    def export_pdf(groupes, libelles_mois):
+        headers = HEADERS_FIXES + [f"{libelle} (kg/j)" for libelle in libelles_mois]
+
         buffer = BytesIO()
         doc = SimpleDocTemplate(
             buffer,
@@ -67,11 +83,13 @@ class AgentsSousObjectifExportService:
         )
 
         styles = getSampleStyleSheet()
+        mois_courant_libelle = libelles_mois[-1] if libelles_mois else ""
         elements = [
             Paragraph("<b>Agents sous-performants</b>", styles["Title"]),
             Paragraph(
-                f"Agents dont la moyenne de vente est inférieure à {SEUIL_KG_JOUR_FAIBLE} kg/jour "
-                f"sur la période du {date_debut:%d/%m/%Y} au {date_fin:%d/%m/%Y}.",
+                f"Agents dont la moyenne de vente sur {mois_courant_libelle} (mois en cours) est "
+                f"inférieure à {SEUIL_KG_JOUR_FAIBLE} kg/jour, avec la tendance des mois "
+                f"précédents. Objectif individuel de référence : 50 kg/jour.",
                 styles["Normal"],
             ),
             Spacer(1, 12),
@@ -80,7 +98,7 @@ class AgentsSousObjectifExportService:
         for groupe in groupes:
             elements.append(Paragraph(f"<b>{groupe['superviseur_nom']}</b>", styles["Heading2"]))
 
-            data = [HEADERS] + [_ligne(agent) for agent in groupe["agents"]]
+            data = [headers] + [_ligne(agent) for agent in groupe["agents"]]
             table = Table(data, repeatRows=1)
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),

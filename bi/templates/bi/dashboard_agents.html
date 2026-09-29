@@ -70,7 +70,7 @@
 
 <div class="bi-panel">
     <div class="flex justify-between items-center flex-wrap gap-2">
-        <h3>Extraction des agents sous-performants (&lt; 8 kg/j, depuis le 01/08/2026)</h3>
+        <h3>Extraction des agents sous-performants (&lt; 8 kg/j sur le mois en cours, tendance sur 4 mois)</h3>
         <div class="flex gap-2">
             <a class="btn btn-sm btn-outline" href="{% url 'bi:export_agents_sous_objectif_excel' %}?type_agent={{ type_agent_filtre|default:"" }}&superviseur={{ superviseur_filtre|default:"" }}">Excel</a>
             <a class="btn btn-sm btn-outline" href="{% url 'bi:export_agents_sous_objectif_pdf' %}?type_agent={{ type_agent_filtre|default:"" }}&superviseur={{ superviseur_filtre|default:"" }}">PDF</a>
