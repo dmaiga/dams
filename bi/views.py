@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
+from dateutil.relativedelta import relativedelta
 from django.contrib.auth.decorators import user_passes_test
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models import Count, F, Max, Q, Sum
@@ -698,18 +699,41 @@ def dashboard_agents(request):
     return render(request, "bi/dashboard_agents.html", context)
 
 
-def _agents_sous_objectif(request):
-    """Agents en dessous de SEUIL_KG_JOUR_FAIBLE, pour l'export PDF/Excel de dashboard_agents
-    (demande mdmaiga 24/09/2026). Uniquement en granularité mois (pas de sens à un seuil
-    "kg/jour/mois" en semaine) — mêmes filtres période/type_agent/superviseur que le dashboard,
-    calcul kg_par_jour identique à celui déjà stocké sur VwPerformanceAgent."""
-    annee, mois, _ = _parse_periode(request)
-    if not annee or not mois:
-        annee, mois = _dernier_mois_disponible()
+DATE_DEBUT_SOUS_PERFORMANCE = date(2026, 8, 1)
+
+
+def _anciennete_libelle(date_debut, aujourdhui):
+    """Formate une ancienneté en "X mois et Y jours" plutôt qu'un nombre de jours brut (demande
+    mdmaiga, correction 29/09/2026) — plus lisible pour un responsable métier."""
+    if not date_debut:
+        return "—"
+    rd = relativedelta(aujourdhui, date_debut)
+    total_mois = rd.years * 12 + rd.months
+    jours = rd.days
+    if total_mois == 0 and jours == 0:
+        return "Aujourd'hui"
+    if total_mois == 0:
+        return f"{jours} jour{'s' if jours > 1 else ''}"
+    if jours == 0:
+        return f"{total_mois} mois"
+    return f"{total_mois} mois et {jours} jour{'s' if jours > 1 else ''}"
+
+
+def _agents_sous_performants_par_superviseur(request):
+    """Agents sous-performants (moyenne < SEUIL_KG_JOUR_FAIBLE kg/jour), regroupés par
+    superviseur, sur la période fixe DATE_DEBUT_SOUS_PERFORMANCE → aujourd'hui (correction
+    29/09/2026 : la moyenne doit porter sur toute la période, pas sur un seul mois choisi via le
+    filtre du dashboard). VwPerformanceAgent est à grain agent x mois ; on agrège kg_vendus et
+    jours_ouvres sur tous les mois de la période pour chaque agent. Pour le mois en cours
+    (encore partiel), jours_ouvres stocké sur la vue compte tout le mois calendaire, y compris
+    les jours futurs — on le recalcule donc sur les seuls jours écoulés (_jours_ouvres_dans_periode)
+    pour ne pas fausser la moyenne à la baisse en cours de mois."""
+    aujourdhui = timezone.now().date()
 
     agents_qs = VwPerformanceAgent.objects.filter(
-        mois__year=annee, mois__month=mois, kg_par_jour__lt=constants.SEUIL_KG_JOUR_FAIBLE
-    ).order_by("kg_par_jour")
+        mois__gte=DATE_DEBUT_SOUS_PERFORMANCE,
+        mois__lte=date(aujourdhui.year, aujourdhui.month, 1),
+    )
 
     type_agent_filtre = request.GET.get("type_agent")
     if type_agent_filtre:
@@ -719,55 +743,94 @@ def _agents_sous_objectif(request):
     if superviseur_filtre:
         agents_qs = agents_qs.filter(superviseur_id=superviseur_filtre)
 
-    agents = list(agents_qs)
-    for a in agents:
-        a.jours_label = f"{a.jours_actifs}/{a.jours_ouvres}" if a.jours_ouvres else "—"
+    jours_ouvres_mois_courant = _jours_ouvres_dans_periode(
+        date(aujourdhui.year, aujourdhui.month, 1), aujourdhui
+    )
 
-    # Ancienneté (demande mdmaiga 24/09/2026) : date_debut_fonction si renseignée, sinon
-    # date_creation de l'agent en repli — VwPerformanceAgent n'a que agent_id, une requête
-    # dédiée est nécessaire pour récupérer ces deux champs sur core.Agent.
+    agg = {}
+    for ligne in agents_qs:
+        bloc = agg.setdefault(ligne.agent_id, {
+            "agent_id": ligne.agent_id,
+            "nom_complet": ligne.nom_complet,
+            "superviseur_nom": ligne.superviseur_nom,
+            "kg_vendus_total": Decimal("0"),
+            "jours_ouvres_total": 0,
+        })
+        est_mois_courant = (
+            ligne.mois.year == aujourdhui.year and ligne.mois.month == aujourdhui.month
+        )
+        jours_ouvres_mois = (
+            jours_ouvres_mois_courant if est_mois_courant else (ligne.jours_ouvres or 0)
+        )
+        bloc["kg_vendus_total"] += ligne.kg_vendus or Decimal("0")
+        bloc["jours_ouvres_total"] += jours_ouvres_mois
+
+    agents = []
+    for bloc in agg.values():
+        kg_par_jour = (
+            bloc["kg_vendus_total"] / bloc["jours_ouvres_total"]
+            if bloc["jours_ouvres_total"] > 0
+            else Decimal("0")
+        )
+        if kg_par_jour >= constants.SEUIL_KG_JOUR_FAIBLE:
+            continue
+        bloc["kg_par_jour"] = kg_par_jour
+        agents.append(bloc)
+
+    agents.sort(key=lambda a: a["kg_par_jour"])
+
+    # Ancienneté : date_debut_fonction si renseignée, sinon date_creation de l'agent en repli —
+    # VwPerformanceAgent n'a que agent_id, une requête dédiée est nécessaire sur core.Agent.
     dates_agents = {
         agent_id: (date_debut_fonction, date_creation)
         for agent_id, date_debut_fonction, date_creation in Agent.objects.filter(
-            id__in=[a.agent_id for a in agents]
+            id__in=[a["agent_id"] for a in agents]
         ).values_list("id", "date_debut_fonction", "date_creation")
     }
-    today = timezone.now().date()
     for a in agents:
-        info = dates_agents.get(a.agent_id)
+        info = dates_agents.get(a["agent_id"])
         date_debut = None
         if info:
             date_debut_fonction, date_creation = info
             date_debut = date_debut_fonction or (date_creation.date() if date_creation else None)
-        a.date_debut_fonction_export = date_debut
-        a.anciennete_jours = (today - date_debut).days if date_debut else None
+        a["date_debut"] = date_debut
+        a["anciennete_libelle"] = _anciennete_libelle(date_debut, aujourdhui)
 
-    return agents, annee, mois
+    groupes_par_superviseur = {}
+    for a in agents:
+        nom_superviseur = a["superviseur_nom"] or "Sans superviseur"
+        groupes_par_superviseur.setdefault(nom_superviseur, []).append(a)
+
+    groupes = [
+        {"superviseur_nom": nom, "agents": agents_du_groupe}
+        for nom, agents_du_groupe in sorted(groupes_par_superviseur.items(), key=lambda kv: kv[0])
+    ]
+    return groupes, DATE_DEBUT_SOUS_PERFORMANCE, aujourdhui
 
 
 @bi_access_required
 def export_agents_sous_objectif_excel(request):
-    agents, annee, mois = _agents_sous_objectif(request)
-    buffer = AgentsSousObjectifExportService.export_excel(agents)
+    groupes, date_debut, date_fin = _agents_sous_performants_par_superviseur(request)
+    buffer = AgentsSousObjectifExportService.export_excel(groupes, date_debut, date_fin)
 
     response = HttpResponse(
         buffer,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = (
-        f"attachment; filename=agents_sous_objectif_{annee}-{mois:02d}.xlsx"
+        f"attachment; filename=agents_sous_performants_{date_debut}_{date_fin}.xlsx"
     )
     return response
 
 
 @bi_access_required
 def export_agents_sous_objectif_pdf(request):
-    agents, annee, mois = _agents_sous_objectif(request)
-    buffer = AgentsSousObjectifExportService.export_pdf(agents)
+    groupes, date_debut, date_fin = _agents_sous_performants_par_superviseur(request)
+    buffer = AgentsSousObjectifExportService.export_pdf(groupes, date_debut, date_fin)
 
     response = HttpResponse(buffer, content_type="application/pdf")
     response["Content-Disposition"] = (
-        f"attachment; filename=agents_sous_objectif_{annee}-{mois:02d}.pdf"
+        f"attachment; filename=agents_sous_performants_{date_debut}_{date_fin}.pdf"
     )
     return response
 

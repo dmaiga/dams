@@ -10,47 +10,47 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from bi.constants import SEUIL_KG_JOUR_FAIBLE
 
-HEADERS = ["Agent", "Superviseur", "Jours actifs", "Kg vendus", "Kg/jour", "Date début", "Ancienneté (j)"]
+HEADERS = ["Agent", "Date de début", "Ancienneté", "Kg/jour"]
 
 
-def _ligne(a):
+def _ligne(agent):
     return [
-        a.nom_complet,
-        a.superviseur_nom or "—",
-        a.jours_label,
-        float(a.kg_vendus or 0),
-        float(a.kg_par_jour or 0),
-        a.date_debut_fonction_export.strftime("%d/%m/%Y") if a.date_debut_fonction_export else "—",
-        a.anciennete_jours if a.anciennete_jours is not None else "—",
+        agent["nom_complet"],
+        agent["date_debut"].strftime("%d/%m/%Y") if agent["date_debut"] else "—",
+        agent["anciennete_libelle"],
+        round(float(agent["kg_par_jour"]), 2),
     ]
 
 
 class AgentsSousObjectifExportService:
-    """Export des agents dont la moyenne de vente est en dessous du seuil
-    SEUIL_KG_JOUR_FAIBLE (dashboard bi:agents, demande mdmaiga 24/09/2026) —
-    même liste que celle affichée à l'écran (filtres période/superviseur/type
-    déjà appliqués en amont par la vue)."""
+    """Export des agents sous-performants (moyenne < SEUIL_KG_JOUR_FAIBLE kg/jour sur la
+    période sélectionnée), regroupés par superviseur (correction 29/09/2026, demande mdmaiga) —
+    `groupes` vient de bi.views._agents_sous_performants_par_superviseur, déjà trié par
+    superviseur puis par kg/jour croissant à l'intérieur de chaque groupe."""
 
     @staticmethod
-    def export_excel(agents):
+    def export_excel(groupes, date_debut, date_fin):
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Agents sous seuil"
 
-        ws.append(HEADERS)
-        for col in range(1, len(HEADERS) + 1):
-            ws.cell(row=1, column=col).font = Font(bold=True)
+        for groupe in groupes:
+            ws.append([f"Superviseur : {groupe['superviseur_nom']}"])
+            ws.cell(row=ws.max_row, column=1).font = Font(bold=True, size=12)
 
-        for a in agents:
-            ws.append(_ligne(a))
+            ws.append(HEADERS)
+            for col in range(1, len(HEADERS) + 1):
+                ws.cell(row=ws.max_row, column=col).font = Font(bold=True)
 
-        ws.column_dimensions["A"].width = 28
-        ws.column_dimensions["B"].width = 22
-        ws.column_dimensions["C"].width = 14
-        ws.column_dimensions["D"].width = 14
-        ws.column_dimensions["E"].width = 12
-        ws.column_dimensions["F"].width = 14
-        ws.column_dimensions["G"].width = 16
+            for agent in groupe["agents"]:
+                ws.append(_ligne(agent))
+                ws.cell(row=ws.max_row, column=len(HEADERS)).number_format = "0.00"
+
+            ws.append([])
+
+        largeurs = (28, 16, 22, 12)
+        for col, largeur in zip("ABCD", largeurs):
+            ws.column_dimensions[col].width = largeur
 
         buffer = BytesIO()
         wb.save(buffer)
@@ -58,37 +58,41 @@ class AgentsSousObjectifExportService:
         return buffer
 
     @staticmethod
-    def export_pdf(agents):
+    def export_pdf(groupes, date_debut, date_fin):
         buffer = BytesIO()
         doc = SimpleDocTemplate(
             buffer,
             pagesize=landscape(A4),
-            title="Agents sous le seuil",
+            title="Agents sous-performants",
         )
 
         styles = getSampleStyleSheet()
         elements = [
-            Paragraph("<b>Agents en dessous de la moyenne de vente</b>", styles["Title"]),
+            Paragraph("<b>Agents sous-performants</b>", styles["Title"]),
             Paragraph(
                 f"Agents dont la moyenne de vente est inférieure à {SEUIL_KG_JOUR_FAIBLE} kg/jour "
-                "sur la période sélectionnée.",
+                f"sur la période du {date_debut:%d/%m/%Y} au {date_fin:%d/%m/%Y}.",
                 styles["Normal"],
             ),
             Spacer(1, 12),
         ]
 
-        data = [HEADERS] + [_ligne(a) for a in agents]
-        table = Table(data, repeatRows=1)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-        ]))
-        elements.append(table)
+        for groupe in groupes:
+            elements.append(Paragraph(f"<b>{groupe['superviseur_nom']}</b>", styles["Heading2"]))
+
+            data = [HEADERS] + [_ligne(agent) for agent in groupe["agents"]]
+            table = Table(data, repeatRows=1)
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
+            ]))
+            elements.append(table)
+            elements.append(Spacer(1, 14))
 
         doc.build(elements)
         buffer.seek(0)
