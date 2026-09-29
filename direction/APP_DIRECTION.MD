@@ -70,9 +70,24 @@ sélectionnée à l'écran (`SuperviseurAgentsService.resolve_period`).
 
 Organisation en deux niveaux, pour retracer un produit de sa réception jusqu'à sa vente :
 **fournisseur** (`LotEntrepot.fournisseur`, nullable — "Sans fournisseur" en repli) → **lot**
-(produit, prix d'achat, date de réception) → **ventes** (vendeur — agent ou superviseur lui-même
-— date, quantité, prix). Groupé par lot individuel, pas par nom de produit agrégé : deux
-réceptions du même produit à des prix/dates différents restent deux blocs distincts.
+(produit, prix d'achat unitaire, quantité reçue, prix total du lot, date de réception) →
+**ventes** (vendeur — agent ou superviseur lui-même — date, quantité vendue, quantité perdue,
+prix). Groupé par lot individuel, pas par nom de produit agrégé : deux réceptions du même produit
+à des prix/dates différents restent deux blocs distincts.
+
+**Quantité perdue** (correction 29/09/2026, demande mdmaiga) : colonne ajoutée pour permettre le
+rapprochement fournisseur/lot/vente/perte — sans elle, l'export ne montrait que ce qui avait été
+vendu, pas l'écart avec ce qui avait été reçu. Source = `Perte.quantite_perdue` liée à la vente
+(`Vente.pertes_liees`, produit vrac) ; à défaut (produit conditionné, pas de quantité chiffrée),
+repli sur `Vente.commentaire_perte`.
+
+**Quantité reçue et prix total du lot** (correction 29/09/2026, demande mdmaiga) : ajoutés à côté
+du prix d'achat unitaire — le prix unitaire seul obligeait à recalculer mentalement le montant
+réellement engagé sur le lot pour le rapprocher du prix total payé au fournisseur. Source =
+`LotEntrepot.quantite_initiale` / `valeur_stock_initiale` (déjà calculé et persisté au save, cf.
+`rules/ARCHITECTURE.md`). Sur le PDF, l'en-tête de chaque lot est éclatée en une ligne par
+information (prix unitaire / quantité reçue / prix total / date de réception) plutôt qu'une seule
+phrase dense, pour rester lisible.
 
 Contrairement à `get_agents_ventes` (écran de pilotage courant, agents actifs non-stagiaires
 uniquement), cet export **n'exclut personne** sur le statut ou le type d'agent — c'est une trace

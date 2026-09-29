@@ -218,7 +218,12 @@ class SuperviseurAgentsService:
         retracer un produit de sa réception jusqu'à sa vente (demande mdmaiga, 24/09/2026).
         Pas de filtre est_actif/type_agent ici, contrairement à get_agents_ventes : c'est un
         export historique, pas un écran de pilotage courant — un agent parti depuis doit
-        rester visible dans la trace de ce qu'il a vendu."""
+        rester visible dans la trace de ce qu'il a vendu.
+        prefetch_related("pertes_liees") : la quantité déclarée perdue par le superviseur au
+        moment de la vente (correction 29/09/2026, demande mdmaiga) doit apparaître dans
+        l'export pour permettre le rapprochement fournisseur/lot/vente/perte — sans elle,
+        l'export ne montrait que les ventes, pas l'écart entre ce qui a été reçu et ce qui a
+        réellement été écoulé."""
         ventes = (
             Vente.objects
             .filter(
@@ -231,6 +236,7 @@ class SuperviseurAgentsService:
                 "detail_distribution__lot__produit",
                 "detail_distribution__lot__fournisseur",
             )
+            .prefetch_related("pertes_liees")
             .order_by(
                 "detail_distribution__lot__fournisseur__nom",
                 "detail_distribution__lot__date_reception",
@@ -250,6 +256,8 @@ class SuperviseurAgentsService:
                 "lot": lot,
                 "produit": lot.produit,
                 "prix_achat": lot.prix_achat_unitaire,
+                "quantite_recue": lot.quantite_initiale,
+                "prix_total": lot.valeur_stock_initiale,
                 "date_reception": lot.date_reception,
                 "ventes": [],
             })

@@ -9,8 +9,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 HEADERS = [
-    "Fournisseur", "Produit", "Prix d'achat", "Date réception",
-    "Vendeur", "Date vente", "Quantité", "Prix de vente", "Montant",
+    "Fournisseur", "Produit", "Prix d'achat unitaire", "Quantité reçue", "Prix total (lot)",
+    "Date réception", "Vendeur", "Date vente", "Quantité vendue", "Quantité perdue",
+    "Prix de vente", "Montant",
 ]
 
 
@@ -18,15 +19,35 @@ def _nom_vendeur(vente):
     return vente.agent.full_name if vente.agent else "—"
 
 
+def _fcfa(valeur):
+    """Format FCFA avec séparateur de milliers en espace (convention française), sans décimales
+    — les prix/quantités reçus ne portent pas de centimes dans ce métier."""
+    return f"{valeur:,.0f}".replace(",", " ")
+
+
+def _quantite_perdue(vente):
+    """Quantité déclarée perdue par le superviseur au moment de la vente (Perte.vente, produit
+    vrac) — nécessaire au rapprochement fournisseur/lot/vente/perte (correction 29/09/2026,
+    demande mdmaiga). Un produit conditionné n'a qu'un commentaire de perte, pas de quantité
+    (cf. Vente.commentaire_perte) : on l'affiche en repli quand aucune Perte chiffrée n'existe."""
+    total = sum((p.quantite_perdue or 0) for p in vente.pertes_liees.all())
+    if total:
+        return f"{float(total):.2f}"
+    return vente.commentaire_perte or "—"
+
+
 def _ligne(nom_fournisseur, bloc_produit, vente):
     return [
         nom_fournisseur,
         bloc_produit["produit"].nom,
         float(bloc_produit["prix_achat"]),
+        float(bloc_produit["quantite_recue"]),
+        float(bloc_produit["prix_total"]),
         bloc_produit["date_reception"].strftime("%d/%m/%Y"),
         _nom_vendeur(vente),
         vente.date_vente.strftime("%d/%m/%Y %H:%M"),
         float(vente.quantite),
+        _quantite_perdue(vente),
         float(vente.prix_vente_unitaire),
         float(vente.quantite * vente.prix_vente_unitaire),
     ]
@@ -34,8 +55,8 @@ def _ligne(nom_fournisseur, bloc_produit, vente):
 
 class SuperviseurVentesFournisseurExportService:
     """Export des ventes du superviseur et de ses agents, organisé par fournisseur puis par
-    lot reçu (produit, prix d'achat, date de réception) — retrace un produit de sa réception
-    jusqu'à sa vente (demande mdmaiga, 24/09/2026). `groupes` vient de
+    lot reçu (produit, prix d'achat, quantité reçue, prix total, date de réception) — retrace un
+    produit de sa réception jusqu'à sa vente (demande mdmaiga, 24/09/2026). `groupes` vient de
     SuperviseurAgentsService.ventes_par_fournisseur."""
 
     @staticmethod
@@ -54,8 +75,8 @@ class SuperviseurVentesFournisseurExportService:
                 for vente in bloc_produit["ventes"]:
                     ws.append(_ligne(nom_fournisseur, bloc_produit, vente))
 
-        largeurs = (22, 22, 14, 16, 22, 18, 12, 14, 14)
-        for col, largeur in zip("ABCDEFGHI", largeurs):
+        largeurs = (22, 22, 18, 14, 16, 16, 22, 18, 14, 14, 14, 14)
+        for col, largeur in zip("ABCDEFGHIJKL", largeurs):
             ws.column_dimensions[col].width = largeur
 
         buffer = BytesIO()
@@ -87,19 +108,26 @@ class SuperviseurVentesFournisseurExportService:
             elements.append(Paragraph(f"<b>{nom_fournisseur}</b>", styles["Heading2"]))
 
             for bloc_produit in groupe["produits"]:
+                # Un champ par ligne (correction 29/09/2026, demande mdmaiga) : la quantité
+                # reçue et le prix total du lot sont plus lisibles séparés du prix unitaire
+                # qu'inline sur une seule phrase.
+                elements.append(Paragraph(bloc_produit["produit"].nom, styles["Heading3"]))
                 elements.append(Paragraph(
-                    f"{bloc_produit['produit'].nom} — prix d'achat "
-                    f"{bloc_produit['prix_achat']:.0f} FCFA — reçu le "
-                    f"{bloc_produit['date_reception']:%d/%m/%Y}",
-                    styles["Heading3"],
+                    f"Prix d'achat unitaire : {_fcfa(bloc_produit['prix_achat'])} FCFA<br/>"
+                    f"Quantité reçue : {bloc_produit['quantite_recue']:.2f}<br/>"
+                    f"Prix total : {_fcfa(bloc_produit['prix_total'])} FCFA<br/>"
+                    f"Reçu le : {bloc_produit['date_reception']:%d/%m/%Y}",
+                    styles["Normal"],
                 ))
+                elements.append(Spacer(1, 6))
 
-                data = [["Vendeur", "Date vente", "Quantité", "Prix de vente", "Montant"]]
+                data = [["Vendeur", "Date vente", "Qté vendue", "Qté perdue", "Prix de vente", "Montant"]]
                 for vente in bloc_produit["ventes"]:
                     data.append([
                         _nom_vendeur(vente),
                         vente.date_vente.strftime("%d/%m/%Y %H:%M"),
                         f"{vente.quantite:.2f}",
+                        _quantite_perdue(vente),
                         f"{vente.prix_vente_unitaire:.0f}",
                         f"{vente.quantite * vente.prix_vente_unitaire:.0f}",
                     ])
