@@ -699,7 +699,11 @@ def dashboard_agents(request):
     return render(request, "bi/dashboard_agents.html", context)
 
 
-NB_MOIS_SOUS_PERFORMANCE = 4
+NB_MOIS_SOUS_PERFORMANCE = 3
+
+# Superviseur de test à exclure de l'extraction sous-performants (demande mdmaiga,
+# correction 30/09/2026) — compte marqué actif en base mais pas une véritable équipe.
+USERNAME_SUPERVISEUR_EXCLU = "jeanclaude.sup"
 
 
 def _derniers_mois(n, aujourdhui):
@@ -742,13 +746,24 @@ def _agents_sous_performants_par_superviseur(request):
     calendaire — sinon sa moyenne serait faussée à la baisse en cours de mois. Un mois antérieur à
     l'embauche de l'agent (date_debut_fonction) est affiché "—", pas 0 : VwPerformanceAgent
     produit quand même une ligne à 0 pour ces mois (produit cartésien agents actifs x mois
-    actifs de l'entreprise), qui ne reflète pas une sous-performance réelle de l'agent."""
+    actifs de l'entreprise), qui ne reflète pas une sous-performance réelle de l'agent.
+    Seuls les agents dont le superviseur est actif sont retenus (un superviseur désactivé n'a
+    plus d'équipe à piloter) — VwPerformanceAgent n'a pas cette notion, une requête dédiée sur
+    core.Agent (type_agent='entrepot') est nécessaire. USERNAME_SUPERVISEUR_EXCLU écarte en plus
+    un compte de test marqué actif en base (demande mdmaiga, correction 30/09/2026)."""
     aujourdhui = timezone.now().date()
     mois_periode = _derniers_mois(NB_MOIS_SOUS_PERFORMANCE, aujourdhui)
     mois_courant_cle = (aujourdhui.year, aujourdhui.month)
 
+    superviseurs_valides = set(
+        Agent.objects.filter(type_agent="entrepot", est_actif=True)
+        .exclude(user__username=USERNAME_SUPERVISEUR_EXCLU)
+        .values_list("id", flat=True)
+    )
+
     agents_qs = VwPerformanceAgent.objects.filter(
-        mois__in=[date(annee, mois, 1) for annee, mois in mois_periode]
+        mois__in=[date(annee, mois, 1) for annee, mois in mois_periode],
+        superviseur_id__in=superviseurs_valides,
     )
 
     type_agent_filtre = request.GET.get("type_agent")
