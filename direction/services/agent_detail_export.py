@@ -3,12 +3,10 @@ from io import BytesIO
 
 import openpyxl
 from openpyxl.styles import Font
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer
 
 from core.models import DetailDistribution, Vente
+from core.pdf_compact import nouveau_document, styles_compacts, tableau
 from direction.services.agent_detail_service import AgentDetailService
 
 HEADERS_DISTRIBUTIONS = ["Date", "Produit", "Quantité", "Superviseur", "Type distribution"]
@@ -149,8 +147,8 @@ class AgentDetailExportService:
         produits = AgentDetailService.get_produits_en_possession(agent)
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, title=f"Produits en sa possession — {agent.full_name}")
-        styles = getSampleStyleSheet()
+        doc = nouveau_document(buffer, f"Produits en sa possession — {agent.full_name}")
+        styles = styles_compacts()
 
         elements = [
             Paragraph(f"<b>{agent.full_name}</b> — produits en sa possession", styles["Title"]),
@@ -162,6 +160,7 @@ class AgentDetailExportService:
             AgentDetailExportService._table(
                 HEADERS_POSSESSION,
                 [AgentDetailExportService._ligne_possession(p) for p in produits],
+                doc,
             ),
         ]
 
@@ -170,17 +169,8 @@ class AgentDetailExportService:
         return buffer
 
     @staticmethod
-    def _table(headers, lignes):
-        table = Table([headers] + lignes, repeatRows=1)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-        ]))
-        return table
+    def _table(headers, lignes, doc):
+        return tableau([headers] + lignes, doc, fractions=[1] * len(headers))
 
     @staticmethod
     def export_pdf(agent, date_debut, date_fin):
@@ -188,8 +178,8 @@ class AgentDetailExportService:
         ventes = AgentDetailExportService.ventes_realisees(agent, date_debut, date_fin)
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), title=f"Détail agent — {agent.full_name}")
-        styles = getSampleStyleSheet()
+        doc = nouveau_document(buffer, f"Détail agent — {agent.full_name}")
+        styles = styles_compacts()
 
         elements = [
             Paragraph(f"<b>{agent.full_name}</b> — distributions reçues et ventes réalisées", styles["Title"]),
@@ -199,14 +189,16 @@ class AgentDetailExportService:
             AgentDetailExportService._table(
                 HEADERS_DISTRIBUTIONS,
                 [AgentDetailExportService._ligne_distribution(d) for d in distributions],
+                doc,
             ),
-            Spacer(1, 20),
+            Spacer(1, 8),
             Paragraph("Ventes réalisées", styles["Heading2"]),
             AgentDetailExportService._table(
                 HEADERS_VENTES,
                 [AgentDetailExportService._ligne_vente(v) for v in ventes],
+                doc,
             ),
-            Spacer(1, 20),
+            Spacer(1, 8),
             Paragraph("Produits en sa possession", styles["Heading2"]),
             AgentDetailExportService._table(
                 HEADERS_POSSESSION,
@@ -214,6 +206,7 @@ class AgentDetailExportService:
                     AgentDetailExportService._ligne_possession(p)
                     for p in AgentDetailService.get_produits_en_possession(agent)
                 ],
+                doc,
             ),
         ]
 

@@ -100,6 +100,13 @@ filtre dans Excel) ; `export_pdf` — hiérarchie fournisseur → produit → ta
 la structure demandée. Exposé par `ExportSuperviseurVentesFournisseurExcelView`/`PDFView`
 (`LoginRequiredMixin` uniquement, même niveau d'accès que `SuperviseurDetail`).
 
+**Mise en page PDF commune (correction 01/10/2026)** — tous les exports PDF (ventes par fournisseur,
+produits à investiguer, détail agent, liste des ventes, et `bi` agents sous-performants) passent par
+`core/pdf_compact.py` : A4 **portrait**, marges 1,2 cm, police 8 pt, tableaux pleine largeur,
+`CondPageBreak` avant chaque lot pour éviter un titre orphelin. Avant, `landscape(A4)` + marges
+2,5 cm + police 10 pt gonflaient le nombre de pages à l'impression. Un nouvel export PDF doit
+réutiliser ce module, pas recréer un `SimpleDocTemplate` à la main.
+
 ### C. Analyse Opérationnelle du Terrain (`AnalyseOperationnelleService`)
 
 * Offre un moteur de filtrage multidimensionnel croisant la temporalité (par défaut, du 1er janvier à la date du jour), l'identifiant unique de l'agent et la référence produit.

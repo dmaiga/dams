@@ -3,11 +3,9 @@ from io import BytesIO
 
 import openpyxl
 from openpyxl.styles import Alignment, Font
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer
 
+from core.pdf_compact import nouveau_document, styles_compacts, tableau
 from direction.constants import SEUIL_ATTENTION_JOURS
 from direction.services.stock_investigation_service import StockInvestigationService
 
@@ -76,13 +74,9 @@ class StockInvestigationExportService:
         groupes = StockInvestigationExportService._groupes(lignes_annotees)
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(A4),
-            title="Produits à investiguer",
-        )
+        doc = nouveau_document(buffer, "Produits à investiguer")
 
-        styles = getSampleStyleSheet()
+        styles = styles_compacts()
         cell_style = styles["BodyText"]
         elements = [
             Paragraph(
@@ -107,18 +101,8 @@ class StockInvestigationExportService:
                     Paragraph(_formater_produits(bloc_agent["produits"]).replace("\n", "<br/>"), cell_style),
                 ])
 
-            table = Table(data, repeatRows=1, colWidths=[150, 600])
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 10),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-            ]))
-            elements.append(table)
-            elements.append(Spacer(1, 16))
+            elements.append(tableau(data, doc, fractions=[1, 3]))
+            elements.append(Spacer(1, 8))
 
         doc.build(elements)
 

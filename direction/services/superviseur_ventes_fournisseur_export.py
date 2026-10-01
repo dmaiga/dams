@@ -3,10 +3,10 @@ from io import BytesIO
 
 import openpyxl
 from openpyxl.styles import Font
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import CondPageBreak, Paragraph, Spacer
+
+from core.pdf_compact import nouveau_document, styles_compacts, tableau
 
 HEADERS = [
     "Fournisseur", "Produit", "Prix d'achat unitaire", "Quantité reçue", "Prix total (lot)",
@@ -87,13 +87,9 @@ class SuperviseurVentesFournisseurExportService:
     @staticmethod
     def export_pdf(superviseur, date_debut, date_fin, groupes):
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(A4),
-            title=f"Ventes par fournisseur — {superviseur.full_name}",
-        )
+        doc = nouveau_document(buffer, f"Ventes par fournisseur — {superviseur.full_name}")
 
-        styles = getSampleStyleSheet()
+        styles = styles_compacts()
         elements = [
             Paragraph(
                 f"<b>{superviseur.full_name}</b> — ventes par fournisseur (superviseur et agents)",
@@ -111,6 +107,8 @@ class SuperviseurVentesFournisseurExportService:
                 # Un champ par ligne (correction 29/09/2026, demande mdmaiga) : la quantité
                 # reçue et le prix total du lot sont plus lisibles séparés du prix unitaire
                 # qu'inline sur une seule phrase.
+                # Évite un titre de lot orphelin en bas de page, séparé de son tableau.
+                elements.append(CondPageBreak(3.5 * cm))
                 elements.append(Paragraph(bloc_produit["produit"].nom, styles["Heading3"]))
                 elements.append(Paragraph(
                     f"Prix d'achat unitaire : {_fcfa(bloc_produit['prix_achat'])} FCFA<br/>"
@@ -132,19 +130,10 @@ class SuperviseurVentesFournisseurExportService:
                         f"{vente.quantite * vente.prix_vente_unitaire:.0f}",
                     ])
 
-                table = Table(data, repeatRows=1)
-                table.setStyle(TableStyle([
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, 0), 10),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-                ]))
-                elements.append(table)
-                elements.append(Spacer(1, 10))
+                elements.append(tableau(data, doc, fractions=[3.2, 2.6, 1.2, 1.2, 1.4, 1.4]))
+                elements.append(Spacer(1, 6))
 
-            elements.append(Spacer(1, 14))
+            elements.append(Spacer(1, 6))
 
         doc.build(elements)
         buffer.seek(0)

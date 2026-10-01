@@ -3,12 +3,10 @@ from io import BytesIO
 
 import openpyxl
 from openpyxl.styles import Font
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, Spacer
 
 from bi.constants import SEUIL_KG_JOUR_FAIBLE
+from core.pdf_compact import nouveau_document, styles_compacts, tableau
 
 HEADERS_FIXES = ["Agent", "Date de début", "Ancienneté"]
 
@@ -76,13 +74,9 @@ class AgentsSousObjectifExportService:
         headers = HEADERS_FIXES + [f"{libelle} (kg/j)" for libelle in libelles_mois]
 
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(A4),
-            title="Agents sous-performants",
-        )
+        doc = nouveau_document(buffer, "Agents sous-performants")
 
-        styles = getSampleStyleSheet()
+        styles = styles_compacts()
         mois_courant_libelle = libelles_mois[-1] if libelles_mois else ""
         elements = [
             Paragraph("<b>Agents sous-performants</b>", styles["Title"]),
@@ -99,18 +93,8 @@ class AgentsSousObjectifExportService:
             elements.append(Paragraph(f"<b>{groupe['superviseur_nom']}</b>", styles["Heading2"]))
 
             data = [headers] + [_ligne(agent) for agent in groupe["agents"]]
-            table = Table(data, repeatRows=1)
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 10),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-            ]))
-            elements.append(table)
-            elements.append(Spacer(1, 14))
+            elements.append(tableau(data, doc))
+            elements.append(Spacer(1, 8))
 
         doc.build(elements)
         buffer.seek(0)

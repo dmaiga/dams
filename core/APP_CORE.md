@@ -216,3 +216,9 @@ Sprint-13 complet (2026-09-15) : services `marchandise.services.CorrectionLotSer
 templates dans `direction/`, section de menu « Admin » (mdmaiga uniquement) dans
 `base_admin.html`. Voir `marchandise/APP_MARCHANDISE.md`, `vente/APP_VENTE.md` et
 `direction/APP_DIRECTION.MD` pour le détail par app.
+## 12. Mise en page PDF partagée (`core/pdf_compact.py`) — 2026-10-01
+
+Module utilitaire (pas de modèle) utilisé par les exports reportlab de `direction` et `bi` :
+`nouveau_document` (A4 portrait, marges 1,2 cm), `styles_compacts` (polices réduites) et `tableau`
+(en-tête bleu, lignes alternées, largeurs par fractions de la largeur utile). Objectif : limiter le
+nombre de pages à l'impression. Voir `direction/APP_DIRECTION.md` § C bis.

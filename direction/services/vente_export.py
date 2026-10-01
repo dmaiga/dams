@@ -2,10 +2,9 @@
 from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, Alignment
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph
+
+from core.pdf_compact import nouveau_document, styles_compacts, tableau
 
 from io import BytesIO
 import openpyxl
@@ -78,13 +77,9 @@ class VenteExportService:
 
         buffer = BytesIO()
 
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=landscape(A4),
-            title="Liste des ventes"
-        )
+        doc = nouveau_document(buffer, "Liste des ventes")
 
-        styles = getSampleStyleSheet()
+        styles = styles_compacts()
         elements = []
 
         # Titre
@@ -112,18 +107,10 @@ class VenteExportService:
                 v.get_type_vente_display(),
             ])
 
-        table = Table(data, repeatRows=1)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 11),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.lightgrey]),
-        ]))
-
-        elements.append(table)
+        elements.append(tableau(
+            data, doc, fractions=[1.5, 3, 2.5, 3, 1.2, 1.4, 1.6, 1.6],
+            extra_style=[("ALIGN", (0, 0), (-1, -1), "CENTER")],
+        ))
         doc.build(elements)
 
         buffer.seek(0)
