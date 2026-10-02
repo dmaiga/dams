@@ -153,21 +153,21 @@
 
     <!-- TABLEAU -->
     <div class="overflow-x-auto">
-      <table class="table table-sm">
+      <table class="table table-sm" id="table-mamies">
         <thead>
           <tr class="bg-info/10">
-            <th>Agent</th>
-            <th>Superviseur</th>
-            <th class="text-right">Kg</th>
-            <th class="text-right">Base</th>
-            <th class="text-right">Incentive</th>
-            <th class="text-right">Total</th>
+            <th class="cursor-pointer select-none" data-sort="text">Agent <span class="sort-ind opacity-50"></span></th>
+            <th class="cursor-pointer select-none" data-sort="text">Superviseur <span class="sort-ind opacity-50"></span></th>
+            <th class="text-right cursor-pointer select-none" data-sort="num">Kg <span class="sort-ind opacity-50"></span></th>
+            <th class="text-right cursor-pointer select-none" data-sort="num">Base <span class="sort-ind opacity-50"></span></th>
+            <th class="text-right cursor-pointer select-none" data-sort="num">Incentive <span class="sort-ind opacity-50"></span></th>
+            <th class="text-right cursor-pointer select-none" data-sort="num">Total <span class="sort-ind opacity-50"></span></th>
           </tr>
         </thead>
         <tbody>
           {% for s in salaires_mamy %}
           <tr class="hover">
-            <td>
+            <td data-v="{{ s.agent.full_name }}">
               <div class="font-medium">{{ s.agent.full_name }}</div>
               {% if s.jours_travailles and s.jours_mois and s.jours_travailles < s.jours_mois %}
                 <div class="text-xs text-info">
@@ -175,11 +175,11 @@
                 </div>
               {% endif %}
             </td>
-            <td class="text-gray-600">{{ s.superviseur.full_name }}</td>
-            <td class="text-right font-mono">{{ s.kilo_total|format_number }}</td>
-            <td class="text-right font-mono">{{ s.salaire_base|fcfa }}</td>
-            <td class="text-right font-mono">{{ s.incentive|fcfa }}</td>
-            <td class="text-right font-bold text-info">{{ s.salaire_total|fcfa }}</td>
+            <td class="text-gray-600" data-v="{{ s.superviseur.full_name }}">{{ s.superviseur.full_name }}</td>
+            <td class="text-right font-mono" data-v="{{ s.kilo_total|stringformat:'f' }}">{{ s.kilo_total|format_number }}</td>
+            <td class="text-right font-mono" data-v="{{ s.salaire_base|stringformat:'f' }}">{{ s.salaire_base|fcfa }}</td>
+            <td class="text-right font-mono" data-v="{{ s.incentive|stringformat:'f' }}">{{ s.incentive|fcfa }}</td>
+            <td class="text-right font-bold text-info" data-v="{{ s.salaire_total|stringformat:'f' }}">{{ s.salaire_total|fcfa }}</td>
           </tr>
           {% empty %}
           <tr>
@@ -202,6 +202,31 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    var table = document.getElementById("table-mamies");
+    if (!table) return;
+    var tbody = table.tBodies[0];
+    var ths = table.tHead.rows[0].cells;
+    Array.prototype.forEach.call(ths, function (th, idx) {
+      th.addEventListener("click", function () {
+        var asc = th.dataset.dir !== "asc";
+        var num = th.dataset.sort === "num";
+        var rows = Array.prototype.filter.call(tbody.rows, function (r) { return r.cells[idx] && r.cells[idx].dataset.v !== undefined; });
+        rows.sort(function (a, b) {
+          var va = a.cells[idx].dataset.v, vb = b.cells[idx].dataset.v;
+          var r = num ? parseFloat(va) - parseFloat(vb) : va.localeCompare(vb, "fr", { sensitivity: "base" });
+          return asc ? r : -r;
+        });
+        rows.forEach(function (r) { tbody.appendChild(r); });
+        Array.prototype.forEach.call(ths, function (o) { o.dataset.dir = ""; o.querySelector(".sort-ind").textContent = ""; });
+        th.dataset.dir = asc ? "asc" : "desc";
+        th.querySelector(".sort-ind").textContent = asc ? "▲" : "▼";
+      });
+    });
+  })();
+</script>
 
 <!-- ================= SECTION AGENTS GROS (ORANGE) ================= -->
 <div class="card bg-base-100 shadow border-t-4 border-t-warning">

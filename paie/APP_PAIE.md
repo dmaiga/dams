@@ -198,6 +198,7 @@ Cette vue en mode lecture seule (`TemplateView`) centralise la restitution finan
 ## 3. Moteur d’Exportation de Performance Croisée (`export_salaires_mamies_excel`)
 
 Une fonctionnalité avancée d'audit est intégrée à l'export Excel des agents terrain (Mamies), permettant de mesurer la performance d'un mois sur l'autre (Mois $N$ vs Mois $N-1$).
+Les lignes sont triées par ordre alphabétique superviseur puis agent. Sur la page `/paie/direction/paie/`, le tableau « Agents Mamies » est triable côté client (clic sur les en-têtes Agent, Superviseur, Kg, Base, Incentive, Total).
 
 * **Reconstitution de la Période Précédente ($N-1$)** : Le script embarque une logique de décrémentation chronologique prenant en charge la transition annuelle (si le mois courant est Janvier ($1$), le mois précédent devient Décembre ($12$) de l'année $year - 1$).
 * **Appel Croisé de Calculateur (`CalculatorSalaire`)** : Pour chaque ligne d'agent terrain issue du mois courant ($N$), le script effectue un calcul à la volée via `CalculatorSalaire.calcul_salaire_mamy(...)` sur la période $N-1$ pour extraire le volume de ventes historique (`kilo_n_1`).

@@ -172,7 +172,14 @@ def export_salaires_mamies_excel(request):
         type_agent_filter="terrain"
     )
 
-    mamies = result["mamies"]
+    # Tri alphabétique : superviseur puis agent
+    mamies = sorted(
+        result["mamies"],
+        key=lambda s: (
+            (s["superviseur"].full_name if s["superviseur"] else "").casefold(),
+            s["agent"].full_name.casefold(),
+        ),
+    )
 
     # ==========================
     # EXCEL
