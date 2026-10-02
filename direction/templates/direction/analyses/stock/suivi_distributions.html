@@ -35,7 +35,7 @@
                     Liste à vérifier — Excel
                 </a>
                 <a
-                    href="{% url 'export_produits_investigation_pdf' %}?{{ pagination_query }}"
+                    href="{% url 'export_produits_investigation_pdf' %}?{{ pagination_query }}&amp;telecharger=1"
                     class="btn btn-sm btn-outline"
                 >
                     Liste à vérifier — PDF
@@ -488,34 +488,36 @@
                     </span>
                 </div>
 
-                <!-- Toute cette section est déjà la zone "à risque" (produits > seuil_attention_jours
-                     j) : entourer chaque ligne d'un badge plein rouge/ambre partout noie le signal
-                     (tout devient rouge, donc plus rien n'attire l'œil). Un simple point de couleur
-                     marque la ligne ; seul le compteur de jours des cas "critique" (>= seuil_critique_jours)
-                     reste accentué — c'est la seule distinction qui reste actionnable ici. -->
-                <div class="divide-y divide-base-200">
-                    {% for bloc_agent in groupe.agents %}
-                    <div class="py-3 flex flex-col md:flex-row md:items-start gap-2">
-                        <div class="md:w-48 shrink-0">
-                            <div class="font-semibold text-sm text-slate-900">{{ bloc_agent.agent.full_name }}</div>
-                            <div class="text-[10px] text-slate-400">
-                                {{ bloc_agent.nb_produits }} produit{{ bloc_agent.nb_produits|pluralize }} à vérifier
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-1">
+                <!-- Une ligne par produit ; le nom de l'agent n'est affiché que sur la première
+                     ligne de chaque agent (consigne mdmaiga 02/10/2026). Montant = quantité
+                     restante × prix d'achat unitaire du lot. -->
+                <div class="overflow-x-auto">
+                    <table class="table table-sm text-xs">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th>Produit</th>
+                                <th class="text-right">Quantité</th>
+                                <th class="text-right">Montant total achat</th>
+                                <th>Date de réception</th>
+                                <th class="text-right">Nombre de jours</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bloc_agent in groupe.agents %}
                             {% for p in bloc_agent.produits %}
-                            <div class="flex items-center gap-1.5 text-xs">
-                               
-                                <span class="text-slate-700">{{ p.quantite|format_number }} {{ p.produit_nom }}</span>
-                                <span class="text-slate-400">— depuis le {{ p.date_reference|date:"d/m/Y" }}</span>
-                                <span class="text-slate-900 font-semibold">
-                                    ({{ p.jours_ecoules }} j)
-                                </span>
-                            </div>
+                            <tr{% if forloop.first and not forloop.parentloop.first %} class="border-t-2 border-slate-400"{% endif %}>
+                                <td class="font-semibold text-slate-900">{% if forloop.first %}{{ bloc_agent.agent.full_name }}{% endif %}</td>
+                                <td>{{ p.produit_nom }}</td>
+                                <td class="text-right">{{ p.quantite|format_number }}</td>
+                                <td class="text-right">{{ p.montant_achat|format_number }} FCFA</td>
+                                <td>{{ p.date_reception|date:"d/m/Y" }}</td>
+                                <td class="text-right font-semibold">{{ p.jours_reception }} j</td>
+                            </tr>
                             {% endfor %}
-                        </div>
-                    </div>
-                    {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
 
             </div>
@@ -528,6 +530,26 @@
             </div>
         </div>
         {% endfor %}
+
+        <!-- Aperçu PDF direct (Content-Disposition: inline). L'iframe n'est chargée qu'à
+             l'ouverture du bloc pour ne pas générer le PDF à chaque affichage de la page. -->
+        <details class="card bg-base-100 shadow-sm border border-base-200"
+                 ontoggle="if (this.open) { var f = this.querySelector('iframe'); if (!f.src) f.src = f.dataset.src; }">
+            <summary class="cursor-pointer p-4 font-semibold text-sm">
+                Aperçu PDF de la liste à vérifier
+            </summary>
+            <div class="p-4 pt-0 space-y-2">
+                <div class="flex gap-2">
+                    <a href="{% url 'export_produits_investigation_pdf' %}?{{ pagination_query }}&amp;telecharger=1"
+                       class="btn btn-sm btn-outline">Télécharger le PDF</a>
+                    <a href="{% url 'export_produits_investigation_excel' %}?{{ pagination_query }}"
+                       class="btn btn-sm btn-outline">Télécharger l'Excel</a>
+                </div>
+                <iframe data-src="{% url 'export_produits_investigation_pdf' %}?{{ pagination_query }}"
+                        title="Aperçu PDF des produits à investiguer"
+                        class="w-full border border-base-200 rounded" style="height: 80vh;"></iframe>
+            </div>
+        </details>
 
     </div>
 

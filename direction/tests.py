@@ -370,6 +370,33 @@ class SuiviDistributionsProduitsEnCirculationTests(TestCase):
         response_pdf = self.client.get(reverse('export_produits_investigation_pdf'))
         self.assertEqual(response_pdf.status_code, 200)
         self.assertEqual(response_pdf['Content-Type'], 'application/pdf')
+        # Aperçu inline par défaut, téléchargement explicite sur demande.
+        self.assertTrue(response_pdf['Content-Disposition'].startswith('inline'))
+        response_dl = self.client.get(reverse('export_produits_investigation_pdf'), {'telecharger': 1})
+        self.assertTrue(response_dl['Content-Disposition'].startswith('attachment'))
+
+    def test_produits_a_investiguer_montant_achat_et_dates_reception(self):
+        response = self.client.get(reverse('suivi_distributions'))
+        produits = response.context['agents_a_investiguer'][0]['agents'][0]['produits']
+        # 10 unités restantes × 250 FCFA, valorisées directement au prix d'achat du lot.
+        self.assertTrue(all(p['montant_achat'] == Decimal('2500.00') for p in produits))
+        self.assertTrue(all(p['date_reception'] == self.lot.date_reception for p in produits))
+        self.assertContains(response, '2 500 FCFA')
+
+    def test_export_excel_agent_affiche_une_seule_fois(self):
+        import openpyxl
+        from io import BytesIO
+        response = self.client.get(reverse('export_produits_investigation_excel'))
+        ws = openpyxl.load_workbook(BytesIO(response.content)).active
+        self.assertEqual(
+            [c.value for c in ws[1]],
+            ['Agent', 'Produit', 'Quantité', 'Montant total achat', 'Date de réception', 'Nombre de jours'],
+        )
+        lignes = [[c.value for c in row] for row in ws.iter_rows(min_row=3)]
+        self.assertEqual(lignes[0][0], self.agent.full_name)
+        self.assertIn(lignes[1][0], (None, ''))
+        self.assertEqual(lignes[0][2], '10')
+        self.assertEqual(lignes[0][3], '2 500 FCFA')
 
 
 class VentesSuperviseurAffichageTests(TestCase):

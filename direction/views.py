@@ -2411,6 +2411,8 @@ from core.models import (
     Agent,
     Produit,
 )
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from direction.constants import SEUIL_ATTENTION_JOURS, SEUIL_CRITIQUE_JOURS
 from direction.services.stock_investigation_service import StockInvestigationService
 from direction.services.stock_investigation_export import StockInvestigationExportService
@@ -2549,7 +2551,11 @@ class ExportProduitsInvestigationExcelView(LoginRequiredMixin, UserPassesTestMix
         return response
 
 
+@method_decorator(xframe_options_sameorigin, name="dispatch")
 class ExportProduitsInvestigationPDFView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Affichage inline par défaut (aperçu dans une iframe de la page, X-Frame-Options
+    en same-origin) ; `?telecharger=1` force le téléchargement (attachment)."""
+
     def test_func(self):
         agent = getattr(self.request.user, "agent", None)
         return agent and (agent.est_direction or agent.est_superviseur)
@@ -2558,8 +2564,9 @@ class ExportProduitsInvestigationPDFView(LoginRequiredMixin, UserPassesTestMixin
         lignes = _lignes_a_investiguer_export(request)
         buffer = StockInvestigationExportService.export_pdf(lignes)
 
+        disposition = "attachment" if request.GET.get("telecharger") else "inline"
         response = HttpResponse(buffer, content_type="application/pdf")
         response["Content-Disposition"] = (
-            f"attachment; filename=produits_a_investiguer_{date.today()}.pdf"
+            f"{disposition}; filename=produits_a_investiguer_{date.today()}.pdf"
         )
         return response

@@ -495,6 +495,22 @@ inutiles supprimés). mdmaiga avait suggéré `format_quantity` (même fichier) 
 filtre produit un format anglo-saxon à point (`20.00`) et n'est utilisé nulle part ailleurs dans
 l'app — `format_number` reste la référence pour rester cohérent avec le reste de `direction`.
 
+**Refonte du tableau « Produits à investiguer » (consigne mdmaiga, 02/10/2026)** : écran, Excel et
+PDF affichent désormais la même table plate, une ligne par produit, colonnes **Agent / Produit /
+Quantité / Montant total achat / Date de réception / Nombre de jours** (le superviseur reste en
+titre de groupe — carte web, ligne de titre Excel, `Heading3` PDF). Le nom de l'agent n'apparaît que
+sur la première ligne de chaque agent. Quantités via `format_number` (`1`, `1,5`), jours au format
+`15 j`. **Montant** = quantité restante × `lot.prix_achat_unitaire` (`valeur_immobilisee`, déjà
+annotée), sans tenir compte du conditionnement. **Nombre de jours** = ancienneté depuis la
+**date de réception du lot** (`jours_reception`), alors que le seuil d'inclusion
+(`SEUIL_ATTENTION_JOURS`) reste calculé sur la date de distribution (`jours_ecoules`) : une ligne
+peut donc afficher moins de 7 j si le lot est récent mais distribué depuis longtemps — cas rare.
+**Aperçu PDF** : `ExportProduitsInvestigationPDFView` sert en `Content-Disposition: inline` par
+défaut (`xframe_options_sameorigin` pour autoriser l'iframe ; le middleware Django est en DENY
+sinon) et en `attachment` avec `?telecharger=1`. La page embarque un bloc repliable « Aperçu PDF »
+(iframe chargée à l'ouverture seulement) avec boutons de téléchargement PDF/Excel ; le bouton PDF
+d'en-tête télécharge toujours.
+
 **Hors périmètre (décision mdmaiga, 17/09/2026)** : un axe BI dédié « produits en circulation »
 a été envisagé puis écarté — cette page couvre déjà le besoin de valorisation, le dupliquer dans
 le BI serait une surcharge sans valeur ajoutée à ce stade. Voir `docs/sprints/archive/sprint-14.md`

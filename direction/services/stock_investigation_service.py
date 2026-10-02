@@ -173,9 +173,16 @@ class StockInvestigationService:
             bloc_agent = groupe["agents"].setdefault(
                 agent.id, {"agent": agent, "produits": []}
             )
+            date_reception = d.lot.date_reception
             bloc_agent["produits"].append({
                 "produit_nom": d.lot.produit.nom,
                 "quantite": d.restant,
+                # Valorisation directe quantité restante × prix d'achat unitaire du
+                # lot (annotée `valeur_immobilisee`), quel que soit le conditionnement
+                # (sac de 1 unité ou vrac au kilo) — consigne mdmaiga 02/10/2026.
+                "montant_achat": d.valeur_immobilisee,
+                "date_reception": date_reception,
+                "jours_reception": (timezone.now() - date_reception).days,
                 "date_reference": d.distribution.date_distribution,
                 "jours_ecoules": d.jours_ecoules,
                 "statut_circulation": d.statut_circulation,
