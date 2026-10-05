@@ -641,6 +641,10 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             superviseur_id=superviseur_id
         )
 
+        # Stats/top agents : calculés sur le queryset filtré SANS annotations
+        # ni prefetch (sous-requête recouvrement, Concat, pertes inutiles ici).
+        self.stats_queryset = qs
+
         dernier_recouvrement = Recouvrement.objects.filter(
             vente_id=OuterRef("pk")
         ).order_by("-date_recouvrement")
@@ -686,7 +690,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        ventes_qs = self.filtered_queryset
+        ventes_qs = self.stats_queryset
 
         stats = VenteAnalyseService.compute_stats(ventes_qs)
         top_agents = VenteAnalyseService.compute_top_agents(ventes_qs)
@@ -717,7 +721,8 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "agents_list": agents_list,
             "superviseurs_list": superviseurs_list,
             "produits_list": Produit.objects.only("id", "nom").order_by("nom"),
-            "lots_list": LotEntrepot.objects.select_related("produit")
+            # fournisseur requis par le template (sinon 1 requête par lot)
+            "lots_list": LotEntrepot.objects.select_related("produit", "fournisseur")
                         .order_by("-date_reception"),
 
             "years": list(range(current_year - 2, current_year + 3)),

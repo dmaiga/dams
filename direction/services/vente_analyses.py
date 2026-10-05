@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.utils import timezone
-from django.db.models import Sum, F, Q, Case, When, IntegerField, DecimalField, ExpressionWrapper
+from django.db.models import Sum, Count, F, Q, Case, When, IntegerField, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from core.models import Vente, Agent
 from datetime import datetime, time
@@ -64,6 +64,9 @@ class VenteAnalyseService:
             ventes_detail=Sum(
                 Case(When(type_vente="detail", then=1), default=0, output_field=IntegerField())
             ),
+            # Comptes distincts dans la même passe SQL (évite 2 requêtes supplémentaires)
+            clients_count=Count("client_id", distinct=True),
+            agents_count=Count("agent_id", distinct=True),
         )
 
         total_ca = stats["total_ca"]
@@ -78,8 +81,8 @@ class VenteAnalyseService:
             "ventes_gros": stats["ventes_gros"] or 0,
             "ventes_detail": stats["ventes_detail"] or 0,
             "total_quantite": stats["total_quantite"],
-            "clients_count": ventes_qs.values("client_id").distinct().count(),
-            "agents_count": ventes_qs.values("agent_id").distinct().count(),
+            "clients_count": stats["clients_count"],
+            "agents_count": stats["agents_count"],
         }
 
     # ------------------------------------------------------------------
