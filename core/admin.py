@@ -160,9 +160,12 @@ class DetailDistributionAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
             'lot__produit',
-            'distribution__agent_terrain',
-            'distribution__superviseur',
+            'distribution__agent_terrain__user',
+            'distribution__superviseur__user',
         )
+
+    show_full_result_count = False
+    list_per_page = 50
 
     @admin.display(description="Produit")
     def produit_nom(self, obj):
@@ -217,17 +220,29 @@ class VenteAdmin(admin.ModelAdmin):
 
     raw_id_fields = ('agent', 'stagiaire', 'client', 'detail_distribution')
 
+    # Perf prod : évite le 2e COUNT(*) sur toute la table et allège la page
+    show_full_result_count = False
+    list_per_page = 50
+
     def get_queryset(self, request):
-        return (
-            super()
-            .get_queryset(request)
-            .select_related(
-                'agent__user',
-                'stagiaire__user',
-                'client',
-                'detail_distribution__lot__produit',
-            )
+        qs = super().get_queryset(request).select_related(
+            'agent__user',
+            'stagiaire__user',
+            'client',
+            'detail_distribution__lot__produit',
         )
+        # Sur la liste uniquement : ne charger que les colonnes affichées
+        # (les jointures agent/user/client/lot/produit ramenaient ~2 Ko par ligne).
+        if request.resolver_match and request.resolver_match.url_name == 'core_vente_changelist':
+            qs = qs.only(
+                'id', 'quantite', 'prix_vente_unitaire', 'date_vente', 'date_creation',
+                'agent__user__first_name', 'agent__user__last_name', 'agent__user__username',
+                'stagiaire__user__first_name', 'stagiaire__user__last_name', 'stagiaire__user__username',
+                'client__nom', 'client__type_client',
+                'detail_distribution__lot__produit__nom',
+                'detail_distribution__lot__produit__poids_unitaire_kg',
+            )
+        return qs
 
     # ----------------------------
     # AFFICHAGES OPTIMISÉS

@@ -1926,8 +1926,6 @@ class Vente(models.Model):
     def total_vente(self):
         return (self.quantite or 0) * (self.prix_vente_unitaire or 0)
 
-    class Meta:
-        ordering = ['-date_vente']    
     @property
     def nom_client(self):
         """Retourne le nom du client ou 'Inconnu' si non spécifié"""
@@ -2044,6 +2042,12 @@ class Vente(models.Model):
 
     class Meta:
         ordering = ['-date_vente']
+        indexes = [
+            # Tri par défaut de l'admin/listes (-date_vente, -id) + filtres de période
+            models.Index(fields=['-date_vente', '-id'], name='vente_date_id_idx'),
+            models.Index(fields=['date_creation'], name='vente_date_creation_idx'),
+            models.Index(fields=['agent', '-date_vente'], name='vente_agent_date_idx'),
+        ]
         verbose_name = "Vente"
         verbose_name_plural = "Ventes"
        
