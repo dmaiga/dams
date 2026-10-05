@@ -5,14 +5,42 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import DecimalField, OuterRef, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from core.models import DetailDistribution, Recouvrement, Vente
+from core.models import DetailDistribution, Perte, Recouvrement, Vente
 from core.services.corrections import enregistrer_correction
 
 
 _NON_RENSEIGNE = object()
+
+
+def details_avec_restant(queryset):
+    """Annote chaque DetailDistribution de `restant` (= quantite - ventes non
+    supprimees - pertes), en une seule requete SQL.
+
+    Equivalent de `DetailDistribution.quantite_restante_calculee`, qui coute
+    2 requetes par detail (N+1 : tres lent pour un agent a l'historique long).
+    """
+    decimal = DecimalField(max_digits=12, decimal_places=2)
+    vendu = (
+        Vente.objects.filter(detail_distribution=OuterRef('pk'), est_supprime=False)
+        .order_by().values('detail_distribution')
+        .annotate(t=Sum('quantite')).values('t')
+    )
+    perdu = (
+        Perte.objects.filter(detail_distribution=OuterRef('pk'))
+        .order_by().values('detail_distribution')
+        .annotate(t=Sum('quantite_perdue')).values('t')
+    )
+    return queryset.annotate(
+        restant=(
+            Coalesce('quantite', 0, output_field=decimal)
+            - Coalesce(Subquery(vendu, output_field=decimal), 0, output_field=decimal)
+            - Coalesce(Subquery(perdu, output_field=decimal), 0, output_field=decimal)
+        )
+    )
 
 
 class CorrectionVenteService:

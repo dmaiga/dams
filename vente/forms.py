@@ -11,6 +11,8 @@ from core.models import (
     Agent, AffectationLotSuperviseur, DistributionAgent, DetailDistribution, Vente, Perte,
 )
 
+from vente.services import details_avec_restant
+
 TYPES_AGENT_TERRAIN = ['terrain', 'agent_gros', 'agent_polivalent', 'stagiaire']
 
 
@@ -220,18 +222,16 @@ class VenteForm(forms.Form):
         if 'agent_terrain' in self.data:
             try:
                 agent_id = int(self.data.get('agent_terrain'))
-                candidats = (
+                self.fields['detail_distribution'].queryset = details_avec_restant(
                     DetailDistribution.objects
                     .filter(distribution__superviseur=superviseur, distribution__agent_terrain_id=agent_id)
                     .select_related('lot__produit')
-                )
-                actifs_ids = [d.pk for d in candidats if d.quantite_restante_calculee > 0]
-                self.fields['detail_distribution'].queryset = DetailDistribution.objects.filter(pk__in=actifs_ids)
+                ).filter(restant__gt=0)
             except (ValueError, TypeError):
                 pass
 
         self.fields['detail_distribution'].label_from_instance = lambda obj: (
-            f"{obj.lot.produit.nom} | reste {obj.quantite_restante_calculee}"
+            f"{obj.lot.produit.nom} | reste {getattr(obj, 'restant', obj.quantite_restante_calculee)}"
         )
 
     def clean(self):

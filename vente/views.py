@@ -5,8 +5,9 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.http import JsonResponse
 
-from core.models import AffectationLotSuperviseur, DetailDistribution, Vente, Recouvrement
+from core.models import Agent, AffectationLotSuperviseur, DetailDistribution, Vente, Recouvrement
 from vente.forms import DistributionForm, VenteForm
+from vente.services import details_avec_restant
 
 
 def _acces_superviseur(agent):
@@ -163,24 +164,27 @@ def ajax_distributions_par_agent(request):
     agent_id = request.GET.get('agent_id')
     superviseur = request.user.agent
 
-    details = (
+    details = details_avec_restant(
         DetailDistribution.objects
         .filter(distribution__superviseur=superviseur, distribution__agent_terrain_id=agent_id)
         .select_related('lot__produit', 'distribution')
+    ).filter(restant__gt=0)
+
+    # Même agent pour toutes les lignes : une seule lecture au lieu d'une par détail
+    agent_cible = Agent.objects.filter(pk=agent_id).first()
+    type_suggere = (
+        agent_cible.type_vente_par_defaut()
+        if agent_cible and agent_cible.pk != superviseur.pk else None
     )
 
     data = [
         {
             'id': d.id,
-            'label': f"{d.lot.produit.nom} | Affecté le {d.distribution.date_distribution:%d/%m/%Y} | reste {d.quantite_restante_calculee}",
-            'type_vente_suggere': (
-                d.distribution.agent_terrain.type_vente_par_defaut()
-                if d.distribution.agent_terrain_id != superviseur.id else None
-            ),
+            'label': f"{d.lot.produit.nom} | Affecté le {d.distribution.date_distribution:%d/%m/%Y} | reste {d.restant}",
+            'type_vente_suggere': type_suggere,
             # Perte déclarable uniquement pour un produit vrac (non conditionné) — cf. PerteDistributionForm.
             'is_vrac': d.lot.produit.poids_unitaire_kg is None,
         }
         for d in details
-        if d.quantite_restante_calculee > 0
     ]
     return JsonResponse(data, safe=False)
