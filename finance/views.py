@@ -231,17 +231,18 @@ def recouvrement_versement_groupe(request):
                     # reste l'horodatage système, non touché.
                     date_versement = form.cleaned_data.get('date_versement') or timezone.now()
 
-                    RecouvrementSuperviseur.objects.create(
-                        superviseur=superviseur,
-                        rot=agent,
-                        montant=montant,
-                        date_recouvrement=date_versement,
-                    )
                     versement = VersementBancaire.objects.create(
                         effectue_par=agent,
                         montant_vente=montant,
                         montant_hors_vente=montant_hors_vente,
                         date_versement_reelle=date_versement,
+                    )
+                    RecouvrementSuperviseur.objects.create(
+                        superviseur=superviseur,
+                        rot=agent,
+                        montant=montant,
+                        date_recouvrement=date_versement,
+                        versement=versement,
                     )
                     if recu:
                         RecuVersement.objects.create(

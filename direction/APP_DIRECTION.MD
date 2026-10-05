@@ -203,9 +203,9 @@ La direction centralise le contrôle des pièces justificatives via deux méthod
 * **Vue d'ensemble (`dashboard_justificatif`)** : Réalise une réconciliation macro entre la valeur d'acquisition initiale des stocks fournisseurs (`valeur_stock_initiale`) et la totalité des flux sortants enregistrés sur le compte `VersementBancaire`.
 * **Analyse Analytique (`liste_factures_fournisseurs`)** : Utilise un `select_related` sur les relations `lot`, `fournisseur` et `produit` pour lister les pièces téléversées, agréger les montants globaux par entité commerciale et suivre le nombre d'actes d'achat.
 
-### B. Traçabilité Fine des Flux du ROT (`liste_versements_direction`)
+### B. Traçabilité des versements (`liste_versements_direction`, `detail_versement_direction`)
 
-Cette vue surveille de manière exclusive l'activité de versement du Responsable des Opérations (`rot`) vers les comptes de l'entreprise :
+Cette vue surveille l'activité de versement vers les comptes de l'entreprise. Un versement peut couvrir **plusieurs superviseurs** (saisie groupée du gestionnaire de stock) : la liste affiche la colonne « Superviseurs » (montant remis par chacun), le filtre est par **superviseur** (plus de filtre ROT), et le détail contient le tableau « Montant remis par superviseur ». La répartition vient de `RecouvrementSuperviseur.versement` (FK nullable, `related_name='recouvrements'`, migration 0127 ; rattrapage des anciennes données par 0128 sur même acteur + même horodatage). La notion « ROT / responsable » a été retirée de ces écrans (« Enregistré par »). Côté admin, `VersementBancaireAdmin` affiche les remises par superviseur en inline lecture seule.
 
 * **Découpage des Flux** : Le système applique des filtres stricts pour catégoriser la nature des fonds déposés :
 * **Vente** : Provenance directe des recouvrements d'exploitation (`montant_vente > 0` et `montant_hors_vente == 0`).

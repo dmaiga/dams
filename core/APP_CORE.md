@@ -142,10 +142,12 @@ solde des superviseurs n'était donc jamais réduit par ce chemin, et le moteur 
   n'est préaffiché ni comparé**, contrairement à `finance.recouvrement_versement_groupe`. Un champ
   hors-vente et un bordereau uniques pour toute la soumission (`VersementSuperviseurGlobalForm`),
   au lieu d'un champ par ligne côté `finance`.
-* Chaque ligne saisie crée un `RecouvrementSuperviseur` (réduit le solde individuel — c'est le
-  correctif du bug). Une fois la boucle terminée, un seul `VersementBancaire` (+ un seul
-  `RecuVersement` si bordereau fourni) est créé pour toute la soumission, dans un
-  `transaction.atomic()`.
+* Un seul `VersementBancaire` (+ un seul `RecuVersement` si bordereau fourni) est créé pour toute la
+  soumission, puis chaque ligne saisie crée un `RecouvrementSuperviseur` rattaché à ce versement via
+  `RecouvrementSuperviseur.versement` (réduit le solde individuel — c'est le correctif du bug ; permet
+  d'afficher le montant remis par superviseur côté direction/admin), le tout dans un
+  `transaction.atomic()`. `finance.recouvrement_versement_groupe` renseigne aussi ce lien (1 versement
+  par superviseur).
 * **`creer_versement`/`VersementForm`** restent inchangés pour ROT et Direction, mais le gestionnaire
   de stock n'y a plus accès : `VersementForm.save()` n'accepte plus `rot.est_gestionnaire_stock`
   (seuls `est_rot`/`est_direction`), et `creer_versement` redirige explicitement vers `access_denied`

@@ -2242,6 +2242,16 @@ class RecouvrementSuperviseur(models.Model):
 
   
 
+    versement = models.ForeignKey(
+        'VersementBancaire',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recouvrements',
+        verbose_name="Versement bancaire associé",
+        help_text="Versement qui a regroupé cette remise (un versement peut couvrir plusieurs superviseurs)",
+    )
+
     commentaire = models.TextField(blank=True)
 
     date_recouvrement = models.DateTimeField(default=timezone.now)

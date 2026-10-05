@@ -16,20 +16,18 @@
                 <!-- Ligne 1 des filtres -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Filtre par superviseur -->
-
-                    <!-- Filtre par ROT -->
-<div>
-    <label class="label label-text font-semibold py-1">ROT (Trésorerie)</label>
-    <select name="rot" class="select select-bordered select-sm w-full">
-        <option value="">Tous les ROT</option>
-        {% for rot in rots %}
-        <option value="{{ rot.id }}"
-            {% if filtres_actifs.rot|stringformat:"s" == rot.id|stringformat:"s" %}selected{% endif %}>
-            {{ rot.full_name }}
-        </option>
-        {% endfor %}
-    </select>
-</div>
+                    <div>
+                        <label class="label label-text font-semibold py-1">Superviseur</label>
+                        <select name="superviseur" class="select select-bordered select-sm w-full">
+                            <option value="">Tous les superviseurs</option>
+                            {% for sup in superviseurs %}
+                            <option value="{{ sup.id }}"
+                                {% if filtres_actifs.superviseur|stringformat:"s" == sup.id|stringformat:"s" %}selected{% endif %}>
+                                {{ sup.full_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
                     
                     <!-- Filtre périodique -->
@@ -176,7 +174,8 @@
                     <thead>
                         <tr class="bg-base-200 text-base">
                             <th class="py-2 px-2">Date</th>
-                            <th class="py-2 px-2">Effectué par</th>
+                            <th class="py-2 px-2">Enregistré par</th>
+                            <th class="py-2 px-2">Superviseurs</th>
                             <th class="py-2 px-2">Type</th>
                             <th class="py-2 px-2">Vente</th>
                             <th class="py-2 px-2">Apport</th>
@@ -206,6 +205,13 @@
         </div>
 
     {% endif %}
+</td>
+<td class="py-2 px-2">
+    {% for rec in versement.recouvrements.all %}
+        <div class="text-xs whitespace-nowrap">{{ rec.superviseur.full_name }} : <span class="font-semibold">{{ rec.montant|fcfa }}</span></div>
+    {% empty %}
+        <span class="text-gray-400">—</span>
+    {% endfor %}
 </td>
 
 
@@ -253,7 +259,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="text-center py-6">
+                            <td colspan="10" class="text-center py-6">
                                 <div class="text-gray-400">
                                     <i class="fas fa-money-bill-transfer text-3xl mb-2"></i>
                                     <p class="text-base">Aucun versement trouvé</p>

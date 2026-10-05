@@ -898,17 +898,17 @@ def liste_versements_direction(request):
         .select_related(
             'effectue_par', 'effectue_par__user'
         )
-        .prefetch_related('recus')
+        .prefetch_related('recus', 'recouvrements__superviseur__user')
         .order_by('-date_versement_reelle')
     )
 
     filtres_actifs = {}
 
-    # ========= FILTRE ROT =========
-    rot_id = request.GET.get('rot')
-    if rot_id:
-        versements = versements.filter(effectue_par_id=rot_id)
-        filtres_actifs['rot'] = rot_id
+    # ========= FILTRE SUPERVISEUR =========
+    superviseur_id = request.GET.get('superviseur')
+    if superviseur_id:
+        versements = versements.filter(recouvrements__superviseur_id=superviseur_id).distinct()
+        filtres_actifs['superviseur'] = superviseur_id
 
     # ========= FILTRE PERIODE =========
     periode = request.GET.get('periode')
@@ -986,7 +986,7 @@ def liste_versements_direction(request):
 
         # Filtres
         'filtres_actifs': filtres_actifs,
-        'rots': Agent.objects.filter(type_agent='rot').select_related('user'),
+        'superviseurs': Agent.objects.filter(type_agent='entrepot').select_related('user'),
 
         'periodes_disponibles': [
             ('', 'Sélectionner période'),
@@ -1021,6 +1021,9 @@ def detail_versement_direction(request, versement_id):
         id=versement_id
     )
     responsable = versement.effectue_par or versement.superviseur
+    recouvrements = versement.recouvrements.select_related(
+        'superviseur', 'superviseur__user'
+    ).order_by('superviseur__user__first_name')
     depenses = versement.depenses.all()
     recus = versement.recus.all()
 
@@ -1030,13 +1033,11 @@ def detail_versement_direction(request, versement_id):
     context = {
         'versement': versement,
         'responsable': responsable,
+        'recouvrements': recouvrements,
         'depenses': depenses,
         'recus': recus,
         'total_depenses': total_depenses,
         'montant_net': montant_net,
-
-        # 🔑 ROT = acteur principal
-        'rot': versement.effectue_par,
     }
 
     return render(

@@ -23,7 +23,7 @@
             Versement #{{ versement.id }}
         </h1>
         <p class="text-gray-600">
-            Responsable :
+            Enregistré par :
             <span class="badge badge-primary">
                 {{ responsable.full_name }}
             </span>
@@ -54,7 +54,7 @@
                         </span>
                     </div>
             <div class="flex justify-between">
-                <span class="font-semibold">Responsable (ROT) :</span>
+                <span class="font-semibold">Enregistré par :</span>
                 <span class="font-medium">{{ responsable.full_name }}</span>
             </div>
 
@@ -101,6 +101,42 @@
     </div>
 </div>
 
+    </div>
+
+    <!-- Répartition par superviseur -->
+    <div class="card bg-base-100 shadow mb-6">
+        <div class="card-body">
+            <h2 class="card-title text-primary mb-3">
+                <i class="fas fa-users mr-2"></i>
+                Montant remis par superviseur
+                <span class="badge badge-success ml-2">{{ recouvrements|length }}</span>
+            </h2>
+            {% if recouvrements %}
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr><th>Superviseur</th><th class="text-right">Montant remis</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in recouvrements %}
+                        <tr>
+                            <td>{{ rec.superviseur.full_name }}</td>
+                            <td class="text-right font-semibold">{{ rec.montant|fcfa }} FCFA</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="font-bold">
+                            <td>Total ventes</td>
+                            <td class="text-right">{{ versement.montant_vente|fcfa }} FCFA</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-gray-500">Aucun superviseur rattaché à ce versement (saisie antérieure).</p>
+            {% endif %}
+        </div>
     </div>
 
     <!-- Description -->

@@ -1568,24 +1568,14 @@ def verser_superviseurs_gestionnaire(request):
             description = global_form.cleaned_data.get('description')
             maintenant = timezone.now()
 
-            nb_traites = 0
-            total_montant = Decimal('0.00')
+            lignes_saisies = [
+                (form.cleaned_data['superviseur'], form.cleaned_data['montant'])
+                for form in formset
+                if form.cleaned_data.get('montant')
+            ]
+            nb_traites = len(lignes_saisies)
+            total_montant = sum((m for _, m in lignes_saisies), Decimal('0.00'))
             with transaction.atomic():
-                for form in formset:
-                    montant = form.cleaned_data.get('montant')
-                    if not montant:
-                        continue
-
-                    superviseur = form.cleaned_data['superviseur']
-                    RecouvrementSuperviseur.objects.create(
-                        superviseur=superviseur,
-                        rot=agent_connecte,
-                        montant=montant,
-                        date_recouvrement=maintenant,
-                    )
-                    total_montant += montant
-                    nb_traites += 1
-
                 if nb_traites:
                     versement = VersementBancaire.objects.create(
                         effectue_par=agent_connecte,
@@ -1594,6 +1584,14 @@ def verser_superviseurs_gestionnaire(request):
                         description=description,
                         date_versement_reelle=maintenant,
                     )
+                    for superviseur, montant in lignes_saisies:
+                        RecouvrementSuperviseur.objects.create(
+                            superviseur=superviseur,
+                            rot=agent_connecte,
+                            montant=montant,
+                            date_recouvrement=maintenant,
+                            versement=versement,
+                        )
                     if bordereau:
                         RecuVersement.objects.create(
                             versement=versement,

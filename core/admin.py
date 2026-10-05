@@ -442,14 +442,37 @@ class RecuVersementInline(admin.TabularInline):
     fields = ('fichier', 'description', 'date_upload')
     readonly_fields = ('date_upload',)
 
+class RecouvrementVersementInline(admin.TabularInline):
+    """Montant remis par chaque superviseur pour ce versement (lecture seule)."""
+    model = RecouvrementSuperviseur
+    fk_name = 'versement'
+    extra = 0
+    can_delete = False
+    fields = ('superviseur', 'montant', 'date_recouvrement')
+    readonly_fields = fields
+    verbose_name = "Remise superviseur"
+    verbose_name_plural = "Montant remis par superviseur"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(VersementBancaire)
 class VersementBancaireAdmin(admin.ModelAdmin):
-    inlines = [RecuVersementInline]
-    list_display = ('id', 'effectue_par', 'montant_vente', 'montant_hors_vente', 'date_versement_reelle')
-    
+    inlines = [RecouvrementVersementInline, RecuVersementInline]
+    list_display = ('id', 'effectue_par', 'superviseurs_resume', 'montant_vente', 'montant_hors_vente', 'date_versement_reelle')
+
+    @admin.display(description="Superviseurs")
+    def superviseurs_resume(self, obj):
+        return ", ".join(
+            f"{r.superviseur.full_name} ({r.montant:.0f})" for r in obj.recouvrements.all()
+        ) or "—"
+
     def get_queryset(self, request):
         """Optimise les requêtes pour éviter N+1 sur effectue_par et superviseur"""
-        return super().get_queryset(request).select_related('effectue_par__user', 'superviseur__user')
+        return super().get_queryset(request).select_related(
+            'effectue_par__user', 'superviseur__user'
+        ).prefetch_related('recouvrements__superviseur__user')
 
 
 @admin.register(RecuVersement)
@@ -672,7 +695,7 @@ class RecouvrementSuperviseurAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'superviseur',
-        'rot',
+        'versement',
         'montant',
         'cash_disponible',
         'date_recouvrement',
@@ -680,7 +703,6 @@ class RecouvrementSuperviseurAdmin(admin.ModelAdmin):
 
     list_filter = (
         'superviseur',
-        'rot',
         'date_recouvrement',
     )
 
