@@ -211,13 +211,13 @@ couvre aussi le produit/lot distribué (pas seulement l'agent/la quantité) — 
 
 Migration `core/migrations/0122_correction_administrative.py`. Accès aux vues de correction
 (`direction/`) : garde partagée `direction.views._acces_admin_mdmaiga` (généralisée depuis
-`_acces_reaffectation`, même principe — voir `direction/APP_DIRECTION.MD`).
+`_acces_reaffectation`, même principe — voir `direction/APP_DIRECTION.md`).
 
 Sprint-13 complet (2026-09-15) : services `marchandise.services.CorrectionLotService`/
 `CorrectionDistributionService` et `vente.services.CorrectionVenteService`, formulaires/vues/
 templates dans `direction/`, section de menu « Admin » (mdmaiga uniquement) dans
 `base_admin.html`. Voir `marchandise/APP_MARCHANDISE.md`, `vente/APP_VENTE.md` et
-`direction/APP_DIRECTION.MD` pour le détail par app.
+`direction/APP_DIRECTION.md` pour le détail par app.
 ## 12. Mise en page PDF partagée (`core/pdf_compact.py`) — 2026-10-01
 
 Module utilitaire (pas de modèle) utilisé par les exports reportlab de `direction` et `bi` :

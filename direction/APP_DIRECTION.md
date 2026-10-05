@@ -304,6 +304,7 @@ Historique) :
 | `liste_corrections_ventes` | `direction/corrections/ventes/` | Liste des ventes, filtrable par **agent**, **produit** et **période de vente** — point d'entrée de la correction de vente. |
 | `corriger_lot` | `direction/corrections/lot/<lot_id>/` | Appelle `marchandise.services.CorrectionLotService.corriger_lot` |
 | `corriger_distribution` | `direction/corrections/distribution/<detail_distribution_id>/` | Appelle `marchandise.services.CorrectionDistributionService.corriger_distribution` |
+| `scinder_distribution_admin` | `direction/corrections/distribution/<detail_distribution_id>/scinder/` | Appelle `CorrectionDistributionService.scinder_distribution` — répartit une distribution entre deux agents du même superviseur, POST uniquement (bloc sur `corriger_distribution.html`) |
 | `supprimer_distribution_admin` | `direction/corrections/distribution/<detail_distribution_id>/supprimer/` | Appelle `marchandise.services.CorrectionDistributionService.supprimer_distribution` — bouton « Zone dangereuse » sur `corriger_distribution.html`, POST uniquement |
 | `corriger_vente` | `direction/corrections/vente/<vente_id>/` | Appelle `vente.services.CorrectionVenteService.corriger_vente` |
 | `historique_corrections` | `direction/corrections/historique/` | Lecture de `CorrectionAdministrative` (filtrable par type, paginée 30/page) |

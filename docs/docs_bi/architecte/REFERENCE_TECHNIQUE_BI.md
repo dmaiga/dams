@@ -682,7 +682,7 @@ Cadence réelle : mensuelle par convention d'usage (bornes calculées via `calen
 
 Pour `core`, `marchandise`, `vente`, `paie`, `agents`, `direction`, `surveillance`, `analyse_champ`, se reporter d'abord aux `APP_*.md` respectifs (à jour sur le périmètre fonctionnel déclaré) et à `rules/ARCHITECTURE.md`. Cette section ne documente que les **permissions réelles telles que vérifiées dans le code**, et les cas non couverts par un `APP_*.md`.
 
-### 5.1 `direction` — permissions réelles par vue (non documentées dans `APP_DIRECTION.MD`)
+### 5.1 `direction` — permissions réelles par vue (non documentées dans `APP_DIRECTION.md`)
 
 | Vue | Mécanisme réel | Accès accordé |
 |---|---|---|
@@ -695,7 +695,7 @@ Pour `core`, `marchandise`, `vente`, `paie`, `agents`, `direction`, `surveillanc
 | `calcul_salaires`, `detail_salaire_agent`, `export_salaires_excel`, `api_calcul_salaire_rapide` | `@user_passes_test(... est_direction)` | `direction` uniquement |
 | `suivi_distributions`, `monitoring_alertes_dashboard` | **aucun décorateur du tout** | accès public, y compris non authentifié |
 
-**— signaler explicitement pour la BI** : l'app `direction` n'a pas de gouvernance de sécurité homogène malgré son rôle de « couche de gouvernance et d'audit » (`APP_DIRECTION.MD:5`) — une majorité de vues financières sensibles (paiements fournisseurs, versements, dépenses, clôtures) sont accessibles à tout agent authentifié, et deux vues n'ont même pas `@login_required`.
+**— signaler explicitement pour la BI** : l'app `direction` n'a pas de gouvernance de sécurité homogène malgré son rôle de « couche de gouvernance et d'audit » (`APP_DIRECTION.md:5`) — une majorité de vues financières sensibles (paiements fournisseurs, versements, dépenses, clôtures) sont accessibles à tout agent authentifié, et deux vues n'ont même pas `@login_required`.
 
 ### 5.2 `surveillance` — mixin de permission unique
 
@@ -739,7 +739,7 @@ Liste consolidée, sans arbitrage — chaque écart cite (a) la doc existante, (
 
 ### 6.2 Divergences de permissions / sécurité (impact sur la fiabilité des flux, pas sur la formule)
 
-7. `direction/views.py` : la majorité des vues financières (paiements fournisseurs, versements, dépenses, clôtures) n'ont **aucun contrôle `type_agent`**, contrairement à l'image de « couche de gouvernance » de `APP_DIRECTION.MD`. Deux vues (`suivi_distributions`, `monitoring_alertes_dashboard`) n'ont même pas `@login_required`. Voir §5.1.
+7. `direction/views.py` : la majorité des vues financières (paiements fournisseurs, versements, dépenses, clôtures) n'ont **aucun contrôle `type_agent`**, contrairement à l'image de « couche de gouvernance » de `APP_DIRECTION.md`. Deux vues (`suivi_distributions`, `monitoring_alertes_dashboard`) n'ont même pas `@login_required`. Voir §5.1.
 8. Accès hardcodé par `username` littéral (`"jeanclaude.sup"`, `agents/views.py:314`) pour le canal de distribution à prix forcé — non qualifié de risque par `APP_AGENT.md`.
 9. `core.forms.gestion_factures_lot` — `FactureLotForm.save(rot=request.user.agent)` ne vérifie jamais que l'agent est effectivement `type_agent='rot'`, contrairement à `VersementForm.save()` qui le fait.
 10. `RecouvrementSuperviseur.clean()` calcule un `cash_restant` mais ne lève jamais de `ValidationError` — garde-fou de non-dépassement présent dans le code mais fonctionnellement inactif.
@@ -760,10 +760,10 @@ Liste consolidée, sans arbitrage — chaque écart cite (a) la doc existante, (
 22. `Depense.categorie`/`Depense.source` comptent chacun 21 lignes `NULL` en base malgré l'absence de `null=True` dans le modèle et un `default` non-NULL (`'DIVERS'`/`'ROT'`) — la migration `0094_alter_distributionagent_options_depense_categorie_and_more.py` a réintroduit ces champs après leur suppression en `0045`; l'origine exacte des 21 `NULL` (import brut, backfill incomplet, données antérieures à `0094` non re-remplies) n'a pas pu être tranchée par la lecture du code seul — signalé sans trancher.
 23. `RegleSalaire` compte une 4— valeur `type_agent='entrepot'` en base (créée par `init_regles_remuneration.py`), hors du `choices` déclaré par le modèle (`terrain`/`agent_gros`/`superviseur`) — Django ne contraint pas les `choices` au niveau SQL, donc la ligne existe silencieusement sans jamais être lue par le calculateur de paie (cf. 6.1.4).
 24. `surveillance` : le seuil « vente rouge » n'est pas une perte stricte mais une marge minimale (`SEUIL_MARGE_MINIMALE`), et exclut les ventes antérieures à `DATE_PLANCHER_PRIX` (`surveillance/constants.py`) — plus restrictif/nuancé que ce que suggère `APP_SURVEILLANCE.md:41` (« ventes à perte »). **Corrigé le 2026-08-13** : `surveillance/services/prix_service.py` et `surveillance/services/surveillance_prix_service.py` définissaient chacun leur propre valeur locale (45 FCFA), jamais alignée sur `surveillance.constants.SEUIL_MARGE_MINIMALE` (déclarée mais inutilisée) — les deux importent désormais cette constante unique (valeur toujours 45 FCFA, décision mdmaiga du même jour après un essai à 25 FCFA). La comparaison est aussi passée de `<=` (marge ≤ seuil) à `<` stricte (marge < seuil), pour que « marge exactement au seuil » ne soit plus une anomalie.
-25. `direction/services/dashboard_service.py:get_periodes` ne gère explicitement que `'annee'` et `'mois'` — toute valeur `'semaine'`/`'custom'` (pourtant citée par `APP_DIRECTION.MD:11` comme granularité supportée) retombe silencieusement sur le mois calendaire courant, sans erreur.
+25. `direction/services/dashboard_service.py:get_periodes` ne gère explicitement que `'annee'` et `'mois'` — toute valeur `'semaine'`/`'custom'` (pourtant citée par `APP_DIRECTION.md:11` comme granularité supportée) retombe silencieusement sur le mois calendaire courant, sans erreur.
 26. `direction/services/dashboard_service.py:get_kpis_globaux` : le calcul du CA période filtre `Vente.est_supprime=False` (ligne ~209-219) mais le calcul de la marge brute période (ligne ~295-306) ne filtre pas `est_supprime` — incohérence interne entre deux métriques du même service, à corriger avant réplication dbt.
 27. `direction/services/vente_analyses.py:VenteAnalyseService.filter_ventes` ne filtre pas `est_supprime=False` explicitement — à vérifier si un manager par défaut du modèle `Vente` l'exclut déjà (non confirmé par la lecture ciblée) avant de répliquer ce filtre en dbt.
-28. —cran (`ToutesLesVentesView`, annotations SQL `ExpressionWrapper`) vs export (`VenteExportService`, properties Python `Vente.total_vente`) : le même queryset filtré est utilisé pour les deux (garantie "au centime près" de `APP_DIRECTION.MD §6` confirmée **au niveau du filtrage**), mais les **modes de calcul du montant affiché diffèrent** (SQL annoté vs property Python) — écart potentiel d'arrondi non exclu, non vérifié en détail sur `Vente.total_vente`/`produit_nom`.
+28. —cran (`ToutesLesVentesView`, annotations SQL `ExpressionWrapper`) vs export (`VenteExportService`, properties Python `Vente.total_vente`) : le même queryset filtré est utilisé pour les deux (garantie "au centime près" de `APP_DIRECTION.md §6` confirmée **au niveau du filtrage**), mais les **modes de calcul du montant affiché diffèrent** (SQL annoté vs property Python) — écart potentiel d'arrondi non exclu, non vérifié en détail sur `Vente.total_vente`/`produit_nom`.
 29. `JournalModificationDistribution`, `AjustementSolde` (dans la base explorée), `Client`, `Dette`, `PaiementDette` sont des tables vides ou quasi jamais alimentées par le code actif — à exclure ou traiter comme dimensions vides dans le modèle dbt tant qu'aucune donnée n'y transite.
 
 ---

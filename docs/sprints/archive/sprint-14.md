@@ -9,7 +9,7 @@ initiale listait une ligne par produit (avec fournisseur et valorisation FCFA). 
 ce n'est pas un document comptable mais une checklist terrain — reconstruite en vue agrégée
 superviseur → agent → produits (badges compacts, sans fournisseur ni valorisation), export Excel/
 PDF aligné sur la même structure, boutons d'export remontés en tête de page. Détail dans
-`direction/APP_DIRECTION.MD` § 7 (source de vérité à jour) ; ce fichier garde la trace de la
+`direction/APP_DIRECTION.md` § 7 (source de vérité à jour) ; ce fichier garde la trace de la
 demande et du raisonnement initial, non mis à jour ligne à ligne après coup.
 
 ---
@@ -194,11 +194,11 @@ repris un jour, prévoir un nouveau sprint dédié plutôt que de rouvrir celui-
 
 ## Documentation à mettre à jour (toutes apps concernées, cf. CLAUDE.md § Après avoir codé)
 
-- `direction/APP_DIRECTION.MD` (si présent — à vérifier) : nouveau comportement filtre par défaut,
+- `direction/APP_DIRECTION.md` (si présent — à vérifier) : nouveau comportement filtre par défaut,
   nouveau tableau d'investigation, export associé, ajout superviseur sur `direction/ventes`.
 - `docs/features/` : pas de fichier dédié `direction` identifié à ce jour — à créer si l'app en
   est dépourvue (seul `app_surveillance.md` existe actuellement dans `docs/features/`), ou statuer
-  que `APP_DIRECTION.MD` en tient déjà lieu.
+  que `APP_DIRECTION.md` en tient déjà lieu.
 
 ---
 
@@ -230,7 +230,7 @@ repris un jour, prévoir un nouveau sprint dédié plutôt que de rouvrir celui-
 **Transverse**
 - ✅ `python manage.py test direction` vert (20/20, dont 8 nouveaux tests) ; suite complète du
   projet vérifiée (`python manage.py test`, 125/125).
-- ✅ `APP_DIRECTION.MD` mis à jour dans la même session que le code (§ 6 et nouvelle § 7).
+- ✅ `APP_DIRECTION.md` mis à jour dans la même session que le code (§ 6 et nouvelle § 7).
 
 ---
 

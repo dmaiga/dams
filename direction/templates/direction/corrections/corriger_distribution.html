@@ -82,6 +82,37 @@
         </div>
     </div>
 
+    <div class="card bg-white shadow-sm border border-slate-200">
+        <div class="card-body space-y-3">
+            <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                Répartir entre deux agents
+            </h2>
+            <p class="text-xs text-slate-500">
+                Transfère une partie de la quantité ({{ detail.quantite }}) à un autre agent du même
+                superviseur ; le reste demeure chez {{ distribution.agent_terrain.full_name|default:"—" }}.
+                Le stock central n'est pas modifié. Seule la part non vendue ni perdue est transférable.
+            </p>
+            <form method="post" action="{% url 'scinder_distribution_admin' detail.id %}" class="space-y-3">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Autre agent destinataire</span></label>
+                        {{ scission_form.agent_terrain }}
+                    </div>
+                    <div class="form-control">
+                        <label class="label"><span class="label-text text-xs">Quantité à lui transférer</span></label>
+                        {{ scission_form.quantite }}
+                    </div>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-xs">Motif (facultatif)</span></label>
+                    {{ scission_form.motif }}
+                </div>
+                <button type="submit" class="btn btn-outline btn-sm w-full">Répartir</button>
+            </form>
+        </div>
+    </div>
+
     <div class="card bg-white shadow-sm border border-red-200">
         <div class="card-body space-y-3">
             <h2 class="text-sm font-semibold text-red-700 uppercase tracking-wide">

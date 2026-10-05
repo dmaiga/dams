@@ -166,6 +166,17 @@ par champ effectivement modifié. **`motif` facultatif** (décision mdmaiga, 202
 correction reste tracée qui/quand/avant/après sans lui). Accès réservé à
 `direction.views._acces_admin_mdmaiga`.
 
+### `CorrectionDistributionService.scinder_distribution(...)` — 2026-10-05
+
+Répartit une distribution entre l'agent d'origine et un autre agent **du même superviseur** (cas : A a reçu 2
+alors que 1 était destiné à A et 1 à B — `corriger_distribution` changerait l'agent de la **totalité**, jamais
+d'une part). Le détail d'origine et son `AffectationLotSuperviseur` source sont réduits de `quantite` ; un nouveau
+`DistributionAgent`/`DetailDistribution`/`AffectationLotSuperviseur` (même lot, prix, spécification, date) est créé
+pour le destinataire. **Le stock central du lot n'est pas touché.** Refus si : quantité ≥ quantité distribuée (utiliser
+la correction d'agent), quantité > non vendu/non perdu (`quantite - ventes - pertes`), agent d'un autre superviseur,
+ou stock source non identifiable sans ambiguïté. Journalisé en `CorrectionAdministrative` type
+`DISTRIBUTION_SCISSION` (migration 0130). Écran : bloc « Répartir entre deux agents » sur `corriger_distribution.html`.
+
 ### `CorrectionDistributionService.corriger_distribution(...)` — sprint-13, 2026-09-15, révisé le même jour
 
 Correction administrative d'une distribution déjà enregistrée (`DistributionAgent`/

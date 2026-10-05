@@ -638,6 +638,149 @@ class CorrectionDistributionService:
         return detail
 
     @classmethod
+    def scinder_distribution(
+        cls,
+        detail_distribution_id,
+        *,
+        agent_terrain,
+        quantite,
+        motif='',
+        utilisateur,
+    ):
+        """Scinde une distribution : `quantite` unites sont transferees a un
+        autre agent du MEME superviseur, le reste demeure chez l'agent
+        d'origine. Cas d'usage : un agent a recu 2 alors que 1 etait destine
+        a l'agent A et 1 a l'agent B (corriger l'agent seul deplacerait la
+        totalite).
+
+        Le stock central du lot n'est pas touche (la quantite reste
+        distribuee). Le detail d'origine et son AffectationLotSuperviseur
+        source sont reduits de `quantite` ; un nouveau DistributionAgent /
+        DetailDistribution / AffectationLotSuperviseur est cree pour le
+        destinataire (meme lot, prix, specification et date). Les ventes et
+        pertes deja saisies restent sur le detail d'origine : on ne peut
+        transferer que la part non vendue/perdue.
+        """
+        motif = motif or ''
+        quantite = AffectationLotService._normaliser_quantite(quantite)
+
+        with transaction.atomic():
+            detail = DetailDistribution.objects.select_for_update().get(
+                pk=detail_distribution_id
+            )
+            distribution = DistributionAgent.objects.select_for_update().get(
+                pk=detail.distribution_id
+            )
+
+            if agent_terrain is None:
+                raise ValidationError("Choisissez l'agent destinataire.")
+            if distribution.agent_terrain_id == agent_terrain.pk:
+                raise ValidationError(
+                    "L'agent destinataire est deja celui de cette distribution."
+                )
+            if agent_terrain.superviseur_id != distribution.superviseur_id:
+                raise ValidationError(
+                    f"{agent_terrain.full_name} n'est pas rattache au superviseur "
+                    f"{distribution.superviseur.full_name}."
+                )
+            if quantite >= detail.quantite:
+                raise ValidationError(
+                    "La quantite a transferer doit etre inferieure a la quantite "
+                    f"distribuee ({detail.quantite}) — pour tout deplacer, utilisez "
+                    "la correction de l'agent."
+                )
+
+            quantite_vendue = (
+                Vente.objects.filter(
+                    detail_distribution=detail, est_supprime=False
+                ).aggregate(total=Sum('quantite'))['total']
+                or Decimal('0.00')
+            )
+            quantite_perdue = (
+                detail.pertes.aggregate(total=Sum('quantite_perdue'))['total']
+                or Decimal('0.00')
+            )
+            restant = detail.quantite - quantite_vendue - quantite_perdue
+            if quantite > restant:
+                raise ValidationError(
+                    f"Seules {restant} unites sont encore disponibles chez "
+                    f"{distribution.agent_terrain.full_name} (le reste est deja vendu "
+                    "ou perdu) — transfert refuse."
+                )
+
+            affectation = cls._trouver_affectation_source(detail, distribution)
+            if affectation is None:
+                raise ValidationError(
+                    "Impossible d'identifier sans ambiguite le stock source de "
+                    "cette distribution — scission refusee."
+                )
+
+            ancienne_quantite = detail.quantite
+            nouvelle_quantite = ancienne_quantite - quantite
+            ancien_agent = distribution.agent_terrain
+
+            # 1) Part restante chez l'agent d'origine
+            detail.quantite = nouvelle_quantite
+            detail.save(update_fields=['quantite'])
+            distribution.quantite_totale = (
+                DetailDistribution.objects.filter(distribution=distribution)
+                .aggregate(total=Sum('quantite'))['total']
+                or Decimal('0.00')
+            )
+            distribution.save(update_fields=['quantite_totale'])
+            affectation.quantite_initiale = nouvelle_quantite
+            affectation.save(update_fields=['quantite_initiale'])
+
+            # 2) Part transferee : nouvelle distribution + affectation miroir
+            nouvelle_distribution = DistributionAgent.objects.create(
+                superviseur=distribution.superviseur,
+                agent_terrain=agent_terrain,
+                date_distribution=distribution.date_distribution,
+                quantite_totale=quantite,
+                nombre_produits_differents=1,
+            )
+            nouveau_detail = DetailDistribution.objects.create(
+                distribution=nouvelle_distribution,
+                lot=detail.lot,
+                quantite=quantite,
+                prix_gros=detail.prix_gros,
+                prix_detail=detail.prix_detail,
+                specification=detail.specification,
+            )
+            AffectationLotSuperviseur.objects.create(
+                lot=affectation.lot,
+                superviseur=affectation.superviseur,
+                quantite_initiale=quantite,
+                quantite_restante=Decimal('0.00'),
+                prix_gros=affectation.prix_gros,
+                prix_detail=affectation.prix_detail,
+                attribue_par=affectation.attribue_par,
+                agent_terrain_direct=agent_terrain,
+                date_affectation=affectation.date_affectation,
+            )
+
+            enregistrer_correction(
+                cible=detail,
+                type_correction='DISTRIBUTION_SCISSION',
+                motif=motif,
+                utilisateur=utilisateur,
+                anciennes_valeurs={
+                    'quantite': str(ancienne_quantite),
+                    'agent_terrain_id': ancien_agent.id if ancien_agent else None,
+                    'agent_terrain': ancien_agent.full_name if ancien_agent else None,
+                },
+                nouvelles_valeurs={
+                    'quantite': str(nouvelle_quantite),
+                    'quantite_transferee': str(quantite),
+                    'agent_destinataire_id': agent_terrain.id,
+                    'agent_destinataire': agent_terrain.full_name,
+                    'nouveau_detail_id': nouveau_detail.id,
+                },
+            )
+
+        return detail, nouveau_detail
+
+    @classmethod
     def supprimer_distribution(
         cls,
         detail_distribution_id,

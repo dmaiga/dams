@@ -323,6 +323,38 @@ class CorrectionDistributionForm(forms.Form):
         return cleaned
 
 
+class ScissionDistributionForm(forms.Form):
+    """Scinde une distribution entre l'agent d'origine et un autre agent du
+    même superviseur (cf. CorrectionDistributionService.scinder_distribution)."""
+
+    agent_terrain = forms.ModelChoiceField(
+        queryset=None,
+        label="Autre agent destinataire",
+        widget=forms.Select(attrs={'class': _SELECT_CLASS}),
+    )
+    quantite = forms.DecimalField(
+        label="Quantité à transférer",
+        min_value=0.01,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': _INPUT_CLASS, 'step': '0.01'}),
+    )
+    motif = forms.CharField(
+        label="Motif (facultatif)",
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2, 'class': _TEXTAREA_CLASS}),
+    )
+
+    def __init__(self, *args, distribution, **kwargs):
+        super().__init__(*args, **kwargs)
+        from core.models import Agent
+
+        agents = Agent.objects.filter(
+            superviseur_id=distribution.superviseur_id, est_actif=True
+        ).exclude(pk=distribution.agent_terrain_id).select_related('user')
+        self.fields['agent_terrain'].queryset = agents.order_by('user__first_name', 'user__username')
+        self.fields['agent_terrain'].label_from_instance = lambda obj: obj.full_name
+
+
 class CorrectionVenteForm(forms.Form):
     """Correction d'une Vente déjà enregistrée — prix, quantité et/ou date."""
 

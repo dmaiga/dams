@@ -337,6 +337,63 @@ class CorrectionDistributionServiceTests(TestCase):
         correction = CorrectionAdministrative.objects.get()
         self.assertEqual(correction.type_correction, 'DISTRIBUTION_QUANTITE')
 
+    def test_scinde_une_distribution_entre_deux_agents(self):
+        detail_a, detail_b = CorrectionDistributionService.scinder_distribution(
+            self.detail.id,
+            agent_terrain=self.agent2,
+            quantite=Decimal('20.00'),
+            utilisateur=self.utilisateur,
+        )
+        self.lot.refresh_from_db()
+        self.affectation.refresh_from_db()
+        self.distribution.refresh_from_db()
+
+        self.assertEqual(detail_a.quantite, Decimal('30.00'))
+        self.assertEqual(detail_b.quantite, Decimal('20.00'))
+        self.assertEqual(detail_b.distribution.agent_terrain, self.agent2)
+        self.assertEqual(self.distribution.agent_terrain, self.agent)
+        self.assertEqual(self.distribution.quantite_totale, Decimal('30.00'))
+        self.assertEqual(self.affectation.quantite_initiale, Decimal('30.00'))
+        self.assertEqual(self.lot.quantite_restante, Decimal('150.00'))  # stock central inchange
+        self.assertTrue(AffectationLotSuperviseur.objects.filter(
+            lot=self.lot, superviseur=self.superviseur,
+            agent_terrain_direct=self.agent2, quantite_initiale=Decimal('20.00'),
+        ).exists())
+        self.assertEqual(
+            CorrectionAdministrative.objects.get().type_correction, 'DISTRIBUTION_SCISSION'
+        )
+
+    def test_scission_refuse_au_dela_du_non_vendu(self):
+        Vente.objects.create(
+            agent=self.agent, detail_distribution=self.detail,
+            quantite=Decimal('40.00'), prix_vente_unitaire=Decimal('150.00'),
+        )
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.scinder_distribution(
+                self.detail.id, agent_terrain=self.agent2,
+                quantite=Decimal('20.00'), utilisateur=self.utilisateur,
+            )
+
+    def test_scission_refuse_quantite_totale_et_autre_superviseur(self):
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.scinder_distribution(
+                self.detail.id, agent_terrain=self.agent2,
+                quantite=Decimal('50.00'), utilisateur=self.utilisateur,
+            )
+        autre_sup = Agent.objects.create(
+            user=User.objects.create_user(username='sup2', password='x'), type_agent='entrepot'
+        )
+        etranger = Agent.objects.create(
+            user=User.objects.create_user(username='agent3', password='x'),
+            type_agent='terrain', superviseur=autre_sup,
+        )
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.scinder_distribution(
+                self.detail.id, agent_terrain=etranger,
+                quantite=Decimal('10.00'), utilisateur=self.utilisateur,
+            )
+        self.assertEqual(DetailDistribution.objects.count(), 1)
+
     def test_refuse_quantite_sous_les_ventes_deja_enregistrees(self):
         Vente.objects.create(
             agent=self.agent,

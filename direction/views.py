@@ -1612,6 +1612,7 @@ from direction.forms import (
     TYPES_AGENTS_GERES,
     CorrectionLotForm,
     CorrectionDistributionForm,
+    ScissionDistributionForm,
     CorrectionVenteForm,
 )
 
@@ -1976,9 +1977,53 @@ def corriger_distribution(request, detail_distribution_id):
 
     return render(request, 'direction/corrections/corriger_distribution.html', {
         'form': form,
+        'scission_form': ScissionDistributionForm(distribution=distribution),
         'detail': detail,
         'distribution': distribution,
     })
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
+def scinder_distribution_admin(request, detail_distribution_id):
+    """Répartit une distribution entre deux agents du même superviseur
+    (ex. 2 reçus par A alors que 1 était destiné à B)."""
+    from marchandise.services import CorrectionDistributionService
+
+    detail = get_object_or_404(
+        DetailDistribution.objects.select_related(
+            'distribution__superviseur__user', 'distribution__agent_terrain__user', 'lot__produit'
+        ),
+        pk=detail_distribution_id,
+    )
+
+    if request.method == 'POST':
+        form = ScissionDistributionForm(request.POST, distribution=detail.distribution)
+        if form.is_valid():
+            try:
+                CorrectionDistributionService.scinder_distribution(
+                    detail.id,
+                    agent_terrain=form.cleaned_data['agent_terrain'],
+                    quantite=form.cleaned_data['quantite'],
+                    motif=form.cleaned_data['motif'],
+                    utilisateur=request.user,
+                )
+            except _DjangoValidationError as exc:
+                for erreur in _erreurs_formulaire(exc):
+                    messages.error(request, erreur)
+            else:
+                messages.success(
+                    request,
+                    f"{form.cleaned_data['quantite']} transférée(s) à "
+                    f"{form.cleaned_data['agent_terrain'].full_name}.",
+                )
+                return redirect('historique_corrections')
+        else:
+            for erreurs in form.errors.values():
+                for erreur in erreurs:
+                    messages.error(request, erreur)
+
+    return redirect('corriger_distribution', detail_distribution_id=detail.id)
 
 
 @login_required

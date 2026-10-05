@@ -14,7 +14,7 @@ montant_remis_rot), `direction/services/agent_dashboard_service.py::get_supervis
 (dashboards direction). Les calculs "situation financière ROT" équivalents dans ces deux derniers
 fichiers (`get_rot_finance`/`get_rots_finance`) ont été supprimés (dépréciés, jamais alignés sur
 `finance.services`). `direction/services/agent_analysis_service.py` conserve trois méthodes analogues
-non migrées, marquées code mort en commentaire (aucun appelant) — voir `direction/APP_DIRECTION.MD` § 3.A.
+non migrées, marquées code mort en commentaire (aucun appelant) — voir `direction/APP_DIRECTION.md` § 3.A.
 
 **Contexte métier (modèle à deux niveaux — voir décision n°13, sprint-03) :**
 

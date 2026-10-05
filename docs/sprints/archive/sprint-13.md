@@ -230,7 +230,7 @@ desktop/mobile, bouton de validation `sticky` sur mobile.
   `corriger_affectation` (section Service métier + Invariants).
 - `vente/APP_VENTE.md` : ajouter `corriger_vente` (nouveau `vente/services.py` si créé cette
   fois-ci).
-- `direction/APP_DIRECTION.MD` (ou équivalent) : nouvelle section "Admin — corrections
+- `direction/APP_DIRECTION.md` (ou équivalent) : nouvelle section "Admin — corrections
   administratives" (accès, 4 écrans, modèle `CorrectionAdministrative`), mise à jour de la
   section menu pour refléter le déplacement de la réaffectation.
 - `core/APP_CORE.md` : ajouter `CorrectionAdministrative` à la section modèles d'audit, à côté de
