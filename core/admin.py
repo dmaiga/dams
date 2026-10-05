@@ -26,6 +26,21 @@ from core.models import Alerte
 
 admin.site.register(Perte)
 
+
+class _SuperviseurActifFilter(admin.RelatedFieldListFilter):
+    """Filtre FK limité aux superviseurs actifs (type 'entrepot')."""
+    def field_choices(self, field, request, model_admin):
+        qs = Agent.objects.filter(type_agent='entrepot', est_actif=True).select_related('user')
+        return [(a.pk, a.full_name) for a in qs]
+
+
+class _AgentActifFilter(admin.RelatedFieldListFilter):
+    """Filtre FK limité aux agents actifs hors superviseurs."""
+    def field_choices(self, field, request, model_admin):
+        qs = Agent.objects.filter(est_actif=True).exclude(type_agent='entrepot').select_related('user')
+        return [(a.pk, a.full_name) for a in qs]
+
+
 @admin.register(Alerte)
 class AlerteAdmin(admin.ModelAdmin):
 
@@ -103,7 +118,12 @@ class LotEntrepotAdmin(admin.ModelAdmin):
 @admin.register(DistributionAgent)
 class DistributionAgentAdmin(admin.ModelAdmin):
     list_display = ['superviseur', 'agent_terrain', 'date_distribution','date_creation']
-    list_filter = ['date_distribution', 'superviseur', 'agent_terrain','date_creation']
+    list_filter = [
+        'date_distribution',
+        ('superviseur', _SuperviseurActifFilter),
+        ('agent_terrain', _AgentActifFilter),
+        'date_creation',
+    ]
     
     def get_queryset(self, request):
         """Optimise les requêtes pour éviter N+1 sur superviseur et agent_terrain"""
@@ -130,6 +150,9 @@ class DetailDistributionAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'distribution__date_distribution',
+        'distribution__date_creation',
+        ('distribution__superviseur', _SuperviseurActifFilter),
+        ('distribution__agent_terrain', _AgentActifFilter),
     )
 
     raw_id_fields = ('distribution', 'lot')
@@ -179,6 +202,8 @@ class VenteAdmin(admin.ModelAdmin):
     list_filter = (
         'date_vente',
         'date_creation',
+        ('detail_distribution__distribution__superviseur', _SuperviseurActifFilter),
+        ('agent', _AgentActifFilter),
         'type_vente',
         'mode_paiement',
     )
