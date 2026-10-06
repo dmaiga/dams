@@ -133,6 +133,10 @@ Ce simple seuil a en réalité une valeur limitée pris isolément : la quasi-to
 
 **Historique** : une première version sommait tout l'historique sans borne basse (décision n°13). Constat en usage réel : `deja_remis` dépassait `encaissements` pour les 3 superviseurs de test, un signal jugé plus gênant qu'utile — mdmaiga a préféré couper franchement au 01/08/2026 plutôt que d'investiguer des données de test anciennes (décision n°14).
 
+### `historique_journalier(superviseur, date_debut, date_fin)`
+
+Un enregistrement par jour ayant au moins un mouvement (du plus récent au plus ancien) : `solde_debut`, `entrees`, `sorties`, `versements`, `solde_fin`. Réutilise les mêmes sources et signes que `solde_superviseur` : le solde de début du premier jour est l'ouverture (ajustement d'août + flux jusqu'à la veille de `date_debut`) et le solde de fin d'un jour égale `solde_superviseur(superviseur, ce_jour)["solde"]`. Bascule du 01/10/2026 : le solde repart de zéro dans la fenêtre, comme dans `solde_superviseur`. Tests : `finance/tests.py`.
+
 ### `lister_soldes_superviseurs(date_fin=None)`
 
 Applique `solde_superviseur` à tous les superviseurs actifs (`type_agent='entrepot', est_actif=True`), pour alimenter le dashboard.
@@ -278,10 +282,8 @@ même logique que `EngagementFinancier` côté dams_agro) : `est_engagement_cham
 - Dashboard Direction (`finance/dashboard.html`) : colonne "Reste à rembourser
   (champ)" par superviseur.
 - Détail superviseur (`finance/detail_solde_superviseur.html`) : stats
-  "Engagé/Remboursé/Reste (champ)" + mouvements distingués par badge
-  (`avance_champ`, `depense_champ`, `remboursement_champ`) avec commentaire et
-  reste à rembourser par ligne — c'est ici que la Direction distingue nature/
-  origine/montant initial/déjà remboursé/reste/état, sans nouvel écran.
+  "Engagé/Remboursé/Reste (champ)" + mouvements (depuis le 06/10/2026 agrégés par jour, sans
+  badge ni reste à rembourser par ligne ; les avances/dépenses champ sont comptées dans les « sorties ») ; le détail par engagement (nature/origine/montant initial/déjà remboursé/reste/état) n'est plus visible côté Direction sur cette page (la page "Engagements champ" est réservée au superviseur concerné).
 
 **Risques connus** : fenêtre résiduelle d'incohérence si l'appel dams_agro
 réussit mais que l'écriture locale échoue juste après (panne DB) — non
@@ -314,7 +316,7 @@ Deux notions de "date" bien séparées, avec des paramètres GET distincts :
 
 Vues :
 - `dashboard_finance` : liste des soldes (`lister_soldes_superviseurs`) + caisse globale (`solde_caisse_globale`) + compteur d'alertes.
-- `detail_solde_superviseur` : solde du superviseur + mouvements **paginés** (`Paginator`, 30/page). Les mouvements affichés sont `Recouvrement` (encaissement, +), `Depense` personnelle (-) et `RecouvrementSuperviseur` (remise, -) — **jamais `VersementBancaire`**, qui n'appartient plus à ce superviseur une fois la recette mutualisée.
+- `detail_solde_superviseur` : solde du superviseur + historique **agrégé par jour** (`historique_journalier`, paginé 30 jours/page) : solde de début, entrées (`Recouvrement` + `RemboursementChamp`), sorties (`Depense` perso, engagements champ inclus), versements (`RecouvrementSuperviseur`), solde de fin — **jamais `VersementBancaire`**, qui n'appartient plus à ce superviseur une fois la recette mutualisée. Plus de ligne par vente ni de commentaire/reste à rembourser par mouvement (changement du 06/10/2026, demande mdmaiga) ; le détail d'un engagement champ reste consultable via `lister_engagements_champ`.
 - `recouvrement_versement_groupe` : voir section dédiée ci-dessus — action principale au quotidien.
 - `recouvrer_superviseur` / `creer_versement` / `creer_depense` : conservées, non exposées dans l'UI (voir tableau des URLs).
 - `historique_versements` / `historique_depenses` : listes complètes, non filtrées, triées par date décroissante (colonne "Superviseur" retirée de `historique_versements.html`, ce champ n'ayant plus de sens).
@@ -329,7 +331,7 @@ Héritent de `base_admin.html` (espace direction), style DaisyUI/Tailwind cohér
 | Template | Description |
 |---|---|
 | `dashboard.html` | Stats "caisse globale" en haut, tableau des soldes par superviseur (encaissements / dépenses perso / déjà remis / reste à remettre), sélecteur "solde à la date du", badge alerte, bouton vers l'action groupée. |
-| `detail_solde_superviseur.html` | Stats (encaissements/dépenses perso/déjà remis/reste à remettre) + tableau paginé des mouvements sur une fenêtre filtrable séparément (dates sans l'heure). |
+| `detail_solde_superviseur.html` | Stats (encaissements/dépenses perso/déjà remis/reste à remettre) + tableau journalier (solde de début, entrées, sorties, versements, solde de fin) sur une fenêtre filtrable séparément (dates sans l'heure). |
 | `recouvrement_versement_groupe.html` | Formset `RecouvrementVersementFormSet` — une ligne par superviseur (nom, solde actuel en lecture seule, montant, apport hors vente, reçu). |
 | `recouvrer_superviseur.html` | Formulaire `RecouvrementSuperviseurForm` — non lié dans la navigation. |
 | `creer_versement.html` | Formulaire `VersementBancaireForm` (sans champ superviseur) + upload de reçu(s) — non lié dans la navigation. |

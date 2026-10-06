@@ -21,7 +21,7 @@ from finance.forms import (
 )
 from finance.services import (
     DATE_DEBUT_FINANCE, creer_engagement_champ, lister_engagements_champ,
-    lister_soldes_superviseurs, solde_caisse_globale,
+    historique_journalier, lister_soldes_superviseurs, solde_caisse_globale,
     solde_superviseur, synchroniser_engagements_champ,
 )
 from django.core.exceptions import ValidationError
@@ -93,56 +93,10 @@ def detail_solde_superviseur(request, pk):
 
     mvt_debut, mvt_fin = _get_periode_mouvements(request)
 
-    mouvements = sorted(
-        [
-            {'type': 'encaissement', 'date': r.date_recouvrement, 'montant': r.montant_recouvre, 'objet': r}
-            for r in Recouvrement.objects.filter(
-                superviseur=superviseur,
-                date_recouvrement__date__gte=mvt_debut,
-                date_recouvrement__date__lte=mvt_fin,
-            )
-        ] + [
-            {
-                # Distingue les engagements champ (avance/dépense pour compte)
-                # des dépenses classiques du superviseur, pour la Direction.
-                'type': 'avance_champ' if d.categorie == 'AVANCE_CHAMP'
-                        else 'depense_champ' if d.categorie == 'DEPENSE_CHAMP'
-                        else 'depense',
-                'date': timezone.make_aware(datetime.combine(d.date_depense, datetime.min.time())),
-                'montant': -d.montant,
-                'objet': d,
-            }
-            for d in Depense.objects.filter(
-                effectue_par=superviseur,
-                date_depense__gte=mvt_debut,
-                date_depense__lte=mvt_fin,
-            )
-        ] + [
-            {'type': 'remise', 'date': rs.date_recouvrement, 'montant': -rs.montant, 'objet': rs}
-            for rs in RecouvrementSuperviseur.objects.filter(
-                superviseur=superviseur,
-                date_recouvrement__date__gte=mvt_debut,
-                date_recouvrement__date__lte=mvt_fin,
-            )
-        ] + [
-            {
-                'type': 'remboursement_champ',
-                'date': timezone.make_aware(datetime.combine(rc.date_remboursement, datetime.min.time())),
-                'montant': rc.montant,
-                'objet': rc,
-            }
-            for rc in RemboursementChamp.objects.filter(
-                depense__effectue_par=superviseur,
-                date_remboursement__gte=mvt_debut,
-                date_remboursement__lte=mvt_fin,
-            )
-        ],
-        key=lambda m: m['date'],
-        reverse=True,
-    )
     # Pas de VersementBancaire ici : une fois la recette remise (RecouvrementSuperviseur),
     # l'argent est mutualisé — le versement est un événement de la caisse globale,
     # pas de ce superviseur (voir finance/services.py::solde_caisse_globale).
+    mouvements = historique_journalier(superviseur, mvt_debut, mvt_fin)
 
     paginator = Paginator(mouvements, 30)
     mouvements_page = paginator.get_page(request.GET.get('page', 1))

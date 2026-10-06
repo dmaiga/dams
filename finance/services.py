@@ -1,10 +1,10 @@
 import logging
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from core.models import Agent, Depense, Recouvrement, RecouvrementSuperviseur, RemboursementChamp, VersementBancaire
@@ -151,6 +151,91 @@ def solde_superviseur(superviseur, date_fin=None):
         "solde": solde,
         "alerte": solde > SEUIL_ALERTE_SOLDE,
     }
+
+
+def _flux_par_jour(superviseur, date_debut, date_fin):
+    """Flux d'un superviseur agrégés par jour calendaire sur [date_debut, date_fin] :
+    {jour: {'entrees', 'sorties', 'versements'}}. Mêmes sources et mêmes signes que
+    `solde_superviseur` (entrées = encaissements + remboursements champ, sorties =
+    dépenses perso dont engagements champ, versements = remises au ROT/direction)."""
+    flux = {}
+
+    def cumuler(lignes, cle):
+        for jour, total in lignes:
+            flux.setdefault(
+                jour, {'entrees': Decimal("0.00"), 'sorties': Decimal("0.00"), 'versements': Decimal("0.00")}
+            )[cle] += total
+
+    cumuler(
+        Recouvrement.objects.filter(
+            superviseur=superviseur,
+            date_recouvrement__date__gte=date_debut,
+            date_recouvrement__date__lte=date_fin,
+        ).annotate(jour=TruncDate("date_recouvrement")).values_list("jour").annotate(total=Sum("montant_recouvre")),
+        'entrees',
+    )
+    cumuler(
+        RemboursementChamp.objects.filter(
+            depense__effectue_par=superviseur,
+            date_remboursement__gte=date_debut,
+            date_remboursement__lte=date_fin,
+        ).values_list("date_remboursement").annotate(total=Sum("montant")),
+        'entrees',
+    )
+    cumuler(
+        Depense.objects.filter(
+            effectue_par=superviseur,
+            date_depense__gte=date_debut,
+            date_depense__lte=date_fin,
+        ).values_list("date_depense").annotate(total=Sum("montant")),
+        'sorties',
+    )
+    cumuler(
+        RecouvrementSuperviseur.objects.filter(
+            superviseur=superviseur,
+            date_recouvrement__date__gte=date_debut,
+            date_recouvrement__date__lte=date_fin,
+        ).annotate(jour=TruncDate("date_recouvrement")).values_list("jour").annotate(total=Sum("montant")),
+        'versements',
+    )
+    return flux
+
+
+def historique_journalier(superviseur, date_debut, date_fin):
+    """
+    Historique des mouvements d'un superviseur, un enregistrement par jour ayant au
+    moins un mouvement (du plus récent au plus ancien) : solde de début, entrées,
+    sorties, versements (remises), solde de fin.
+
+    Même formule que `solde_superviseur` : le solde de début du premier jour est
+    l'ouverture (ajustement manuel si la période est celle du 01/08/2026, puis les
+    flux antérieurs jusqu'à la veille de `date_debut`), de sorte que le solde de fin
+    d'un jour est exactement `solde_superviseur(superviseur, ce_jour)["solde"]`. À la
+    bascule du 01/10/2026 (DATE_DEBUT_PERIODE_ACTUELLE) le solde repart de zéro,
+    comme dans `solde_superviseur`.
+    """
+    debut_periode = _date_debut_effective(date_debut)
+    solde = (
+        (superviseur.ajustement_solde or Decimal("0.00"))
+        if debut_periode == DATE_DEBUT_FINANCE
+        else Decimal("0.00")
+    )
+    if date_debut > debut_periode:
+        for f in _flux_par_jour(superviseur, debut_periode, date_debut - timedelta(days=1)).values():
+            solde += f['entrees'] - f['sorties'] - f['versements']
+
+    bascule_faite = date_debut >= DATE_DEBUT_PERIODE_ACTUELLE
+    lignes = []
+    for jour, f in sorted(_flux_par_jour(superviseur, date_debut, date_fin).items()):
+        if not bascule_faite and jour >= DATE_DEBUT_PERIODE_ACTUELLE:
+            solde = Decimal("0.00")
+            bascule_faite = True
+        debut = solde
+        solde = debut + f['entrees'] - f['sorties'] - f['versements']
+        lignes.append({'date': jour, 'solde_debut': debut, **f, 'solde_fin': solde})
+
+    lignes.reverse()
+    return lignes
 
 
 def lister_soldes_superviseurs(date_fin=None):

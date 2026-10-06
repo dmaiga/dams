@@ -93,7 +93,7 @@
                 <button class="btn btn-outline btn-sm"><i class="fas fa-filter"></i> Filtrer</button>
             </form>
             <p class="text-xs text-gray-500 mt-2">
-                Cette liste est un historique consultable librement — elle n'affecte jamais le calcul du solde ci-dessus.
+                Une ligne par jour ayant des mouvements. Entrées = encaissements des ventes + remboursements champ ; sorties = dépenses (dont avances/dépenses champ) ; versements = remises au ROT/direction. Historique consultable librement — il n'affecte jamais le calcul du solde ci-dessus.
             </p>
         </div>
     </div>
@@ -103,53 +103,26 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Type</th>
-                        <th>Origine / commentaire</th>
-                        <th class="text-right">Montant</th>
+                        <th class="text-right">Solde de début</th>
+                        <th class="text-right">Entrées</th>
+                        <th class="text-right">Sorties</th>
+                        <th class="text-right">Versements</th>
+                        <th class="text-right">Solde de fin</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in mouvements %}
                     <tr>
                         <td>{{ m.date|date:"d/m/Y" }}</td>
-                        <td>
-                            {% if m.type == 'encaissement' %}
-                                <span class="badge badge-success badge-outline">Encaissement</span>
-                            {% elif m.type == 'depense' %}
-                                <span class="badge badge-error badge-outline">Dépense</span>
-                            {% elif m.type == 'avance_champ' %}
-                                <span class="badge badge-info badge-outline">Avance champ</span>
-                            {% elif m.type == 'depense_champ' %}
-                                <span class="badge badge-warning badge-outline">Dépense pour compte (champ)</span>
-                            {% elif m.type == 'remboursement_champ' %}
-                                <span class="badge badge-success badge-outline">Remboursement champ</span>
-                            {% else %}
-                                <span class="badge badge-warning badge-outline">Remise</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-xs text-gray-500">
-                            {% if m.type == 'avance_champ' or m.type == 'depense_champ' %}
-                                {{ m.objet.note|default:"—" }}
-                                {% if m.objet.reste_a_rembourser_champ %}
-                                    <span class="badge badge-ghost badge-sm ml-1">Reste : {{ m.objet.reste_a_rembourser_champ|fcfa }}</span>
-                                {% else %}
-                                    <span class="badge badge-success badge-sm ml-1">Soldé</span>
-                                {% endif %}
-                            {% elif m.type == 'remboursement_champ' %}
-                                Remb. engagement #{{ m.objet.depense_id }}
-                            {% elif m.type == 'encaissement' %}
-                                {{ m.objet.commentaire|default:"—" }}
-                            {% else %}
-                                {{ m.objet.commentaire|default:"—" }}
-                            {% endif %}
-                        </td>
-                        <td class="text-right {% if m.montant < 0 %}text-error{% else %}text-success{% endif %}">
-                            {{ m.montant|fcfa }} FCFA
-                        </td>
+                        <td class="text-right text-gray-500">{{ m.solde_debut|fcfa }}</td>
+                        <td class="text-right {% if m.entrees %}text-success{% else %}text-gray-400{% endif %}">{{ m.entrees|fcfa }}</td>
+                        <td class="text-right {% if m.sorties %}text-error{% else %}text-gray-400{% endif %}">{{ m.sorties|fcfa }}</td>
+                        <td class="text-right {% if m.versements %}text-warning{% else %}text-gray-400{% endif %}">{{ m.versements|fcfa }}</td>
+                        <td class="text-right font-semibold">{{ m.solde_fin|fcfa }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-6 text-gray-400">Aucun mouvement sur la période</td>
+                        <td colspan="6" class="text-center py-6 text-gray-400">Aucun mouvement sur la période</td>
                     </tr>
                     {% endfor %}
                 </tbody>
