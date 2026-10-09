@@ -2,7 +2,14 @@
 def agent_context(request):
     """Ajoute les données contextuelles pour les agents"""
     context = {}
-    
+
+    # Menu « Corriger une vente » : mdmaiga ou groupe « Correcteurs ventes ».
+    if request.user.is_authenticated:
+        from core.services.corrections import est_correcteur_ventes
+        context['peut_corriger_ventes'] = est_correcteur_ventes(request.user)
+        from core.services.acces import peut_suivre_stock_agents
+        context['peut_suivre_stock_agents'] = peut_suivre_stock_agents(request.user)
+
     if hasattr(request.user, 'agent') and request.user.agent.type_agent == 'terrain':
         agent = request.user.agent
         

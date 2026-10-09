@@ -11,7 +11,7 @@ from datetime import datetime, time
 class VenteAnalyseService:
  
     @staticmethod
-    def filter_ventes(date_debut, date_fin, agent_id=None,superviseur_id=None, type_vente=None, produit_id=None, lot_id=None  ):
+    def filter_ventes(date_debut, date_fin, agent_id=None,superviseur_id=None, type_vente=None, produit_id=None, lot_id=None, anomalie=None):
         qs = (
             Vente.objects
             .select_related(
@@ -41,6 +41,11 @@ class VenteAnalyseService:
             qs = qs.filter(
                 detail_distribution__distribution__superviseur_id=superviseur_id
             )
+        if anomalie:
+            from vente.services import q_anomalie_prix
+            q_anomalie = q_anomalie_prix(anomalie)
+            if q_anomalie is not None:
+                qs = qs.filter(q_anomalie)
         return qs
 
     # ------------------------------------------------------------------

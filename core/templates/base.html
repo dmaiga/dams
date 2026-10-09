@@ -468,6 +468,12 @@
                             <i class="fas fa-share-alt"></i>
                             <span>Affectations</span>
                         </a>
+
+                        <a class="nav-link {% if request.resolver_match.url_name == 'suivi_stock_agents' %}active{% endif %}"
+                           href="{% url 'suivi_stock_agents' %}">
+                            <i class="fas fa-boxes-stacked"></i>
+                            <span>Suivi stock agents</span>
+                        </a>
                           <a class="nav-link {% if request.resolver_match.url_name in 'liste_factures_entrepot,liste_factures' %}active{% endif %}" 
                             href="{% url 'liste_versement' %}">
                              <i class="fas fa-file-invoice"></i>
@@ -491,6 +497,13 @@
                             <span>Gestion Agents</span>
                         </a>
 
+                        {% if peut_suivre_stock_agents %}
+                        <a class="nav-link {% if request.resolver_match.url_name == 'suivi_stock_agents' %}active{% endif %}"
+                           href="{% url 'suivi_stock_agents' %}">
+                            <i class="fas fa-boxes-stacked"></i>
+                            <span>Suivi stock agents</span>
+                        </a>
+                        {% endif %}
 
                         <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name == 'enregistrer_vente' %}active{% endif %}"
                            href="{% url 'vente:enregistrer_vente' %}">
@@ -519,11 +532,21 @@
                     {% endif %}
 
                         
+{% comment %}Lien « Distribuer (exception) » masqué (09/10/2026) — l'URL vente:creer_distribution reste active.
                         <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name in 'liste_affectations,creer_distribution,detail_distribution' %}active{% endif %}"
                            href="{% url 'vente:creer_distribution' %}">
                             <i class="fas fa-share"></i>
                             <span>Distribuer (exception)</span>
                         </a>
+{% endcomment %}
+
+                    {% if peut_corriger_ventes %}
+                        <a class="nav-link {% if request.resolver_match.url_name in 'corrections_ventes,corriger_vente_groupe,historique_corrections_ventes' %}active{% endif %}"
+                           href="{% url 'vente:corrections_ventes' %}">
+                            <i class="fas fa-magnifying-glass-dollar"></i>
+                            <span>Corriger les ventes</span>
+                        </a>
+                    {% endif %}
 
                     {% if request.user.agent.user.username == "abdoulaye.kone" %}
                         <a class="nav-link {% if request.resolver_match.namespace == 'finance' and request.resolver_match.url_name in 'mes_engagements_champ,creer_engagement_champ' %}active{% endif %}"

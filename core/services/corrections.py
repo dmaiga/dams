@@ -8,6 +8,20 @@ from django.contrib.contenttypes.models import ContentType
 
 from core.models import CorrectionAdministrative
 
+# Groupe Django des personnes habilitees a surveiller et corriger prix/quantite
+# des ventes saisies par les superviseurs (premier garde-fou contre les erreurs
+# de saisie et les ecarts de prix). Cree par la migration core.0131.
+GROUPE_CORRECTEURS_VENTES = "Correcteurs ventes"
+
+
+def est_correcteur_ventes(user):
+    """mdmaiga (admin) ou membre du groupe « Correcteurs ventes »."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if user.username == "mdmaiga":
+        return True
+    return user.groups.filter(name=GROUPE_CORRECTEURS_VENTES).exists()
+
 
 def enregistrer_correction(
     *,

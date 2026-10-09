@@ -10,6 +10,7 @@ urlpatterns = [
   
   path('sup/agent/liste/', views.liste_agents_sup, name='liste_agents_sup'),
   path('sup/agent/<int:agent_id>/', views.detail_agent_sup, name='detail_agent_sup'),
+  path('stock/agents/', views.suivi_stock_agents, name='suivi_stock_agents'),
   path('sup/agents/creer/', views.creer_agent, name='creer_agent'),
   path('sup/agents/modifier/<int:agent_id>/', views.modifier_agent, name='modifier_agent'),
   

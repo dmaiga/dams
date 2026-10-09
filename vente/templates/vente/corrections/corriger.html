@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Corriger la vente #{{ vente.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-3" style="max-width: 720px;">
+
+  <div class="d-flex align-items-center mb-3">
+    <a href="{% url 'vente:corrections_ventes' %}" class="btn btn-light border me-3"><i class="fas fa-arrow-left"></i></a>
+    <div>
+      <h4 class="fw-bold mb-0">Corriger la vente #{{ vente.id }}</h4>
+      <small class="text-muted">{{ vente.produit_nom }} · {{ vente.date_vente|date:"d/m/Y" }}</small>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger">
+    {% for erreur in form.non_field_errors %}<div>{{ erreur }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body small">
+      <div class="row g-2">
+        <div class="col-6"><span class="text-muted">Superviseur :</span> {{ vente.detail_distribution.distribution.superviseur.full_name|default:"—" }}</div>
+        <div class="col-6"><span class="text-muted">Agent :</span> {{ vente.agent.full_name }}</div>
+        <div class="col-6"><span class="text-muted">Produit :</span> {{ vente.produit_nom }}</div>
+        <div class="col-6"><span class="text-muted">Fournisseur :</span> {{ lot.fournisseur.nom|default:"—" }}</div>
+        <div class="col-6"><span class="text-muted">Reçu le :</span> {{ lot.date_reception|date:"d/m/Y" }}</div>
+        <div class="col-6"><span class="text-muted">Prix d'achat unitaire :</span> {{ lot.prix_achat_unitaire|floatformat:"-2"|intcomma }}</div>
+        <div class="col-6"><span class="text-muted">Quantité vendue :</span> {{ vente.quantite|floatformat:"-2" }}</div>
+        <div class="col-6"><span class="text-muted">Prix de vente :</span> {{ vente.prix_vente_unitaire|floatformat:"-2"|intcomma }}</div>
+        <div class="col-6"><span class="text-muted">Total saisi :</span> {{ vente.total_vente|floatformat:0|intcomma }}</div>
+        <div class="col-6"><span class="text-muted">Poids perdu :</span> {% if kilo_perdu > 0 %}{{ kilo_perdu|floatformat:"-2" }} kg{% else %}aucun{% endif %}</div>
+      </div>
+    </div>
+  </div>
+
+  {% if historique %}
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white small fw-semibold">Corrections déjà faites</div>
+    <ul class="list-group list-group-flush small">
+      {% for c in historique %}
+      <li class="list-group-item">
+        <div class="text-muted">{{ c.date_action|date:"d/m/Y H:i" }} — {{ c.utilisateur.get_full_name|default:c.utilisateur.username }}</div>
+        {% if c.anciennes_valeurs.prix_vente_unitaire %}Prix : <s class="text-muted">{{ c.anciennes_valeurs.prix_vente_unitaire }}</s> → <strong>{{ c.nouvelles_valeurs.prix_vente_unitaire }}</strong><br>{% endif %}
+        {% if c.anciennes_valeurs.quantite %}Quantité : <s class="text-muted">{{ c.anciennes_valeurs.quantite }}</s> → <strong>{{ c.nouvelles_valeurs.quantite }}</strong><br>{% endif %}
+        {% if c.motif %}<span class="text-muted">Motif : {{ c.motif }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="alert alert-info small">
+    <strong>Effet de la correction :</strong> le reste de l'agent, le montant ajouté au solde du
+    superviseur et le recouvrement de cette vente sont recalculés avec les nouvelles valeurs.
+    L'ancienne et la nouvelle valeur sont conservées dans l'historique.
+  </div>
+
+  <form method="post" class="card shadow-sm border-0">
+    {% csrf_token %}
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label small">Prix unitaire (actuel : {{ vente.prix_vente_unitaire|floatformat:"-2" }})</label>
+          {{ form.prix_vente_unitaire }}
+          {{ form.prix_vente_unitaire.errors }}
+        </div>
+        <div class="col-6">
+          <label class="form-label small">Quantité (actuelle : {{ vente.quantite|floatformat:"-2" }})</label>
+          {{ form.quantite }}
+          {{ form.quantite.errors }}
+        </div>
+        <div class="col-12">
+          <label class="form-label small">{{ form.motif.label }}</label>
+          {{ form.motif }}
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-100 mt-3">Enregistrer la correction</button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

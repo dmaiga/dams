@@ -5,12 +5,13 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import DecimalField, OuterRef, Subquery, Sum
+from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from core.models import DetailDistribution, Perte, Recouvrement, Vente
 from core.services.corrections import enregistrer_correction
+from vente.constants import SEUIL_MARGE_MINIMALE, SEUIL_PRIX_ELEVE
 
 
 _NON_RENSEIGNE = object()
@@ -41,6 +42,81 @@ def details_avec_restant(queryset):
             - Coalesce(Subquery(perdu, output_field=decimal), 0, output_field=decimal)
         )
     )
+
+
+ANOMALIES_PRIX = (
+    ('suspect', "Tous les prix suspects"),
+    ('sous_cout', "Vendu sous le prix d'achat"),
+    ('marge_faible', "Marge faible"),
+    ('prix_eleve', "Prix trop élevé"),
+)
+# Les libellés n'affichent volontairement AUCUN seuil chiffré : le montant exact ne doit pas
+# inciter à enregistrer des ventes juste en dessous.
+
+
+def q_anomalie_prix(anomalie):
+    """Q sur `Vente` pour le filtre d'anomalie de prix (None si valeur inconnue/vide).
+    Partagée par la page des correcteurs et la liste des ventes de la direction."""
+    achat = F('detail_distribution__lot__prix_achat_unitaire')
+    q_sous_cout = Q(prix_vente_unitaire__lt=achat)
+    q_marge_faible = Q(prix_vente_unitaire__lt=achat + SEUIL_MARGE_MINIMALE)
+    q_prix_eleve = Q(prix_vente_unitaire__gt=achat + SEUIL_PRIX_ELEVE)
+    return {
+        'sous_cout': q_sous_cout,
+        'marge_faible': q_marge_faible,
+        'prix_eleve': q_prix_eleve,
+        'suspect': q_marge_faible | q_prix_eleve,
+    }.get(anomalie)
+
+
+def classer_prix(prix_vente, prix_achat):
+    """Étiquette d'alerte d'une vente (`sous_cout` | `marge_faible` | `prix_eleve`)
+    ou None — mêmes règles que le filtre `anomalie`."""
+    if prix_vente < prix_achat:
+        return 'sous_cout'
+    if prix_vente < prix_achat + SEUIL_MARGE_MINIMALE:
+        return 'marge_faible'
+    if prix_vente > prix_achat + SEUIL_PRIX_ELEVE:
+        return 'prix_eleve'
+    return None
+
+
+def lister_ventes_a_surveiller(
+    *, agent_id=None, superviseur_id=None, produit_id=None, fournisseur_id=None,
+    anomalie=None, debut=None, fin=None,
+):
+    """Ventes non supprimées, filtrées pour la surveillance des prix saisis
+    (page dédiée au groupe « Correcteurs ventes »). Porte tout ce qu'il faut
+    pour repérer une erreur sans N+1 : lot (prix d'achat, date de réception),
+    fournisseur, superviseur de la distribution et agent vendeur.
+
+    `anomalie` (voir `ANOMALIES_PRIX`) : `sous_cout` (prix < achat — confusion prix
+    au kilo / prix au sac), `marge_faible` (prix < achat + SEUIL_MARGE_MINIMALE, sous-coût
+    inclus), `prix_eleve` (prix > achat + SEUIL_PRIX_ELEVE, probable faute de frappe) ou
+    `suspect` (marge faible OU prix élevé).
+    """
+    ventes = Vente.objects.filter(est_supprime=False).select_related(
+        'agent__user',
+        'detail_distribution__lot__produit',
+        'detail_distribution__lot__fournisseur',
+        'detail_distribution__distribution__superviseur__user',
+    )
+    if agent_id:
+        ventes = ventes.filter(agent_id=agent_id)
+    if superviseur_id:
+        ventes = ventes.filter(detail_distribution__distribution__superviseur_id=superviseur_id)
+    if produit_id:
+        ventes = ventes.filter(detail_distribution__lot__produit_id=produit_id)
+    if fournisseur_id:
+        ventes = ventes.filter(detail_distribution__lot__fournisseur_id=fournisseur_id)
+    q_anomalie = q_anomalie_prix(anomalie)
+    if q_anomalie is not None:
+        ventes = ventes.filter(q_anomalie)
+    if debut:
+        ventes = ventes.filter(date_vente__date__gte=debut)
+    if fin:
+        ventes = ventes.filter(date_vente__date__lte=fin)
+    return ventes.order_by('-date_vente')
 
 
 class CorrectionVenteService:

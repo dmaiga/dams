@@ -363,6 +363,38 @@ class CorrectionDistributionServiceTests(TestCase):
             CorrectionAdministrative.objects.get().type_correction, 'DISTRIBUTION_SCISSION'
         )
 
+    def test_retourne_une_partie_au_depot(self):
+        CorrectionDistributionService.retourner_au_depot(
+            self.detail.id, quantite=Decimal('10.00'),
+            motif='2 distribués au lieu de 1', utilisateur=self.utilisateur,
+        )
+        self.detail.refresh_from_db()
+        self.lot.refresh_from_db()
+        self.affectation.refresh_from_db()
+
+        self.assertEqual(self.detail.quantite, Decimal('40.00'))  # l'agent garde le reste
+        self.assertEqual(self.affectation.quantite_initiale, Decimal('40.00'))
+        self.assertEqual(self.lot.quantite_restante, Decimal('160.00'))  # rendu au dépôt
+        correction = CorrectionAdministrative.objects.get()
+        self.assertEqual(correction.type_correction, 'DISTRIBUTION_QUANTITE')
+        self.assertIn('Retour au depot', correction.motif)
+
+    def test_retour_depot_refuse_au_dela_du_non_vendu_ou_total(self):
+        Vente.objects.create(
+            agent=self.agent, detail_distribution=self.detail,
+            quantite=Decimal('45.00'), prix_vente_unitaire=Decimal('150.00'),
+        )
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.retourner_au_depot(
+                self.detail.id, quantite=Decimal('10.00'), utilisateur=self.utilisateur,
+            )
+        with self.assertRaises(ValidationError):
+            CorrectionDistributionService.retourner_au_depot(
+                self.detail.id, quantite=Decimal('50.00'), utilisateur=self.utilisateur,
+            )
+        self.lot.refresh_from_db()
+        self.assertEqual(self.lot.quantite_restante, Decimal('150.00'))
+
     def test_scission_refuse_au_dela_du_non_vendu(self):
         Vente.objects.create(
             agent=self.agent, detail_distribution=self.detail,

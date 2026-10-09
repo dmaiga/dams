@@ -28,6 +28,17 @@
 
     <div class="card bg-white shadow-sm border border-slate-200">
         <div class="card-body space-y-4">
+            <div>
+                <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                    <span class="badge badge-neutral mr-1">A</span> Corriger la saisie
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">
+                    Modifie cette distribution <strong>en place</strong> : agent, superviseur, produit/lot,
+                    quantité ou date. Changer la quantité ajuste le stock central du lot (la différence
+                    y est retirée ou rendue). Changer l'agent ou le produit est refusé si des ventes ou
+                    pertes existent déjà. <em>Tout est tracé dans l'historique.</em>
+                </p>
+            </div>
             <form method="post" class="space-y-4">
                 {% csrf_token %}
 
@@ -85,12 +96,14 @@
     <div class="card bg-white shadow-sm border border-slate-200">
         <div class="card-body space-y-3">
             <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-                Répartir entre deux agents
+                <span class="badge badge-neutral mr-1">B</span> Répartir entre deux agents
             </h2>
             <p class="text-xs text-slate-500">
-                Transfère une partie de la quantité ({{ detail.quantite }}) à un autre agent du même
-                superviseur ; le reste demeure chez {{ distribution.agent_terrain.full_name|default:"—" }}.
-                Le stock central n'est pas modifié. Seule la part non vendue ni perdue est transférable.
+                <strong>Quand :</strong> la quantité ({{ detail.quantite }}) était destinée à deux agents
+                mais a été saisie sur un seul. <strong>Effet :</strong> une partie passe à un autre agent
+                du même superviseur, le reste demeure chez
+                {{ distribution.agent_terrain.full_name|default:"—" }}. Le stock central n'est
+                <strong>pas</strong> modifié. Seule la part non vendue ni perdue est transférable.
             </p>
             <form method="post" action="{% url 'scinder_distribution_admin' detail.id %}" class="space-y-3">
                 {% csrf_token %}
@@ -113,15 +126,43 @@
         </div>
     </div>
 
+    <div class="card bg-white shadow-sm border border-slate-200">
+        <div class="card-body space-y-3">
+            <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                <span class="badge badge-neutral mr-1">C</span> Retourner une partie au dépôt
+            </h2>
+            <p class="text-xs text-slate-500">
+                <strong>Quand :</strong> l'agent a reçu 2 alors que 1 était prévu. <strong>Effet :</strong>
+                la quantité indiquée est retirée de cette distribution et <strong>rendue au stock central
+                du lot</strong> ; l'agent garde le reste (actuellement {{ detail.quantite }}). Aucun
+                autre agent n'est concerné. Seule la part non vendue ni perdue peut revenir.
+            </p>
+            <form method="post" action="{% url 'retourner_depot_distribution_admin' detail.id %}" class="space-y-3">
+                {% csrf_token %}
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-xs">Quantité à retourner au dépôt</span></label>
+                    <input type="number" name="quantite" step="0.01" min="0.01" required
+                           class="input input-bordered input-sm w-full">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-xs">Motif (facultatif)</span></label>
+                    <textarea name="motif" rows="2" class="textarea textarea-bordered textarea-sm w-full"></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline btn-sm w-full">Retourner au dépôt</button>
+            </form>
+        </div>
+    </div>
+
     <div class="card bg-white shadow-sm border border-red-200">
         <div class="card-body space-y-3">
             <h2 class="text-sm font-semibold text-red-700 uppercase tracking-wide">
-                Zone dangereuse — doublon
+                <span class="badge badge-error mr-1">D</span> Supprimer — doublon
             </h2>
             <p class="text-xs text-slate-500">
-                Supprime intégralement cette distribution (et son détail) et restitue la quantité
-                au stock central du lot. Réservé aux distributions en double ou totalement
-                erronées, sans aucune vente ni perte déjà enregistrées dessus.
+                <strong>Quand :</strong> la même distribution a été saisie deux fois ou est entièrement
+                erronée. <strong>Effet :</strong> la distribution (et son détail) disparaît et
+                <strong>toute</strong> sa quantité ({{ detail.quantite }}) revient au stock central du lot.
+                Refusé si une vente ou une perte existe déjà dessus. Action définitive (tracée dans l'historique).
             </p>
             <form method="post" action="{% url 'supprimer_distribution_admin' detail.id %}"
                   onsubmit="return confirm('Supprimer définitivement cette distribution et restituer le stock ?');">

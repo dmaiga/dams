@@ -1,13 +1,25 @@
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from datetime import timedelta
 from django.http import JsonResponse
 
-from core.models import Agent, AffectationLotSuperviseur, DetailDistribution, Vente, Recouvrement
-from vente.forms import DistributionForm, VenteForm
-from vente.services import details_avec_restant
+from core.models import (
+    Agent, AffectationLotSuperviseur, CorrectionAdministrative, DetailDistribution,
+    Fournisseur, Produit, Vente, Recouvrement,
+)
+from core.services.corrections import est_correcteur_ventes
+from vente.forms import CorrectionVenteGroupeForm, DistributionForm, VenteForm
+from vente.services import (
+    ANOMALIES_PRIX, CorrectionVenteService, classer_prix, details_avec_restant,
+    lister_ventes_a_surveiller,
+)
 
 
 def _acces_superviseur(agent):
@@ -188,3 +200,178 @@ def ajax_distributions_par_agent(request):
         for d in details
     ]
     return JsonResponse(data, safe=False)
+
+
+# ----------------------------------------------------------------------------
+# SURVEILLANCE / CORRECTION DES VENTES — groupe « Correcteurs ventes »
+# ----------------------------------------------------------------------------
+#
+# Pages dédiées (gabarit superviseur, aucune donnée CA/marge) : le groupe
+# n'accède pas aux écrans d'analyse de la direction. Elles appellent le même
+# CorrectionVenteService que l'écran direction (audit CorrectionAdministrative,
+# stock de l'agent et recouvrement recalculés).
+
+TYPES_CORRECTION_VENTE = ('VENTE_PRIX_QUANTITE', 'VENTE_DATE')
+
+
+def _resoudre_periode(get):
+    """Période de la liste : `hebdo` (7 derniers jours, défaut), `mensuel`
+    (mois en cours) ou `custom` (`debut`/`fin`)."""
+    aujourdhui = timezone.localdate()
+    periode = get.get('periode') or 'hebdo'
+    if periode == 'mensuel':
+        return periode, aujourdhui.replace(day=1), aujourdhui
+    if periode == 'custom':
+        debut = parse_date(get.get('debut') or '')
+        fin = parse_date(get.get('fin') or '')
+        return periode, debut, fin
+    return 'hebdo', aujourdhui - timedelta(days=6), aujourdhui
+
+
+JOURS_PAR_PAGE = 7
+
+
+@login_required
+@user_passes_test(est_correcteur_ventes)
+def corrections_ventes(request):
+    get = request.GET
+    agent_id = get.get('agent') or ''
+    superviseur_id = get.get('superviseur') or ''
+    produit_id = get.get('produit') or ''
+    fournisseur_id = get.get('fournisseur') or ''
+    anomalie = get.get('anomalie') or ''
+    periode, debut, fin = _resoudre_periode(get)
+
+    ventes = lister_ventes_a_surveiller(
+        agent_id=agent_id or None,
+        superviseur_id=superviseur_id or None,
+        produit_id=produit_id or None,
+        fournisseur_id=fournisseur_id or None,
+        anomalie=anomalie,
+        debut=debut,
+        fin=fin,
+    )
+
+    # Pagination par JOURS (pas par lignes) : une journée n'est jamais coupée.
+    jours = list(ventes.dates('date_vente', 'day', order='DESC'))
+    page_obj = Paginator(jours, JOURS_PAR_PAGE).get_page(get.get('page'))
+    jours_page = list(page_obj.object_list)
+
+    ventes_page = list(
+        ventes.filter(date_vente__date__in=jours_page).order_by(
+            'detail_distribution__distribution__superviseur__user__first_name',
+            'detail_distribution__distribution__superviseur_id',
+            '-date_vente',
+        )
+    )
+    ids_corriges = set(
+        CorrectionAdministrative.objects.filter(
+            content_type=ContentType.objects.get_for_model(Vente),
+            object_id__in=[v.id for v in ventes_page],
+            type_correction__in=TYPES_CORRECTION_VENTE,
+        ).values_list('object_id', flat=True)
+    )
+
+    # jour (récent d'abord) → superviseur → ventes : un superviseur est terminé
+    # avant d'afficher le suivant, et un jour avant le jour précédent.
+    par_jour = {jour: [] for jour in jours_page}
+    for vente in ventes_page:
+        vente.deja_corrigee = vente.id in ids_corriges
+        vente.alerte_prix = classer_prix(
+            vente.prix_vente_unitaire, vente.detail_distribution.lot.prix_achat_unitaire
+        )
+        jour = timezone.localtime(vente.date_vente).date()
+        superviseur = vente.detail_distribution.distribution.superviseur
+        groupes = par_jour[jour]
+        if not groupes or groupes[-1]['superviseur'] != superviseur:
+            groupes.append({'superviseur': superviseur, 'ventes': []})
+        groupes[-1]['ventes'].append(vente)
+    journees = [{'jour': jour, 'groupes': par_jour[jour]} for jour in jours_page]
+
+    return render(request, 'vente/corrections/liste.html', {
+        'page_obj': page_obj,
+        'journees': journees,
+        'agents': Agent.objects.filter(
+            type_agent__in=('terrain', 'agent_gros', 'agent_polivalent', 'stagiaire')
+        ).select_related('user').order_by('user__first_name', 'user__username'),
+        'superviseurs': Agent.objects.filter(type_agent='entrepot')
+            .select_related('user').order_by('user__first_name', 'user__username'),
+        'produits': Produit.objects.order_by('nom'),
+        'fournisseurs': Fournisseur.objects.order_by('nom'),
+        'agent_id': agent_id,
+        'superviseur_id': superviseur_id,
+        'produit_id': produit_id,
+        'fournisseur_id': fournisseur_id,
+        'anomalie': anomalie,
+        'anomalies': ANOMALIES_PRIX,
+        'periode': periode,
+        'debut': debut.isoformat() if debut else '',
+        'fin': fin.isoformat() if fin else '',
+    })
+
+
+@login_required
+@user_passes_test(est_correcteur_ventes)
+def corriger_vente_groupe(request, vente_id):
+    vente = get_object_or_404(
+        Vente.objects.select_related(
+            'agent__user',
+            'detail_distribution__lot__produit',
+            'detail_distribution__lot__fournisseur',
+            'detail_distribution__distribution__superviseur__user',
+        ),
+        pk=vente_id, est_supprime=False,
+    )
+
+    if request.method == 'POST':
+        form = CorrectionVenteGroupeForm(request.POST)
+        if form.is_valid():
+            kwargs = {'motif': form.cleaned_data['motif'], 'utilisateur': request.user}
+            for champ in ('prix_vente_unitaire', 'quantite'):
+                if form.cleaned_data.get(champ) is not None:
+                    kwargs[champ] = form.cleaned_data[champ]
+            try:
+                CorrectionVenteService.corriger_vente(vente.id, **kwargs)
+            except ValidationError as exc:
+                for erreur in getattr(exc, 'messages', [str(exc)]):
+                    form.add_error(None, erreur)
+            else:
+                messages.success(request, f"Vente #{vente.id} corrigée.")
+                return redirect('vente:corrections_ventes')
+    else:
+        form = CorrectionVenteGroupeForm(initial={
+            'prix_vente_unitaire': vente.prix_vente_unitaire,
+            'quantite': vente.quantite,
+        })
+
+    historique = (
+        CorrectionAdministrative.objects
+        .filter(
+            content_type=ContentType.objects.get_for_model(Vente),
+            object_id=vente.id,
+            type_correction__in=TYPES_CORRECTION_VENTE,
+        )
+        .select_related('utilisateur')
+        .order_by('-date_action')
+    )
+
+    return render(request, 'vente/corrections/corriger.html', {
+        'form': form,
+        'vente': vente,
+        'lot': vente.detail_distribution.lot,
+        'kilo_perdu': vente.kilo_perdu,
+        'historique': historique,
+    })
+
+
+@login_required
+@user_passes_test(est_correcteur_ventes)
+def historique_corrections_ventes(request):
+    corrections = (
+        CorrectionAdministrative.objects
+        .filter(type_correction__in=TYPES_CORRECTION_VENTE)
+        .select_related('utilisateur')
+        .order_by('-date_action')
+    )
+    page_obj = Paginator(corrections, 30).get_page(request.GET.get('page'))
+    return render(request, 'vente/corrections/historique.html', {'page_obj': page_obj})

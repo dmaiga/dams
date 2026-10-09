@@ -306,3 +306,16 @@ Tous les templates sont **mobile-first** : double layout Bootstrap (tableau `d-n
 ### ROT (Abdoulaye)
 
 - Accès complet en lecture et écriture sur les mêmes vues (`_acces_stock` = gestionnaire_stock **ou** rot).
+
+---
+
+## `CorrectionDistributionService.retourner_au_depot` (09/10/2026)
+
+Retourne `quantite` unités d'une distribution au stock central du lot (« 2 distribués au lieu de 1,
+retour de 1 au dépôt ») : l'agent garde le reste, aucun autre agent n'est touché. Implémenté par
+délégation à `corriger_distribution(quantite=détail.quantite − retour)` — même cascade
+(`LotEntrepot.quantite_restante`, `AffectationLotSuperviseur.quantite_initiale`,
+`DistributionAgent.quantite_totale`) et même audit (`DISTRIBUTION_QUANTITE`, motif préfixé
+« Retour au depot de X »). Refusé si `quantite ≥` quantité distribuée (utiliser la suppression) ou
+`> restant` (vendu/perdu exclus). Tests : `marchandise/tests.py` (`test_retourne_une_partie_au_depot`,
+`test_retour_depot_refuse_au_dela_du_non_vendu_ou_total`).

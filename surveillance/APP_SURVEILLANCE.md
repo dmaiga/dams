@@ -36,7 +36,7 @@ Fichier : `surveillance/constants.py`
 | `DELAI_STOCK_DORMANT_JOURS` | `15` j | Stock non distribué à l'entrepôt central |
 | `DELAI_RETENTION_ACTEURS_JOURS` | `3` j | Stock détenu par un superviseur ou un agent sans être redistribué/vendu |
 | `SEUIL_MARGE_MINIMALE` | `45` FCFA | Marge minimale attendue par vente unitaire (source unique pour `PrixSurveillanceService`/`SurveillancePrixService`) |
-| `SEUIL_ECART_PRIX_ACHAT` | `2500` FCFA | Ajouté 24/09/2026 — écart max au-dessus du prix d'achat avant de signaler une vente comme erreur de saisie probable (voir `ventes_ecart_prix_achat_suspect` ci-dessous) |
+| `SEUIL_ECART_PRIX_ACHAT` | `3500` FCFA (2500 avant le 09/10/2026) | Ajouté 24/09/2026 — écart max au-dessus du prix d'achat avant de signaler une vente comme erreur de saisie probable (voir `ventes_ecart_prix_achat_suspect` ci-dessous) |
 
 `DATE_PLANCHER_STOCK` est un choix **volontaire** pour ignorer un passé jugé peu fiable, pas un
 oubli — réexaminé puis confirmé inchangé lors de la clôture du sprint 12 (17/09/2026), malgré des

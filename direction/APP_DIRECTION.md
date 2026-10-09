@@ -751,3 +751,28 @@ de stock financé/Payé/Reste n'avaient pas `whitespace-nowrap` — un montant F
 `fcfa` insère des espaces comme séparateur de milliers) pouvait donc se couper sur deux lignes dans
 une cellule de tableau Tailwind (`px-6 py-4`, pas de `nowrap` par défaut contrairement au CSS des
 tableaux BI qui l'applique globalement). Classe `whitespace-nowrap` ajoutée à ces 6 colonnes.
+---
+
+## 10. Liste des ventes : point d'exclamation sur les ventes corrigées ; cartes de correction de distribution (09/10/2026)
+
+**`direction/ventes` (`ToutesLesVentesView`)** : une vente corrigée (`CorrectionAdministrative`
+`VENTE_PRIX_QUANTITE`/`VENTE_DATE`) affiche son **dernier prix** suivi d'un « ! » rouge ; le clic ouvre
+un `<dialog>` centralisant produit, fournisseur, date de réception, prix d'achat, prix actuel (et prix
+annoncé à l'origine = ancien prix de la première correction), poids vendu / perdu / net, puis chaque
+correction (avant → après, qui, quand, motif). Corrections chargées en **une requête** pour la page
+(`get_context_data`, attributs `corrections_admin` / `prix_initial` posés sur les ventes de la page).
+Le lien « Corriger » reste réservé à mdmaiga ; les corrections du groupe « Correcteurs ventes » passent
+par leurs pages dédiées (voir `vente/APP_VENTE.md`) et apparaissent ici comme les autres.
+
+**`corriger_distribution.html`** : les cartes sont désormais **étiquetées A à D**, chacune décrivant
+quand l'utiliser et son effet : A corriger la saisie, B répartir entre deux agents (stock central
+inchangé), **C retourner une partie au dépôt** (nouveau), D supprimer — doublon.
+
+**Retour au dépôt** : `retourner_depot_distribution_admin`
+(`direction/corrections/distribution/<id>/retour-depot/`, POST, mdmaiga) →
+`CorrectionDistributionService.retourner_au_depot` (voir `marchandise/APP_MARCHANDISE.md`).
+
+**Filtre « Anomalie de prix » sur `direction/ventes` (09/10/2026)** : tous les prix suspects / vendu sous le
+prix d'achat / marge faible / prix trop élevé — mêmes règles et mêmes seuils que la page des correcteurs
+(`vente.services.q_anomalie_prix`, seuils dans `surveillance/constants.py`, sans les afficher). Appliqué à
+l'écran et aux exports (même `filter_ventes`).
