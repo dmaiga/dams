@@ -162,6 +162,50 @@
             </div>
         </div>
 
+        <!-- Produits en possession de l'agent : récents / anciens (distinction {{ seuil_jours }} jours) -->
+        <div class="px-3 pt-3 pb-0">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="mb-0"><i class="fas fa-boxes-stacked me-2"></i>Produits en sa possession</h6>
+                </div>
+                <div class="card-body pt-0">
+                    <div class="small fw-semibold text-danger mb-1">
+                        Depuis {{ seuil_jours }} jours ou plus ({{ produits_anciens|length }})
+                    </div>
+                    {% if produits_anciens %}
+                    <div class="list-group list-group-flush mb-3">
+                        {% for p in produits_anciens %}
+                        <div class="list-group-item border-0 px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span>{{ p.produit_nom }} <small class="text-muted">— {{ p.quantite|floatformat:"-2" }}</small></span>
+                            <small class="{% if p.statut == 'critique' %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                {{ p.date_distribution|date:"d/m" }} · {{ p.jours }} j
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-3">Aucun.</p>
+                    {% endif %}
+
+                    <div class="small fw-semibold text-primary mb-1">
+                        Depuis moins de {{ seuil_jours }} jours ({{ produits_recents|length }})
+                    </div>
+                    {% if produits_recents %}
+                    <div class="list-group list-group-flush">
+                        {% for p in produits_recents %}
+                        <div class="list-group-item border-0 px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span>{{ p.produit_nom }} <small class="text-muted">— {{ p.quantite|floatformat:"-2" }}</small></span>
+                            <small class="text-muted">{{ p.date_distribution|date:"d/m" }} · {{ p.jours }} j</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted small mb-0">Aucun.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <!-- Informations agent -->
         <div class="card border-0 shadow-sm mt-3">
             <div class="card-header bg-white border-0 py-3">

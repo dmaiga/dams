@@ -176,3 +176,60 @@ Mobile-first, cohérent avec les conventions posées dans `marchandise/APP_MARCH
 ## User stories couvertes
 
 Voir `docs/sprints/sprint-02.md` (US-01 à US-06).
+
+---
+
+## Surveillance et correction des ventes — groupe « Correcteurs ventes » (09/10/2026)
+
+**Besoin (mdmaiga)** : les prix saisis par les superviseurs échappent à tout contrôle en temps réel
+(écart terrain/système, ou simple erreur comme `1 × 800` au lieu de `25 × 800`). Un groupe de
+personnes dédiées est le premier garde-fou : voir les ventes avec leur contexte d'achat, corriger prix
+et quantité.
+
+**Groupe Django** « Correcteurs ventes » (`core.services.corrections.GROUPE_CORRECTEURS_VENTES`),
+créé par la migration `core.0131` avec `abdoulaye.kone` et `modibo.sidibe` s'ils existent (ajouter un
+membre = l'ajouter au groupe dans l'admin Django). `est_correcteur_ventes(user)` = mdmaiga ou membre du
+groupe ; le context processor expose `peut_corriger_ventes` pour le menu.
+
+**Pages dédiées, gabarit superviseur (`base.html`)** — décision de la direction : le groupe n'accède
+**pas** aux écrans `direction/` (CA, marge) ; aucune permission de `direction` n'est élargie.
+- `/vente/corrections/` (`corrections_ventes`) : superviseur / agent / produit / fournisseur / date de
+  réception / prix d'achat / quantité / prix saisi / total ; filtres superviseur, agent, produit,
+  fournisseur, période, anomalie « vendu sous le prix d'achat » ; badge « corrigée ».
+  Requête : `vente.services.lister_ventes_a_surveiller`.
+- `/vente/corrections/<id>/` (`corriger_vente_groupe`, `CorrectionVenteGroupeForm`) : prix et quantité
+  uniquement (la date reste réservée à la direction). Appelle `CorrectionVenteService.corriger_vente`
+  (stock de l'agent via `quantite_vendue`, `Recouvrement.montant_recouvre`, audit
+  `CorrectionAdministrative` `VENTE_PRIX_QUANTITE`).
+- `/vente/corrections/historique/` : historique des corrections de ventes uniquement.
+
+**Tests** : `vente/tests.py::CorrecteursVentesPagesTests`.
+
+**Révision de lisibilité (09/10/2026)** : la liste `/vente/corrections/` affiche **un tableau par
+superviseur** (bandeau de couleur distinct), une ligne par vente — `Date · Agent` / `Produit` (sous-ligne
+fournisseur · date de réception) / `Qté` / `Achat` sur `Vendu` (rouge + ⚠ si vendu sous le prix d'achat) /
+« Ouvrir ». Tout le reste (superviseur, totaux, poids perdu, corrections déjà faites avec avant → après)
+est dans la page détail `/vente/corrections/<id>/`, au-dessus du formulaire. Tri : superviseur puis
+date décroissante, paginé par 40 ventes (les groupes sont reconstruits sur la page courante).
+
+**Période et regroupement par jour (09/10/2026)** : la liste `/vente/corrections/` ne charge plus tout :
+filtre **Période** (`hebdo` par défaut = 7 derniers jours incluant aujourd'hui, `mensuel` = mois en cours,
+`custom` = Du/Au). Affichage **jour (récent d'abord) → superviseur → tableau** : un superviseur est terminé
+avant le suivant, une journée avant la précédente. Pagination **par jours** (7 jours/page, jamais une
+journée coupée) : la requête récupère d'abord les jours distincts (`QuerySet.dates`), puis seulement les
+ventes de ces jours. Tests : `test_periode_hebdo_par_defaut_et_regroupement_jour_puis_superviseur`.
+
+**Filtre « Anomalie » — prix suspects (09/10/2026)** : réutilise les seuils de `surveillance` au lieu de
+les redéfinir (`vente/constants.py`). Options : *Tous les prix suspects* (marge faible OU prix élevé),
+*Vendu sous le prix d'achat*, *Marge faible* (prix < achat + `SEUIL_MARGE_MINIMALE` = 45 F, importé de
+`surveillance.constants`, sous-coût inclus), *Prix trop élevé* (prix > achat + `SEUIL_PRIX_ELEVE` = 3 500 F depuis le 09/10/2026 (2 500 avant), alias de
+`surveillance.constants.SEUIL_ECART_PRIX_ACHAT`). Chaque ligne de la liste porte l'icône correspondante (rouge sous-coût / prix élevé,
+ambre marge faible) via `classer_prix`. **Seuils alignés (09/10/2026, décision mdmaiga)** : le filtre et l'alerte monitoring `prix_ecart_achat`
+lisent la même constante `SEUIL_ECART_PRIX_ACHAT` (relevée à 3 500 F le 09/10/2026 : des ventes normales à ~2 750 F étaient signalées) — modifier le seuil à un seul endroit
+(`surveillance/constants.py`) change les deux.
+
+**Libellés sans montant + filtre côté direction (09/10/2026)** : les libellés du filtre n'affichent plus
+aucun seuil chiffré (le montant exact pourrait inciter à enregistrer des ventes juste en dessous).
+Le même filtre « Anomalie de prix » est disponible sur `direction/ventes` (`ToutesLesVentesView`,
+`VenteAnalyseService.filter_ventes(anomalie=...)`, repris par les exports Excel/PDF) — règles partagées via
+`vente.services.q_anomalie_prix`.

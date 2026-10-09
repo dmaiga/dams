@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Historique des corrections{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-3">
+
+  <div class="d-flex align-items-center mb-3">
+    <a href="{% url 'vente:corrections_ventes' %}" class="btn btn-light border me-3"><i class="fas fa-arrow-left"></i></a>
+    <h4 class="fw-bold mb-0">Historique des corrections de ventes</h4>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Date</th><th>Par</th><th>Vente</th><th>Avant</th><th>Après</th><th>Motif</th></tr>
+        </thead>
+        <tbody>
+          {% for c in page_obj %}
+          <tr>
+            <td class="text-nowrap">{{ c.date_action|date:"d/m/Y H:i" }}</td>
+            <td>{{ c.utilisateur.get_full_name|default:c.utilisateur.username }}</td>
+            <td>#{{ c.object_id }}</td>
+            <td class="small">
+              {% for k, v in c.anciennes_valeurs.items %}{{ k }} : {{ v }}<br>{% endfor %}
+            </td>
+            <td class="small fw-semibold">
+              {% for k, v in c.nouvelles_valeurs.items %}{{ k }} : {{ v }}<br>{% endfor %}
+            </td>
+            <td class="small">{{ c.motif|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-4">Aucune correction.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">‹</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">›</a></li>{% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+</div>
+{% endblock %}

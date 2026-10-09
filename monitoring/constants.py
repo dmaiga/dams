@@ -43,7 +43,7 @@ DESCRIPTIONS_ALERTES = {
         "ou de prix mal saisi. Notification unique à la détection, sans rappel automatique."
     ),
     "prix_ecart_achat": (
-        "Ventes enregistrées à un prix supérieur de plus de 2 500 FCFA au prix d'achat — à vérifier "
+        "Ventes enregistrées à un prix supérieur de plus de 3 500 FCFA au prix d'achat — à vérifier "
         "(bonne négociation ou erreur de saisie). Notification unique à la détection, sans rappel "
         "automatique."
     ),

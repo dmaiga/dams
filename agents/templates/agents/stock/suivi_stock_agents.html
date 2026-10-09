@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load direction_filters %}
+
+{% block title %}Suivi stock agents{% endblock %}
+
+{% block content %}
+<style>
+  /* Une carte par agent, couleur de bandeau différente pour séparer nettement deux agents. */
+  .agent-card { border-radius: 10px; overflow: hidden; border: 1px solid #dee2e6; border-left-width: 6px; background: #fff; margin-bottom: .75rem; }
+  .agent-card .agent-head { padding: .45rem .75rem; display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+  .agent-card .agent-nom { font-weight: 700; font-size: .95rem; }
+  .agent-card .agent-sup { font-size: .72rem; opacity: .75; white-space: nowrap; }
+  .agent-card .ligne { display: flex; align-items: baseline; gap: .5rem; padding: .3rem .75rem; border-top: 1px solid #eef0f2; font-size: .82rem; }
+  .agent-card .ligne .prod { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+  .agent-card .ligne .qte { flex: 0 0 auto; font-weight: 700; }
+  .agent-card .ligne .age { flex: 0 0 auto; min-width: 5.6rem; text-align: right; color: #6c757d; white-space: nowrap; font-size: .75rem; }
+  .agent-card .ligne .age.critique { color: #dc3545; font-weight: 700; }
+  @media (max-width: 575.98px) {
+    .agent-card .ligne { font-size: .76rem; padding: .28rem .6rem; gap: .35rem; }
+    .agent-card .ligne .age { min-width: 4.8rem; font-size: .7rem; }
+    .agent-card .agent-nom { font-size: .88rem; }
+  }
+  .couleur-0 { border-left-color: #0d6efd; } .couleur-0 .agent-head { background: #e7f0ff; color: #0a3d91; }
+  .couleur-1 { border-left-color: #198754; } .couleur-1 .agent-head { background: #e4f4ea; color: #0f5132; }
+  .couleur-2 { border-left-color: #fd7e14; } .couleur-2 .agent-head { background: #fff0e0; color: #8a4200; }
+  .couleur-3 { border-left-color: #6f42c1; } .couleur-3 .agent-head { background: #efe8fa; color: #3d2273; }
+</style>
+
+<div class="container-fluid py-3">
+
+    <div class="mb-3">
+        <h1 class="h5 mb-1"><i class="fas fa-boxes-stacked me-2 text-primary"></i>Suivi stock agents</h1>
+        <small class="text-muted">Produits en possession des agents de vente.</small>
+    </div>
+
+    <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-6 col-md-3">
+            <label class="form-label small mb-1">Superviseur</label>
+            <select name="superviseur" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for s in superviseurs %}
+                <option value="{{ s.id }}" {% if superviseur_id == s.id|stringformat:"s" %}selected{% endif %}>{{ s.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small mb-1">Agent</label>
+            <select name="agent" class="form-select form-select-sm">
+                <option value="">Tous les agents</option>
+                {% for a in agents %}
+                <option value="{{ a.id }}" {% if agent_id == a.id|stringformat:"s" %}selected{% endif %}>{{ a.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small mb-1">Produit</label>
+            <select name="produit" class="form-select form-select-sm">
+                <option value="">Tous</option>
+                {% for p in produits %}
+                <option value="{{ p.id }}" {% if produit_id == p.id|stringformat:"s" %}selected{% endif %}>{{ p.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">Filtrer</button>
+            {% if agent_id or produit_id or superviseur_id %}
+            <a href="{% url 'suivi_stock_agents' %}" class="btn btn-light btn-sm border">Réinitialiser</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Produits à investiguer : chez l'agent depuis {{ seuil_jours }} jours ou plus -->
+    <h6 class="mb-0"><i class="fas fa-magnifying-glass me-2 text-danger"></i>Produits à investiguer</h6>
+    <small class="text-muted d-block mb-2">Chez l'agent depuis {{ seuil_jours }} jours ou plus, pas encore vendus.</small>
+    {% for bloc in a_investiguer %}
+    {% cycle '0' '1' '2' '3' as couleur silent %}
+    <div class="agent-card couleur-{{ couleur }}">
+        <div class="agent-head">
+            <span class="agent-nom">{{ bloc.agent.full_name }}</span>
+            <span class="agent-sup">{{ bloc.agent.superviseur.full_name|default:"—" }}</span>
+        </div>
+        {% for p in bloc.anciens %}
+        <div class="ligne">
+            <span class="prod" title="{{ p.produit_nom }}">{{ p.produit_nom }}</span>
+            <span class="qte">{{ p.quantite|format_number }}</span>
+            <span class="age {% if p.statut == 'critique' %}critique{% endif %}">{{ p.date_distribution|date:"d/m" }} · {{ p.jours }} j</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% empty %}
+    <p class="text-muted text-center py-3">Rien à investiguer.</p>
+    {% endfor %}
+
+    <!-- Produits récents : chez l'agent depuis moins de {{ seuil_jours }} jours -->
+    <h6 class="mb-0 mt-4"><i class="fas fa-clock me-2 text-primary"></i>Distribués récemment</h6>
+    <small class="text-muted d-block mb-2">Chez l'agent depuis moins de {{ seuil_jours }} jours.</small>
+    {% if a_des_recents %}
+    {% for bloc in blocs %}
+    {% if bloc.recents %}
+    {% cycle '0' '1' '2' '3' as couleur_recent silent %}
+    <div class="agent-card couleur-{{ couleur_recent }}">
+        <div class="agent-head">
+            <span class="agent-nom">{{ bloc.agent.full_name }}</span>
+            <span class="agent-sup">{{ bloc.agent.superviseur.full_name|default:"—" }}</span>
+        </div>
+        {% for p in bloc.recents %}
+        <div class="ligne">
+            <span class="prod" title="{{ p.produit_nom }}">{{ p.produit_nom }}</span>
+            <span class="qte">{{ p.quantite|format_number }}</span>
+            <span class="age">{{ p.date_distribution|date:"d/m" }} · {{ p.jours }} j</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% else %}
+    <p class="text-muted text-center py-3">Aucun produit distribué récemment.</p>
+    {% endif %}
+</div>
+{% endblock %}

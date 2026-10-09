@@ -638,7 +638,8 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             type_vente=type_vente,
             produit_id=produit_id,
             lot_id=lot_id,
-            superviseur_id=superviseur_id
+            superviseur_id=superviseur_id,
+            anomalie=params.get("anomalie"),
         )
 
         # Stats/top agents : calculés sur le queryset filtré SANS annotations
@@ -700,6 +701,37 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             .get_superviseurs_list()
         )
 
+        # Ventes de la page déjà corrigées par la direction/les correcteurs :
+        # 1 requête pour toute la page → point d'exclamation + modal de détail.
+        # `ventes` est le queryset de la page : l'itérer ici remplit son cache,
+        # le template réutilise les mêmes objets.
+        ventes_page = list(context["ventes"])
+        corrections_par_vente = {}
+        if ventes_page:
+            corrections = (
+                CorrectionAdministrative.objects
+                .filter(
+                    content_type=ContentType.objects.get_for_model(Vente),
+                    object_id__in=[v.id for v in ventes_page],
+                    type_correction__in=TYPES_CORRECTION_VENTE,
+                )
+                .select_related("utilisateur")
+                .order_by("date_action")
+            )
+            for c in corrections:
+                corrections_par_vente.setdefault(c.object_id, []).append(c)
+        for v in ventes_page:
+            v.corrections_admin = corrections_par_vente.get(v.id, [])
+            # Prix annoncé à l'origine = ancien prix de la toute première correction de prix.
+            v.prix_initial = next(
+                (
+                    c.anciennes_valeurs.get("prix_vente_unitaire")
+                    for c in v.corrections_admin
+                    if c.anciennes_valeurs.get("prix_vente_unitaire") is not None
+                ),
+                None,
+            )
+
         current_year = timezone.now().year
         months = [
             (1, 'Jan'), (2, 'Fév'), (3, 'Mar'), (4, 'Avr'),
@@ -720,6 +752,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             "top_agents": top_agents,
             "agents_list": agents_list,
             "superviseurs_list": superviseurs_list,
+            "anomalies": ANOMALIES_PRIX,
             "produits_list": Produit.objects.only("id", "nom").order_by("nom"),
             # fournisseur requis par le template (sinon 1 requête par lot)
             "lots_list": LotEntrepot.objects.select_related("produit", "fournisseur")
@@ -761,7 +794,8 @@ class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             type_vente=params.get("type"),
             produit_id=params.get("produit"),
             lot_id=params.get("lot"),
-            superviseur_id=params.get("superviseur"),   
+            superviseur_id=params.get("superviseur"),
+            anomalie=params.get("anomalie"),
         )
 
         # 3) Export
@@ -801,7 +835,8 @@ class ExportVentesPDFView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             type_vente=params.get("type"),
             produit_id=params.get("produit"),
             lot_id=params.get("lot"),
-            superviseur_id=params.get("superviseur"),   
+            superviseur_id=params.get("superviseur"),
+            anomalie=params.get("anomalie"),
         )
 
         # 3) Génération PDF
@@ -1607,6 +1642,8 @@ def admin_create_agent(request):
 
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import ValidationError as _DjangoValidationError
+from django.contrib.contenttypes.models import ContentType
+from vente.services import ANOMALIES_PRIX
 from direction.forms import (
     ReaffectationAgentsForm,
     TYPES_AGENTS_GERES,
@@ -2028,6 +2065,38 @@ def scinder_distribution_admin(request, detail_distribution_id):
 
 @login_required
 @user_passes_test(_acces_admin_mdmaiga)
+def retourner_depot_distribution_admin(request, detail_distribution_id):
+    """Retourne une partie de la quantité distribuée au dépôt (le lot récupère
+    le stock, l'agent garde le reste)."""
+    from marchandise.services import CorrectionDistributionService
+
+    detail = get_object_or_404(DetailDistribution, pk=detail_distribution_id)
+
+    if request.method == 'POST':
+        try:
+            quantite = Decimal(request.POST.get('quantite', '').replace(',', '.'))
+        except Exception:
+            messages.error(request, "Indiquez une quantité valide à retourner au dépôt.")
+            return redirect('corriger_distribution', detail_distribution_id=detail.id)
+        try:
+            CorrectionDistributionService.retourner_au_depot(
+                detail.id,
+                quantite=quantite,
+                motif=request.POST.get('motif', ''),
+                utilisateur=request.user,
+            )
+        except _DjangoValidationError as exc:
+            for erreur in _erreurs_formulaire(exc):
+                messages.error(request, erreur)
+            return redirect('corriger_distribution', detail_distribution_id=detail.id)
+        messages.success(request, f"{quantite} retournée(s) au dépôt.")
+        return redirect('historique_corrections')
+
+    return redirect('corriger_distribution', detail_distribution_id=detail.id)
+
+
+@login_required
+@user_passes_test(_acces_admin_mdmaiga)
 def supprimer_distribution_admin(request, detail_distribution_id):
     """Suppression d'une distribution erronee (doublon typique) — detail +
     restitution du stock au LotEntrepot. Distinct de core.views.
@@ -2060,7 +2129,10 @@ def corriger_vente(request, vente_id):
     from vente.services import CorrectionVenteService
 
     vente = get_object_or_404(
-        Vente.objects.select_related('agent__user', 'detail_distribution__lot__produit'),
+        Vente.objects.select_related(
+            'agent__user', 'agent__superviseur__user',
+            'detail_distribution__lot__produit', 'detail_distribution__lot__fournisseur',
+        ),
         pk=vente_id, est_supprime=False,
     )
 
@@ -2173,6 +2245,9 @@ def liste_corrections_distributions(request):
         'debut': debut,
         'fin': fin,
     })
+
+
+TYPES_CORRECTION_VENTE = ('VENTE_PRIX_QUANTITE', 'VENTE_DATE')
 
 
 @login_required

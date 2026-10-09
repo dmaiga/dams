@@ -224,3 +224,18 @@ Module utilitaire (pas de modèle) utilisé par les exports reportlab de `direct
 `nouveau_document` (A4 portrait, marges 1,2 cm), `styles_compacts` (polices réduites) et `tableau`
 (en-tête bleu, lignes alternées, largeurs par fractions de la largeur utile). Objectif : limiter le
 nombre de pages à l'impression. Voir `direction/APP_DIRECTION.md` § C bis.
+
+---
+
+## Groupe « Correcteurs ventes » (09/10/2026)
+
+Migration `0131_groupe_correcteurs_ventes` : crée le `Group` « Correcteurs ventes » et y ajoute
+`abdoulaye.kone` / `modibo.sidibe` (recherche `iexact`, ignorés s'ils n'existent pas — l'ajout se fait
+alors dans l'admin Django). Helper `core/services/corrections.py::est_correcteur_ventes(user)`
+(mdmaiga ou membre du groupe) ; `core.context_processors.agent_context` expose `peut_corriger_ventes`
+aux templates. Usage : voir `vente/APP_VENTE.md`.
+
+**Groupe « Suivi stock agents »** (migration `0132`, contient `jeanclaude.sup`) + helper
+`core/services/acces.py::peut_suivre_stock_agents(user)` (gestionnaire de stock ou membre du groupe) —
+voir `agents/APP_AGENT.md` § 8. Les migrations 0131/0132 sont des migrations de données : elles doivent
+être appliquées (`python manage.py migrate`) pour que les groupes existent.

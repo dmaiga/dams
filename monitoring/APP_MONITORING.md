@@ -37,7 +37,7 @@ regroupant tous les superviseurs, soit un message distinct par superviseur, selo
 3bis. **Ventes à prix suspect** (`prix_ecart_achat`, ajouté le 24/09/2026) — même structure de message
    qu'au point 3 (un seul message, groupé par superviseur puis par agent), mais détecte l'anomalie
    inverse : un prix de vente dépassant `prix_achat_unitaire + surveillance.constants.
-   SEUIL_ECART_PRIX_ACHAT` (2500 FCFA). La règle `prix` ne couvre que les prix trop **bas** (marge
+   SEUIL_ECART_PRIX_ACHAT` (3500 FCFA depuis le 09/10/2026, 2500 avant). La règle `prix` ne couvre que les prix trop **bas** (marge
    négative) — un superviseur qui saisit 130000 FCFA au lieu de 12000 (un zéro de trop) a une marge
    largement positive et ne déclenche jamais `prix`. `reenvoi_heures=None` (même convention que
    `prix` : notification unique, silence tant que l'`Alerte` reste ACTIVE). Seuil fixe volontairement

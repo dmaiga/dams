@@ -36,6 +36,9 @@ from urllib3 import request
 # Project models
 from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
 from agents.services.analyse_operationnelle_service import AnalyseOperationnelleService
+from direction.constants import (
+    DATE_DEBUT_SUIVI_TERRAIN, SEUIL_ATTENTION_JOURS, SEUIL_CRITIQUE_JOURS,
+)
 from core.models import (
     Agent, Client, MiseDispositionRot, Vente, Produit,Depense,
     LotEntrepot, DetailDistribution, DistributionAgent,
@@ -465,6 +468,59 @@ def liste_agents_sup(request):
 
 
 @login_required
+def suivi_stock_agents(request):
+    """Suivi du stock détenu par les agents de vente : produits en possession de
+    TOUS les agents, depuis quand — pendant de `direction/suivi-distributions/`
+    pour le gestionnaire de stock et le groupe « Suivi stock agents »."""
+    from agents.services.stock_agents_service import StockAgentsService
+    from core.services.acces import peut_suivre_stock_agents
+
+    if not peut_suivre_stock_agents(request.user):
+        return redirect("access_denied")
+
+    superviseur_id = request.GET.get("superviseur") or ""
+    agent_id = request.GET.get("agent") or ""
+    produit_id = request.GET.get("produit") or ""
+
+    agents_vente = (
+        Agent.objects
+        .filter(type_agent__in=["terrain", "agent_gros", "agent_polivalent"], est_actif=True)
+        .select_related("user")
+        .order_by("user__first_name", "user__username")
+    )
+    superviseur = (
+        Agent.objects.filter(pk=superviseur_id, type_agent="entrepot").first()
+        if superviseur_id.isdigit() else None
+    )
+    agent = agents_vente.filter(pk=agent_id).first() if agent_id.isdigit() else None
+
+    blocs = StockAgentsService.produits_par_agent(
+        superviseur=superviseur,
+        agent=agent,
+        produit_id=produit_id if produit_id.isdigit() else None,
+    )
+
+    # Les agents « à investiguer » (au moins un produit ≥ seuil) remontent en tête.
+    a_investiguer = [b for b in blocs if b["nb_anciens"]]
+
+    return render(request, "agents/stock/suivi_stock_agents.html", {
+        "blocs": blocs,
+        "a_investiguer": a_investiguer,
+        "a_des_recents": any(b["nb_recents"] for b in blocs),
+        "agents": agents_vente,
+        "superviseurs": Agent.objects.filter(type_agent="entrepot", est_actif=True)
+            .select_related("user").order_by("user__first_name", "user__username"),
+        "produits": Produit.objects.order_by("nom"),
+        "superviseur_id": superviseur_id,
+        "agent_id": agent_id,
+        "produit_id": produit_id,
+        "seuil_jours": SEUIL_ATTENTION_JOURS,
+        "seuil_critique_jours": SEUIL_CRITIQUE_JOURS,
+        "date_debut_suivi": DATE_DEBUT_SUIVI_TERRAIN,
+    })
+
+
+@login_required
 def detail_agent_sup(request, agent_id):
     # =========================
     # SÉCURITÉ
@@ -580,10 +636,24 @@ def detail_agent_sup(request, agent_id):
     )
 
     # =========================
+    # PRODUITS EN SA POSSESSION (récents / anciens)
+    # =========================
+    from agents.services.stock_agents_service import StockAgentsService
+    blocs_stock = StockAgentsService.produits_par_agent(
+        superviseur=superviseur, agent=agent
+    )
+    bloc_stock = blocs_stock[0] if blocs_stock else None
+
+    # =========================
     # CONTEXT
     # =========================
     context = {
         "agent": agent,
+
+        # produits en possession (distribués depuis < / ≥ SEUIL_ATTENTION_JOURS)
+        "produits_recents": bloc_stock["recents"] if bloc_stock else [],
+        "produits_anciens": bloc_stock["anciens"] if bloc_stock else [],
+        "seuil_jours": SEUIL_ATTENTION_JOURS,
 
         # montants
         "total_ventes": total_ventes,

@@ -440,3 +440,31 @@ class VentesSuperviseurAffichageTests(TestCase):
         response = self.client.get(reverse('toutes_les_ventes'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.superviseur.full_name)
+
+    def test_point_d_exclamation_et_modal_pour_une_vente_corrigee(self):
+        from vente.services import CorrectionVenteService
+
+        # Vente non corrigée : aucun indicateur.
+        response = self.client.get(reverse('toutes_les_ventes'))
+        self.assertNotContains(response, 'correction-vente-')
+
+        CorrectionVenteService.corriger_vente(
+            self.vente.id,
+            prix_vente_unitaire=Decimal('1000.00'),
+            motif='Erreur de saisie',
+            utilisateur=User.objects.get(username='direction2'),
+        )
+        response = self.client.get(reverse('toutes_les_ventes'))
+        self.assertContains(response, f'correction-vente-{self.vente.id}')
+        self.assertContains(response, 'Erreur de saisie')
+        self.assertContains(response, '800.00')  # prix annoncé à l'origine
+
+    def test_filtre_anomalie_de_prix(self):
+        # Vente du jeu de test : 800 contre un achat de 250 → prix correct (ni sous coût, ni élevé).
+        response = self.client.get(reverse('toutes_les_ventes'), {'anomalie': 'suspect'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['ventes']), 0)
+
+        Vente.objects.filter(pk=self.vente.pk).update(prix_vente_unitaire=Decimal('100.00'))
+        response = self.client.get(reverse('toutes_les_ventes'), {'anomalie': 'sous_cout'})
+        self.assertEqual(len(response.context['ventes']), 1)

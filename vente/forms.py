@@ -329,3 +329,34 @@ class VenteForm(forms.Form):
                 )
 
         return vente
+
+
+class CorrectionVenteGroupeForm(forms.Form):
+    """Correction d'une vente par le groupe « Correcteurs ventes » : prix et/ou
+    quantité uniquement (la date reste réservée à la direction)."""
+
+    prix_vente_unitaire = forms.DecimalField(
+        label="Prix de vente unitaire",
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+    )
+    quantite = forms.DecimalField(
+        label="Quantité vendue",
+        min_value=Decimal('0.01'),
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+    )
+    motif = forms.CharField(
+        label="Motif (facultatif)",
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('prix_vente_unitaire') is None and cleaned.get('quantite') is None:
+            raise ValidationError("Indiquez un prix ou une quantité corrigés.")
+        return cleaned

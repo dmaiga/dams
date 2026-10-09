@@ -47,4 +47,5 @@ SEUIL_MARGE_MINIMALE = 45
 # signalait jusqu'ici. Une vraie fourchette de prix acceptable par produit ("spectrum")
 # serait plus juste mais difficile à établir pour l'instant (variation de marché,
 # négociation) — ce seuil fixe et simple est un repli volontairement provisoire.
-SEUIL_ECART_PRIX_ACHAT = 2500
+# 09/10/2026 : relevé de 2 500 à 3 500 (des ventes normales à ~2 750 déclenchaient le signalement).
+SEUIL_ECART_PRIX_ACHAT = 3500

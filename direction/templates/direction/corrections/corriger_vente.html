@@ -25,6 +25,27 @@
         </div>
     {% endif %}
 
+    {% with lot=vente.detail_distribution.lot %}
+    <div class="card bg-slate-50 border border-slate-200">
+        <div class="card-body py-4 text-sm grid grid-cols-2 gap-x-6 gap-y-1">
+            <div><span class="text-slate-500">Superviseur :</span> {{ vente.detail_distribution.distribution.superviseur.full_name|default:"—" }}</div>
+            <div><span class="text-slate-500">Agent :</span> {{ vente.agent.full_name }}</div>
+            <div><span class="text-slate-500">Fournisseur :</span> {{ lot.fournisseur.nom|default:"—" }}</div>
+            <div><span class="text-slate-500">Reçu le :</span> {{ lot.date_reception|date:"d/m/Y" }}</div>
+            <div><span class="text-slate-500">Prix d'achat unitaire :</span> {{ lot.prix_achat_unitaire }}</div>
+            <div><span class="text-slate-500">Total vente actuel :</span> {{ vente.total_vente }}</div>
+        </div>
+    </div>
+    {% endwith %}
+
+    <div class="alert text-xs bg-blue-50 border border-blue-200 text-slate-700">
+        <span>
+            <strong>Effet de la correction :</strong> la quantité restante chez l'agent, le montant ajouté
+            au solde du superviseur et le recouvrement de cette vente sont recalculés avec les nouvelles
+            valeurs. L'ancienne et la nouvelle valeur sont conservées dans l'historique des corrections.
+        </span>
+    </div>
+
     <div class="card bg-white shadow-sm border border-slate-200">
         <div class="card-body space-y-4">
             <form method="post" class="space-y-4">

@@ -169,3 +169,39 @@ routé et lié dans `base.html`, encore accessible pour le ROT actif en base —
 touché par la nouvelle borne `DATE_DEBUT_PERIODE_ACTUELLE`** (finance, 24/09/2026) : maintenir à jour un
 calcul déjà considéré obsolète n'a pas été jugé utile. Voir `finance/APP_FINANCE.md` pour le contexte
 plus large sur la duplication du calcul de solde.
+---
+
+## 8. Produits en possession des agents — récents / anciens (09/10/2026)
+
+**Besoin (mdmaiga)** : le superviseur doit voir, avec ses agents, quels produits ils détiennent et
+depuis quand, en distinguant les distributions de moins de 7 jours de celles de 7 jours et plus (suivi,
+inventaire, produits à investiguer).
+
+**Service** : `agents/services/stock_agents_service.py::StockAgentsService.produits_par_agent(superviseur,
+agent=None, produit_id=None)` — réutilise `direction.services.StockInvestigationService.base_queryset`
+(même source de vérité que `direction/suivi-distributions/`) : `restant > 0`, distributions
+postérieures à `DATE_DEBUT_SUIVI_TERRAIN` (01/07/2026), agents rattachés au superviseur
+(`Agent.superviseur`). Ancienneté = jours depuis `DistributionAgent.date_distribution` (moment où le
+produit est remis à l'agent). Seuils : `SEUIL_ATTENTION_JOURS` (7 j, frontière récent/ancien) et
+`SEUIL_CRITIQUE_JOURS` (14 j, compteur en rouge). Limite héritée : `restant` ne déduit pas les pertes
+(comme la page direction).
+
+**Écrans** :
+- `detail_agent_sup` (`/agents/sup/agent/<id>/`, superviseur) : carte « Produits en sa possession » — deux
+  listes distinctes (depuis ≥ 7 j / depuis < 7 j).
+- `suivi_stock_agents` (`/agents/stock/agents/`, onglet **« Suivi stock agents »**,
+  `agents/stock/suivi_stock_agents.html`) : pendant de `direction/suivi-distributions/` pour **tous** les
+  agents de vente (tous superviseurs). Tableau « Produits à investiguer » (≥ 7 j) puis « Distribués
+  récemment » (< 7 j) ; filtres superviseur, agent, produit. **Accès** (`core.services.acces.
+  peut_suivre_stock_agents`) : gestionnaire de stock (`type_agent='gestionnaire_stock'`) **ou** membre du
+  groupe Django « Suivi stock agents » (migration `core.0132`, contient `jeanclaude.sup`). Le lien
+  apparaît dans le menu gestionnaire de stock et, pour les membres du groupe, dans le menu superviseur
+  (`peut_suivre_stock_agents` exposé par le context processor). Les autres superviseurs n'y ont pas accès.
+
+**Tests** : `agents/tests.py::StockAgentsTests`.
+
+**Lisibilité mobile (09/10/2026)** : `suivi_stock_agents.html` affiche **une carte par agent**, bandeau et
+liseré de couleur alternés (4 teintes) pour séparer nettement deux agents ; une ligne par produit
+(`nom` sur une seule ligne, tronqué avec `…` si besoin / quantité / `jj/mm · N j`, police réduite sous
+576 px). Le menu superviseur ne propose plus « Distribuer (exception) » (lien masqué dans `base.html`
+par `{% comment %}` — l'URL `vente:creer_distribution` reste active).

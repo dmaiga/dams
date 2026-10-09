@@ -781,6 +781,61 @@ class CorrectionDistributionService:
         return detail, nouveau_detail
 
     @classmethod
+    def retourner_au_depot(
+        cls,
+        detail_distribution_id,
+        *,
+        quantite,
+        motif='',
+        utilisateur,
+    ):
+        """Retourne `quantite` unites au depot (stock central du lot) et la
+        retire de la distribution, l'agent conservant le reste. Cas d'usage :
+        2 ont ete distribues alors que 1 seulement etait prevu — le surplus
+        revient au lot sans supprimer toute la distribution.
+
+        Passe par `corriger_distribution` (meme cascade stock/affectation,
+        meme audit DISTRIBUTION_QUANTITE) : seule la part non vendue ni
+        perdue est retournable.
+        """
+        quantite = AffectationLotService._normaliser_quantite(quantite)
+
+        with transaction.atomic():
+            detail = DetailDistribution.objects.select_for_update().get(
+                pk=detail_distribution_id
+            )
+            if quantite >= detail.quantite:
+                raise ValidationError(
+                    "La quantite retournee doit etre inferieure a la quantite "
+                    f"distribuee ({detail.quantite}) — pour tout retirer, utilisez "
+                    "la suppression."
+                )
+            quantite_vendue = (
+                Vente.objects.filter(
+                    detail_distribution=detail, est_supprime=False
+                ).aggregate(total=Sum('quantite'))['total']
+                or Decimal('0.00')
+            )
+            quantite_perdue = (
+                detail.pertes.aggregate(total=Sum('quantite_perdue'))['total']
+                or Decimal('0.00')
+            )
+            restant = detail.quantite - quantite_vendue - quantite_perdue
+            if quantite > restant:
+                raise ValidationError(
+                    f"Seules {restant} unites sont encore chez l'agent (le reste "
+                    "est deja vendu ou perdu) — retour refuse."
+                )
+
+            motif_final = f"Retour au depot de {quantite}" + (f" — {motif}" if motif else "")
+            return cls.corriger_distribution(
+                detail.id,
+                quantite=detail.quantite - quantite,
+                motif=motif_final,
+                utilisateur=utilisateur,
+            )
+
+    @classmethod
     def supprimer_distribution(
         cls,
         detail_distribution_id,
