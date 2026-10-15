@@ -417,9 +417,10 @@ potentiel).
 
 **Stock détenu par les superviseurs (15/10/2026)** : une `AffectationLotSuperviseur` créée sans agent
 choisi (`agent_terrain_direct` NULL, `quantite_restante > 0`) n'a aucun `DetailDistribution` tant que le
-superviseur ne l'a pas distribuée — elle était donc invisible de cette page. Une section en tête
+superviseur ne l'a pas distribuée — elle était donc invisible de cette page. Une section en accordéon, au-dessus de l'aperçu PDF en bas de page,
 (`StockInvestigationService.stock_detenu_superviseurs`, filtres superviseur/produit, masquée si filtre
 agent) liste ces affectations avec valeur d'achat immobilisée et ancienneté (seuils 7 j / 14 j).
+Dispositif transitoire : depuis le 15/10/2026 les nouveaux envois sans agent sont attribués au superviseur lui-même (voir `marchandise`) ; la section se vide à mesure que l'ancien stock est vendu.
 
 **Bug corrigé — « None FCFA »** : la colonne Valorisation affichait `DetailDistribution.prix_detail`,
 qui est **structurellement toujours `None`** avant la vente (`rules/ARCHITECTURE.md` § invariants

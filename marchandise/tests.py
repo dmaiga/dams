@@ -19,6 +19,7 @@ from core.models import (
     Produit,
     Vente,
 )
+from marchandise.forms import AffectationSuperviseurForm
 from marchandise.services import CorrectionDistributionService, CorrectionLotService
 
 API_KEY = 'test-dams-champs-key'
@@ -644,3 +645,39 @@ class CorrectionDistributionServiceTests(TestCase):
                 utilisateur=self.utilisateur,
             )
         self.assertTrue(DetailDistribution.objects.filter(pk=self.detail.pk).exists())
+
+
+class AffectationSansAgentTests(TestCase):
+    """15/10/2026 — sans agent choisi, le stock est attribué au superviseur
+    lui-même (auto-distribution) : vendable immédiatement, jamais « en attente »."""
+
+    def test_affectation_sans_agent_cree_une_auto_distribution_du_superviseur(self):
+        gestionnaire = Agent.objects.create(
+            user=User.objects.create_user(username='jean', password='x'),
+            type_agent='gestionnaire_stock',
+        )
+        superviseur = Agent.objects.create(
+            user=User.objects.create_user(username='sup1', password='x'), type_agent='entrepot'
+        )
+        lot = LotEntrepot.objects.create(
+            produit=Produit.objects.create(nom='riz'),
+            quantite_initiale=Decimal('100.00'),
+            quantite_restante=Decimal('100.00'),
+            prix_achat_unitaire=Decimal('100.00'),
+        )
+        form = AffectationSuperviseurForm({
+            'produit': lot.produit_id, 'lot': lot.pk, 'superviseur': superviseur.pk,
+            'quantite': '30.00',
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        affectation = form.save(gestionnaire)
+
+        affectation.refresh_from_db()
+        self.assertEqual(affectation.agent_terrain_direct, superviseur)
+        self.assertEqual(affectation.quantite_restante, Decimal('0.00'))
+        detail = DetailDistribution.objects.get(lot=lot)
+        self.assertEqual(detail.distribution.agent_terrain, superviseur)
+        self.assertEqual(detail.distribution.superviseur, superviseur)
+        self.assertEqual(detail.quantite, Decimal('30.00'))
+        lot.refresh_from_db()
+        self.assertEqual(lot.quantite_restante, Decimal('70.00'))

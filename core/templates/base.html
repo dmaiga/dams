@@ -532,11 +532,11 @@
                     {% endif %}
 
                         
-                        {# Réaffiché (15/10/2026) : sans ce lien, le stock reçu sans agent choisi restait invisible et invendable. #}
+                        {# Lien d'exception conservé pour l'ancien stock en attente (entrée directe sur le formulaire de distribution). #}
                         <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name in 'liste_affectations,creer_distribution,detail_distribution' %}active{% endif %}"
-                           href="{% url 'vente:liste_affectations' %}">
+                           href="{% url 'vente:creer_distribution' %}">
                             <i class="fas fa-share"></i>
-                            <span>Stock à distribuer</span>
+                            <span>Distribuer (exception)</span>
                         </a>
 
                     {% if peut_corriger_ventes %}
