@@ -44,7 +44,8 @@ class AffectationSuperviseurForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'}),
         help_text=(
             "Optionnel — si renseigné, la marchandise part directement à cet agent "
-            "sous la supervision du superviseur choisi, sans étape intermédiaire."
+            "sous la supervision du superviseur choisi. Sinon, elle est attribuée au "
+            "superviseur lui-même, qui peut la vendre immédiatement."
         )
     )
 
@@ -133,7 +134,11 @@ class AffectationSuperviseurForm(forms.Form):
         lot = self.cleaned_data['lot']
         quantite = self.cleaned_data['quantite']
         superviseur = self.cleaned_data['superviseur']
-        agent_terrain = self.cleaned_data.get('agent_terrain')
+        # Sans agent choisi, le stock est transmis au superviseur lui-même
+        # (auto-distribution) : il est vendable immédiatement et visible partout
+        # (vente, suivi des distributions, correcteurs) — plus de stock « en attente »
+        # sans DetailDistribution.
+        agent_terrain = self.cleaned_data.get('agent_terrain') or superviseur
 
         if quantite > lot.quantite_restante:
             raise ValidationError(f"Stock insuffisant. Disponible : {lot.quantite_restante}")
@@ -154,24 +159,23 @@ class AffectationSuperviseurForm(forms.Form):
             lot.quantite_disponible_rot += quantite
             lot.save(update_fields=['quantite_restante', 'quantite_disponible_rot'])
 
-            if agent_terrain:
-                distribution = DistributionAgent.objects.create(
-                    superviseur=superviseur,
-                    agent_terrain=agent_terrain,
-                    date_distribution=timezone.now(),
-                    quantite_totale=quantite,
-                    nombre_produits_differents=1
-                )
-                DetailDistribution.objects.create(
-                    distribution=distribution,
-                    lot=lot,
-                    quantite=quantite,
-                    prix_gros=affectation.prix_gros,
-                    prix_detail=affectation.prix_detail
-                )
-                # Tout est parti directement à l'agent : rien ne reste au niveau du superviseur
-                affectation.quantite_restante = Decimal('0.00')
-                affectation.agent_terrain_direct = agent_terrain
-                affectation.save(update_fields=['quantite_restante', 'agent_terrain_direct'])
+            distribution = DistributionAgent.objects.create(
+                superviseur=superviseur,
+                agent_terrain=agent_terrain,
+                date_distribution=timezone.now(),
+                quantite_totale=quantite,
+                nombre_produits_differents=1
+            )
+            DetailDistribution.objects.create(
+                distribution=distribution,
+                lot=lot,
+                quantite=quantite,
+                prix_gros=affectation.prix_gros,
+                prix_detail=affectation.prix_detail
+            )
+            # Tout est parti directement à l'agent : rien ne reste au niveau du superviseur
+            affectation.quantite_restante = Decimal('0.00')
+            affectation.agent_terrain_direct = agent_terrain
+            affectation.save(update_fields=['quantite_restante', 'agent_terrain_direct'])
 
         return affectation
