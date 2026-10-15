@@ -2610,10 +2610,24 @@ def suivi_distributions(request):
     agents_a_investiguer = StockInvestigationService.regrouper_par_superviseur(lignes_a_investiguer)
     nb_agents_a_investiguer = sum(g["nb_agents"] for g in agents_a_investiguer)
 
+    # Stock reçu par un superviseur mais pas encore distribué : pas de
+    # DetailDistribution, donc absent des tables ci-dessus. Masqué si un
+    # filtre agent est actif (ce stock n'appartient à aucun agent).
+    stock_detenu = (
+        [] if filtres["agent_id"]
+        else StockInvestigationService.stock_detenu_superviseurs(
+            DATE_DEBUT_SUIVI_TERRAIN,
+            superviseur_id=filtres["superviseur_id"],
+            produit_id=filtres["produit_id"],
+        )
+    )
+
     context = {
         "page_obj": page_obj,
         "pagination_query": pagination_params.urlencode(),
         "statut_filtre": statut_filtre,
+        "stock_detenu_superviseurs": stock_detenu,
+        "valeur_stock_detenu": sum((a.valeur_immobilisee for a in stock_detenu), Decimal("0")),
         "agents_a_investiguer": agents_a_investiguer,
         "nb_agents_a_investiguer": nb_agents_a_investiguer,
         "seuil_attention_jours": SEUIL_ATTENTION_JOURS,

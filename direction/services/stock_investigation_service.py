@@ -5,7 +5,7 @@ from django.db.models import DecimalField, ExpressionWrapper, F, Max, Min, Prefe
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from core.models import DetailDistribution, Vente
+from core.models import AffectationLotSuperviseur, DetailDistribution, Vente
 from direction.constants import SEUIL_ATTENTION_JOURS, SEUIL_CRITIQUE_JOURS
 
 
@@ -94,6 +94,47 @@ class StockInvestigationService:
         if date_fin:
             details = details.filter(distribution__date_distribution__date__lte=date_fin)
         return details
+
+    # ------------------------------------------------------------------
+    # STOCK DÉTENU PAR LES SUPERVISEURS — affectations reçues du gestionnaire
+    # sans agent choisi (agent_terrain_direct NULL) et pas encore distribuées :
+    # aucun DetailDistribution n'existe, donc invisibles de la table 1.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def stock_detenu_superviseurs(date_debut_suivi, superviseur_id=None, produit_id=None):
+        affectations = (
+            AffectationLotSuperviseur.objects
+            .filter(
+                quantite_restante__gt=0,
+                agent_terrain_direct__isnull=True,
+                date_affectation__gte=date_debut_suivi,
+            )
+            .select_related("superviseur", "lot__produit", "lot__fournisseur")
+            .annotate(
+                valeur_immobilisee=ExpressionWrapper(
+                    F("quantite_restante") * F("lot__prix_achat_unitaire"),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            )
+            .order_by("date_affectation")
+        )
+        if superviseur_id:
+            affectations = affectations.filter(superviseur_id=superviseur_id)
+        if produit_id:
+            affectations = affectations.filter(lot__produit_id=produit_id)
+
+        affectations = list(affectations)
+        aujourdhui = timezone.localdate()
+        for a in affectations:
+            a.jours_detenu = (aujourdhui - a.date_affectation).days
+            if a.jours_detenu >= SEUIL_CRITIQUE_JOURS:
+                a.statut_circulation = "critique"
+            elif a.jours_detenu >= SEUIL_ATTENTION_JOURS:
+                a.statut_circulation = "attention"
+            else:
+                a.statut_circulation = "ok"
+        return affectations
 
     # ------------------------------------------------------------------
     # TABLE 2 — produits en circulation depuis plus de SEUIL_ATTENTION_JOURS
