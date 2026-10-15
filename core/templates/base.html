@@ -532,13 +532,12 @@
                     {% endif %}
 
                         
-{% comment %}Lien « Distribuer (exception) » masqué (09/10/2026) — l'URL vente:creer_distribution reste active.
+                        {# Réaffiché (15/10/2026) : sans ce lien, le stock reçu sans agent choisi restait invisible et invendable. #}
                         <a class="nav-link {% if request.resolver_match.namespace == 'vente' and request.resolver_match.url_name in 'liste_affectations,creer_distribution,detail_distribution' %}active{% endif %}"
-                           href="{% url 'vente:creer_distribution' %}">
+                           href="{% url 'vente:liste_affectations' %}">
                             <i class="fas fa-share"></i>
-                            <span>Distribuer (exception)</span>
+                            <span>Stock à distribuer</span>
                         </a>
-{% endcomment %}
 
                     {% if peut_corriger_ventes %}
                         <a class="nav-link {% if request.resolver_match.url_name in 'corrections_ventes,corriger_vente_groupe,historique_corrections_ventes' %}active{% endif %}"

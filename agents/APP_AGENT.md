@@ -203,5 +203,6 @@ produit est remis à l'agent). Seuils : `SEUIL_ATTENTION_JOURS` (7 j, frontière
 **Lisibilité mobile (09/10/2026)** : `suivi_stock_agents.html` affiche **une carte par agent**, bandeau et
 liseré de couleur alternés (4 teintes) pour séparer nettement deux agents ; une ligne par produit
 (`nom` sur une seule ligne, tronqué avec `…` si besoin / quantité / `jj/mm · N j`, police réduite sous
-576 px). Le menu superviseur ne propose plus « Distribuer (exception) » (lien masqué dans `base.html`
-par `{% comment %}` — l'URL `vente:creer_distribution` reste active).
+576 px). Le menu superviseur propose de nouveau l'accès au stock à distribuer (lien « Stock à distribuer »
+dans `base.html` → `vente:liste_affectations`, réaffiché le 15/10/2026 : masqué depuis le 09/10, il
+rendait invisible et invendable le stock reçu du gestionnaire sans agent choisi).

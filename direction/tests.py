@@ -328,6 +328,34 @@ class SuiviDistributionsProduitsEnCirculationTests(TestCase):
             Decimal('2500.00'),
         )
 
+    def test_stock_detenu_par_superviseur_apparait_sans_distribution(self):
+        # Stock reçu du gestionnaire sans agent choisi : aucune DetailDistribution,
+        # mais la direction doit le voir. Une affectation déjà redirigée directement
+        # vers un agent (agent_terrain_direct) ou soldée n'y figure pas.
+        from core.models import AffectationLotSuperviseur
+
+        date_aff = timezone.localdate() - timezone.timedelta(days=4)
+        detenue = AffectationLotSuperviseur.objects.create(
+            lot=self.lot, superviseur=self.superviseur,
+            quantite_initiale=Decimal('40.00'), quantite_restante=Decimal('40.00'),
+            date_affectation=date_aff,
+        )
+        AffectationLotSuperviseur.objects.create(
+            lot=self.lot, superviseur=self.superviseur,
+            quantite_initiale=Decimal('15.00'), quantite_restante=Decimal('0.00'),
+            agent_terrain_direct=self.agent, date_affectation=date_aff,
+        )
+
+        response = self.client.get(reverse('suivi_distributions'))
+        self.assertEqual(response.context['stock_detenu_superviseurs'], [detenue])
+        self.assertEqual(response.context['valeur_stock_detenu'], Decimal('10000.00'))
+        self.assertEqual(response.context['stock_detenu_superviseurs'][0].jours_detenu, 4)
+        self.assertContains(response, 'Stock détenu par les superviseurs')
+
+        # Le filtre agent écarte ce stock (il n'appartient à aucun agent).
+        response = self.client.get(reverse('suivi_distributions'), {'agent': self.agent.id})
+        self.assertEqual(response.context['stock_detenu_superviseurs'], [])
+
     def test_tableau_a_investiguer_regroupe_par_superviseur_puis_agent(self):
         # sprint-14, révision 17/09/2026 : checklist terrain regroupée
         # superviseur -> agent -> produits, sans fournisseur ni valorisation.

@@ -177,6 +177,60 @@
 
     </form>
 
+    <!-- STOCK DÉTENU PAR LES SUPERVISEURS : reçu du gestionnaire sans agent choisi, pas encore
+         distribué — aucun DetailDistribution, donc absent du tableau de traçabilité ci-dessous. -->
+    {% if stock_detenu_superviseurs %}
+    <div class="card bg-base-100 shadow-sm border border-amber-200">
+        <div class="card-body">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                    <h2 class="text-lg font-bold">Stock détenu par les superviseurs</h2>
+                    <p class="text-sm opacity-70">
+                        Reçu du gestionnaire de stock, pas encore distribué ni vendu.
+                    </p>
+                </div>
+                <span class="font-bold text-slate-700 text-sm">
+                    {{ valeur_stock_detenu|floatformat:0|intcomma }} <span class="text-[10px]">FCFA immobilisés</span>
+                </span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="table table-sm text-xs">
+                    <thead>
+                        <tr>
+                            <th>Superviseur</th>
+                            <th>Produit</th>
+                            <th>Fournisseur</th>
+                            <th class="text-right">Reçu</th>
+                            <th class="text-right">Reste</th>
+                            <th class="text-right">Valeur achat</th>
+                            <th>Affecté le</th>
+                            <th class="text-right">Depuis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in stock_detenu_superviseurs %}
+                        <tr>
+                            <td class="font-semibold text-slate-900">{{ a.superviseur.full_name }}</td>
+                            <td>{{ a.lot.produit.nom }}</td>
+                            <td class="text-slate-500">{{ a.lot.fournisseur.nom }}</td>
+                            <td class="text-right">{{ a.quantite_initiale|format_number }}</td>
+                            <td class="text-right font-bold text-error">{{ a.quantite_restante|format_number }}</td>
+                            <td class="text-right">{{ a.valeur_immobilisee|floatformat:0|intcomma }} FCFA</td>
+                            <td>{{ a.date_affectation|date:"d/m/Y" }}</td>
+                            <td class="text-right font-semibold
+                                {% if a.statut_circulation == 'critique' %}text-error
+                                {% elif a.statut_circulation == 'attention' %}text-amber-600{% endif %}">
+                                {{ a.jours_detenu }} j
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- TABLE -->
 
     <div class="card bg-base-100 shadow-sm border border-base-200">

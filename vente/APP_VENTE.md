@@ -27,7 +27,7 @@ Dans le cas courant, la marchandise part **directement** du gestionnaire de stoc
 
 | Nom | URL | Accès |
 |---|---|---|
-| `vente:liste_affectations` | `/vente/` | superviseur |
+| `vente:liste_affectations` | `/vente/` | superviseur — lien de menu « Stock à distribuer » (réaffiché le 15/10/2026) |
 | `vente:creer_distribution` | `/vente/distribuer/` | superviseur |
 | `vente:detail_distribution` | `/vente/distribution/<pk>/` | superviseur |
 | `vente:enregistrer_vente` | `/vente/vente/nouvelle/` | superviseur |
