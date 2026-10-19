@@ -71,8 +71,8 @@ def test_excel_quantites_et_evolution(client, equipe):
     assert ["aloco", "—", 30.0, 1, 0] in lignes
     assert any(l and "4 sacs vendus" in str(l[0]) and "130 kg" in str(l[0]) for l in lignes)
     # évolution : septembre 50 kg, octobre 130 kg -> +80 kg (+160 %)
-    assert ["Octobre 2026", 130.0, "+80.0", "+160.0 %"] in lignes
-    assert ["Septembre 2026", 50.0, "+50.0", "—"] in lignes
+    assert ["Octobre 2026", 4.0, 130.0, "+80.0", "+160.0 %"] in lignes
+    assert ["Septembre 2026", 2.0, 50.0, "+50.0", "—"] in lignes
 
 
 def test_filtre_produit_restreint_aussi_l_evolution(client, equipe):
@@ -80,7 +80,7 @@ def test_filtre_produit_restreint_aussi_l_evolution(client, equipe):
                         produit=Produit.objects.get(nom="aloco").id))
     wb = openpyxl.load_workbook(BytesIO(r.content))
     lignes = [[c for c in row if c is not None] for row in wb["Synthèse produits"].iter_rows(values_only=True)]
-    assert ["Octobre 2026", 30.0, "+30.0", "—"] in lignes
+    assert ["Octobre 2026", 0.0, 30.0, "+30.0", "—"] in lignes
     assert not any(l and l[0] == "oignon" for l in lignes)
 
 
