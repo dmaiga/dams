@@ -98,6 +98,11 @@
         </div>
         <button type="submit" class="btn btn-primary">Filtrer</button>
     </form>
+    <div class="flex flex-wrap items-center gap-2 text-sm my-2">
+        <span>Exporter les ventes de l'équipe ({{ periode_libelle }}{% if produit_filtre %}, produit filtré{% endif %}) :</span>
+        <a class="btn btn-sm" href="{% url 'bi:export_ventes_equipe_excel' superviseur.id %}?granularite={{ granularite }}&annee={{ annee }}&mois={{ mois }}&semaine={{ semaine_selectionnee|date:'Y-m-d' }}{% if produit_filtre %}&produit={{ produit_filtre }}{% endif %}">Excel</a>
+        <a class="btn btn-sm" href="{% url 'bi:export_ventes_equipe_pdf' superviseur.id %}?granularite={{ granularite }}&annee={{ annee }}&mois={{ mois }}&semaine={{ semaine_selectionnee|date:'Y-m-d' }}{% if produit_filtre %}&produit={{ produit_filtre }}{% endif %}">PDF</a>
+    </div>
     <div class="overflow-x-auto">
         <table class="table">
             <thead>

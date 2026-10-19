@@ -21,6 +21,16 @@ urlpatterns = [
     ),
     path("agents/<int:agent_id>/", views.dashboard_agent_detail, name="agent_detail"),
     path("agents/equipe/<int:superviseur_id>/", views.dashboard_superviseur_detail, name="superviseur_detail"),
+    path(
+        "agents/equipe/<int:superviseur_id>/export/excel/",
+        views.export_ventes_equipe_excel,
+        name="export_ventes_equipe_excel",
+    ),
+    path(
+        "agents/equipe/<int:superviseur_id>/export/pdf/",
+        views.export_ventes_equipe_pdf,
+        name="export_ventes_equipe_pdf",
+    ),
     path("depenses/", views.dashboard_depenses, name="depenses"),
     path("stock/", views.dashboard_stock, name="stock"),
 ]
