@@ -2535,6 +2535,7 @@ from django.shortcuts import render
 
 from core.models import (
     Agent,
+    LotEntrepot,
     Produit,
 )
 from django.utils.decorators import method_decorator
@@ -2551,10 +2552,20 @@ def _params_suivi_distributions(request):
     """Filtres communs à direction.suivi_distributions et aux deux exports
     (traçabilité + investigation) — sprint-14, 17/09/2026."""
     params = request.GET
+    produit_id = params.get("produit")
+    lot_id = params.get("lot")
+    # Le filtre lot n'a de sens que dans un produit : sans produit, ou si le
+    # lot n'appartient pas au produit choisi (produit changé depuis), on l'ignore.
+    if lot_id and not (
+        produit_id
+        and LotEntrepot.objects.filter(pk=lot_id, produit_id=produit_id).exists()
+    ):
+        lot_id = None
     return {
         "superviseur_id": params.get("superviseur"),
         "agent_id": params.get("agent"),
-        "produit_id": params.get("produit"),
+        "produit_id": produit_id,
+        "lot_id": lot_id,
         "date_debut": params.get("date_debut"),
         "date_fin": params.get("date_fin"),
     }
@@ -2612,14 +2623,25 @@ def suivi_distributions(request):
 
     # Stock reçu par un superviseur mais pas encore distribué : pas de
     # DetailDistribution, donc absent des tables ci-dessus. Masqué si un
-    # filtre agent est actif (ce stock n'appartient à aucun agent).
+    # filtre agent est actif (ce stock n'appartient à aucun agent). Réservé à
+    # l'utilisateur mdmaiga : les autres profils ne voient pas la section.
     stock_detenu = (
-        [] if filtres["agent_id"]
+        [] if filtres["agent_id"] or request.user.username != "mdmaiga"
         else StockInvestigationService.stock_detenu_superviseurs(
             DATE_DEBUT_SUIVI_TERRAIN,
             superviseur_id=filtres["superviseur_id"],
             produit_id=filtres["produit_id"],
+            lot_id=filtres["lot_id"],
         )
+    )
+
+    # Filtre conditionnel : les lots n'apparaissent que si un produit est choisi.
+    lots = (
+        LotEntrepot.objects
+        .filter(produit_id=filtres["produit_id"])
+        .select_related("fournisseur")
+        .order_by("-date_reception")
+        if filtres["produit_id"] else []
     )
 
     context = {
@@ -2644,6 +2666,8 @@ def suivi_distributions(request):
         ),
 
         "produits": Produit.objects.all(),
+        "lots": lots,
+        "lot_id": filtres["lot_id"],
         "labels_agents": {
             'terrain': 'Mami',
             'agent_gros': 'Agent Gros',

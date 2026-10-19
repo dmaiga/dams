@@ -82,13 +82,15 @@ class StockInvestigationService:
 
     @staticmethod
     def filtrer(details, superviseur_id=None, agent_id=None, produit_id=None,
-                date_debut=None, date_fin=None):
+                date_debut=None, date_fin=None, lot_id=None):
         if superviseur_id:
             details = details.filter(distribution__superviseur_id=superviseur_id)
         if agent_id:
             details = details.filter(distribution__agent_terrain_id=agent_id)
         if produit_id:
             details = details.filter(lot__produit_id=produit_id)
+        if lot_id:
+            details = details.filter(lot_id=lot_id)
         if date_debut:
             details = details.filter(distribution__date_distribution__date__gte=date_debut)
         if date_fin:
@@ -102,7 +104,8 @@ class StockInvestigationService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def stock_detenu_superviseurs(date_debut_suivi, superviseur_id=None, produit_id=None):
+    def stock_detenu_superviseurs(date_debut_suivi, superviseur_id=None, produit_id=None,
+                                  lot_id=None):
         affectations = (
             AffectationLotSuperviseur.objects
             .filter(
@@ -123,6 +126,8 @@ class StockInvestigationService:
             affectations = affectations.filter(superviseur_id=superviseur_id)
         if produit_id:
             affectations = affectations.filter(lot__produit_id=produit_id)
+        if lot_id:
+            affectations = affectations.filter(lot_id=lot_id)
 
         affectations = list(affectations)
         aujourdhui = timezone.localdate()
