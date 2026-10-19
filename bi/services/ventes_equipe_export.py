@@ -62,21 +62,25 @@ class VentesEquipeExportService:
             base.filter(date_vente__date__gte=premier_jour)
             .annotate(m=TruncMonth("date_vente"))
             .values("m")
-            .annotate(kg=Sum(KG_EXPR, output_field=DecimalField(max_digits=15, decimal_places=2)))
+            .annotate(
+                kg=Sum(KG_EXPR, output_field=DecimalField(max_digits=15, decimal_places=2)),
+                sacs=Sum("quantite", filter=Q(detail_distribution__lot__produit__poids_unitaire_kg__isnull=False)),
+            )
         ):
             m = r["m"]
-            par_mois[date(m.year, m.month, 1)] = r["kg"]
+            par_mois[date(m.year, m.month, 1)] = (r["kg"], r["sacs"] or Decimal("0"))
 
         evolution = []
-        precedent = par_mois.get(premier_jour, Decimal("0"))
+        precedent = par_mois.get(premier_jour, (Decimal("0"), Decimal("0")))[0]
         for n in range(NB_MOIS_EVOLUTION - 1, -1, -1):
             a, m = _mois_moins_n(annee, mois, n)
-            kg = par_mois.get(date(a, m, 1), Decimal("0"))
+            kg, sacs = par_mois.get(date(a, m, 1), (Decimal("0"), Decimal("0")))
             variation = kg - precedent
             pct = float(variation / precedent * 100) if precedent else None
             evolution.append({
                 "libelle": f"{MOIS_FR[m].capitalize()} {a}",
                 "kg": kg,
+                "sacs": sacs,
                 "variation": variation,
                 "variation_pct": pct,
             })
@@ -133,10 +137,11 @@ class VentesEquipeExportService:
 
     @staticmethod
     def _lignes_evolution(d):
-        lignes = [["Mois", "Kg vendus", "Variation (kg)", "Variation (%)"]]
+        lignes = [["Mois", "Sacs vendus", "Kg vendus", "Variation (kg)", "Variation (%)"]]
         for e in d["evolution"]:
             lignes.append([
-                e["libelle"], round(float(e["kg"]), 1), f"{float(e['variation']):+.1f}",
+                e["libelle"], float(e["sacs"]), round(float(e["kg"]), 1),
+                f"{float(e['variation']):+.1f}",
                 f"{e['variation_pct']:+.1f} %" if e["variation_pct"] is not None else "—",
             ])
         return lignes
@@ -178,7 +183,7 @@ class VentesEquipeExportService:
         ws = wb.active
         ws.title = "Synthèse produits"
         entete(ws)
-        bloc(ws, "Évolution mensuelle (kg vendus)", cls._lignes_evolution(d))
+        bloc(ws, "Évolution mensuelle (sacs et kg vendus)", cls._lignes_evolution(d))
         ws.append([])
         bloc(ws, "Synthèse par produit", cls._lignes_produits(d))
 
@@ -211,8 +216,8 @@ class VentesEquipeExportService:
             Paragraph(info[1], styles["Normal"]),
             Paragraph(info[2], styles["Normal"]),
             Spacer(1, 6),
-            Paragraph("Évolution mensuelle (kg vendus)", styles["Heading2"]),
-            tableau(cls._lignes_evolution(d), doc, fractions=[4, 2, 2, 2]),
+            Paragraph("Évolution mensuelle (sacs et kg vendus)", styles["Heading2"]),
+            tableau(cls._lignes_evolution(d), doc, fractions=[4, 2, 2, 2, 2]),
             Paragraph("Synthèse par produit", styles["Heading2"]),
             tableau(cls._lignes_produits(d), doc, fractions=[4, 2, 2, 2, 2]),
         ]
