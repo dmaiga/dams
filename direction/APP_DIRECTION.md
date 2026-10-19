@@ -524,6 +524,12 @@ a été envisagé puis écarté — cette page couvre déjà le besoin de valori
 le BI serait une surcharge sans valeur ajoutée à ce stade. Voir `docs/sprints/archive/sprint-14.md`
 pour le détail de l'investigation BI (`fct_stock_agent.sql`).
 
+**Filtre conditionnel par lot** : quand un produit est choisi, un select « Lot » (`?lot=<id>`) apparaît
+et liste les `LotEntrepot` de ce produit (récents d'abord) pour suivre la vie d'un lot. Il filtre les
+tables 1 et 2, le « Stock détenu par les superviseurs » (section réservée au username `mdmaiga`, vide pour
+les autres profils donc non affichée) et les exports (`StockInvestigationService.filtrer(lot_id=…)`). Un lot qui n'appartient pas
+au produit choisi est ignoré (`_params_suivi_distributions`).
+
 **Tests** : `direction/tests.py` — `SuiviDistributionsProduitsEnCirculationTests` (filtre par
 défaut, statut "tous", absence de "None FCFA", seuils de couleur, regroupement superviseur →
 agent → produits du tableau d'investigation, exports), `VentesSuperviseurAffichageTests`.

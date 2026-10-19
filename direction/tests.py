@@ -346,6 +346,14 @@ class SuiviDistributionsProduitsEnCirculationTests(TestCase):
             agent_terrain_direct=self.agent, date_affectation=date_aff,
         )
 
+        # Réservé à mdmaiga : un autre profil direction ne voit pas la section.
+        response = self.client.get(reverse('suivi_distributions'))
+        self.assertEqual(response.context['stock_detenu_superviseurs'], [])
+
+        from core.models import Agent
+        mdmaiga = User.objects.create_user(username='mdmaiga', password='x')
+        Agent.objects.create(user=mdmaiga, type_agent='direction')
+        self.client.login(username='mdmaiga', password='x')
         response = self.client.get(reverse('suivi_distributions'))
         self.assertEqual(response.context['stock_detenu_superviseurs'], [detenue])
         self.assertEqual(response.context['valeur_stock_detenu'], Decimal('10000.00'))
