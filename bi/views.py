@@ -33,6 +33,7 @@ from bi.models import (
     VwVentesAgentProduitSemaine,
 )
 from bi.services.agents_sous_objectif_export import AgentsSousObjectifExportService
+from bi.services.ventes_equipe_export import VentesEquipeExportService
 from core.models import Agent, RegleSalaire, Vente
 from core.services.incentive_service import (
     get_incentive_par_kg_terrain,
@@ -1128,6 +1129,57 @@ def _jours_ouvres_dans_periode(date_debut, date_fin):
             jours += 1
         courant += timedelta(days=1)
     return jours
+
+
+def _donnees_ventes_equipe(request, superviseur_id):
+    """Période de la fiche équipe (mois, ou semaine si granularite=semaine) + filtre produit
+    -> données de l'export des ventes de l'équipe. Mêmes règles de période que
+    dashboard_superviseur_detail."""
+    superviseur = get_object_or_404(Agent, pk=superviseur_id, type_agent="entrepot")
+    annee, mois, _ = _parse_periode(request)
+    if not annee or not mois:
+        annee, mois = _dernier_mois_disponible()
+
+    semaine = None
+    if request.GET.get("granularite") == "semaine":
+        semaine = parse_date(request.GET.get("semaine") or "")
+    if semaine:
+        date_debut, date_fin = semaine, semaine + timedelta(days=6)
+        annee, mois = semaine.year, semaine.month
+    else:
+        date_debut = date(annee, mois, 1)
+        date_fin = date(annee, mois, calendar.monthrange(annee, mois)[1])
+
+    produit_id = request.GET.get("produit") or None
+    donnees = VentesEquipeExportService.collecter(
+        superviseur, date_debut, date_fin, annee, mois, produit_id=produit_id
+    )
+    return donnees, date_debut, date_fin
+
+
+@bi_access_required
+def export_ventes_equipe_excel(request, superviseur_id):
+    donnees, date_debut, date_fin = _donnees_ventes_equipe(request, superviseur_id)
+    response = HttpResponse(
+        VentesEquipeExportService.export_excel(donnees),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = (
+        f"attachment; filename=ventes_equipe_{superviseur_id}_{date_debut}_{date_fin}.xlsx"
+    )
+    return response
+
+
+@bi_access_required
+def export_ventes_equipe_pdf(request, superviseur_id):
+    donnees, date_debut, date_fin = _donnees_ventes_equipe(request, superviseur_id)
+    response = HttpResponse(
+        VentesEquipeExportService.export_pdf(donnees), content_type="application/pdf"
+    )
+    response["Content-Disposition"] = (
+        f"attachment; filename=ventes_equipe_{superviseur_id}_{date_debut}_{date_fin}.pdf"
+    )
+    return response
 
 
 @bi_access_required
