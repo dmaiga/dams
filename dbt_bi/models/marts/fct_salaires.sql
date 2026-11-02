@@ -81,7 +81,9 @@ mamy_detail as (
         v.agent_id,
         date_trunc('month', v.date_vente)::date as mois,
         v.quantite,
-        v.quantite_en_kg,
+        -- aloco : 1 unité = 5 kg (5 aloco = 25 kg) pour le volume réalisé / seuil du fixe
+        -- (miroir de ALOCO_KG_PAR_UNITE dans salaire_calculator.py).
+        case when p.nom ~* '^al+oco' then v.quantite * 5 else v.quantite_en_kg end as quantite_en_kg,
         p.taux_incentive as produit_taux_incentive,
         coalesce(pe.kilo_perdu_incentive, 0) as kilo_perdu_incentive
     from ventes v
@@ -112,14 +114,14 @@ mamy_calcul as (
     select
         am.agent_id,
         am.mois,
-        case when (coalesce(ma.kilo_total, 0) - coalesce(ma.kilo_perdu, 0)) >= 750 then 20000 else 10000 end as salaire_base_theorique,
+        case when (coalesce(ma.kilo_total, 0) - coalesce(ma.kilo_perdu, 0)) >= 400 then 10000 else 0 end as salaire_base_theorique,
         case
             when am.date_debut_fonction is not null and jt.jours_travailles < jt.total_jours_mois
                 then round(
-                    (case when (coalesce(ma.kilo_total, 0) - coalesce(ma.kilo_perdu, 0)) >= 750 then 20000 else 10000 end)
+                    (case when (coalesce(ma.kilo_total, 0) - coalesce(ma.kilo_perdu, 0)) >= 400 then 10000 else 0 end)
                     * jt.jours_travailles::numeric / jt.total_jours_mois
                 )
-            else (case when (coalesce(ma.kilo_total, 0) - coalesce(ma.kilo_perdu, 0)) >= 750 then 20000 else 10000 end)
+            else (case when (coalesce(ma.kilo_total, 0) - coalesce(ma.kilo_perdu, 0)) >= 400 then 10000 else 0 end)
         end as salaire_base,
         (coalesce(ma.kilo_au_kg, 0) - coalesce(ma.kilo_perdu_au_kg, 0)) * coalesce(r.incentive_par_kg, 0)
             + coalesce(ma.incentive_taux_dedie, 0) as incentive,

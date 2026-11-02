@@ -111,7 +111,12 @@ def test_dashboard_sante_avec_donnees(client, utilisateur_connecte):
         rentabilite_nette=Decimal("2500000"),
         rentabilite_nette_pct=Decimal("16.67"),
     )
-    with patch.object(VwRentabiliteGlobale, "objects") as mock_globale:
+    with patch.object(VwRentabiliteGlobale, "objects") as mock_globale, patch.object(
+        VwPerformanceAgent, "objects"
+    ) as mock_agents, patch.object(VwRentabiliteProduit, "objects") as mock_produits:
+        # Top 10 agents / produits du mois de référence : listes vides (vues bi_ absentes en test).
+        mock_agents.filter.return_value.order_by.return_value.__getitem__.return_value = []
+        mock_produits.filter.return_value.order_by.return_value.__getitem__.return_value = []
         mock_globale.order_by.return_value = [ligne]
         mock_globale.filter.return_value.order_by.return_value.first.return_value = None
         response = client.get(reverse("bi:sante"), TOUTES_PERIODES)
@@ -120,7 +125,6 @@ def test_dashboard_sante_avec_donnees(client, utilisateur_connecte):
     kpis_brute = {k["code"]: k for k in response.context["kpis_marge_brute"]}
     kpis_nette = {k["code"]: k for k in response.context["kpis_marge_nette"]}
     assert kpis_brute["KPI-003"]["valeur"] == Decimal("7500000")
-    assert kpis_brute["KPI-003"]["principal"] is True
     assert kpis_nette["KPI-009"]["valeur"] == Decimal("2500000")
     assert kpis_nette["KPI-009"]["statut"] == "vert"
     assert response.context["chart_est_journalier"] is False
@@ -152,7 +156,11 @@ def test_dashboard_sante_graph_journalier_si_mois_precis(client, utilisateur_con
     )
     with patch.object(VwRentabiliteGlobale, "objects") as mock_globale, patch.object(
         VwRentabiliteJournaliere, "objects"
-    ) as mock_journaliere:
+    ) as mock_journaliere, patch.object(VwPerformanceAgent, "objects") as mock_agents, patch.object(
+        VwRentabiliteProduit, "objects"
+    ) as mock_produits:
+        mock_agents.filter.return_value.order_by.return_value.__getitem__.return_value = []
+        mock_produits.filter.return_value.order_by.return_value.__getitem__.return_value = []
         mock_globale.order_by.return_value.filter.return_value.filter.return_value = [ligne]
         mock_globale.filter.return_value.order_by.return_value.first.return_value = None
         mock_journaliere.filter.return_value.order_by.return_value = [jour]

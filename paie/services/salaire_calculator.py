@@ -1,9 +1,20 @@
 #paie/services/salaire_calculator.py
 from decimal import Decimal
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Case, When, Value, DecimalField, Q
 from django.db.models.functions import Coalesce
 from core.models import Agent, Vente, Perte, RegleSalaire
 from django.utils import timezone
+
+# Aloco : chaque unité vendue compte pour 5 kg (5 aloco = 25 kg) dans le volume réalisé,
+# donc dans le seuil du fixe. L'incentive de l'aloco reste son taux dédié par unité.
+ALOCO_KG_PAR_UNITE = Decimal("5")
+ALOCO_NOM_REGEX = r"^al+oco"
+
+# Fixe terrain : 10 000 FCFA à partir de 400 kg réalisés (net des pertes), sinon aucun fixe
+# (seul l'incentive est dû).
+SEUIL_FIXE_TERRAIN_KG = Decimal("400")
+FIXE_TERRAIN = Decimal("10000")
+
 
 class CalculatorSalaire:
     """
@@ -75,17 +86,20 @@ class CalculatorSalaire:
             est_supprime=False,
         )
 
+        kg_par_vente = Case(
+            When(
+                Q(detail_distribution__lot__produit__nom__iregex=ALOCO_NOM_REGEX),
+                then=F("quantite") * Value(ALOCO_KG_PAR_UNITE),
+            ),
+            default=F("quantite") * Coalesce(
+                F("detail_distribution__lot__produit__poids_unitaire_kg"),
+                Decimal("1")
+            ),
+            output_field=DecimalField(),
+        )
+
         kilo_total = ventes.aggregate(
-            total=Coalesce(
-                Sum(
-                    F("quantite") *
-                    Coalesce(
-                        F("detail_distribution__lot__produit__poids_unitaire_kg"),
-                        Decimal("1")
-                    )
-                ),
-                Decimal("0.00")
-            )
+            total=Coalesce(Sum(kg_par_vente), Decimal("0.00"))
         )["total"]
 
         # Kg perdus déclarés par le superviseur sur ces ventes (Perte.kilo_perdu_incentive,
@@ -141,13 +155,14 @@ class CalculatorSalaire:
 
         incentive = incentive_au_kg + incentive_taux_dedie
 
-        # ===== FIXE VARIABLE SELON LE VOLUME RÉALISÉ =====
-        # >= 750 kg sur la période (net des pertes) -> fixe 20 000 ; en dessous -> fixe 10 000.
-        # S'applique à tous les agents terrain (salaire_base_personnel n'est plus lu ici).
-        if kilo_facturable >= Decimal("750"):
-            salaire_base_theorique = Decimal("20000")
+        # ===== FIXE SELON LE VOLUME RÉALISÉ =====
+        # >= 400 kg sur la période (net des pertes) -> fixe 10 000 ; en dessous -> pas de fixe,
+        # uniquement l'incentive. S'applique à tous les agents terrain
+        # (salaire_base_personnel n'est plus lu ici).
+        if kilo_facturable >= SEUIL_FIXE_TERRAIN_KG:
+            salaire_base_theorique = FIXE_TERRAIN
         else:
-            salaire_base_theorique = Decimal("10000")
+            salaire_base_theorique = Decimal("0")
 
         # 🔹 PRORATISATION SI < 1 MOIS
         if agent.date_debut_fonction and jours_travailles < total_jours_mois:

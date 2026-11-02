@@ -9,6 +9,8 @@ def agent_context(request):
         context['peut_corriger_ventes'] = est_correcteur_ventes(request.user)
         from core.services.acces import peut_suivre_stock_agents
         context['peut_suivre_stock_agents'] = peut_suivre_stock_agents(request.user)
+        from core.services.acces import est_verificateur_restreint
+        context['est_verificateur_restreint'] = est_verificateur_restreint(request.user)
 
     if hasattr(request.user, 'agent') and request.user.agent.type_agent == 'terrain':
         agent = request.user.agent

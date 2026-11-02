@@ -175,6 +175,7 @@
                                         <span>Analyse Opérationnelle</span>
                                     </a>
                                 </li>
+                                {% if not est_verificateur_restreint %}
                                 <li>
                                     <a href="{% url 'salaire_lecture' %}"
                                        class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
@@ -183,6 +184,7 @@
                                         <span>Rémunération</span>
                                     </a>
                                 </li>
+                                {% endif %}
                                 <li>
                                     <a href="{% url 'dashboard_surveillance' %}"
                                        class="dams-nav-link flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-all duration-150
@@ -202,6 +204,7 @@
                             </ul>
                         </div>
 
+                        {% if not est_verificateur_restreint %}
                         <div>
                             <!-- ================= FINANCE ================= -->
                             <p class="dams-nav-section text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2 flex items-center gap-1.5">
@@ -261,6 +264,7 @@
                                 </li>
                             </ul>
                         </div>
+                        {% endif %}
 
                         {% if request.user.username == "mdmaiga" %}
                         <div>
