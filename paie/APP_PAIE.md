@@ -19,8 +19,15 @@ Le fixe mensuel des agents terrain n'est plus une valeur statique (`Agent.salair
 agents `type_agent='terrain'` sans exception individuelle** (les anciens ajustements salariaux
 personnalisés type `salaire_base_personnel` ne sont plus lus par `calcul_salaire_mamy`) :
 
-* **≥ 750 kg réalisés sur la période** → fixe théorique de **20 000 FCFA**.
-* **< 750 kg** → fixe théorique de **10 000 FCFA**.
+* **≥ 400 kg réalisés sur la période** (net des pertes) → fixe théorique de **10 000 FCFA**.
+* **< 400 kg** → **aucun fixe** (0), seul l'incentive est dû.
+
+> **Mise à jour (02/11/2026)** : remplace l'ancienne règle à deux classes (≥ 750 kg → 20 000, sinon
+> 10 000). Les mentions « 750 kg » / « 20 000 » plus bas dans ce document et dans les sprints
+> archivés décrivent l'historique. **Aloco** : chaque unité vendue compte pour **5 kg** dans le volume
+> réalisé (5 aloco = 25 kg), cf. `ALOCO_KG_PAR_UNITE` ; son incentive reste son `taux_incentive` par
+> unité. Le kg aloco alimente aussi `kilo_total` (donc le bonus superviseur). Répliqué dans
+> `dbt_bi/models/marts/fct_salaires.sql`.
 
 Le kg réalisé est calculé **avant** la détermination du fixe (même agrégation `Vente`/`quantite_en_kg`
 qu'auparavant pour l'incentive). La proratisation en cas d'entrée en cours de mois (`date_debut_fonction`)

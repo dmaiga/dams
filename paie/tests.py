@@ -116,11 +116,11 @@ class CalculSalaireMamyPertesTestCase(TestCase):
         detail.refresh_from_db()
         self.assertEqual(detail.quantite_restante_calculee, Decimal("9"))
 
-    def test_seuil_750kg_calcule_sur_le_kilo_facturable_net(self):
+    def test_seuil_400kg_calcule_sur_le_kilo_facturable_net(self):
         produit = Produit.objects.create(nom="Riz")
         lot = LotEntrepot.objects.create(produit=produit, quantite_initiale=1000, quantite_restante=1000, prix_achat_unitaire=500)
         detail = DetailDistribution.objects.create(distribution=self.distribution, lot=lot, quantite=1000)
-        vente = self._vente(detail, quantite=760)  # brut >= 750, net < 750 après perte
+        vente = self._vente(detail, quantite=410)  # brut >= 400, net < 400 après perte
         Perte.objects.create(
             detail_distribution=detail,
             vente=vente,
@@ -131,5 +131,30 @@ class CalculSalaireMamyPertesTestCase(TestCase):
 
         resultat = CalculatorSalaire.calcul_salaire_mamy(self.agent, self.date_debut, self.date_fin)
 
-        self.assertEqual(resultat["kilo_facturable"], Decimal("745"))
+        self.assertEqual(resultat["kilo_facturable"], Decimal("395"))
+        self.assertEqual(resultat["salaire_base_theorique"], Decimal("0"))
+        self.assertEqual(resultat["salaire_total"], Decimal("9875"))  # incentive seul : 395 * 25
+
+    def test_fixe_10000_a_partir_de_400kg(self):
+        produit = Produit.objects.create(nom="Riz")
+        lot = LotEntrepot.objects.create(produit=produit, quantite_initiale=1000, quantite_restante=1000, prix_achat_unitaire=500)
+        detail = DetailDistribution.objects.create(distribution=self.distribution, lot=lot, quantite=1000)
+        self._vente(detail, quantite=400)
+
+        resultat = CalculatorSalaire.calcul_salaire_mamy(self.agent, self.date_debut, self.date_fin)
+
         self.assertEqual(resultat["salaire_base_theorique"], Decimal("10000"))
+        self.assertEqual(resultat["salaire_total"], Decimal("20000"))  # 10 000 + 400 * 25
+
+    def test_aloco_compte_5_kg_par_unite_pour_le_seuil(self):
+        # 80 aloco = 400 kg -> fixe acquis ; l'incentive aloco reste son taux dédié par unité.
+        produit = Produit.objects.create(nom="Aloco", taux_incentive=Decimal("25"))
+        lot = LotEntrepot.objects.create(produit=produit, quantite_initiale=100, quantite_restante=100, prix_achat_unitaire=500)
+        detail = DetailDistribution.objects.create(distribution=self.distribution, lot=lot, quantite=100)
+        self._vente(detail, quantite=80)
+
+        resultat = CalculatorSalaire.calcul_salaire_mamy(self.agent, self.date_debut, self.date_fin)
+
+        self.assertEqual(resultat["kilo_total"], Decimal("400"))
+        self.assertEqual(resultat["salaire_base_theorique"], Decimal("10000"))
+        self.assertEqual(resultat["incentive"], Decimal("2000"))  # 80 * 25
