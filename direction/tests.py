@@ -504,3 +504,37 @@ class VentesSuperviseurAffichageTests(TestCase):
         Vente.objects.filter(pk=self.vente.pk).update(prix_vente_unitaire=Decimal('100.00'))
         response = self.client.get(reverse('toutes_les_ventes'), {'anomalie': 'sous_cout'})
         self.assertEqual(len(response.context['ventes']), 1)
+
+
+class RechercheAgentTest(TestCase):
+    """Barre de recherche par nom d'agent : suivi des distributions et liste des ventes."""
+
+    def test_filtre_nom_agent_mots_dans_n_importe_quel_ordre(self):
+        from django.contrib.auth.models import User
+        from direction.services.recherche_agent import filtre_nom_agent
+
+        moussa = User.objects.create_user("m1", first_name="Moussa", last_name="Traoré")
+        User.objects.create_user("a1", first_name="Awa", last_name="Diallo")
+
+        # `filtre_nom_agent` attend un préfixe vers le user : on l'applique via Agent.user.
+        from core.models import Agent
+        a_moussa = Agent.objects.create(user=moussa, type_agent="terrain")
+        Agent.objects.create(user=User.objects.get(username="a1"), type_agent="terrain")
+        for terme in ("moussa", "TRAORÉ", "traoré moussa", "m1"):
+            self.assertEqual(
+                list(Agent.objects.filter(filtre_nom_agent("user", terme))), [a_moussa], terme
+            )
+        self.assertEqual(Agent.objects.filter(filtre_nom_agent("user", "inconnu")).count(), 0)
+
+    def test_pages_acceptent_le_parametre_q(self):
+        from django.contrib.auth.models import Group, User
+        from django.urls import reverse
+        from core.services.acces import GROUPE_VERIFICATEUR_GENERAL
+
+        user = User.objects.create_user("verif_q", password="x")
+        user.groups.add(Group.objects.get_or_create(name=GROUPE_VERIFICATEUR_GENERAL)[0])
+        self.client.force_login(user)
+        for nom in ("suivi_distributions", "toutes_les_ventes"):
+            reponse = self.client.get(reverse(nom), {"q": "moussa traoré"})
+            self.assertEqual(reponse.status_code, 200, nom)
+            self.assertContains(reponse, 'name="q"')

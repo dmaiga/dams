@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from core.models import AffectationLotSuperviseur, DetailDistribution, Vente
 from direction.constants import SEUIL_ATTENTION_JOURS, SEUIL_CRITIQUE_JOURS
+from direction.services.recherche_agent import filtre_nom_agent
 
 
 class StockInvestigationService:
@@ -82,11 +83,13 @@ class StockInvestigationService:
 
     @staticmethod
     def filtrer(details, superviseur_id=None, agent_id=None, produit_id=None,
-                date_debut=None, date_fin=None, lot_id=None):
+                date_debut=None, date_fin=None, lot_id=None, q=None):
         if superviseur_id:
             details = details.filter(distribution__superviseur_id=superviseur_id)
         if agent_id:
             details = details.filter(distribution__agent_terrain_id=agent_id)
+        if q and q.strip():
+            details = details.filter(filtre_nom_agent("distribution__agent_terrain__user", q))
         if produit_id:
             details = details.filter(lot__produit_id=produit_id)
         if lot_id:

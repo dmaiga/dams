@@ -641,6 +641,7 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             lot_id=lot_id,
             superviseur_id=superviseur_id,
             anomalie=params.get("anomalie"),
+            q=params.get("q"),
         )
 
         # Stats/top agents : calculés sur le queryset filtré SANS annotations
@@ -797,6 +798,7 @@ class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             lot_id=params.get("lot"),
             superviseur_id=params.get("superviseur"),
             anomalie=params.get("anomalie"),
+            q=params.get("q"),
         )
 
         # 3) Export
@@ -838,6 +840,7 @@ class ExportVentesPDFView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             lot_id=params.get("lot"),
             superviseur_id=params.get("superviseur"),
             anomalie=params.get("anomalie"),
+            q=params.get("q"),
         )
 
         # 3) Génération PDF
@@ -2565,6 +2568,7 @@ def _params_suivi_distributions(request):
     return {
         "superviseur_id": params.get("superviseur"),
         "agent_id": params.get("agent"),
+        "q": params.get("q"),
         "produit_id": produit_id,
         "lot_id": lot_id,
         "date_debut": params.get("date_debut"),
@@ -2627,7 +2631,7 @@ def suivi_distributions(request):
     # filtre agent est actif (ce stock n'appartient à aucun agent). Réservé à
     # l'utilisateur mdmaiga : les autres profils ne voient pas la section.
     stock_detenu = (
-        [] if filtres["agent_id"] or request.user.username != "mdmaiga"
+        [] if filtres["agent_id"] or filtres["q"] or request.user.username != "mdmaiga"
         else StockInvestigationService.stock_detenu_superviseurs(
             DATE_DEBUT_SUIVI_TERRAIN,
             superviseur_id=filtres["superviseur_id"],

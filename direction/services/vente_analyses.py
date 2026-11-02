@@ -8,10 +8,13 @@ from django.db.models.functions import Coalesce
 from core.models import Vente, Agent
 from datetime import datetime, time
 
+from direction.services.recherche_agent import filtre_nom_agent
+
+
 class VenteAnalyseService:
  
     @staticmethod
-    def filter_ventes(date_debut, date_fin, agent_id=None,superviseur_id=None, type_vente=None, produit_id=None, lot_id=None, anomalie=None):
+    def filter_ventes(date_debut, date_fin, agent_id=None,superviseur_id=None, type_vente=None, produit_id=None, lot_id=None, anomalie=None, q=None):
         qs = (
             Vente.objects
             .select_related(
@@ -31,6 +34,8 @@ class VenteAnalyseService:
 
         if agent_id:
             qs = qs.filter(agent_id=agent_id)
+        if q and q.strip():
+            qs = qs.filter(filtre_nom_agent("agent__user", q))
         if type_vente:
             qs = qs.filter(type_vente=type_vente)
         if produit_id:

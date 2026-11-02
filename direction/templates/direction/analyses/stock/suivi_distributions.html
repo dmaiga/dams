@@ -51,7 +51,18 @@
 
         <div class="card-body">
 
-            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+
+                <!-- RECHERCHE PAR NOM D'AGENT -->
+
+                <input
+                    type="search"
+                    name="q"
+                    value="{{ request.GET.q }}"
+                    placeholder="Rechercher un agent (nom, prénom)…"
+                    autocomplete="off"
+                    class="input input-bordered w-full"
+                >
 
                 <!-- SUPERVISEUR -->
 
