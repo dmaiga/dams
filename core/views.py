@@ -89,6 +89,11 @@ def custom_login(request):
                     # S'ils ont un dashboard direction
                     return redirect("dashboard")
 
+                # 🔹 Vérificateur général : écrans direction en consultation
+                from core.services.acces import est_verificateur_general
+                if est_verificateur_general(user):
+                    return redirect("dashboard")
+
                 # 🔹 CAS 2 : Utilisateur lié à un Agent
                 agent = Agent.objects.filter(user=user).first()
 

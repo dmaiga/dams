@@ -16,6 +16,7 @@ from direction.services.analyse_financiere_service import (
     AnalyseFinanciereDirectionService
 )
 from core.models import Agent
+from core.services.acces import est_verificateur_general, peut_consulter_direction
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -606,9 +607,9 @@ class ToutesLesVentesView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         self.agent = getattr(request.user, "agent", None)
 
     def test_func(self):
-        return self.agent and (
+        return bool(self.agent and (
             self.agent.est_direction or self.agent.est_superviseur
-        )
+        )) or est_verificateur_general(self.user)
 
     # ------------------------------------------------------------------
     # QUERYSET UNIQUE, OPTIMISÉ, AVEC ANNOTATIONS SQL
@@ -777,7 +778,7 @@ class ExportVentesExcelView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         return (
             self.request.user.agent.est_direction
             or self.request.user.agent.est_superviseur
-        )
+        ) or est_verificateur_general(self.request.user)
 
     def get(self, request, *args, **kwargs):
         params = request.GET
@@ -818,7 +819,7 @@ class ExportVentesPDFView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         return (
             self.request.user.agent.est_direction
             or self.request.user.agent.est_superviseur
-        )
+        ) or est_verificateur_general(self.request.user)
 
     def get(self, request, *args, **kwargs):
         params = request.GET
@@ -1212,7 +1213,7 @@ class AnalyseFournisseursView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Vue pour l'analyse des fournisseurs"""
     
     def test_func(self):
-        return self.request.user.agent.est_direction 
+        return peut_consulter_direction(self.request.user)
     
     def get(self, request):
         analyse_data = FournisseurAnalyseService.get_analyse_globale()
@@ -1232,7 +1233,7 @@ class DetailFournisseurView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Vue détaillée d'un fournisseur"""
     
     def test_func(self):
-        return self.request.user.agent.est_direction 
+        return peut_consulter_direction(self.request.user)
     
     def get(self, request, pk):
         # Récupération des paramètres de filtre
@@ -2699,7 +2700,7 @@ def _lignes_a_investiguer_export(request):
 class ExportProduitsInvestigationExcelView(LoginRequiredMixin, UserPassesTestMixin, View):
     def test_func(self):
         agent = getattr(self.request.user, "agent", None)
-        return agent and (agent.est_direction or agent.est_superviseur)
+        return bool(agent and (agent.est_direction or agent.est_superviseur)) or est_verificateur_general(self.request.user)
 
     def get(self, request, *args, **kwargs):
         lignes = _lignes_a_investiguer_export(request)
@@ -2722,7 +2723,7 @@ class ExportProduitsInvestigationPDFView(LoginRequiredMixin, UserPassesTestMixin
 
     def test_func(self):
         agent = getattr(self.request.user, "agent", None)
-        return agent and (agent.est_direction or agent.est_superviseur)
+        return bool(agent and (agent.est_direction or agent.est_superviseur)) or est_verificateur_general(self.request.user)
 
     def get(self, request, *args, **kwargs):
         lignes = _lignes_a_investiguer_export(request)

@@ -1,4 +1,5 @@
 from multiprocessing import context
+from django.core.exceptions import PermissionDenied
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import datetime, timedelta
@@ -30,6 +31,12 @@ from openpyxl.styles import Font
 
 class SalaireLectureView(LoginRequiredMixin, TemplateView):
     template_name = "paie/salaire_liste.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        from core.services.acces import est_verificateur_restreint
+        if est_verificateur_restreint(request.user):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

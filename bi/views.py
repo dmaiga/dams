@@ -40,6 +40,7 @@ from core.services.incentive_service import (
     calculer_incentive_terrain,
 )
 from paie.services.salaire_calculator import CalculatorSalaire
+from core.services.acces import est_verificateur_general
 
 
 def _est_utilisateur_autorise(user):
@@ -47,7 +48,7 @@ def _est_utilisateur_autorise(user):
         user.is_authenticated
         and hasattr(user, 'agent')
         and user.agent.est_direction
-    )
+    ) or est_verificateur_general(user)
 
 
 bi_access_required = user_passes_test(_est_utilisateur_autorise, login_url="login")
